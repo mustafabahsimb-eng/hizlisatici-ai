@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Giriş</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #141821;
+    border-radius: 16px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 380px;
+    border: 1px solid #232838;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .logo-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #1D9E75;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    font-size: 16px;
+  }
+  .logo-text {
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #9aa3b2;
+    margin-bottom: 24px;
+  }
+  .tabs {
+    display: flex;
+    background: #0d0f16;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #9aa3b2;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    background: #1D9E75;
+    color: #fff;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: #9aa3b2;
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input {
+    width: 100%;
+    background: #1c212c;
+    border: 1px solid #2a3040;
+    border-radius: 8px;
+    padding: 11px 12px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+  }
+  input:focus {
+    border-color: #1D9E75;
+  }
+  button.submit {
+    width: 100%;
+    background: #1D9E75;
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 22px;
+    cursor: pointer;
+  }
+  button.submit:hover { background: #178a65; }
+  button.submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .msg {
+    margin-top: 14px;
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    display: none;
+  }
+  .msg.error { background: #2a1414; color: #f28b8b; display: block; }
+  .msg.success { background: #123222; color: #6ee7b7; display: block; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <h1 id="formTitle">Giriş yap</h1>
+  <div class="subtitle">Ürünlerini yönetmeye devam et.</div>
+
+  <div class="tabs">
+    <div class="tab active" id="loginTab" onclick="switchTab('login')">Giriş yap</div>
+    <div class="tab" id="signupTab" onclick="switchTab('signup')">Kayıt ol</div>
+  </div>
+
+  <form id="authForm">
+    <label for="email">E-posta</label>
+    <input type="email" id="email" placeholder="ornek@eposta.com" required>
+
+    <label for="password">Şifre</label>
+    <input type="password" id="password" placeholder="En az 6 karakter" required minlength="6">
+
+    <button type="submit" class="submit" id="submitBtn">Giriş yap</button>
+  </form>
+
+  <div class="msg" id="msgBox"></div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let mode = 'login';
+
+  function switchTab(newMode) {
+    mode = newMode;
+    document.getElementById('loginTab').classList.toggle('active', mode === 'login');
+    document.getElementById('signupTab').classList.toggle('active', mode === 'signup');
+    document.getElementById('formTitle').textContent = mode === 'login' ? 'Giriş yap' : 'Hesap oluştur';
+    document.getElementById('submitBtn').textContent = mode === 'login' ? 'Giriş yap' : 'Kayıt ol';
+    hideMsg();
+  }
+
+  function showMsg(text, type) {
+    const box = document.getElementById('msgBox');
+    box.textContent = text;
+    box.className = 'msg ' + type;
+  }
+
+  function hideMsg() {
+    const box = document.getElementById('msgBox');
+    box.className = 'msg';
+    box.textContent = '';
+  }
+
+  document.getElementById('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideMsg();
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('submitBtn');
+
+    btn.disabled = true;
+    btn.textContent = mode === 'login' ? 'Giriş yapılıyor...' : 'Kayıt oluyor...';
+
+    try {
+      if (mode === 'login') {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        showMsg('Giriş başarılı, yönlendiriliyorsun...', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+      } else {
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) throw error;
+        showMsg('Hesabın oluşturuldu. Şimdi giriş yapabilirsin.', 'success');
+        switchTab('login');
+      }
+    } catch (err) {
+      showMsg(err.message || 'Bir hata oluştu, tekrar dene.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = mode === 'login' ? 'Giriş yap' : 'Kayıt ol';
+    }
+  });
+</script>
+
+</body>
+</html>
