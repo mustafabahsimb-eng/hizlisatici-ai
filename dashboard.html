@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Panel</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #1D9E75;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid #2a3040;
+    color: #9aa3b2;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .logout-btn:hover { border-color: #3a4258; color: #fff; }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; }
+  .btn-primary {
+    background: #1D9E75;
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: #178a65; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #1c212c;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #232838;
+  }
+  .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 600; color: #fff; }
+  .stat-value.green { color: #5DCAA5; }
+
+  .product-list {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    overflow: hidden;
+  }
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: #9aa3b2;
+  }
+  .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
+  .empty-state p { font-size: 14px; margin-bottom: 20px; }
+
+  .product-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #232838;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-name { font-size: 14px; font-weight: 500; color: #fff; }
+  .product-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .product-profit { font-size: 15px; font-weight: 600; color: #5DCAA5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <div class="header-right">
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="logout()">Çıkış yap</button>
+  </div>
+</header>
+
+<main>
+  <div class="top-row">
+    <div>
+      <h1>Ürünlerin</h1>
+      <div class="subtitle" id="productCountText">Yükleniyor...</div>
+    </div>
+    <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Toplam ürün</div>
+      <div class="stat-value" id="totalProducts">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ortalama kâr marjı</div>
+      <div class="stat-value green" id="avgMargin">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Toplam potansiyel kâr</div>
+      <div class="stat-value green" id="totalProfit">₺0</div>
+    </div>
+  </div>
+
+  <div class="product-list" id="productList">
+    <div class="empty-state">
+      <h3>Henüz ürün eklemedin</h3>
+      <p>İlk ürününü ekleyerek AI ile içerik üretmeye ve kâr hesaplamaya başla.</p>
+      <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
+    </div>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    document.getElementById('userEmail').textContent = session.user.email;
+    loadProducts(session.user.id);
+  }
+
+  async function loadProducts(userId) {
+    const { data: products, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    document.getElementById('totalProducts').textContent = products.length;
+    document.getElementById('productCountText').textContent =
+      products.length === 0 ? 'Henüz ürün yok' : products.length + ' ürün listeleniyor';
+
+    if (products.length === 0) return;
+
+    const listEl = document.getElementById('productList');
+    listEl.innerHTML = products.map(p => `
+      <div class="product-row">
+        <div>
+          <div class="product-name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
+          <div class="product-meta">${escapeHtml(p.platform || '-')}</div>
+        </div>
+        <div class="product-profit">${p.supplier_price ? '₺' + p.supplier_price : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function logout() {
+    await supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
+  }
+
+  init();
+</script>
+
+</body>
+</html>
