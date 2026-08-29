@@ -118,6 +118,17 @@
   }
   .cj-use-btn:hover { background: #178a65; }
 
+  .kw-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1c212c; border: 1px solid #2a3040; border-radius: 20px;
+    padding: 6px 12px; margin: 0 6px 8px 0; font-size: 12px; cursor: pointer; color: #e6e8ee;
+  }
+  .kw-chip:hover { border-color: #1D9E75; }
+  .kw-chip.observed { border-color: #2a4a3a; }
+  .kw-chip-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; }
+  .kw-chip-badge.observed { background: #123222; color: #6ee7b7; }
+  .kw-chip-badge.estimated { background: #232838; color: #9aa3b2; }
+
   .actions { display: flex; gap: 10px; margin-top: 20px; }
   .msg { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
   .msg.error { background: #2a1414; color: #f28b8b; display: block; }
@@ -235,6 +246,14 @@
       <label for="genTags">Etiketler (virgülle ayır)</label>
       <input type="text" id="genTags" placeholder="etiket1, etiket2, etiket3">
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Gerçek anahtar kelime analizi</div>
+    <div class="ai-note">AI tahmini değil — gerçek rakip ilanlarını web'de tarayıp gerçekten kullanılan/aranan kelimeleri bulur. Önce ürün adını gir.</div>
+    <button class="btn-secondary" id="keywordAnalysisBtn" onclick="analyzeKeywords()">🔍 Anahtar kelimeleri analiz et</button>
+    <div id="keywordSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="keywordResults" style="margin-top:8px;"></div>
   </div>
 
   <div class="section">
@@ -616,6 +635,78 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '✨ Başlık, açıklama ve etiket üret';
+    }
+  }
+
+  async function analyzeKeywords() {
+    const productName = document.getElementById('productName').value.trim();
+    const platform = document.getElementById('platform').value;
+    const btn = document.getElementById('keywordAnalysisBtn');
+    const summaryEl = document.getElementById('keywordSummary');
+    const resultsEl = document.getElementById('keywordResults');
+
+    if (!productName) {
+      showMsg('Önce ürün adını gir.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Analiz ediliyor...';
+    summaryEl.style.display = 'none';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Rakip ilanlar taranıyor, bu biraz sürebilir...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/keyword-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productName, platform }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const keywords = data.keywords || [];
+      if (keywords.length === 0) {
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Sonuç bulunamadı.</div>';
+        return;
+      }
+
+      if (data.summary) {
+        summaryEl.textContent = data.summary;
+        summaryEl.style.display = 'block';
+      }
+
+      resultsEl.innerHTML = keywords.map((k, i) => {
+        const isObserved = k.source === 'gozlemlenen';
+        const badgeClass = isObserved ? 'observed' : 'estimated';
+        const badgeText = isObserved ? 'gerçek ilanda görüldü' : 'tahmini';
+        const title = k.note ? k.note.replace(/"/g, '&quot;') : '';
+        return `<span class="kw-chip ${badgeClass}" title="${title}" onclick="addKeywordToTags(${i})">
+          ${escapeHtml(k.term)}
+          <span class="kw-chip-badge ${badgeClass}">${badgeText}</span>
+        </span>`;
+      }).join('');
+
+      window._analyzedKeywords = keywords;
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Anahtar kelimeleri analiz et';
+    }
+  }
+
+  function addKeywordToTags(index) {
+    const k = (window._analyzedKeywords || [])[index];
+    if (!k) return;
+    const tagsEl = document.getElementById('genTags');
+    const current = tagsEl.value.split(',').map(t => t.trim()).filter(Boolean);
+    if (!current.includes(k.term)) {
+      current.push(k.term);
+      tagsEl.value = current.join(', ');
     }
   }
 
