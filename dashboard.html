@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HızlıSatıcı AI - Ürün Ekle</title>
+<title>HızlıSatıcı AI - Panel</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,100 +21,120 @@
     border-bottom: 1px solid #232838;
     background: #141821;
   }
-  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
   .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #1D9E75;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .back-link {
-    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid #2a3040;
+    color: #9aa3b2;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
   }
-  .back-link:hover { color: #fff; }
+  .logout-btn:hover { border-color: #3a4258; color: #fff; }
 
   main {
-    max-width: 760px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 32px 24px 80px;
+    padding: 32px 24px;
   }
-  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 28px; }
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; }
+  .btn-primary {
+    background: #1D9E75;
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: #178a65; }
 
-  .section {
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #1c212c;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #232838;
+  }
+  .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 600; color: #fff; }
+  .stat-value.green { color: #5DCAA5; }
+
+  .product-list {
     background: #141821;
     border-radius: 14px;
     border: 1px solid #232838;
-    padding: 22px;
-    margin-bottom: 18px;
+    overflow: hidden;
   }
-  .section-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 16px; }
-
-  .form-row { margin-bottom: 16px; }
-  .form-row:last-child { margin-bottom: 0; }
-  label { display: block; font-size: 13px; color: #9aa3b2; margin-bottom: 6px; }
-  input, select, textarea {
-    width: 100%;
-    background: #1c212c;
-    border: 1px solid #2a3040;
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: #fff;
-    font-size: 14px;
-    outline: none;
-    font-family: inherit;
-  }
-  input:focus, select:focus, textarea:focus { border-color: #1D9E75; }
-  textarea { resize: vertical; min-height: 70px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-  .btn-primary {
-    background: #1D9E75; color: #fff; border: none;
-    padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  .btn-primary:hover { background: #178a65; }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-secondary {
-    background: transparent; color: #9aa3b2; border: 1px solid #2a3040;
-    padding: 11px 18px; border-radius: 8px; font-size: 14px; cursor: pointer;
-  }
-  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
-
-  .ai-result {
-    background: #10251d;
-    border: 1px solid #1D9E75;
-    border-radius: 10px;
-    padding: 16px;
-    margin-top: 16px;
-    display: none;
-  }
-  .ai-result.show { display: block; }
-  .ai-label { font-size: 11px; color: #5DCAA5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .ai-title { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 10px; }
-  .ai-desc { font-size: 13px; color: #c5cad4; line-height: 1.5; margin-bottom: 10px; }
-  .ai-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .ai-tag { background: #1c3a2e; color: #5DCAA5; font-size: 12px; padding: 4px 10px; border-radius: 20px; }
-
-  .profit-box {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 4px;
-  }
-  .profit-item {
-    background: #1c212c;
-    border-radius: 10px;
-    padding: 14px;
+  .empty-state {
+    padding: 60px 20px;
     text-align: center;
+    color: #9aa3b2;
   }
-  .profit-label { font-size: 11px; color: #9aa3b2; margin-bottom: 4px; }
-  .profit-value { font-size: 17px; font-weight: 600; color: #fff; }
-  .profit-value.green { color: #5DCAA5; }
+  .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
+  .empty-state p { font-size: 14px; margin-bottom: 20px; }
 
-  .actions { display: flex; gap: 10px; margin-top: 20px; }
-  .msg { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
-  .msg.error { background: #2a1414; color: #f28b8b; display: block; }
-  .msg.success { background: #123222; color: #6ee7b7; display: block; }
+  .product-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #232838;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-name { font-size: 14px; font-weight: 500; color: #fff; }
+  .product-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .product-profit { font-size: 15px; font-weight: 600; color: #5DCAA5; }
+  .product-right { display: flex; align-items: center; gap: 14px; }
+  .delete-btn {
+    background: transparent;
+    border: 1px solid #2a3040;
+    color: #9aa3b2;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover { border-color: #f28b8b; color: #f28b8b; background: #2a1414; }
 </style>
 </head>
 <body>
@@ -124,98 +144,43 @@
     <div class="logo-dot">H</div>
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
+  <div class="header-right">
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="logout()">Çıkış yap</button>
+  </div>
 </header>
 
 <main>
-  <h1>Yeni ürün ekle</h1>
-  <div class="subtitle">Ürün bilgilerini gir, AI içerik üretsin, kârını gör.</div>
+  <div class="top-row">
+    <div>
+      <h1>Ürünlerin</h1>
+      <div class="subtitle" id="productCountText">Yükleniyor...</div>
+    </div>
+    <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
+  </div>
 
-  <div class="section">
-    <div class="section-title">Ürün bilgileri</div>
-    <div class="form-row">
-      <label for="productName">Ürün adı</label>
-      <input type="text" id="productName" placeholder="Örn: Kablosuz Bluetooth Kulaklık">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Toplam ürün</div>
+      <div class="stat-value" id="totalProducts">0</div>
     </div>
-    <div class="two-col">
-      <div class="form-row">
-        <label for="supplierPrice">Tedarikçi/alış fiyatı (₺)</label>
-        <input type="number" id="supplierPrice" placeholder="150">
-      </div>
-      <div class="form-row">
-        <label for="weightKg">Ağırlık (kg)</label>
-        <input type="number" id="weightKg" placeholder="0.5" step="0.1">
-        <div id="weightNote" style="font-size:11px; color:#9aa3b2; margin-top:5px; display:none;">
-          ⚠️ Bu tahmini bir ağırlıktır. Gerçek paket ağırlığını kontrol et.
-        </div>
-      </div>
+    <div class="stat-card">
+      <div class="stat-label">Ortalama kâr marjı</div>
+      <div class="stat-value green" id="avgMargin">-</div>
     </div>
-    <div class="two-col">
-      <div class="form-row">
-        <label for="platform">Platform</label>
-        <select id="platform" onchange="fillCommissionRate()">
-          <option value="">Seç...</option>
-          <option value="Trendyol">Trendyol</option>
-          <option value="Hepsiburada">Hepsiburada</option>
-          <option value="N11">N11</option>
-          <option value="Etsy">Etsy</option>
-          <option value="Diğer">Diğer</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label for="commissionRate">Komisyon oranı (%)</label>
-        <input type="number" id="commissionRate" placeholder="15" step="0.1">
-        <div id="commissionNote" style="font-size:11px; color:#9aa3b2; margin-top:5px; display:none;">
-          ⚠️ Bu tahmini bir orandır. Kesin oranı platformun satıcı panelinden doğrula.
-        </div>
-      </div>
-    </div>
-    <div class="form-row">
-      <label for="salePrice">Satış fiyatı (₺) — kâr hesabı için</label>
-      <input type="number" id="salePrice" placeholder="299">
+    <div class="stat-card">
+      <div class="stat-label">Toplam potansiyel kâr</div>
+      <div class="stat-value green" id="totalProfit">₺0</div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">AI ile içerik üret</div>
-    <button class="btn-primary" id="generateBtn" onclick="generateContent()">✨ Başlık, açıklama ve etiket üret</button>
-
-    <div class="ai-result" id="aiResult">
-      <div class="ai-label">Kategori (tahmin)</div>
-      <div class="ai-desc" id="genCategory" style="margin-bottom:10px;"></div>
-      <div class="ai-label">Üretilen başlık</div>
-      <div class="ai-title" id="genTitle"></div>
-      <div class="ai-label">Açıklama</div>
-      <div class="ai-desc" id="genDesc"></div>
-      <div class="ai-label">Etiketler</div>
-      <div class="ai-tags" id="genTags"></div>
+  <div class="product-list" id="productList">
+    <div class="empty-state">
+      <h3>Henüz ürün eklemedin</h3>
+      <p>İlk ürününü ekleyerek AI ile içerik üretmeye ve kâr hesaplamaya başla.</p>
+      <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
   </div>
-
-  <div class="section">
-    <div class="section-title">Kâr hesabı</div>
-    <div class="profit-box">
-      <div class="profit-item">
-        <div class="profit-label">Kargo maliyeti</div>
-        <div class="profit-value" id="shippingCost">₺0</div>
-      </div>
-      <div class="profit-item">
-        <div class="profit-label">Komisyon tutarı</div>
-        <div class="profit-value" id="commissionCost">₺0</div>
-      </div>
-      <div class="profit-item">
-        <div class="profit-label">Net kâr</div>
-        <div class="profit-value green" id="netProfit">₺0</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="actions">
-    <button class="btn-primary" id="saveBtn" onclick="saveProduct()">Ürünü kaydet</button>
-    <button class="btn-secondary" onclick="window.location.href='dashboard.html'">Vazgeç</button>
-  </div>
-
-  <div class="msg" id="msgBox"></div>
 </main>
 
 <script>
@@ -223,203 +188,109 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  let currentUser = null;
-  let generatedContent = null;
-  let detectedCategory = null;
-  let lastGeneratedName = null;
-
-  // Platform + kategori bazlı YAKLAŞIK komisyon oranları (%) - tahminidir, kesin oran platform panelinden kontrol edilmeli
-  const COMMISSION_TABLE = {
-    'Trendyol': {
-      'Elektronik': 7, 'Cep Telefonu': 6, 'Giyim': 22, 'Ayakkabı & Çanta': 24,
-      'Aksesuar (Saat, Takı, Kemer)': 30, 'Kozmetik & Kişisel Bakım': 17, 'Ev & Yaşam': 15,
-      'Mobilya': 15, 'Anne & Bebek': 14, 'Spor & Outdoor': 18, 'Kitap & Kırtasiye': 8, 'Diğer': 15
-    },
-    'Hepsiburada': {
-      'Elektronik': 8, 'Cep Telefonu': 7.5, 'Giyim': 22, 'Ayakkabı & Çanta': 24,
-      'Aksesuar (Saat, Takı, Kemer)': 28, 'Kozmetik & Kişisel Bakım': 18, 'Ev & Yaşam': 20,
-      'Mobilya': 20, 'Anne & Bebek': 15, 'Spor & Outdoor': 18, 'Kitap & Kırtasiye': 8, 'Diğer': 15
-    },
-    'N11': {
-      'Elektronik': 7, 'Cep Telefonu': 6.5, 'Giyim': 16, 'Ayakkabı & Çanta': 18,
-      'Aksesuar (Saat, Takı, Kemer)': 20, 'Kozmetik & Kişisel Bakım': 13, 'Ev & Yaşam': 13,
-      'Mobilya': 13, 'Anne & Bebek': 11, 'Spor & Outdoor': 13, 'Kitap & Kırtasiye': 7, 'Diğer': 12
-    },
-    'Etsy': {
-      'Elektronik': 6.5, 'Cep Telefonu': 6.5, 'Giyim': 6.5, 'Ayakkabı & Çanta': 6.5,
-      'Aksesuar (Saat, Takı, Kemer)': 6.5, 'Kozmetik & Kişisel Bakım': 6.5, 'Ev & Yaşam': 6.5,
-      'Mobilya': 6.5, 'Anne & Bebek': 6.5, 'Spor & Outdoor': 6.5, 'Kitap & Kırtasiye': 6.5, 'Diğer': 6.5
-    },
-  };
-
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
-    currentUser = session.user;
-  }
-  init();
-
-  // Kâr hesabını canlı güncelle
-  ['supplierPrice', 'weightKg', 'commissionRate', 'salePrice'].forEach(id => {
-    document.getElementById(id).addEventListener('input', updateProfitCalc);
-  });
-
-  // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
-  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
-  document.getElementById('productName').addEventListener('blur', () => {
-    const name = document.getElementById('productName').value.trim();
-    if (name && name !== lastGeneratedName) {
-      generateContent();
-    }
-  });
-
-  async function fillCommissionRate() {
-    const platform = document.getElementById('platform').value;
-    if (!platform || platform === 'Diğer') return;
-    applyCommissionRate(platform, detectedCategory);
-  }
-
-  function applyCommissionRate(platform, category) {
-    if (!platform || platform === 'Diğer') return;
-    const table = COMMISSION_TABLE[platform];
-    const noteEl = document.getElementById('commissionNote');
-    if (table && category && table[category] !== undefined) {
-      document.getElementById('commissionRate').value = table[category];
-      updateProfitCalc();
-      if (noteEl) noteEl.style.display = 'block';
-    } else if (table) {
-      document.getElementById('commissionRate').value = table['Diğer'];
-      updateProfitCalc();
-      if (noteEl) noteEl.style.display = 'block';
-    }
-  }
-
-  async function updateProfitCalc() {
-    const supplierPrice = parseFloat(document.getElementById('supplierPrice').value) || 0;
-    const weightKg = parseFloat(document.getElementById('weightKg').value) || 0;
-    const commissionRate = parseFloat(document.getElementById('commissionRate').value) || 0;
-    const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
-
-    let shippingCost = 0;
-    if (weightKg > 0) {
-      const { data: rates } = await supabaseClient
-        .from('shipping_rates')
-        .select('*')
-        .lte('min_weight_kg', weightKg)
-        .gte('max_weight_kg', weightKg)
-        .order('price', { ascending: true })
-        .limit(1);
-      if (rates && rates.length > 0) shippingCost = rates[0].price;
-    }
-
-    const commissionCost = salePrice * (commissionRate / 100);
-    const netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
-
-    document.getElementById('shippingCost').textContent = '₺' + shippingCost.toFixed(2);
-    document.getElementById('commissionCost').textContent = '₺' + commissionCost.toFixed(2);
-    const profitEl = document.getElementById('netProfit');
-    profitEl.textContent = '₺' + netProfit.toFixed(2);
-    profitEl.style.color = netProfit >= 0 ? '#5DCAA5' : '#f28b8b';
-  }
-
-  async function generateContent() {
-    const productName = document.getElementById('productName').value.trim();
-    const platform = document.getElementById('platform').value;
-    const btn = document.getElementById('generateBtn');
-
-    if (!productName) {
-      showMsg('Önce ürün adını gir.', 'error');
+    if (!session) {
+      window.location.href = 'index.html';
       return;
     }
-
-    lastGeneratedName = productName;
-    btn.disabled = true;
-    btn.textContent = 'Üretiliyor...';
-    hideMsg();
-
-    try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/hyper-api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
-        body: JSON.stringify({ productName, platform }),
-      });
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      generatedContent = data;
-      detectedCategory = data.category || null;
-      document.getElementById('genCategory').textContent = data.category || '-';
-      document.getElementById('genTitle').textContent = data.title || '-';
-      document.getElementById('genDesc').textContent = data.description || '-';
-      document.getElementById('genTags').innerHTML = (data.tags || [])
-        .map(t => `<span class="ai-tag">${escapeHtml(t)}</span>`).join('');
-      document.getElementById('aiResult').classList.add('show');
-
-      // Kategori tahmin edildiyse ve platform zaten seçiliyse komisyonu güncelle
-      const currentPlatform = document.getElementById('platform').value;
-      if (currentPlatform && detectedCategory) {
-        applyCommissionRate(currentPlatform, detectedCategory);
-      }
-
-      // Ağırlık tahmini varsa ve alan boşsa doldur
-      const weightInput = document.getElementById('weightKg');
-      const weightNoteEl = document.getElementById('weightNote');
-      if (data.estimatedWeightKg && !weightInput.value) {
-        weightInput.value = data.estimatedWeightKg;
-        if (weightNoteEl) weightNoteEl.style.display = 'block';
-        updateProfitCalc();
-      }
-    } catch (err) {
-      showMsg('İçerik üretilemedi: ' + err.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '✨ Başlık, açıklama ve etiket üret';
-    }
+    document.getElementById('userEmail').textContent = session.user.email;
+    loadProducts(session.user.id);
   }
 
-  async function saveProduct() {
-    const productName = document.getElementById('productName').value.trim();
-    const supplierPrice = parseFloat(document.getElementById('supplierPrice').value) || null;
-    const weightKg = parseFloat(document.getElementById('weightKg').value) || null;
-    const platform = document.getElementById('platform').value;
-    const commissionRate = parseFloat(document.getElementById('commissionRate').value) || null;
-    const salePrice = parseFloat(document.getElementById('salePrice').value) || null;
-
-    if (!productName) {
-      showMsg('Ürün adı gerekli.', 'error');
-      return;
-    }
-
-    const btn = document.getElementById('saveBtn');
-    btn.disabled = true;
-    btn.textContent = 'Kaydediliyor...';
-
-    const { error } = await supabaseClient.from('products').insert({
-      user_id: currentUser.id,
-      name: productName,
-      supplier_price: supplierPrice,
-      weight_kg: weightKg,
-      platform: platform,
-      commission_rate: commissionRate,
-      sale_price: salePrice,
-      generated_title: generatedContent?.title || null,
-      generated_description: generatedContent?.description || null,
-    });
+  async function loadProducts(userId) {
+    const { data: products, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
     if (error) {
-      showMsg('Kaydedilemedi: ' + error.message, 'error');
-      btn.disabled = false;
-      btn.textContent = 'Ürünü kaydet';
+      console.error(error);
       return;
     }
 
-    showMsg('Ürün kaydedildi! Panele yönlendiriliyorsun...', 'success');
-    setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+    document.getElementById('totalProducts').textContent = products.length;
+    document.getElementById('productCountText').textContent =
+      products.length === 0 ? 'Henüz ürün yok' : products.length + ' ürün listeleniyor';
+
+    if (products.length === 0) return;
+
+    const { data: shippingRates } = await supabaseClient
+      .from('shipping_rates')
+      .select('*');
+
+    function getShippingCost(weightKg) {
+      if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
+      const matches = shippingRates
+        .filter(r => r.min_weight_kg <= weightKg && r.max_weight_kg >= weightKg)
+        .sort((a, b) => a.price - b.price);
+      return matches.length > 0 ? matches[0].price : 0;
+    }
+
+    let totalProfit = 0;
+    let marginSum = 0;
+    let marginCount = 0;
+
+    const computed = products.map(p => {
+      const supplierPrice = p.supplier_price || 0;
+      const salePrice = p.sale_price || 0;
+      const commissionRate = p.commission_rate || 0;
+      let netProfit = null;
+      let marginPct = null;
+
+      if (salePrice > 0) {
+        const shippingCost = getShippingCost(p.weight_kg);
+        const commissionCost = salePrice * (commissionRate / 100);
+        netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
+        marginPct = (netProfit / salePrice) * 100;
+
+        totalProfit += netProfit;
+        marginSum += marginPct;
+        marginCount++;
+      }
+
+      return { p, netProfit, marginPct };
+    });
+
+    document.getElementById('totalProfit').textContent = '₺' + totalProfit.toFixed(2);
+    document.getElementById('avgMargin').textContent =
+      marginCount > 0 ? (marginSum / marginCount).toFixed(1) + '%' : '-';
+
+    const listEl = document.getElementById('productList');
+    listEl.innerHTML = computed.map(({ p, netProfit, marginPct }) => `
+      <div class="product-row" data-id="${p.id}">
+        <div>
+          <div class="product-name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
+          <div class="product-meta">${escapeHtml(p.platform || '-')}${marginPct !== null ? ' · %' + marginPct.toFixed(1) + ' marj' : ''}</div>
+        </div>
+        <div class="product-right">
+          <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">
+            ${netProfit !== null ? '₺' + netProfit.toFixed(2) : '<span style="color:#9aa3b2; font-weight:400; font-size:12px;">satış fiyatı girilmemiş</span>'}
+          </div>
+          <button class="delete-btn" title="Ürünü sil" onclick="deleteProduct('${p.id}')">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function deleteProduct(productId) {
+    if (!confirm('Bu ürünü silmek istediğine emin misin?')) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const { error } = await supabaseClient
+      .from('products')
+      .delete()
+      .eq('id', productId);
+
+    if (error) {
+      alert('Silinemedi: ' + error.message);
+      return;
+    }
+
+    loadProducts(session.user.id);
   }
 
   function escapeHtml(str) {
@@ -428,15 +299,12 @@
     return div.innerHTML;
   }
 
-  function showMsg(text, type) {
-    const box = document.getElementById('msgBox');
-    box.textContent = text;
-    box.className = 'msg ' + type;
+  async function logout() {
+    await supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
   }
-  function hideMsg() {
-    const box = document.getElementById('msgBox');
-    box.className = 'msg';
-  }
+
+  init();
 </script>
 
 </body>
