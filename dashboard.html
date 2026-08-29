@@ -77,6 +77,17 @@
     white-space: nowrap;
   }
   .btn-primary:hover { background: #178a65; }
+  .btn-secondary {
+    background: transparent;
+    color: #9aa3b2;
+    border: 1px solid #2a3040;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
 
   .stats-grid {
     display: grid;
@@ -156,7 +167,10 @@
       <h1>Ürünlerin</h1>
       <div class="subtitle" id="productCountText">Yükleniyor...</div>
     </div>
-    <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
+    <div style="display:flex; gap:10px;">
+      <button class="btn-secondary" onclick="window.location.href='trends.html'">🔥 Trend ürünler</button>
+      <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
+    </div>
   </div>
 
   <div class="stats-grid">
