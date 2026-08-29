@@ -80,20 +80,7 @@
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
 
-  .ai-result {
-    background: #10251d;
-    border: 1px solid #1D9E75;
-    border-radius: 10px;
-    padding: 16px;
-    margin-top: 16px;
-    display: none;
-  }
-  .ai-result.show { display: block; }
-  .ai-label { font-size: 11px; color: #5DCAA5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .ai-title { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 10px; }
-  .ai-desc { font-size: 13px; color: #c5cad4; line-height: 1.5; margin-bottom: 10px; }
-  .ai-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .ai-tag { background: #1c3a2e; color: #5DCAA5; font-size: 12px; padding: 4px 10px; border-radius: 20px; }
+  .ai-note { font-size: 12px; color: #9aa3b2; margin-bottom: 16px; }
 
   .profit-box {
     display: grid;
@@ -178,17 +165,24 @@
 
   <div class="section">
     <div class="section-title">AI ile içerik üret</div>
-    <button class="btn-primary" id="generateBtn" onclick="generateContent()">✨ Başlık, açıklama ve etiket üret</button>
+    <button class="btn-primary" id="generateBtn" onclick="generateContent(false)">✨ Başlık, açıklama ve etiket üret</button>
+    <div class="ai-note">AI otomatik doldurur — üzerine yazıp değiştirebilir ya da tamamen elle kendin yazabilirsin.</div>
 
-    <div class="ai-result" id="aiResult">
-      <div class="ai-label">Kategori (tahmin)</div>
-      <div class="ai-desc" id="genCategory" style="margin-bottom:10px;"></div>
-      <div class="ai-label">Üretilen başlık</div>
-      <div class="ai-title" id="genTitle"></div>
-      <div class="ai-label">Açıklama</div>
-      <div class="ai-desc" id="genDesc"></div>
-      <div class="ai-label">Etiketler</div>
-      <div class="ai-tags" id="genTags"></div>
+    <div class="form-row">
+      <label for="genCategory">Kategori (tahmin)</label>
+      <input type="text" id="genCategory" placeholder="Otomatik gelir, elle de değiştirilebilir">
+    </div>
+    <div class="form-row">
+      <label for="genTitle">Ürün başlığı</label>
+      <input type="text" id="genTitle" placeholder="Başlığı üret ya da kendin yaz">
+    </div>
+    <div class="form-row">
+      <label for="genDesc">Açıklama</label>
+      <textarea id="genDesc" placeholder="Açıklamayı üret ya da kendin yaz"></textarea>
+    </div>
+    <div class="form-row">
+      <label for="genTags">Etiketler (virgülle ayır)</label>
+      <input type="text" id="genTags" placeholder="etiket1, etiket2, etiket3">
     </div>
   </div>
 
@@ -269,7 +263,7 @@
   document.getElementById('productName').addEventListener('blur', () => {
     const name = document.getElementById('productName').value.trim();
     if (name && name !== lastGeneratedName) {
-      generateContent();
+      generateContent(true);
     }
   });
 
@@ -322,13 +316,13 @@
     profitEl.style.color = netProfit >= 0 ? '#5DCAA5' : '#f28b8b';
   }
 
-  async function generateContent() {
+  async function generateContent(auto = false) {
     const productName = document.getElementById('productName').value.trim();
     const platform = document.getElementById('platform').value;
     const btn = document.getElementById('generateBtn');
 
     if (!productName) {
-      showMsg('Önce ürün adını gir.', 'error');
+      if (!auto) showMsg('Önce ürün adını gir.', 'error');
       return;
     }
 
@@ -353,12 +347,26 @@
 
       generatedContent = data;
       detectedCategory = data.category || null;
-      document.getElementById('genCategory').textContent = data.category || '-';
-      document.getElementById('genTitle').textContent = data.title || '-';
-      document.getElementById('genDesc').textContent = data.description || '-';
-      document.getElementById('genTags').innerHTML = (data.tags || [])
-        .map(t => `<span class="ai-tag">${escapeHtml(t)}</span>`).join('');
-      document.getElementById('aiResult').classList.add('show');
+
+      const catEl = document.getElementById('genCategory');
+      const titleEl = document.getElementById('genTitle');
+      const descEl = document.getElementById('genDesc');
+      const tagsEl = document.getElementById('genTags');
+      const tagsStr = (data.tags || []).join(', ');
+
+      // Otomatik tetiklendiyse (ürün adından çıkınca) sadece boş alanları doldur,
+      // elle yazdığın bir şeyin üzerine yazmasın. Butona bastıysan (auto=false) her zaman güncelle.
+      if (auto) {
+        if (!catEl.value.trim()) catEl.value = data.category || '';
+        if (!titleEl.value.trim()) titleEl.value = data.title || '';
+        if (!descEl.value.trim()) descEl.value = data.description || '';
+        if (!tagsEl.value.trim()) tagsEl.value = tagsStr;
+      } else {
+        catEl.value = data.category || '';
+        titleEl.value = data.title || '';
+        descEl.value = data.description || '';
+        tagsEl.value = tagsStr;
+      }
 
       // Kategori tahmin edildiyse ve platform zaten seçiliyse komisyonu güncelle
       const currentPlatform = document.getElementById('platform').value;
@@ -389,6 +397,8 @@
     const platform = document.getElementById('platform').value;
     const commissionRate = parseFloat(document.getElementById('commissionRate').value) || null;
     const salePrice = parseFloat(document.getElementById('salePrice').value) || null;
+    const genTitle = document.getElementById('genTitle').value.trim() || null;
+    const genDesc = document.getElementById('genDesc').value.trim() || null;
 
     if (!productName) {
       showMsg('Ürün adı gerekli.', 'error');
@@ -407,8 +417,8 @@
       platform: platform,
       commission_rate: commissionRate,
       sale_price: salePrice,
-      generated_title: generatedContent?.title || null,
-      generated_description: generatedContent?.description || null,
+      generated_title: genTitle,
+      generated_description: genDesc,
     });
 
     if (error) {
