@@ -202,6 +202,12 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
+  const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+  function currencySymbolFor(platform) {
+    return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
+  }
+
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
@@ -242,7 +248,8 @@
       return matches.length > 0 ? matches[0].price : 0;
     }
 
-    let totalProfit = 0;
+    let tryProfit = 0;
+    let usdProfit = 0;
     let marginSum = 0;
     let marginCount = 0;
 
@@ -250,6 +257,7 @@
       const supplierPrice = p.supplier_price || 0;
       const salePrice = p.sale_price || 0;
       const commissionRate = p.commission_rate || 0;
+      const symbol = currencySymbolFor(p.platform);
       let netProfit = null;
       let marginPct = null;
 
@@ -259,20 +267,26 @@
         netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
         marginPct = (netProfit / salePrice) * 100;
 
-        totalProfit += netProfit;
+        if (symbol === '$') {
+          usdProfit += netProfit;
+        } else {
+          tryProfit += netProfit;
+        }
+        // Marj bir yüzde olduğu için para biriminden bağımsız, ortalamaya birlikte katılabilir
         marginSum += marginPct;
         marginCount++;
       }
 
-      return { p, netProfit, marginPct };
+      return { p, netProfit, marginPct, symbol };
     });
 
-    document.getElementById('totalProfit').textContent = '₺' + totalProfit.toFixed(2);
+    document.getElementById('totalProfit').textContent =
+      usdProfit !== 0 ? '₺' + tryProfit.toFixed(2) + ' + $' + usdProfit.toFixed(2) : '₺' + tryProfit.toFixed(2);
     document.getElementById('avgMargin').textContent =
       marginCount > 0 ? (marginSum / marginCount).toFixed(1) + '%' : '-';
 
     const listEl = document.getElementById('productList');
-    listEl.innerHTML = computed.map(({ p, netProfit, marginPct }) => `
+    listEl.innerHTML = computed.map(({ p, netProfit, marginPct, symbol }) => `
       <div class="product-row" data-id="${p.id}">
         <div>
           <div class="product-name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
@@ -280,7 +294,7 @@
         </div>
         <div class="product-right">
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">
-            ${netProfit !== null ? '₺' + netProfit.toFixed(2) : '<span style="color:#9aa3b2; font-weight:400; font-size:12px;">satış fiyatı girilmemiş</span>'}
+            ${netProfit !== null ? symbol + netProfit.toFixed(2) : '<span style="color:#9aa3b2; font-weight:400; font-size:12px;">satış fiyatı girilmemiş</span>'}
           </div>
           <button class="delete-btn" title="Ürünü sil" onclick="deleteProduct('${p.id}')">🗑</button>
         </div>
