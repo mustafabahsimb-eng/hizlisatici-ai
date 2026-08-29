@@ -103,9 +103,6 @@
     border-radius: 10px;
     overflow: hidden;
     background: #1c212c;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
   }
   .trend-img {
@@ -114,13 +111,21 @@
     object-fit: cover;
     display: block;
   }
-  .trend-img-fallback {
-    width: 100%;
-    height: 100%;
+  .trend-top-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .trend-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 42px;
+    font-size: 19px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
   }
   .trend-title { font-size: 15px; font-weight: 600; color: #fff; }
   .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -197,16 +202,20 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const CATEGORY_EMOJI = {
-    'Elektronik': '📱',
-    'Giyim': '👕',
-    'Ev & Yaşam': '🏠',
-    'Kozmetik & Kişisel Bakım': '💄',
-    'Anne & Bebek': '👶',
-    'Spor & Outdoor': '⚽',
-    'Aksesuar': '⌚',
-    'Diğer': '📦'
+  const CATEGORY_STYLE = {
+    'Elektronik': { emoji: '📱', bg: 'linear-gradient(135deg,#4f7cff,#2f4bb3)' },
+    'Giyim': { emoji: '👕', bg: 'linear-gradient(135deg,#ff8a65,#e64a19)' },
+    'Ev & Yaşam': { emoji: '🏠', bg: 'linear-gradient(135deg,#4caf50,#2e7d32)' },
+    'Kozmetik & Kişisel Bakım': { emoji: '💄', bg: 'linear-gradient(135deg,#ec4899,#a21caf)' },
+    'Anne & Bebek': { emoji: '👶', bg: 'linear-gradient(135deg,#60a5fa,#3b5bdb)' },
+    'Spor & Outdoor': { emoji: '⚽', bg: 'linear-gradient(135deg,#f59e0b,#c2680a)' },
+    'Aksesuar': { emoji: '⌚', bg: 'linear-gradient(135deg,#eab308,#92610a)' },
+    'Diğer': { emoji: '📦', bg: 'linear-gradient(135deg,#64748b,#334155)' },
   };
+
+  function categoryStyle(cat) {
+    return CATEGORY_STYLE[cat] || CATEGORY_STYLE['Diğer'];
+  }
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -248,14 +257,18 @@
     }
   }
 
-  function categoryEmoji(cat) {
-    return CATEGORY_EMOJI[cat] || '📦';
-  }
-
   function handleImgError(img) {
+    const card = img.closest('.trend-card');
     const wrap = img.parentElement;
-    wrap.classList.add('trend-img-fallback');
-    wrap.textContent = categoryEmoji(img.getAttribute('data-cat'));
+    const cat = img.getAttribute('data-cat');
+    wrap.remove();
+    const style = categoryStyle(cat);
+    const topRow = card.querySelector('.trend-top-row');
+    const icon = document.createElement('div');
+    icon.className = 'trend-icon';
+    icon.style.background = style.bg;
+    icon.textContent = style.emoji;
+    topRow.insertBefore(icon, topRow.firstChild);
   }
 
   function renderTrends(trends) {
@@ -268,13 +281,22 @@
     resultArea.innerHTML = '<div class="trend-grid">' + trends.map(t => {
       const hasImg = t.imageUrl && /^https?:\/\//.test(t.imageUrl);
       const cat = t.category || 'Diğer';
-      const imgHtml = hasImg
-        ? `<img src="${escapeAttr(t.imageUrl)}" class="trend-img" alt="" data-cat="${escapeAttr(cat)}" onerror="handleImgError(this)">`
-        : `<div class="trend-img-fallback">${categoryEmoji(cat)}</div>`;
+      const style = categoryStyle(cat);
+
+      const imgBlock = hasImg
+        ? `<div class="trend-img-wrap"><img src="${escapeAttr(t.imageUrl)}" class="trend-img" alt="" data-cat="${escapeAttr(cat)}" onerror="handleImgError(this)"></div>`
+        : '';
+      const iconBlock = hasImg
+        ? ''
+        : `<div class="trend-icon" style="background:${style.bg}">${style.emoji}</div>`;
+
       return `
       <div class="trend-card">
-        <div class="trend-img-wrap">${imgHtml}</div>
-        <div class="trend-title">${escapeHtml(t.productIdea || '-')}</div>
+        ${imgBlock}
+        <div class="trend-top-row">
+          ${iconBlock}
+          <div class="trend-title">${escapeHtml(t.productIdea || '-')}</div>
+        </div>
         <div class="badge-row">
           <span class="badge">${escapeHtml(cat)}</span>
           <span class="badge demand-${escapeHtml(t.demandLevel || '')}">${escapeHtml(t.demandLevel || '-')}</span>
