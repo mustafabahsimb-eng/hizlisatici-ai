@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>CJ Test</title>
+<style>
+  body { font-family: sans-serif; background: #0d0f16; color: #e6e8ee; padding: 20px; }
+  input { padding: 10px; width: 300px; font-size: 14px; }
+  button { padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  pre { background: #1c212c; padding: 16px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+  <h2>CJ Dropshipping Test</h2>
+  <input type="text" id="keyword" placeholder="Örn: earbuds" value="earbuds">
+  <button onclick="test()">Ara</button>
+  <pre id="output">Sonuç burada görünecek...</pre>
+
+  <script>
+    async function test() {
+      const keyword = document.getElementById('keyword').value;
+      const output = document.getElementById('output');
+      output.textContent = 'Yükleniyor...';
+
+      const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+
+      try {
+        const response = await fetch(SUPABASE_URL + '/functions/v1/cj-search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'apikey': SUPABASE_KEY,
+          },
+          body: JSON.stringify({ keyword }),
+        });
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        output.textContent = 'Hata: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
