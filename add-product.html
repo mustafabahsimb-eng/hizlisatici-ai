@@ -129,6 +129,22 @@
   .kw-chip-badge.observed { background: #123222; color: #6ee7b7; }
   .kw-chip-badge.estimated { background: #232838; color: #9aa3b2; }
 
+  .ad-card {
+    background: #1c212c; border-radius: 10px; padding: 14px; margin-top: 10px;
+  }
+  .ad-card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px;
+  }
+  .ad-platform-badge {
+    font-size: 10px; padding: 2px 9px; border-radius: 10px; background: #232838; color: #9aa3b2; white-space: nowrap;
+  }
+  .ad-source-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; }
+  .ad-source-badge.observed { background: #123222; color: #6ee7b7; }
+  .ad-source-badge.estimated { background: #232838; color: #9aa3b2; }
+  .ad-hook { font-size: 14px; color: #fff; font-weight: 600; margin-bottom: 6px; }
+  .ad-format { font-size: 11px; color: #9aa3b2; margin-bottom: 6px; }
+  .ad-note { font-size: 12px; color: #9aa3b2; }
+
   .actions { display: flex; gap: 10px; margin-top: 20px; }
   .msg { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
   .msg.error { background: #2a1414; color: #f28b8b; display: block; }
@@ -254,6 +270,14 @@
     <button class="btn-secondary" id="keywordAnalysisBtn" onclick="analyzeKeywords()">🔍 Anahtar kelimeleri analiz et</button>
     <div id="keywordSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
     <div id="keywordResults" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Reklam fikirleri (Ads Spy)</div>
+    <div class="ai-note">Rakiplerin TikTok/Facebook/Instagram'da gerçekten kullandığı reklam kancalarını (hook) ve açılarını (angle) web'de tarayıp bulur. Önce ürün adını gir.</div>
+    <button class="btn-secondary" id="adsSpyBtn" onclick="analyzeAds()">📢 Reklam fikirlerini analiz et</button>
+    <div id="adsSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="adsResults" style="margin-top:8px;"></div>
   </div>
 
   <div class="section">
@@ -707,6 +731,68 @@
     if (!current.includes(k.term)) {
       current.push(k.term);
       tagsEl.value = current.join(', ');
+    }
+  }
+
+  async function analyzeAds() {
+    const productName = document.getElementById('productName').value.trim();
+    const btn = document.getElementById('adsSpyBtn');
+    const summaryEl = document.getElementById('adsSummary');
+    const resultsEl = document.getElementById('adsResults');
+
+    if (!productName) {
+      showMsg('Önce ürün adını gir.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Analiz ediliyor...';
+    summaryEl.style.display = 'none';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Rakip reklamlar taranıyor, bu biraz sürebilir...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/ads-spy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productName }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const ads = data.ads || [];
+      if (ads.length === 0) {
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Sonuç bulunamadı.</div>';
+        return;
+      }
+
+      if (data.summary) {
+        summaryEl.textContent = data.summary;
+        summaryEl.style.display = 'block';
+      }
+
+      resultsEl.innerHTML = ads.map((a) => {
+        const isObserved = a.source === 'gozlemlenen';
+        const sourceBadgeClass = isObserved ? 'observed' : 'estimated';
+        const sourceBadgeText = isObserved ? 'gerçek reklamda görüldü' : 'tahmini';
+        return `<div class="ad-card">
+          <div class="ad-card-header">
+            <span class="ad-platform-badge">${escapeHtml(a.platform || '')}</span>
+            <span class="ad-source-badge ${sourceBadgeClass}">${sourceBadgeText}</span>
+          </div>
+          <div class="ad-hook">${escapeHtml(a.hook || '')}</div>
+          <div class="ad-format">Format: ${escapeHtml(a.format || '-')}</div>
+          <div class="ad-note">${escapeHtml(a.note || '')}</div>
+        </div>`;
+      }).join('');
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📢 Reklam fikirlerini analiz et';
     }
   }
 
