@@ -516,8 +516,18 @@
   function useCJProduct(index) {
     const p = (window._cjProducts || [])[index];
     if (!p) return;
+
+    if (p.name) {
+      document.getElementById('productName').value = p.name;
+      lastGeneratedName = p.name;
+    }
     document.getElementById('supplierPrice').value = p.priceUsd;
     updateProfitCalc();
+
+    // Ürün adı, kategori, ağırlık tahmini, başlık/açıklama/etiket AI ile üretilsin
+    if (p.name) {
+      generateContent(false);
+    }
   }
 
   async function generateContent(auto = false) {
