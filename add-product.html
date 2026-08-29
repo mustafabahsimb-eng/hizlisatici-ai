@@ -492,6 +492,10 @@
       if (data.searchedAs && data.searchedAs.toLowerCase() !== keyword.toLowerCase()) {
         translateEl.textContent = '🔤 "' + data.searchedAs + '" olarak arandı (CJ İngilizce anahtar kelime istiyor)';
         translateEl.style.display = 'block';
+      } else if (data.translateDebug) {
+        translateEl.textContent = '⚠️ Çeviri başarısız (geçici teşhis notu): ' + data.translateDebug;
+        translateEl.style.color = '#f28b8b';
+        translateEl.style.display = 'block';
       }
 
       const products = data.products || [];
