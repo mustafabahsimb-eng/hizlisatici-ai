@@ -98,6 +98,26 @@
   .profit-value { font-size: 17px; font-weight: 600; color: #fff; }
   .profit-value.green { color: #5DCAA5; }
 
+  .cj-search-row { display: flex; gap: 10px; }
+  .cj-search-row input { flex: 1; }
+  .cj-search-row button { white-space: nowrap; }
+  .cj-item {
+    display: flex; align-items: center; gap: 10px;
+    background: #1c212c; border-radius: 8px; padding: 10px; margin-top: 8px;
+  }
+  .cj-item img { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: #0d0f16; }
+  .cj-item-info { flex: 1; min-width: 0; }
+  .cj-item-name {
+    font-size: 12px; color: #e6e8ee; overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .cj-item-price { font-size: 12px; color: #5DCAA5; font-weight: 600; margin-top: 3px; }
+  .cj-use-btn {
+    background: #1D9E75; color: #fff; border: none; padding: 7px 12px;
+    border-radius: 6px; font-size: 11px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .cj-use-btn:hover { background: #178a65; }
+
   .actions { display: flex; gap: 10px; margin-top: 20px; }
   .msg { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
   .msg.error { background: #2a1414; color: #f28b8b; display: block; }
@@ -175,6 +195,18 @@
     <div class="form-row">
       <label for="salePrice">Satış fiyatı (<span id="saleCurrency">₺</span>) — kâr hesabı için</label>
       <input type="number" id="salePrice" placeholder="299">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tedarikçi ara (CJ Dropshipping)</div>
+    <div class="cj-search-row">
+      <input type="text" id="cjKeyword" placeholder="Örn: bluetooth kulaklık, robot süpürge...">
+      <button class="btn-secondary" id="cjSearchBtn" onclick="searchCJ()">🔍 Ara</button>
+    </div>
+    <div id="cjResults"></div>
+    <div id="cjNote" style="font-size:11px; color:#9aa3b2; margin-top:10px; display:none;">
+      ⚠️ Fiyatlar CJ Dropshipping'den dolar ($) cinsinden geliyor. TL platformunda satıyorsan güncel kurla TL karşılığını kendin hesaplayıp güncelle.
     </div>
   </div>
 
@@ -428,6 +460,64 @@
     const profitEl = document.getElementById('netProfit');
     profitEl.textContent = symbol + netProfit.toFixed(2);
     profitEl.style.color = netProfit >= 0 ? '#5DCAA5' : '#f28b8b';
+  }
+
+  async function searchCJ() {
+    const keyword = document.getElementById('cjKeyword').value.trim();
+    const btn = document.getElementById('cjSearchBtn');
+    const resultsEl = document.getElementById('cjResults');
+    const noteEl = document.getElementById('cjNote');
+    if (!keyword) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Aranıyor...';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Aranıyor...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/cj-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ keyword }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const products = data.products || [];
+      if (products.length === 0) {
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Sonuç bulunamadı.</div>';
+        noteEl.style.display = 'none';
+        return;
+      }
+
+      window._cjProducts = products;
+      resultsEl.innerHTML = products.map((p, i) => `
+        <div class="cj-item">
+          <img src="${p.image || ''}" onerror="this.style.visibility='hidden'">
+          <div class="cj-item-info">
+            <div class="cj-item-name">${escapeHtml(p.name || '')}</div>
+            <div class="cj-item-price">$${p.priceUsd.toFixed(2)}</div>
+          </div>
+          <button class="cj-use-btn" onclick="useCJProduct(${i})">Kullan</button>
+        </div>
+      `).join('');
+      noteEl.style.display = 'block';
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b; margin-top:8px;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Ara';
+    }
+  }
+
+  function useCJProduct(index) {
+    const p = (window._cjProducts || [])[index];
+    if (!p) return;
+    document.getElementById('supplierPrice').value = p.priceUsd;
+    updateProfitCalc();
   }
 
   async function generateContent(auto = false) {
