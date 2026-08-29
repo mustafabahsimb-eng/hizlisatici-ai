@@ -97,6 +97,31 @@
     flex-direction: column;
     gap: 10px;
   }
+  .trend-img-wrap {
+    width: 100%;
+    height: 140px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1c212c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .trend-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .trend-img-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+  }
   .trend-title { font-size: 15px; font-weight: 600; color: #fff; }
   .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
   .badge {
@@ -155,7 +180,7 @@
   </div>
 
   <div class="note">
-    Bu liste AI'nin web araması sonucu ürettiği bir tahmindir, kesin satış garantisi değildir. Bir ürünü eklemeden önce kendi araştırmanla da doğrulaman önerilir.
+    Bu liste AI'nin web araması sonucu ürettiği bir tahmindir, kesin satış garantisi değildir. Görseller bulunabildiğinde gerçek ürün görselleridir, bulunamadığında kategori ikonu gösterilir. Bir ürünü eklemeden önce kendi araştırmanla da doğrulaman önerilir.
   </div>
 
   <div class="msg" id="msgBox"></div>
@@ -171,6 +196,17 @@
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const CATEGORY_EMOJI = {
+    'Elektronik': '📱',
+    'Giyim': '👕',
+    'Ev & Yaşam': '🏠',
+    'Kozmetik & Kişisel Bakım': '💄',
+    'Anne & Bebek': '👶',
+    'Spor & Outdoor': '⚽',
+    'Aksesuar': '⌚',
+    'Diğer': '📦'
+  };
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -212,6 +248,16 @@
     }
   }
 
+  function categoryEmoji(cat) {
+    return CATEGORY_EMOJI[cat] || '📦';
+  }
+
+  function handleImgError(img) {
+    const wrap = img.parentElement;
+    wrap.classList.add('trend-img-fallback');
+    wrap.textContent = categoryEmoji(img.getAttribute('data-cat'));
+  }
+
   function renderTrends(trends) {
     const resultArea = document.getElementById('resultArea');
     if (!trends.length) {
@@ -219,18 +265,26 @@
       return;
     }
 
-    resultArea.innerHTML = '<div class="trend-grid">' + trends.map(t => `
+    resultArea.innerHTML = '<div class="trend-grid">' + trends.map(t => {
+      const hasImg = t.imageUrl && /^https?:\/\//.test(t.imageUrl);
+      const cat = t.category || 'Diğer';
+      const imgHtml = hasImg
+        ? `<img src="${escapeAttr(t.imageUrl)}" class="trend-img" alt="" data-cat="${escapeAttr(cat)}" onerror="handleImgError(this)">`
+        : `<div class="trend-img-fallback">${categoryEmoji(cat)}</div>`;
+      return `
       <div class="trend-card">
+        <div class="trend-img-wrap">${imgHtml}</div>
         <div class="trend-title">${escapeHtml(t.productIdea || '-')}</div>
         <div class="badge-row">
-          <span class="badge">${escapeHtml(t.category || 'Diğer')}</span>
+          <span class="badge">${escapeHtml(cat)}</span>
           <span class="badge demand-${escapeHtml(t.demandLevel || '')}">${escapeHtml(t.demandLevel || '-')}</span>
         </div>
         <div class="trend-reason">${escapeHtml(t.reason || '')}</div>
         <div class="trend-platforms">Önerilen platform: ${(t.suggestedPlatforms || []).map(escapeHtml).join(', ') || '-'}</div>
         <button class="btn-add" onclick="addProduct('${escapeAttr(t.productIdea || '')}')">+ Bu ürünü ekle</button>
       </div>
-    `).join('') + '</div>';
+    `;
+    }).join('') + '</div>';
   }
 
   function addProduct(name) {
