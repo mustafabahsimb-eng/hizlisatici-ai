@@ -259,7 +259,7 @@
   });
 
   // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
-  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
+  // AI ile kategori/ağırlık/başlık/açıklama üretimini tetikle (etiketler otomatik dolmaz)
   document.getElementById('productName').addEventListener('blur', () => {
     const name = document.getElementById('productName').value.trim();
     if (name && name !== lastGeneratedName) {
@@ -355,12 +355,12 @@
       const tagsStr = (data.tags || []).join(', ');
 
       // Otomatik tetiklendiyse (ürün adından çıkınca) sadece boş alanları doldur,
-      // elle yazdığın bir şeyin üzerine yazmasın. Butona bastıysan (auto=false) her zaman güncelle.
+      // elle yazdığın bir şeyin üzerine yazmasın. Etiketleri otomatik doldurmuyoruz,
+      // sadece "Üret" butonuna elle basınca dolsun istendi. Butona bastıysan (auto=false) her zaman güncelle.
       if (auto) {
         if (!catEl.value.trim()) catEl.value = data.category || '';
         if (!titleEl.value.trim()) titleEl.value = data.title || '';
         if (!descEl.value.trim()) descEl.value = data.description || '';
-        if (!tagsEl.value.trim()) tagsEl.value = tagsStr;
       } else {
         catEl.value = data.category || '';
         titleEl.value = data.title || '';
