@@ -1,315 +1,129 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HızlıSatıcı AI - Trend Ürünler</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
-  }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
-  }
-  .logo { display: flex; align-items: center; gap: 10px; }
-  .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
-  }
-  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .back-link {
-    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
-  }
-  .back-link:hover { color: #fff; }
+// Supabase Edge Function: trend-discovery
+// Claude'a gerçek zamanlı web araması yaptırıp Türkiye e-ticaretinde
+// (ve istenirse uluslararası) şu an trend olan ürün fikirlerini döndürür.
 
-  main {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 32px 24px 80px;
-  }
-  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-  select {
-    background: #1c212c;
-    border: 1px solid #2a3040;
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: #fff;
-    font-size: 14px;
-    font-family: inherit;
-  }
-  .btn-primary {
-    background: #1D9E75; color: #fff; border: none;
-    padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  .btn-primary:hover { background: #178a65; }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-  .note {
-    font-size: 12px;
-    color: #9aa3b2;
-    margin-bottom: 24px;
-    line-height: 1.5;
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
-  .msg { margin-bottom: 20px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
-  .msg.error { background: #2a1414; color: #f28b8b; display: block; }
+  try {
+    const { scope } = await req.json().catch(() => ({ scope: "turkiye" }));
+    const isGlobal = scope === "global";
 
-  .empty-state {
-    padding: 60px 20px;
-    text-align: center;
-    color: #9aa3b2;
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-  }
+    const systemPrompt = `Sen bir e-ticaret trend analistisin. Web araması kullanarak ${
+      isGlobal ? "hem Türkiye hem de uluslararası (AliExpress, Amazon, TikTok Shop, Etsy vb.)" : "Türkiye (Trendyol, Hepsiburada, N11 vb.)"
+    } pazaryerlerinde ŞU AN trend olan / talebi hızla artan somut ürün fikirlerini buluyorsun.
 
-  .trend-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 14px;
-  }
-  .trend-card {
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .trend-img-wrap {
-    width: 100%;
-    height: 140px;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #1c212c;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .trend-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .trend-img-fallback {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 42px;
-  }
-  .trend-title { font-size: 15px; font-weight: 600; color: #fff; }
-  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
-  .badge {
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 20px;
-    background: #1c3a2e;
-    color: #5DCAA5;
-  }
-  .badge.demand-Yüksek { background: #2a1414; color: #f28b8b; }
-  .badge.demand-Yükselişte { background: #1c3a2e; color: #5DCAA5; }
-  .badge.demand-Orta { background: #262a1c; color: #d7c95d; }
-  .trend-reason { font-size: 13px; color: #c5cad4; line-height: 1.5; flex-grow: 1; }
-  .trend-platforms { font-size: 12px; color: #9aa3b2; }
-  .btn-add {
-    background: transparent;
-    border: 1px solid #1D9E75;
-    color: #5DCAA5;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 4px;
-  }
-  .btn-add:hover { background: #123222; }
+Web aramalarını kullanarak güncel haberler, sosyal medya/viral ürün haberleri, mevsimsel talep sinyalleri ve e-ticaret sektör analizlerini tara. Kesin, tek bir haber kaynağıyla %100 doğrulanmış olmasa bile, aramalarında gördüğün sinyallere (mevsim, sosyal medya trendleri, sektör haberleri, genel talep kalıpları) dayanarak profesyonel bir tahmin yap. Tamamen alakasız veya rastgele ürün uydurma ama arama sonuçlarını yorumlayarak makul ürün fikirleri üretmekten çekinme.
 
-  .loading {
-    text-align: center;
-    padding: 60px 20px;
-    color: #9aa3b2;
-    font-size: 14px;
-  }
-</style>
-</head>
-<body>
+Mümkünse, arama sonuçlarında gördüğün bu ürüne ait GERÇEK bir görsel URL'si varsa (bir ürün sayfası, haber görseli vb.) bunu imageUrl alanına ekle. Emin olmadığın, uydurma ya da tahmini bir görsel URL'si YAZMA - bulamazsan imageUrl'i boş string ("") bırak.
 
-<header>
-  <div class="logo">
-    <div class="logo-dot">H</div>
-    <div class="logo-text">HızlıSatıcı AI</div>
-  </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
-</header>
+ÇOK ÖNEMLİ KURAL: Cevabında TAM OLARAK 25 (yirmi beş) ürün fikri olmalı. "En az" değil, TAM 25 - daha az verme, "yeterince bulamadım" diye erken durma. Farklı kategori ve alt-niş kombinasyonlarıyla (örn. aynı elektronik kategorisinde birden fazla farklı ürün tipi) listeyi 25'e tamamla. Emin olmadığın fikirler için demandLevel'i "Yükselişte" olarak işaretle ve reason alanında bunun bir tahmin olduğunu belirt. Aynı ürünü tekrar etme.
 
-<main>
-  <h1>Trend ürünler</h1>
-  <div class="subtitle">AI, güncel web verilerini tarayarak şu an talebi artan ürünleri buluyor.</div>
+Cevabını SADECE aşağıdaki JSON formatında ver, başka hiçbir metin ekleme:
 
-  <div class="controls">
-    <select id="scopeSelect">
-      <option value="turkiye">Sadece Türkiye pazaryerleri</option>
-      <option value="global">Türkiye + Uluslararası</option>
-    </select>
-    <button class="btn-primary" id="scanBtn" onclick="scanTrends()">🔍 Trendleri tara</button>
-  </div>
+{
+  "trends": [
+    {
+      "productIdea": "kısa ürün adı (Türkçe)",
+      "category": "Elektronik | Giyim | Ev & Yaşam | Kozmetik & Kişisel Bakım | Anne & Bebek | Spor & Outdoor | Aksesuar | Diğer kategorilerden biri",
+      "reason": "neden trend olduğuna dair 1-2 cümlelik somut gerekçe, kaynağa dayalı",
+      "suggestedPlatforms": ["Trendyol", "Hepsiburada"],
+      "demandLevel": "Yüksek | Orta | Yükselişte",
+      "imageUrl": "gerçek bir ürün görseli URL'si varsa buraya, yoksa boş string"
+    }
+  ]
+}
 
-  <div class="note">
-    Bu liste AI'nin web araması sonucu ürettiği bir tahmindir, kesin satış garantisi değildir. Görseller bulunabildiğinde gerçek ürün görselleridir, bulunamadığında kategori ikonu gösterilir. Bir ürünü eklemeden önce kendi araştırmanla da doğrulaman önerilir.
-  </div>
+TAM OLARAK 25 ürün fikri ver.`;
 
-  <div class="msg" id="msgBox"></div>
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 10000,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Bugünün tarihine göre ${
+              isGlobal ? "Türkiye ve uluslararası" : "Türkiye"
+            } e-ticaret pazarında trend olan ürünleri araştır ve JSON formatında listele. TAM OLARAK 25 ürün fikri ver, daha az verme.`,
+          },
+        ],
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 10,
+          },
+        ],
+      }),
+    });
 
-  <div id="resultArea">
-    <div class="empty-state">
-      <p>Trendleri görmek için yukarıdaki "Trendleri tara" butonuna bas.</p>
-    </div>
-  </div>
-</main>
+    const data = await response.json();
 
-<script>
-  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  const CATEGORY_EMOJI = {
-    'Elektronik': '📱',
-    'Giyim': '👕',
-    'Ev & Yaşam': '🏠',
-    'Kozmetik & Kişisel Bakım': '💄',
-    'Anne & Bebek': '👶',
-    'Spor & Outdoor': '⚽',
-    'Aksesuar': '⌚',
-    'Diğer': '📦'
-  };
-
-  async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
-  }
-  init();
-
-  async function scanTrends() {
-    const btn = document.getElementById('scanBtn');
-    const resultArea = document.getElementById('resultArea');
-    const scope = document.getElementById('scopeSelect').value;
-
-    btn.disabled = true;
-    btn.textContent = 'Taranıyor... (biraz sürebilir)';
-    hideMsg();
-    resultArea.innerHTML = '<div class="loading">AI web araması yapıyor, trend ürünleri analiz ediyor...</div>';
-
-    try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/trend-discovery', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
-        body: JSON.stringify({ scope }),
+    if (data.error) {
+      return new Response(JSON.stringify({ error: data.error.message || "Anthropic API hatası" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      renderTrends(data.trends || []);
-    } catch (err) {
-      showMsg('Trendler yüklenemedi: ' + err.message, 'error');
-      resultArea.innerHTML = '';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '🔍 Trendleri tara';
-    }
-  }
-
-  function categoryEmoji(cat) {
-    return CATEGORY_EMOJI[cat] || '📦';
-  }
-
-  function handleImgError(img) {
-    const wrap = img.parentElement;
-    wrap.classList.add('trend-img-fallback');
-    wrap.textContent = categoryEmoji(img.getAttribute('data-cat'));
-  }
-
-  function renderTrends(trends) {
-    const resultArea = document.getElementById('resultArea');
-    if (!trends.length) {
-      resultArea.innerHTML = '<div class="empty-state"><p>Şu an için belirgin bir trend bulunamadı, tekrar dene.</p></div>';
-      return;
     }
 
-    resultArea.innerHTML = '<div class="trend-grid">' + trends.map(t => {
-      const hasImg = t.imageUrl && /^https?:\/\//.test(t.imageUrl);
-      const cat = t.category || 'Diğer';
-      const imgHtml = hasImg
-        ? `<img src="${escapeAttr(t.imageUrl)}" class="trend-img" alt="" data-cat="${escapeAttr(cat)}" onerror="handleImgError(this)">`
-        : `<div class="trend-img-fallback">${categoryEmoji(cat)}</div>`;
-      return `
-      <div class="trend-card">
-        <div class="trend-img-wrap">${imgHtml}</div>
-        <div class="trend-title">${escapeHtml(t.productIdea || '-')}</div>
-        <div class="badge-row">
-          <span class="badge">${escapeHtml(cat)}</span>
-          <span class="badge demand-${escapeHtml(t.demandLevel || '')}">${escapeHtml(t.demandLevel || '-')}</span>
-        </div>
-        <div class="trend-reason">${escapeHtml(t.reason || '')}</div>
-        <div class="trend-platforms">Önerilen platform: ${(t.suggestedPlatforms || []).map(escapeHtml).join(', ') || '-'}</div>
-        <button class="btn-add" onclick="addProduct('${escapeAttr(t.productIdea || '')}')">+ Bu ürünü ekle</button>
-      </div>
-    `;
-    }).join('') + '</div>';
-  }
+    // content dizisinde birden fazla "text" bloğu olabilir (arama adımları arasında);
+    // hepsini birleştirip içinden JSON'u ayıklıyoruz.
+    const textParts = (data.content || [])
+      .filter((block: any) => block.type === "text")
+      .map((block: any) => block.text)
+      .join("\n");
 
-  function addProduct(name) {
-    window.location.href = 'add-product.html?name=' + encodeURIComponent(name);
-  }
+    const jsonMatch = textParts.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return new Response(JSON.stringify({ error: "Model beklenen formatta yanıt vermedi", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str == null ? '' : String(str);
-    return div.innerHTML;
-  }
-  function escapeAttr(str) {
-    return String(str).replace(/'/g, "\\'");
-  }
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "JSON ayrıştırma hatası", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-  function showMsg(text, type) {
-    const box = document.getElementById('msgBox');
-    box.textContent = text;
-    box.className = 'msg ' + type;
-  }
-  function hideMsg() {
-    const box = document.getElementById('msgBox');
-    box.className = 'msg';
-  }
-</script>
+    // Model yine de boş liste döndürürse, bunu açıkça belirten bir hata ver
+    // ki arayüzde "bağlantı sorunu yok, AI hiç fikir üretmedi" ayrımı net olsun.
+    if (!parsed.trends || parsed.trends.length === 0) {
+      return new Response(JSON.stringify({ error: "AI bu taramada ürün fikri üretemedi, lütfen tekrar dene", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-</body>
-</html>
+    return new Response(JSON.stringify(parsed), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
