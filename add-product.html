@@ -323,6 +323,14 @@
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
     currentUser = session.user;
+
+    // Trend ürünler sayfasından "Bu ürünü ekle" ile geldiyse ürün adını doldur ve üretimi başlat
+    const params = new URLSearchParams(window.location.search);
+    const prefillName = params.get('name');
+    if (prefillName) {
+      document.getElementById('productName').value = prefillName;
+      generateContent(false);
+    }
   }
   init();
 
