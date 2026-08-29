@@ -226,6 +226,7 @@
   let currentUser = null;
   let generatedContent = null;
   let detectedCategory = null;
+  let lastGeneratedName = null;
 
   // Platform + kategori bazlı YAKLAŞIK komisyon oranları (%) - tahminidir, kesin oran platform panelinden kontrol edilmeli
   const COMMISSION_TABLE = {
@@ -261,6 +262,15 @@
   // Kâr hesabını canlı güncelle
   ['supplierPrice', 'weightKg', 'commissionRate', 'salePrice'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateProfitCalc);
+  });
+
+  // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
+  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
+  document.getElementById('productName').addEventListener('blur', () => {
+    const name = document.getElementById('productName').value.trim();
+    if (name && name !== lastGeneratedName) {
+      generateContent();
+    }
   });
 
   async function fillCommissionRate() {
@@ -322,6 +332,7 @@
       return;
     }
 
+    lastGeneratedName = productName;
     btn.disabled = true;
     btn.textContent = 'Üretiliyor...';
     hideMsg();
@@ -407,7 +418,9 @@
       return;
     }
 
-    showMsg('Ürün kaydedildi! Panele yönlendiriliyorsun...', 'success');
+    const box = document.getElementById('msgBox');
+    box.innerHTML = 'Ürün kaydedildi! Panele yönlendiriliyorsun... Otomatik geçmezse <a href="dashboard.html" style="color:#6ee7b7; text-decoration:underline;">buraya tıkla</a>.';
+    box.className = 'msg success';
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
   }
 
