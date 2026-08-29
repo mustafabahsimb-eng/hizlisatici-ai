@@ -142,10 +142,25 @@
         <label for="platform">Platform</label>
         <select id="platform" onchange="fillCommissionRate()">
           <option value="">Seç...</option>
-          <option value="Trendyol">Trendyol</option>
-          <option value="Hepsiburada">Hepsiburada</option>
-          <option value="N11">N11</option>
-          <option value="Etsy">Etsy</option>
+          <optgroup label="Türkiye">
+            <option value="Trendyol">Trendyol</option>
+            <option value="Hepsiburada">Hepsiburada</option>
+            <option value="N11">N11</option>
+            <option value="Çiçeksepeti">Çiçeksepeti</option>
+            <option value="PTT AVM">PTT AVM</option>
+            <option value="Amazon TR">Amazon TR</option>
+            <option value="Pazarama">Pazarama</option>
+          </optgroup>
+          <optgroup label="Uluslararası">
+            <option value="Etsy">Etsy</option>
+            <option value="Amazon (Global)">Amazon (Global)</option>
+            <option value="eBay">eBay</option>
+            <option value="Facebook Marketplace">Facebook Marketplace</option>
+            <option value="TikTok Shop">TikTok Shop</option>
+            <option value="Shopify">Shopify</option>
+            <option value="WooCommerce">WooCommerce</option>
+            <option value="Wix">Wix</option>
+          </optgroup>
           <option value="Diğer">Diğer</option>
         </select>
       </div>
@@ -244,7 +259,65 @@
       'Aksesuar (Saat, Takı, Kemer)': 6.5, 'Kozmetik & Kişisel Bakım': 6.5, 'Ev & Yaşam': 6.5,
       'Mobilya': 6.5, 'Anne & Bebek': 6.5, 'Spor & Outdoor': 6.5, 'Kitap & Kırtasiye': 6.5, 'Diğer': 6.5
     },
+    'Çiçeksepeti': {
+      'Elektronik': 15, 'Cep Telefonu': 15, 'Giyim': 18, 'Ayakkabı & Çanta': 18,
+      'Aksesuar (Saat, Takı, Kemer)': 20, 'Kozmetik & Kişisel Bakım': 19, 'Ev & Yaşam': 20,
+      'Mobilya': 18, 'Anne & Bebek': 17, 'Spor & Outdoor': 18, 'Kitap & Kırtasiye': 12, 'Diğer': 18
+    },
+    'PTT AVM': {
+      'Elektronik': 8, 'Cep Telefonu': 7, 'Giyim': 15, 'Ayakkabı & Çanta': 15,
+      'Aksesuar (Saat, Takı, Kemer)': 14, 'Kozmetik & Kişisel Bakım': 14, 'Ev & Yaşam': 12,
+      'Mobilya': 12, 'Anne & Bebek': 10, 'Spor & Outdoor': 12, 'Kitap & Kırtasiye': 11, 'Diğer': 12
+    },
+    'Amazon TR': {
+      'Elektronik': 8, 'Cep Telefonu': 8, 'Giyim': 15, 'Ayakkabı & Çanta': 15,
+      'Aksesuar (Saat, Takı, Kemer)': 15, 'Kozmetik & Kişisel Bakım': 13, 'Ev & Yaşam': 13,
+      'Mobilya': 13, 'Anne & Bebek': 10, 'Spor & Outdoor': 12, 'Kitap & Kırtasiye': 10, 'Diğer': 12
+    },
+    'Pazarama': {
+      'Elektronik': 14, 'Cep Telefonu': 13, 'Giyim': 19, 'Ayakkabı & Çanta': 19,
+      'Aksesuar (Saat, Takı, Kemer)': 18, 'Kozmetik & Kişisel Bakım': 19, 'Ev & Yaşam': 17,
+      'Mobilya': 16, 'Anne & Bebek': 14, 'Spor & Outdoor': 15, 'Kitap & Kırtasiye': 10, 'Diğer': 15
+    },
+    'Amazon (Global)': {
+      'Elektronik': 8, 'Cep Telefonu': 8, 'Giyim': 15, 'Ayakkabı & Çanta': 15,
+      'Aksesuar (Saat, Takı, Kemer)': 15, 'Kozmetik & Kişisel Bakım': 15, 'Ev & Yaşam': 15,
+      'Mobilya': 15, 'Anne & Bebek': 15, 'Spor & Outdoor': 15, 'Kitap & Kırtasiye': 15, 'Diğer': 15
+    },
+    'eBay': {
+      'Elektronik': 13.6, 'Cep Telefonu': 13.6, 'Giyim': 13.6, 'Ayakkabı & Çanta': 13.6,
+      'Aksesuar (Saat, Takı, Kemer)': 13.6, 'Kozmetik & Kişisel Bakım': 13.6, 'Ev & Yaşam': 13.6,
+      'Mobilya': 13.6, 'Anne & Bebek': 13.6, 'Spor & Outdoor': 13.6, 'Kitap & Kırtasiye': 15.3, 'Diğer': 13.6
+    },
+    'Facebook Marketplace': {
+      'Elektronik': 10, 'Cep Telefonu': 10, 'Giyim': 10, 'Ayakkabı & Çanta': 10,
+      'Aksesuar (Saat, Takı, Kemer)': 10, 'Kozmetik & Kişisel Bakım': 10, 'Ev & Yaşam': 10,
+      'Mobilya': 10, 'Anne & Bebek': 10, 'Spor & Outdoor': 10, 'Kitap & Kırtasiye': 10, 'Diğer': 10
+    },
+    'TikTok Shop': {
+      'Elektronik': 6, 'Cep Telefonu': 6, 'Giyim': 6, 'Ayakkabı & Çanta': 6,
+      'Aksesuar (Saat, Takı, Kemer)': 6, 'Kozmetik & Kişisel Bakım': 6, 'Ev & Yaşam': 6,
+      'Mobilya': 6, 'Anne & Bebek': 6, 'Spor & Outdoor': 6, 'Kitap & Kırtasiye': 6, 'Diğer': 6
+    },
+    'Shopify': {
+      'Elektronik': 2.9, 'Cep Telefonu': 2.9, 'Giyim': 2.9, 'Ayakkabı & Çanta': 2.9,
+      'Aksesuar (Saat, Takı, Kemer)': 2.9, 'Kozmetik & Kişisel Bakım': 2.9, 'Ev & Yaşam': 2.9,
+      'Mobilya': 2.9, 'Anne & Bebek': 2.9, 'Spor & Outdoor': 2.9, 'Kitap & Kırtasiye': 2.9, 'Diğer': 2.9
+    },
+    'WooCommerce': {
+      'Elektronik': 2.9, 'Cep Telefonu': 2.9, 'Giyim': 2.9, 'Ayakkabı & Çanta': 2.9,
+      'Aksesuar (Saat, Takı, Kemer)': 2.9, 'Kozmetik & Kişisel Bakım': 2.9, 'Ev & Yaşam': 2.9,
+      'Mobilya': 2.9, 'Anne & Bebek': 2.9, 'Spor & Outdoor': 2.9, 'Kitap & Kırtasiye': 2.9, 'Diğer': 2.9
+    },
+    'Wix': {
+      'Elektronik': 2.9, 'Cep Telefonu': 2.9, 'Giyim': 2.9, 'Ayakkabı & Çanta': 2.9,
+      'Aksesuar (Saat, Takı, Kemer)': 2.9, 'Kozmetik & Kişisel Bakım': 2.9, 'Ev & Yaşam': 2.9,
+      'Mobilya': 2.9, 'Anne & Bebek': 2.9, 'Spor & Outdoor': 2.9, 'Kitap & Kırtasiye': 2.9, 'Diğer': 2.9
+    },
   };
+
+  const PAYMENT_PROCESSOR_PLATFORMS = ['Shopify', 'WooCommerce', 'Wix'];
+  const FLAT_RATE_PLATFORMS = ['Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop'];
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -259,7 +332,7 @@
   });
 
   // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
-  // AI ile kategori/ağırlık/başlık/açıklama üretimini tetikle (etiketler otomatik dolmaz)
+  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
   document.getElementById('productName').addEventListener('blur', () => {
     const name = document.getElementById('productName').value.trim();
     if (name && name !== lastGeneratedName) {
@@ -280,12 +353,22 @@
     if (table && category && table[category] !== undefined) {
       document.getElementById('commissionRate').value = table[category];
       updateProfitCalc();
-      if (noteEl) noteEl.style.display = 'block';
+      if (noteEl) { noteEl.textContent = commissionNoteText(platform); noteEl.style.display = 'block'; }
     } else if (table) {
       document.getElementById('commissionRate').value = table['Diğer'];
       updateProfitCalc();
-      if (noteEl) noteEl.style.display = 'block';
+      if (noteEl) { noteEl.textContent = commissionNoteText(platform); noteEl.style.display = 'block'; }
     }
+  }
+
+  function commissionNoteText(platform) {
+    if (PAYMENT_PROCESSOR_PLATFORMS.includes(platform)) {
+      return '⚠️ Bu platformda pazaryeri komisyonu yoktur — bu oran sadece ödeme altyapısı işlem ücretidir (~%2.9 + sabit ücret). Ayrıca aylık abonelik ücreti de vardır, bunu hesaba katmadık. Kesin oranı sağlayıcının fiyatlandırma sayfasından doğrula.';
+    }
+    if (FLAT_RATE_PLATFORMS.includes(platform)) {
+      return '⚠️ Bu tahmini bir orandır ve ülkeye/kategoriye göre önemli ölçüde değişebilir. Kesin oranı platformun satıcı panelinden doğrula.';
+    }
+    return '⚠️ Bu tahmini bir orandır. Kesin oranı platformun satıcı panelinden doğrula.';
   }
 
   async function updateProfitCalc() {
