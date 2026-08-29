@@ -126,7 +126,7 @@
     </div>
     <div class="two-col">
       <div class="form-row">
-        <label for="supplierPrice">Tedarikçi/alış fiyatı (₺)</label>
+        <label for="supplierPrice">Tedarikçi/alış fiyatı (<span id="supplierCurrency">₺</span>)</label>
         <input type="number" id="supplierPrice" placeholder="150">
       </div>
       <div class="form-row">
@@ -140,7 +140,7 @@
     <div class="two-col">
       <div class="form-row">
         <label for="platform">Platform</label>
-        <select id="platform" onchange="fillCommissionRate()">
+        <select id="platform" onchange="fillCommissionRate(); updateCurrencyDisplay();">
           <option value="">Seç...</option>
           <optgroup label="Türkiye">
             <option value="Trendyol">Trendyol</option>
@@ -173,7 +173,7 @@
       </div>
     </div>
     <div class="form-row">
-      <label for="salePrice">Satış fiyatı (₺) — kâr hesabı için</label>
+      <label for="salePrice">Satış fiyatı (<span id="saleCurrency">₺</span>) — kâr hesabı için</label>
       <input type="number" id="salePrice" placeholder="299">
     </div>
   </div>
@@ -216,6 +216,9 @@
         <div class="profit-label">Net kâr</div>
         <div class="profit-value green" id="netProfit">₺0</div>
       </div>
+    </div>
+    <div id="shippingCurrencyNote" style="font-size:11px; color:#9aa3b2; margin-top:10px; display:none;">
+      ⚠️ Kargo maliyeti tahmini Türkiye kargo fiyat tablosundan (₺) geliyor, uluslararası gönderim için gerçek kargo ücretini ayrıca sağlayıcından kontrol et.
     </div>
   </div>
 
@@ -318,6 +321,24 @@
 
   const PAYMENT_PROCESSOR_PLATFORMS = ['Shopify', 'WooCommerce', 'Wix'];
   const FLAT_RATE_PLATFORMS = ['Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop'];
+  // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
+  const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+
+  function currencySymbolFor(platform) {
+    return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
+  }
+
+  function updateCurrencyDisplay() {
+    const platform = document.getElementById('platform').value;
+    const symbol = currencySymbolFor(platform);
+    document.getElementById('supplierCurrency').textContent = symbol;
+    document.getElementById('saleCurrency').textContent = symbol;
+    const shippingNoteEl = document.getElementById('shippingCurrencyNote');
+    if (shippingNoteEl) {
+      shippingNoteEl.style.display = INTERNATIONAL_PLATFORMS.includes(platform) ? 'block' : 'none';
+    }
+    updateProfitCalc();
+  }
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -380,6 +401,8 @@
   }
 
   async function updateProfitCalc() {
+    const platform = document.getElementById('platform').value;
+    const symbol = currencySymbolFor(platform);
     const supplierPrice = parseFloat(document.getElementById('supplierPrice').value) || 0;
     const weightKg = parseFloat(document.getElementById('weightKg').value) || 0;
     const commissionRate = parseFloat(document.getElementById('commissionRate').value) || 0;
@@ -400,10 +423,10 @@
     const commissionCost = salePrice * (commissionRate / 100);
     const netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
 
-    document.getElementById('shippingCost').textContent = '₺' + shippingCost.toFixed(2);
-    document.getElementById('commissionCost').textContent = '₺' + commissionCost.toFixed(2);
+    document.getElementById('shippingCost').textContent = symbol + shippingCost.toFixed(2);
+    document.getElementById('commissionCost').textContent = symbol + commissionCost.toFixed(2);
     const profitEl = document.getElementById('netProfit');
-    profitEl.textContent = '₺' + netProfit.toFixed(2);
+    profitEl.textContent = symbol + netProfit.toFixed(2);
     profitEl.style.color = netProfit >= 0 ? '#5DCAA5' : '#f28b8b';
   }
 
