@@ -204,6 +204,7 @@
       <input type="text" id="cjKeyword" placeholder="Örn: bluetooth kulaklık, robot süpürge...">
       <button class="btn-secondary" id="cjSearchBtn" onclick="searchCJ()">🔍 Ara</button>
     </div>
+    <div id="cjTranslateNote" style="font-size:11px; color:#6ee7b7; margin-top:6px; display:none;"></div>
     <div id="cjResults"></div>
     <div id="cjNote" style="font-size:11px; color:#9aa3b2; margin-top:10px; display:none;">
       ⚠️ Fiyatlar CJ Dropshipping'den dolar ($) cinsinden geliyor. TL platformunda satıyorsan güncel kurla TL karşılığını kendin hesaplayıp güncelle.
@@ -467,11 +468,13 @@
     const btn = document.getElementById('cjSearchBtn');
     const resultsEl = document.getElementById('cjResults');
     const noteEl = document.getElementById('cjNote');
+    const translateEl = document.getElementById('cjTranslateNote');
     if (!keyword) return;
 
     btn.disabled = true;
     btn.textContent = 'Aranıyor...';
     resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Aranıyor...</div>';
+    translateEl.style.display = 'none';
 
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/cj-search', {
@@ -486,9 +489,14 @@
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
+      if (data.searchedAs && data.searchedAs.toLowerCase() !== keyword.toLowerCase()) {
+        translateEl.textContent = '🔤 "' + data.searchedAs + '" olarak arandı (CJ İngilizce anahtar kelime istiyor)';
+        translateEl.style.display = 'block';
+      }
+
       const products = data.products || [];
       if (products.length === 0) {
-        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Sonuç bulunamadı.</div>';
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Sonuç bulunamadı. Farklı bir kelimeyle (örn. İngilizce) tekrar dene.</div>';
         noteEl.style.display = 'none';
         return;
       }
@@ -517,16 +525,16 @@
     const p = (window._cjProducts || [])[index];
     if (!p) return;
 
-    if (p.name) {
-      document.getElementById('productName').value = p.name;
-      lastGeneratedName = p.name;
-    }
     document.getElementById('supplierPrice').value = p.priceUsd;
     updateProfitCalc();
 
-    // Ürün adı, kategori, ağırlık tahmini, başlık/açıklama/etiket AI ile üretilsin
     if (p.name) {
+      document.getElementById('productName').value = p.name;
+      lastGeneratedName = p.name;
+      // Ürün adı, kategori, ağırlık tahmini, başlık/açıklama/etiket AI ile üretilsin
       generateContent(false);
+    } else {
+      showMsg('Bu ürünün CJ tarafında İngilizce adı boş geldi, ürün adını elle gir ve "Başlık, açıklama ve etiket üret" butonuna bas.', 'error');
     }
   }
 
