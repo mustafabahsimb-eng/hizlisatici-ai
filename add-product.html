@@ -314,6 +314,28 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Kargo süresi / gecikme tahmini</div>
+    <div class="ai-note">Tedarikçiden (genelde Çin, ör. CJ Dropshipping) çıkış + yurtiçi kargo teslimat süresini, olası gecikme risklerini ve önerileri web'de tarayıp bulur. Önce ürün adını gir.</div>
+    <button class="btn-secondary" id="shippingEstimateBtn" onclick="estimateShipping()">📦 Kargo süresini tahmin et</button>
+    <div id="shippingSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="shippingDaysBox" class="profit-box" style="display:none; margin-top:10px;">
+      <div class="profit-item">
+        <div class="profit-label">Tedarikçiden çıkış</div>
+        <div class="profit-value" id="supplierLeadDaysVal">-</div>
+      </div>
+      <div class="profit-item">
+        <div class="profit-label">Yurtiçi kargo</div>
+        <div class="profit-value" id="domesticDaysVal">-</div>
+      </div>
+      <div class="profit-item">
+        <div class="profit-label">Toplam tahmini</div>
+        <div class="profit-value green" id="totalDaysVal">-</div>
+      </div>
+    </div>
+    <div id="shippingResults" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Ürün görseli (arka plan temizle)</div>
     <div class="ai-note">Bir görsel yükle (ya da CJ'den seçtiğin ürünün görselini kullan), arka planı otomatik temizlensin.</div>
     <input type="file" id="imgFileInput" accept="image/*" style="margin-bottom:12px;">
@@ -927,6 +949,82 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '💬 Müşteri yorumlarını analiz et';
+    }
+  }
+
+  async function estimateShipping() {
+    const productName = document.getElementById('productName').value.trim();
+    const platform = document.getElementById('platform').value;
+    const btn = document.getElementById('shippingEstimateBtn');
+    const summaryEl = document.getElementById('shippingSummary');
+    const daysBox = document.getElementById('shippingDaysBox');
+    const resultsEl = document.getElementById('shippingResults');
+
+    if (!productName) {
+      showMsg('Önce ürün adını gir.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Tahmin ediliyor...';
+    summaryEl.style.display = 'none';
+    daysBox.style.display = 'none';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Kargo/teslimat verileri taranıyor, bu biraz sürebilir...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/shipping-estimate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productName, platform }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const riskFactors = data.riskFactors || [];
+      const tips = data.tips || [];
+
+      if (data.summary) {
+        summaryEl.textContent = data.summary;
+        summaryEl.style.display = 'block';
+      }
+
+      function fmtRange(r) {
+        if (!r) return '-';
+        if (r.min === r.max) return r.min + ' gün';
+        return r.min + '-' + r.max + ' gün';
+      }
+      document.getElementById('supplierLeadDaysVal').textContent = fmtRange(data.supplierLeadDays);
+      document.getElementById('domesticDaysVal').textContent = fmtRange(data.domesticDays);
+      document.getElementById('totalDaysVal').textContent = fmtRange(data.totalDays);
+      daysBox.style.display = 'grid';
+
+      let html = '';
+      if (riskFactors.length > 0) {
+        html += '<div class="review-col-title">⚠️ Gecikme riskleri</div>' + riskFactors.map((r) => {
+          const isObserved = r.source === 'gozlemlenen';
+          const badgeClass = isObserved ? 'observed' : 'estimated';
+          const badgeText = isObserved ? 'gerçek veride görüldü' : 'tahmini';
+          return `<div class="review-item">
+            <span class="review-item-badge ${badgeClass}">${badgeText}</span>
+            <span>${escapeHtml(r.risk || '')}</span>
+          </div>`;
+        }).join('');
+      }
+      if (tips.length > 0) {
+        html += '<div class="review-col-title">💡 Öneriler</div>' + tips.map((t) => {
+          return `<div class="review-item"><span>${escapeHtml(t)}</span></div>`;
+        }).join('');
+      }
+      resultsEl.innerHTML = html;
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📦 Kargo süresini tahmin et';
     }
   }
 
