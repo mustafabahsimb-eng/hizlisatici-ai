@@ -982,7 +982,7 @@
         body: JSON.stringify({ productName, platform }),
       });
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) throw new Error(data.error + (data.raw ? ' | RAW: ' + data.raw : ''));
 
       const riskFactors = data.riskFactors || [];
       const tips = data.tips || [];
