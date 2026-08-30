@@ -168,6 +168,8 @@
       <div class="subtitle" id="productCountText">Yükleniyor...</div>
     </div>
     <div style="display:flex; gap:10px;">
+      <button class="btn-secondary" onclick="window.location.href='chat.html'">💬 Sohbetle Yönet</button>
+      <button class="btn-secondary" onclick="window.location.href='accounts.html'">🔑 Hesaplarım</button>
       <button class="btn-secondary" onclick="window.location.href='trends.html'">🔥 Trend ürünler</button>
       <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
@@ -272,7 +274,6 @@
         } else {
           tryProfit += netProfit;
         }
-        // Marj bir yüzde olduğu için para biriminden bağımsız, ortalamaya birlikte katılabilir
         marginSum += marginPct;
         marginCount++;
       }
