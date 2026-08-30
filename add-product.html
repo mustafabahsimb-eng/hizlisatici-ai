@@ -334,6 +334,29 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Rakip fiyat kontrolü</div>
+    <div class="ai-note">Bu ürün için Trendyol, Hepsiburada, Amazon, Akakçe gibi platformlarda gerçek piyasa fiyatlarını tarar ve (girdiysen) senin satış fiyatınla karşılaştırır. Önce ürün adını gir.</div>
+    <button class="btn-secondary" id="priceCheckBtn" onclick="checkPrices()">💰 Fiyatları kontrol et</button>
+    <div id="priceSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="priceRangeBox" class="profit-box" style="display:none; margin-top:10px;">
+      <div class="profit-item">
+        <div class="profit-label">En düşük</div>
+        <div class="profit-value" id="minPriceVal">-</div>
+      </div>
+      <div class="profit-item">
+        <div class="profit-label">Ortalama</div>
+        <div class="profit-value" id="avgPriceVal">-</div>
+      </div>
+      <div class="profit-item">
+        <div class="profit-label">En yüksek</div>
+        <div class="profit-value" id="maxPriceVal">-</div>
+      </div>
+    </div>
+    <div id="pricePositionBox" style="display:none; margin-top:10px;"></div>
+    <div id="priceResults" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Kargo süresi / gecikme tahmini</div>
     <div class="ai-note">Tedarikçiden (genelde Çin, ör. CJ Dropshipping) çıkış + yurtiçi kargo teslimat süresini, olası gecikme risklerini ve önerileri web'de tarayıp bulur. Önce ürün adını gir.</div>
     <button class="btn-secondary" id="shippingEstimateBtn" onclick="estimateShipping()">📦 Kargo süresini tahmin et</button>
@@ -1011,6 +1034,82 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '💬 Müşteri yorumlarını analiz et';
+    }
+  }
+
+  async function checkPrices() {
+    const productName = document.getElementById('productName').value.trim();
+    const platform = document.getElementById('platform').value;
+    const myPrice = parseFloat(document.getElementById('salePrice').value) || null;
+    const currency = currencySymbolFor(platform) === '$' ? 'USD' : 'TL';
+    const btn = document.getElementById('priceCheckBtn');
+    const summaryEl = document.getElementById('priceSummary');
+    const rangeBox = document.getElementById('priceRangeBox');
+    const positionBox = document.getElementById('pricePositionBox');
+    const resultsEl = document.getElementById('priceResults');
+
+    if (!productName) {
+      showMsg('Önce ürün adını gir.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Kontrol ediliyor...';
+    summaryEl.style.display = 'none';
+    rangeBox.style.display = 'none';
+    positionBox.style.display = 'none';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Piyasa fiyatları taranıyor, bu biraz sürebilir...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/price-check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productName, myPrice, platform, currency }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error + (data.raw ? ' | RAW: ' + data.raw : ''));
+
+      const competitors = data.competitors || [];
+
+      if (data.summary) {
+        summaryEl.textContent = data.summary;
+        summaryEl.style.display = 'block';
+      }
+
+      if (data.minPrice != null || data.maxPrice != null || data.avgPrice != null) {
+        document.getElementById('minPriceVal').textContent = data.minPrice != null ? '₺' + data.minPrice : '-';
+        document.getElementById('avgPriceVal').textContent = data.avgPrice != null ? '₺' + data.avgPrice : '-';
+        document.getElementById('maxPriceVal').textContent = data.maxPrice != null ? '₺' + data.maxPrice : '-';
+        rangeBox.style.display = 'grid';
+      }
+
+      if (data.positionText) {
+        positionBox.innerHTML = `<div class="review-item"><span>${escapeHtml(data.positionText)}</span></div>`;
+        positionBox.style.display = 'block';
+      }
+
+      if (competitors.length > 0) {
+        resultsEl.innerHTML = '<div class="review-col-title">🏷️ Bulunan fiyatlar</div>' + competitors.map((c) => {
+          const isObserved = c.source === 'gozlemlenen';
+          const badgeClass = isObserved ? 'observed' : 'estimated';
+          const badgeText = isObserved ? 'gerçek fiyatta görüldü' : 'tahmini';
+          return `<div class="review-item">
+            <span class="review-item-badge ${badgeClass}">${badgeText}</span>
+            <span>${escapeHtml(c.platform || '')}: ${escapeHtml(String(c.price || ''))}</span>
+          </div>`;
+        }).join('');
+      } else {
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Sonuç bulunamadı.</div>';
+      }
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💰 Fiyatları kontrol et';
     }
   }
 
