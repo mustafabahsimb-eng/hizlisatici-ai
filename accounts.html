@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Hesaplarım</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #1D9E75; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link {
+    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  }
+  .back-link:hover { color: #fff; }
+
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
+
+  .section-title {
+    font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
+    letter-spacing: 0.03em; margin: 28px 0 12px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  .acc-list {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    overflow: hidden;
+  }
+  .acc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #232838;
+    gap: 14px;
+  }
+  .acc-row:last-child { border-bottom: none; }
+  .acc-info { flex: 1; min-width: 0; }
+  .acc-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+  .acc-desc { font-size: 12px; color: #9aa3b2; }
+  .acc-status {
+    font-size: 11px; padding: 3px 10px; border-radius: 10px; white-space: nowrap; margin-right: 4px;
+  }
+  .acc-status.connected { background: #123222; color: #6ee7b7; }
+  .acc-status.pending { background: #2e2712; color: #f2d16b; }
+  .acc-status.none { background: #232838; color: #9aa3b2; }
+  .acc-btn {
+    background: #1D9E75; color: #fff; border: none; padding: 9px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    text-decoration: none; white-space: nowrap; display: inline-block;
+  }
+  .acc-btn:hover { background: #178a65; }
+  .acc-btn.secondary {
+    background: transparent; color: #9aa3b2; border: 1px solid #2a3040;
+  }
+  .acc-btn.secondary:hover { border-color: #3a4258; color: #fff; }
+  .acc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+
+<main>
+  <h1>Hesaplarım</h1>
+  <div class="subtitle">Satış yapacağın pazaryerlerinde ve kullandığın tedarikçilerde hesap aç, bağlantı durumunu buradan takip et.</div>
+
+  <div class="section-title">Türkiye pazaryerleri</div>
+  <div class="acc-list">
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Trendyol</div>
+        <div class="acc-desc">Türkiye'nin en büyük pazaryerlerinden biri</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://partner.trendyol.com/onboarding/satici-formu" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Hepsiburada</div>
+        <div class="acc-desc">Geniş kategori ağıyla büyük pazaryeri</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://merchant.hepsiburada.com/v2/sign-up" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">N11</div>
+        <div class="acc-desc">Kayıt için satıcı destek/rehber sayfası</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://magazadestek.n11.com/satis-surecleri/magaza-uyelik-sureci-44" target="_blank" rel="noopener">Kayıt Rehberi</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Çiçeksepeti</div>
+        <div class="acc-desc">Çiçek ve hediye odaklı, geniş ürün yelpazesi de kabul eder</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://www.ciceksepeti.com/s/ciceksepetinde-satis-yap" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">PTT AVM</div>
+        <div class="acc-desc">PTT'nin resmi e-ticaret pazaryeri</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://www.pttavm.com/satici-ol" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Amazon TR</div>
+        <div class="acc-desc">Amazon Türkiye satıcı paneli</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://satis.amazon.com.tr/" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Pazarama</div>
+        <div class="acc-desc">Hızlı büyüyen yerli pazaryeri</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">hesap yok</span>
+        <a class="acc-btn" href="https://isortagim.pazarama.com/auth/seller-application" target="_blank" rel="noopener">Hesap Aç</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Tedarikçiler</div>
+  <div class="acc-list">
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">CJ Dropshipping</div>
+        <div class="acc-desc">Ürün arama ve tedarik için kullandığımız ana kaynak</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status connected">bağlı</span>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">AliExpress Affiliate</div>
+        <div class="acc-desc">Ek ürün kaynağı ve komisyonlu bağlantı programı</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status pending">onay bekleniyor</span>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Temu</div>
+        <div class="acc-desc">Resmi bir dropshipping API'si yok, şimdilik entegrasyon planlanmıyor</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">planda</span>
+        <a class="acc-btn secondary" href="https://www.temu.com" target="_blank" rel="noopener">Siteye Git</a>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Amazon / Walmart Tedarik</div>
+        <div class="acc-desc">İleride eklenmesi planlanan tedarik entegrasyonu</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none">planda</span>
+        <button class="acc-btn secondary" onclick="alert('Bu entegrasyon henüz eklenmedi, ileride planlanıyor.')">Detay</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+  }
+  init();
+</script>
+
+</body>
+</html>
