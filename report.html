@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Kâr-Zarar Raporu</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #1D9E75; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link {
+    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  }
+  .back-link:hover { color: #fff; }
+
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
+
+  .empty-state {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    padding: 60px 20px;
+    text-align: center;
+    color: #9aa3b2;
+  }
+  .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #1c212c;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #232838;
+  }
+  .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .stat-value { font-size: 19px; font-weight: 600; color: #fff; }
+  .stat-value.green { color: #5DCAA5; }
+  .stat-value.red { color: #f28b8b; }
+
+  .section-title {
+    font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
+    letter-spacing: 0.03em; margin: 28px 0 12px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  .panel {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    overflow: hidden;
+  }
+  .prod-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #232838;
+    gap: 14px;
+  }
+  .prod-row:last-child { border-bottom: none; }
+  .prod-rank {
+    width: 22px; flex-shrink: 0; font-size: 12px; color: #9aa3b2; font-weight: 600;
+  }
+  .prod-info { flex: 1; min-width: 0; }
+  .prod-name { font-size: 14px; font-weight: 500; color: #fff; }
+  .prod-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .prod-value { font-size: 14px; font-weight: 600; flex-shrink: 0; }
+  .prod-value.green { color: #5DCAA5; }
+  .prod-value.red { color: #f28b8b; }
+
+  .platform-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #232838;
+    gap: 14px;
+  }
+  .platform-row:last-child { border-bottom: none; }
+  .platform-name { font-size: 14px; font-weight: 500; color: #fff; }
+  .platform-count { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .platform-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: #232838;
+    border-radius: 4px;
+    overflow: hidden;
+    max-width: 200px;
+  }
+  .platform-bar {
+    height: 100%;
+    background: #1D9E75;
+    border-radius: 4px;
+  }
+  .platform-value { font-size: 13px; font-weight: 600; color: #5DCAA5; flex-shrink: 0; min-width: 90px; text-align: right; }
+
+  .no-price-note {
+    font-size: 12px; color: #9aa3b2; padding: 14px 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+
+<main>
+  <h1>📊 Kâr-Zarar Raporu</h1>
+  <div class="subtitle">Tüm ürünlerinin kâr durumu, en iyi/en zayıf performans gösterenler ve platform bazında dağılım.</div>
+
+  <div id="reportContent">
+    <div class="empty-state">
+      <h3>Yükleniyor...</h3>
+    </div>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+  function currencySymbolFor(platform) {
+    return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
+  }
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    await loadReport(session.user.id);
+  }
+  init();
+
+  async function loadReport(userId) {
+    const { data: products, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      document.getElementById('reportContent').innerHTML =
+        '<div class="empty-state"><h3>Rapor yüklenemedi</h3><p>' + escapeHtml(error.message) + '</p></div>';
+      return;
+    }
+
+    if (!products || products.length === 0) {
+      document.getElementById('reportContent').innerHTML = `
+        <div class="empty-state">
+          <h3>Henüz ürün eklemedin</h3>
+          <p>Rapor görebilmen için önce en az bir ürün eklemen gerekiyor.</p>
+        </div>`;
+      return;
+    }
+
+    const { data: shippingRates } = await supabaseClient.from('shipping_rates').select('*');
+
+    function getShippingCost(weightKg) {
+      if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
+      const matches = shippingRates
+        .filter(r => r.min_weight_kg <= weightKg && r.max_weight_kg >= weightKg)
+        .sort((a, b) => a.price - b.price);
+      return matches.length > 0 ? matches[0].price : 0;
+    }
+
+    const computed = products.map(p => {
+      const supplierPrice = p.supplier_price || 0;
+      const salePrice = p.sale_price || 0;
+      const commissionRate = p.commission_rate || 0;
+      const symbol = currencySymbolFor(p.platform);
+      let netProfit = null;
+      let marginPct = null;
+
+      if (salePrice > 0) {
+        const shippingCost = getShippingCost(p.weight_kg);
+        const commissionCost = salePrice * (commissionRate / 100);
+        netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
+        marginPct = (netProfit / salePrice) * 100;
+      }
+
+      return { p, netProfit, marginPct, symbol };
+    });
+
+    const priced = computed.filter(c => c.netProfit !== null);
+    const noPriceCount = computed.length - priced.length;
+
+    let tryProfit = 0, usdProfit = 0, marginSum = 0;
+    priced.forEach(c => {
+      if (c.symbol === '$') usdProfit += c.netProfit; else tryProfit += c.netProfit;
+      marginSum += c.marginPct;
+    });
+    const avgMargin = priced.length > 0 ? (marginSum / priced.length) : null;
+    const profitableCount = priced.filter(c => c.netProfit >= 0).length;
+    const lossCount = priced.filter(c => c.netProfit < 0).length;
+
+    const totalProfitText = usdProfit !== 0
+      ? '₺' + tryProfit.toFixed(2) + ' + $' + usdProfit.toFixed(2)
+      : '₺' + tryProfit.toFixed(2);
+
+    const topProfit = [...priced].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
+    const worstProfit = [...priced].sort((a, b) => a.netProfit - b.netProfit).slice(0, 5).filter(c => c.netProfit < (topProfit[0]?.netProfit ?? Infinity));
+
+    const platformMap = {};
+    priced.forEach(c => {
+      const key = c.p.platform || 'Belirtilmemiş';
+      if (!platformMap[key]) platformMap[key] = { count: 0, profit: 0, symbol: c.symbol };
+      platformMap[key].count++;
+      platformMap[key].profit += c.netProfit;
+    });
+    const platformList = Object.entries(platformMap)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.profit - a.profit);
+    const maxPlatformProfit = Math.max(...platformList.map(p => Math.abs(p.profit)), 1);
+
+    const statsHtml = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Toplam ürün</div>
+          <div class="stat-value">${products.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Toplam net kâr</div>
+          <div class="stat-value green">${totalProfitText}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ortalama marj</div>
+          <div class="stat-value green">${avgMargin !== null ? avgMargin.toFixed(1) + '%' : '-'}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Kârlı / Zararda</div>
+          <div class="stat-value"><span class="green">${profitableCount}</span> / <span class="red">${lossCount}</span></div>
+        </div>
+      </div>
+    `;
+
+    const topHtml = topProfit.length > 0 ? `
+      <div class="section-title">En kârlı ürünler</div>
+      <div class="panel">
+        ${topProfit.map((c, i) => `
+          <div class="prod-row">
+            <div class="prod-rank">#${i + 1}</div>
+            <div class="prod-info">
+              <div class="prod-name">${escapeHtml(c.p.name || 'İsimsiz ürün')}</div>
+              <div class="prod-meta">${escapeHtml(c.p.platform || '-')} · %${c.marginPct.toFixed(1)} marj</div>
+            </div>
+            <div class="prod-value ${c.netProfit >= 0 ? 'green' : 'red'}">${c.symbol}${c.netProfit.toFixed(2)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const worstHtml = worstProfit.length > 0 ? `
+      <div class="section-title">Dikkat edilmesi gerekenler (en düşük kârlı / zararda)</div>
+      <div class="panel">
+        ${worstProfit.map((c, i) => `
+          <div class="prod-row">
+            <div class="prod-rank">#${i + 1}</div>
+            <div class="prod-info">
+              <div class="prod-name">${escapeHtml(c.p.name || 'İsimsiz ürün')}</div>
+              <div class="prod-meta">${escapeHtml(c.p.platform || '-')} · %${c.marginPct.toFixed(1)} marj</div>
+            </div>
+            <div class="prod-value ${c.netProfit >= 0 ? 'green' : 'red'}">${c.symbol}${c.netProfit.toFixed(2)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const platformHtml = platformList.length > 0 ? `
+      <div class="section-title">Platform bazında dağılım</div>
+      <div class="panel">
+        ${platformList.map(p => `
+          <div class="platform-row">
+            <div style="flex:1; min-width:0;">
+              <div class="platform-name">${escapeHtml(p.name)}</div>
+              <div class="platform-count">${p.count} ürün</div>
+            </div>
+            <div class="platform-bar-wrap">
+              <div class="platform-bar" style="width:${Math.min(100, (Math.abs(p.profit) / maxPlatformProfit) * 100)}%; ${p.profit < 0 ? 'background:#f28b8b;' : ''}"></div>
+            </div>
+            <div class="platform-value" style="${p.profit < 0 ? 'color:#f28b8b;' : ''}">${p.symbol}${p.profit.toFixed(2)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const noPriceHtml = noPriceCount > 0
+      ? `<div class="no-price-note">ℹ️ ${noPriceCount} ürünün satış fiyatı girilmediği için rapora dahil edilmedi. Ürün düzenleme sayfasından satış fiyatını ekleyebilirsin.</div>`
+      : '';
+
+    document.getElementById('reportContent').innerHTML = statsHtml + topHtml + worstHtml + platformHtml + noPriceHtml;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>
