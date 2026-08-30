@@ -170,6 +170,7 @@
     <div style="display:flex; gap:10px;">
       <button class="btn-secondary" onclick="window.location.href='chat.html'">💬 Sohbetle Yönet</button>
       <button class="btn-secondary" onclick="window.location.href='accounts.html'">🔑 Hesaplarım</button>
+      <button class="btn-secondary" onclick="window.location.href='report.html'">📊 Kâr-Zarar Raporu</button>
       <button class="btn-secondary" onclick="window.location.href='trends.html'">🔥 Trend ürünler</button>
       <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
@@ -204,7 +205,6 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
   function currencySymbolFor(platform) {
     return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
