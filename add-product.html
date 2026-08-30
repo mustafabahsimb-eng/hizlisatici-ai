@@ -145,6 +145,16 @@
   .ad-format { font-size: 11px; color: #9aa3b2; margin-bottom: 6px; }
   .ad-note { font-size: 12px; color: #9aa3b2; }
 
+  .review-col-title { font-size: 12px; font-weight: 600; color: #9aa3b2; text-transform: uppercase; letter-spacing: 0.03em; margin: 14px 0 6px; }
+  .review-col-title:first-child { margin-top: 0; }
+  .review-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #1c212c; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; font-size: 13px; color: #e6e8ee;
+  }
+  .review-item-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .review-item-badge.observed { background: #123222; color: #6ee7b7; }
+  .review-item-badge.estimated { background: #232838; color: #9aa3b2; }
+
   .img-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
   .img-box {
     width: 140px; height: 140px; border-radius: 10px; border: 1px dashed #2a3040;
@@ -296,6 +306,14 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Müşteri yorumu analizi</div>
+    <div class="ai-note">Bu ürün/benzerleri için gerçek müşteri yorumlarını web'de tarayıp olumlu noktaları, dikkat edilmesi gereken şikayetleri ve sık sorulan soruları bulur. Önce ürün adını gir.</div>
+    <button class="btn-secondary" id="reviewAnalysisBtn" onclick="analyzeReviews()">💬 Müşteri yorumlarını analiz et</button>
+    <div id="reviewSummary" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="reviewResults" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Ürün görseli (arka plan temizle)</div>
     <div class="ai-note">Bir görsel yükle (ya da CJ'den seçtiğin ürünün görselini kullan), arka planı otomatik temizlensin.</div>
     <input type="file" id="imgFileInput" accept="image/*" style="margin-bottom:12px;">
@@ -353,6 +371,7 @@
   let detectedCategory = null;
   let lastGeneratedName = null;
 
+  // Platform + kategori bazlı YAKLAŞIK komisyon oranları (%) - tahminidir, kesin oran platform panelinden kontrol edilmeli
   const COMMISSION_TABLE = {
     'Trendyol': {
       'Elektronik': 7, 'Cep Telefonu': 6, 'Giyim': 22, 'Ayakkabı & Çanta': 24,
@@ -433,6 +452,7 @@
 
   const PAYMENT_PROCESSOR_PLATFORMS = ['Shopify', 'WooCommerce', 'Wix'];
   const FLAT_RATE_PLATFORMS = ['Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop'];
+  // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
 
   function currencySymbolFor(platform) {
@@ -456,6 +476,7 @@
     if (!session) { window.location.href = 'index.html'; return; }
     currentUser = session.user;
 
+    // Trend ürünler sayfasından "Bu ürünü ekle" ile geldiyse ürün adını doldur ve üretimi başlat
     const params = new URLSearchParams(window.location.search);
     const prefillName = params.get('name');
     if (prefillName) {
@@ -465,10 +486,13 @@
   }
   init();
 
+  // Kâr hesabını canlı güncelle
   ['supplierPrice', 'weightKg', 'commissionRate', 'salePrice'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateProfitCalc);
   });
 
+  // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
+  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
   document.getElementById('productName').addEventListener('blur', () => {
     const name = document.getElementById('productName').value.trim();
     if (name && name !== lastGeneratedName) {
@@ -609,6 +633,7 @@
     if (p.name) {
       document.getElementById('productName').value = p.name;
       lastGeneratedName = p.name;
+      // Ürün adı, kategori, ağırlık tahmini, başlık/açıklama/etiket AI ile üretilsin
       generateContent(false);
     } else {
       showMsg('Bu ürünün CJ tarafında İngilizce adı boş geldi, ürün adını elle gir ve "Başlık, açıklama ve etiket üret" butonuna bas.', 'error');
@@ -661,6 +686,9 @@
       const tagsEl = document.getElementById('genTags');
       const tagsStr = (data.tags || []).join(', ');
 
+      // Otomatik tetiklendiyse (ürün adından çıkınca) sadece boş alanları doldur,
+      // elle yazdığın bir şeyin üzerine yazmasın. Etiketleri otomatik doldurmuyoruz,
+      // sadece "Üret" butonuna elle basınca dolsun istendi. Butona bastıysan (auto=false) her zaman güncelle.
       if (auto) {
         if (!catEl.value.trim()) catEl.value = data.category || '';
         if (!titleEl.value.trim()) titleEl.value = data.title || '';
@@ -672,11 +700,13 @@
         tagsEl.value = tagsStr;
       }
 
+      // Kategori tahmin edildiyse ve platform zaten seçiliyse komisyonu güncelle
       const currentPlatform = document.getElementById('platform').value;
       if (currentPlatform && detectedCategory) {
         applyCommissionRate(currentPlatform, detectedCategory);
       }
 
+      // Ağırlık tahmini varsa ve alan boşsa doldur
       const weightInput = document.getElementById('weightKg');
       const weightNoteEl = document.getElementById('weightNote');
       if (data.estimatedWeightKg && !weightInput.value) {
@@ -823,6 +853,80 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '📢 Reklam fikirlerini analiz et';
+    }
+  }
+
+  async function analyzeReviews() {
+    const productName = document.getElementById('productName').value.trim();
+    const btn = document.getElementById('reviewAnalysisBtn');
+    const summaryEl = document.getElementById('reviewSummary');
+    const resultsEl = document.getElementById('reviewResults');
+
+    if (!productName) {
+      showMsg('Önce ürün adını gir.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Analiz ediliyor...';
+    summaryEl.style.display = 'none';
+    resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Müşteri yorumları taranıyor, bu biraz sürebilir...</div>';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/review-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productName }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const positives = data.positives || [];
+      const negatives = data.negatives || [];
+      const questions = data.commonQuestions || [];
+
+      if (positives.length === 0 && negatives.length === 0 && questions.length === 0) {
+        resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2;">Sonuç bulunamadı.</div>';
+        return;
+      }
+
+      if (data.summary) {
+        summaryEl.textContent = data.summary;
+        summaryEl.style.display = 'block';
+      }
+
+      function renderItems(items, textKey) {
+        return items.map((it) => {
+          const isObserved = it.source === 'gozlemlenen';
+          const badgeClass = isObserved ? 'observed' : 'estimated';
+          const badgeText = isObserved ? 'gerçek yorumda görüldü' : 'tahmini';
+          return `<div class="review-item">
+            <span class="review-item-badge ${badgeClass}">${badgeText}</span>
+            <span>${escapeHtml(it[textKey] || '')}</span>
+          </div>`;
+        }).join('');
+      }
+
+      let html = '';
+      if (positives.length > 0) {
+        html += '<div class="review-col-title">👍 Olumlu noktalar</div>' + renderItems(positives, 'point');
+      }
+      if (negatives.length > 0) {
+        html += '<div class="review-col-title">⚠️ Dikkat edilmesi gerekenler</div>' + renderItems(negatives, 'point');
+      }
+      if (questions.length > 0) {
+        html += '<div class="review-col-title">❓ Sık sorulan sorular</div>' + renderItems(questions, 'question');
+      }
+      resultsEl.innerHTML = html;
+    } catch (err) {
+      resultsEl.innerHTML = '<div style="font-size:12px; color:#f28b8b;">Hata: ' + err.message + '</div>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💬 Müşteri yorumlarını analiz et';
     }
   }
 
