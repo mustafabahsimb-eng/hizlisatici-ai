@@ -290,6 +290,26 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Çoklu dil desteği (İngilizce çeviri)</div>
+    <div class="ai-note">Uluslararası platformlarda (Etsy, Amazon Global, eBay, TikTok Shop vb.) satış yapıyorsan başlık, açıklama ve etiketleri SEO dostu İngilizceye çevirir. Önce yukarıdan başlık/açıklama üret ya da en azından ürün adını gir.</div>
+    <button class="btn-secondary" id="translateBtn" onclick="translateListing()">🌐 İngilizceye çevir</button>
+    <div id="translateResults" style="margin-top:12px; display:none;">
+      <div class="form-row">
+        <label for="titleEnOut">Başlık (EN)</label>
+        <input type="text" id="titleEnOut" readonly>
+      </div>
+      <div class="form-row">
+        <label for="descEnOut">Açıklama (EN)</label>
+        <textarea id="descEnOut" readonly></textarea>
+      </div>
+      <div class="form-row">
+        <label for="tagsEnOut">Etiketler (EN)</label>
+        <input type="text" id="tagsEnOut" readonly>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Gerçek anahtar kelime analizi</div>
     <div class="ai-note">AI tahmini değil — gerçek rakip ilanlarını web'de tarayıp gerçekten kullanılan/aranan kelimeleri bulur. Önce ürün adını gir.</div>
     <button class="btn-secondary" id="keywordAnalysisBtn" onclick="analyzeKeywords()">🔍 Anahtar kelimeleri analiz et</button>
@@ -741,6 +761,48 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '✨ Başlık, açıklama ve etiket üret';
+    }
+  }
+
+  async function translateListing() {
+    const title = document.getElementById('genTitle').value.trim();
+    const description = document.getElementById('genDesc').value.trim();
+    const tags = document.getElementById('genTags').value.trim();
+    const productName = document.getElementById('productName').value.trim();
+    const btn = document.getElementById('translateBtn');
+    const resultsBox = document.getElementById('translateResults');
+
+    if (!title && !description && !productName) {
+      showMsg('Önce ürün adını gir ya da başlık/açıklama üret.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Çevriliyor...';
+    resultsBox.style.display = 'none';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/translate-listing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ title, description, tags, productName }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      document.getElementById('titleEnOut').value = data.titleEn || '';
+      document.getElementById('descEnOut').value = data.descriptionEn || '';
+      document.getElementById('tagsEnOut').value = (data.tagsEn || []).join(', ');
+      resultsBox.style.display = 'block';
+    } catch (err) {
+      showMsg('Çeviri yapılamadı: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🌐 İngilizceye çevir';
     }
   }
 
