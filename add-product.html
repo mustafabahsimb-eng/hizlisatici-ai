@@ -145,6 +145,21 @@
   .ad-format { font-size: 11px; color: #9aa3b2; margin-bottom: 6px; }
   .ad-note { font-size: 12px; color: #9aa3b2; }
 
+  .img-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+  .img-box {
+    width: 140px; height: 140px; border-radius: 10px; border: 1px dashed #2a3040;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: #1c212c; flex-shrink: 0; position: relative;
+  }
+  .img-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .img-box.transparent-bg {
+    background-image: linear-gradient(45deg, #232838 25%, transparent 25%), linear-gradient(-45deg, #232838 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #232838 75%), linear-gradient(-45deg, transparent 75%, #232838 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  }
+  .img-placeholder { font-size: 11px; color: #9aa3b2; text-align: center; padding: 8px; }
+  .img-actions { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+
   .actions { display: flex; gap: 10px; margin-top: 20px; }
   .msg { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
   .msg.error { background: #2a1414; color: #f28b8b; display: block; }
@@ -281,6 +296,25 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Ürün görseli (arka plan temizle)</div>
+    <div class="ai-note">Bir görsel yükle (ya da CJ'den seçtiğin ürünün görselini kullan), arka planı otomatik temizlensin.</div>
+    <input type="file" id="imgFileInput" accept="image/*" style="margin-bottom:12px;">
+    <div class="img-row">
+      <div class="img-box" id="imgBoxOriginal">
+        <div class="img-placeholder" id="imgOriginalPlaceholder">Orijinal görsel<br>burada görünecek</div>
+      </div>
+      <div class="img-box transparent-bg" id="imgBoxResult">
+        <div class="img-placeholder" id="imgResultPlaceholder">Sonuç burada<br>görünecek</div>
+      </div>
+      <div class="img-actions">
+        <button class="btn-secondary" id="removeBgBtn" onclick="removeBackground()" disabled>🧹 Arka planı temizle</button>
+        <a class="btn-secondary" id="downloadImgBtn" style="display:none; text-align:center; text-decoration:none;" download="urun-gorseli.png">⬇️ İndir</a>
+      </div>
+    </div>
+    <div id="imgMsg" style="font-size:12px; color:#f28b8b; margin-top:8px; display:none;"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Kâr hesabı</div>
     <div class="profit-box">
       <div class="profit-item">
@@ -319,7 +353,6 @@
   let detectedCategory = null;
   let lastGeneratedName = null;
 
-  // Platform + kategori bazlı YAKLAŞIK komisyon oranları (%) - tahminidir, kesin oran platform panelinden kontrol edilmeli
   const COMMISSION_TABLE = {
     'Trendyol': {
       'Elektronik': 7, 'Cep Telefonu': 6, 'Giyim': 22, 'Ayakkabı & Çanta': 24,
@@ -400,7 +433,6 @@
 
   const PAYMENT_PROCESSOR_PLATFORMS = ['Shopify', 'WooCommerce', 'Wix'];
   const FLAT_RATE_PLATFORMS = ['Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop'];
-  // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
 
   function currencySymbolFor(platform) {
@@ -424,7 +456,6 @@
     if (!session) { window.location.href = 'index.html'; return; }
     currentUser = session.user;
 
-    // Trend ürünler sayfasından "Bu ürünü ekle" ile geldiyse ürün adını doldur ve üretimi başlat
     const params = new URLSearchParams(window.location.search);
     const prefillName = params.get('name');
     if (prefillName) {
@@ -434,13 +465,10 @@
   }
   init();
 
-  // Kâr hesabını canlı güncelle
   ['supplierPrice', 'weightKg', 'commissionRate', 'salePrice'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateProfitCalc);
   });
 
-  // Ürün adı alanından çıkınca (başka bir alana tıklayınca) otomatik olarak
-  // AI ile kategori/ağırlık/başlık/açıklama/etiket üretimini tetikle
   document.getElementById('productName').addEventListener('blur', () => {
     const name = document.getElementById('productName').value.trim();
     if (name && name !== lastGeneratedName) {
@@ -581,10 +609,17 @@
     if (p.name) {
       document.getElementById('productName').value = p.name;
       lastGeneratedName = p.name;
-      // Ürün adı, kategori, ağırlık tahmini, başlık/açıklama/etiket AI ile üretilsin
       generateContent(false);
     } else {
       showMsg('Bu ürünün CJ tarafında İngilizce adı boş geldi, ürün adını elle gir ve "Başlık, açıklama ve etiket üret" butonuna bas.', 'error');
+    }
+
+    if (p.image) {
+      window._imgSourceUrl = p.image;
+      window._imgSourceBase64 = null;
+      const origBox = document.getElementById('imgBoxOriginal');
+      origBox.innerHTML = `<img src="${p.image}">`;
+      document.getElementById('removeBgBtn').disabled = false;
     }
   }
 
@@ -626,9 +661,6 @@
       const tagsEl = document.getElementById('genTags');
       const tagsStr = (data.tags || []).join(', ');
 
-      // Otomatik tetiklendiyse (ürün adından çıkınca) sadece boş alanları doldur,
-      // elle yazdığın bir şeyin üzerine yazmasın. Etiketleri otomatik doldurmuyoruz,
-      // sadece "Üret" butonuna elle basınca dolsun istendi. Butona bastıysan (auto=false) her zaman güncelle.
       if (auto) {
         if (!catEl.value.trim()) catEl.value = data.category || '';
         if (!titleEl.value.trim()) titleEl.value = data.title || '';
@@ -640,13 +672,11 @@
         tagsEl.value = tagsStr;
       }
 
-      // Kategori tahmin edildiyse ve platform zaten seçiliyse komisyonu güncelle
       const currentPlatform = document.getElementById('platform').value;
       if (currentPlatform && detectedCategory) {
         applyCommissionRate(currentPlatform, detectedCategory);
       }
 
-      // Ağırlık tahmini varsa ve alan boşsa doldur
       const weightInput = document.getElementById('weightKg');
       const weightNoteEl = document.getElementById('weightNote');
       if (data.estimatedWeightKg && !weightInput.value) {
@@ -793,6 +823,68 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '📢 Reklam fikirlerini analiz et';
+    }
+  }
+
+  document.getElementById('imgFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      window._imgSourceBase64 = reader.result;
+      window._imgSourceUrl = null;
+      const origBox = document.getElementById('imgBoxOriginal');
+      origBox.innerHTML = `<img src="${reader.result}">`;
+      document.getElementById('removeBgBtn').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  async function removeBackground() {
+    const btn = document.getElementById('removeBgBtn');
+    const resultBox = document.getElementById('imgBoxResult');
+    const downloadBtn = document.getElementById('downloadImgBtn');
+    const msgEl = document.getElementById('imgMsg');
+
+    if (!window._imgSourceBase64 && !window._imgSourceUrl) {
+      msgEl.textContent = 'Önce bir görsel yükle ya da CJ\'den bir ürün seç.';
+      msgEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Temizleniyor...';
+    msgEl.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    resultBox.innerHTML = '<div class="img-placeholder">İşleniyor...</div>';
+
+    try {
+      const body = window._imgSourceBase64
+        ? { imageBase64: window._imgSourceBase64 }
+        : { imageUrl: window._imgSourceUrl };
+
+      const response = await fetch(SUPABASE_URL + '/functions/v1/remove-background', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      resultBox.innerHTML = `<img src="${data.imageBase64}">`;
+      downloadBtn.href = data.imageBase64;
+      downloadBtn.style.display = 'block';
+    } catch (err) {
+      resultBox.innerHTML = '<div class="img-placeholder">Sonuç burada<br>görünecek</div>';
+      msgEl.textContent = 'Hata: ' + err.message;
+      msgEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🧹 Arka planı temizle';
     }
   }
 
