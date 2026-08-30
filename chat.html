@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Sohbetle Yönet</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+  }
+  body { display: flex; flex-direction: column; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+    flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #1D9E75; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link {
+    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  }
+  .back-link:hover { color: #fff; }
+
+  main {
+    flex: 1;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .intro { margin-bottom: 16px; }
+  .intro h1 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .intro p { font-size: 13px; color: #9aa3b2; }
+
+  .chat-log {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px 4px;
+    margin-bottom: 12px;
+  }
+  .msg-row { display: flex; }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+  .msg-row.user .msg-bubble {
+    background: #1D9E75;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg-row.ai .msg-bubble {
+    background: #1c212c;
+    border: 1px solid #232838;
+    color: #e6e8ee;
+    border-bottom-left-radius: 4px;
+  }
+  .msg-row.ai .msg-bubble.system {
+    color: #9aa3b2;
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .suggestion-chip {
+    background: #1c212c; border: 1px solid #2a3040; color: #9aa3b2;
+    padding: 6px 12px; border-radius: 16px; font-size: 12px; cursor: pointer;
+  }
+  .suggestion-chip:hover { border-color: #1D9E75; color: #fff; }
+
+  .chat-input-row {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .chat-input-row input {
+    flex: 1;
+    background: #1c212c;
+    border: 1px solid #2a3040;
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+  .chat-input-row input:focus { border-color: #1D9E75; }
+  .send-btn {
+    background: #1D9E75; color: #fff; border: none;
+    padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .send-btn:hover { background: #178a65; }
+  .send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+
+<main>
+  <div class="intro">
+    <h1>💬 Sohbetle Yönet</h1>
+    <p>Ürün eklemek, silmek veya listeni görmek için doğal dille yaz — "kablosuz kulaklık ekle" veya "ürünlerimi listele" gibi.</p>
+  </div>
+
+  <div class="suggestions" id="suggestions">
+    <div class="suggestion-chip" onclick="sendSuggestion('ürünlerimi listele')">ürünlerimi listele</div>
+    <div class="suggestion-chip" onclick="sendSuggestion('kablosuz kulaklık ekle')">kablosuz kulaklık ekle</div>
+  </div>
+
+  <div class="chat-log" id="chatLog"></div>
+
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Örn: robot süpürge ekle" onkeydown="if(event.key==='Enter') sendMessage();">
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Gönder</button>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null;
+  let cachedProducts = [];
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUser = session.user;
+    await refreshProducts();
+    addAiMessage('Merhaba! Ürünlerinle ilgili ne yapmak istersin? "ürünlerimi listele" ya da "[ürün adı] ekle" yazabilirsin.');
+  }
+  init();
+
+  async function refreshProducts() {
+    const { data } = await supabaseClient
+      .from('products')
+      .select('id, name, platform')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    cachedProducts = data || [];
+  }
+
+  function addUserMessage(text) {
+    const log = document.getElementById('chatLog');
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function addAiMessage(text, isSystem = false) {
+    const log = document.getElementById('chatLog');
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+    row.innerHTML = `<div class="msg-bubble${isSystem ? ' system' : ''}">${escapeHtml(text)}</div>`;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function sendSuggestion(text) {
+    document.getElementById('chatInput').value = text;
+    sendMessage();
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const btn = document.getElementById('sendBtn');
+    const text = input.value.trim();
+    if (!text) return;
+
+    addUserMessage(text);
+    input.value = '';
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/chat-to-sell', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ message: text, products: cachedProducts }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      await handleAction(data);
+    } catch (err) {
+      addAiMessage('Bir hata oldu: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      input.focus();
+    }
+  }
+
+  async function handleAction(data) {
+    const action = data.action || 'none';
+    const params = data.params || {};
+
+    if (action === 'add_product' && params.name) {
+      addAiMessage(data.reply || ('"' + params.name + '" ürününü ekliyorum, ürün ekleme sayfasına yönlendiriyorum...'));
+      setTimeout(() => {
+        window.location.href = 'add-product.html?name=' + encodeURIComponent(params.name);
+      }, 900);
+      return;
+    }
+
+    if (action === 'delete_product' && params.id) {
+      const product = cachedProducts.find(p => p.id === params.id);
+      const confirmMsg = product
+        ? '"' + product.name + '" ürününü silmek istediğine emin misin?'
+        : 'Bu ürünü silmek istediğine emin misin?';
+      if (confirm(confirmMsg)) {
+        const { error } = await supabaseClient.from('products').delete().eq('id', params.id);
+        if (error) {
+          addAiMessage('Silinemedi: ' + error.message);
+        } else {
+          addAiMessage(data.reply || 'Ürün silindi.');
+          await refreshProducts();
+        }
+      } else {
+        addAiMessage('Tamam, silmedim.');
+      }
+      return;
+    }
+
+    if (action === 'list_products') {
+      addAiMessage(data.reply || 'İşte ürünlerin:');
+      if (cachedProducts.length === 0) {
+        addAiMessage('Henüz hiç ürünün yok.', true);
+      } else {
+        const listText = cachedProducts.map(p => '• ' + p.name + (p.platform ? ' (' + p.platform + ')' : '')).join('\n');
+        addAiMessage(listText, true);
+      }
+      return;
+    }
+
+    addAiMessage(data.reply || 'Anlayamadım, tekrar dener misin?');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>
