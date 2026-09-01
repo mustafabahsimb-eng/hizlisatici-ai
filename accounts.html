@@ -177,10 +177,11 @@
     <div class="acc-row">
       <div class="acc-info">
         <div class="acc-name">CJ Dropshipping</div>
-        <div class="acc-desc">Ürün arama ve tedarik için kullandığımız ana kaynak</div>
+        <div class="acc-desc">Ürün arama ve tedarik için kullandığımız ana kaynak. İstersen kendi CJ hesabını bağlayıp aramaları kendi hesabınla yapabilirsin.</div>
       </div>
-      <div class="acc-right">
-        <span class="acc-status connected">bağlı</span>
+      <div class="acc-right" id="cjRight">
+        <span class="acc-status connected" id="cjStatus">bağlı</span>
+        <span id="cjAction"></span>
       </div>
     </div>
     <div class="acc-row">
@@ -189,7 +190,7 @@
         <div class="acc-desc">Ek ürün kaynağı ve komisyonlu bağlantı programı</div>
       </div>
       <div class="acc-right">
-        <span class="acc-status pending">onay bekleniyor</span>
+        <span class="acc-status connected">bağlı</span>
       </div>
     </div>
     <div class="acc-row">
@@ -220,9 +221,79 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  async function renderCJStatus() {
+    const statusEl = document.getElementById('cjStatus');
+    const actionEl = document.getElementById('cjAction');
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_integrations')
+        .select('api_key')
+        .eq('platform', 'cj')
+        .maybeSingle();
+
+      if (error) {
+        statusEl.textContent = 'bağlı';
+        statusEl.className = 'acc-status connected';
+        actionEl.innerHTML = '';
+        return;
+      }
+
+      if (data && data.api_key) {
+        statusEl.textContent = 'kendi hesabın bağlı';
+        statusEl.className = 'acc-status connected';
+        actionEl.innerHTML = '<button class="acc-btn secondary" onclick="disconnectCJ()">Kaldır</button>';
+      } else {
+        statusEl.textContent = 'bağlı (paylaşımlı)';
+        statusEl.className = 'acc-status connected';
+        actionEl.innerHTML = '<button class="acc-btn secondary" onclick="connectCJ()">Kendi Hesabını Bağla</button>';
+      }
+    } catch (e) {
+      statusEl.textContent = 'bağlı';
+      statusEl.className = 'acc-status connected';
+      actionEl.innerHTML = '';
+    }
+  }
+
+  async function connectCJ() {
+    const apiKey = prompt('CJ Dropshipping API anahtarını yapıştır:');
+    if (!apiKey || !apiKey.trim()) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+
+    const { error } = await supabaseClient
+      .from('user_integrations')
+      .upsert(
+        { user_id: session.user.id, platform: 'cj', api_key: apiKey.trim() },
+        { onConflict: 'user_id,platform' }
+      );
+
+    if (error) {
+      alert('Bağlama başarısız: ' + error.message);
+      return;
+    }
+    await renderCJStatus();
+  }
+
+  async function disconnectCJ() {
+    if (!confirm('CJ Dropshipping bağlantını kaldırmak istediğine emin misin? Aramalar tekrar paylaşımlı hesapla yapılacak.')) return;
+
+    const { error } = await supabaseClient
+      .from('user_integrations')
+      .delete()
+      .eq('platform', 'cj');
+
+    if (error) {
+      alert('Kaldırma başarısız: ' + error.message);
+      return;
+    }
+    await renderCJStatus();
+  }
+
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
+    await renderCJStatus();
   }
   init();
 </script>
