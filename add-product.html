@@ -607,6 +607,7 @@
     resultsEl.innerHTML = '<div style="font-size:12px; color:#9aa3b2; margin-top:8px;">Aranıyor...</div>';
     translateEl.style.display = 'none';
     try {
+      const { data: { session: cjSession } } = await supabaseClient.auth.getSession();
       const response = await fetch(SUPABASE_URL + '/functions/v1/cj-search', {
         method: 'POST',
         headers: {
@@ -614,7 +615,7 @@
           'Authorization': 'Bearer ' + SUPABASE_KEY,
           'apikey': SUPABASE_KEY,
         },
-        body: JSON.stringify({ keyword }),
+        body: JSON.stringify({ keyword, userAccessToken: cjSession ? cjSession.access_token : null }),
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
@@ -624,6 +625,10 @@
       } else if (data.translateDebug) {
         translateEl.textContent = '⚠️ Çeviri başarısız (geçici teşhis notu): ' + data.translateDebug;
         translateEl.style.color = '#f28b8b';
+        translateEl.style.display = 'block';
+      } else if (data.usingOwnAccount) {
+        translateEl.textContent = '✅ Kendi CJ hesabınla arandı';
+        translateEl.style.color = '#6ee7b7';
         translateEl.style.display = 'block';
       }
       const products = data.products || [];
