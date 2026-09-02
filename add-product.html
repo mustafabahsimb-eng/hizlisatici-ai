@@ -659,6 +659,12 @@
   function useCJProduct(index) {
     const p = (window._cjProducts || [])[index];
     if (!p) return;
+    // Otomatik sipariş verme altyapısı için tedarikçi + ürün kimliğini sakla.
+    // cj-search fonksiyonu henüz pid/vid döndürmüyorsa bunlar null kalır,
+    // sipariş otomasyonu devreye alınınca cj-search güncellenip burada dolacak.
+    window._selectedSupplier = 'cj';
+    window._selectedSupplierItemId = p.pid || p.productId || p.id || null;
+    window._selectedSupplierVariantId = p.vid || p.variantId || null;
     document.getElementById('supplierPrice').value = p.priceUsd;
     updateProfitCalc();
     if (p.name) {
@@ -676,8 +682,7 @@
       origBox.innerHTML = `<img src="${p.image}">`;
       document.getElementById('removeBgBtn').disabled = false;
     }
-  }
-  async function searchAliExpress() {
+  }  async function searchAliExpress() {
     const keyword = document.getElementById('aliKeyword').value.trim();
     const btn = document.getElementById('aliSearchBtn');
     const resultsEl = document.getElementById('aliResults');
@@ -736,6 +741,10 @@
   function useAliExpressProduct(index) {
     const p = (window._aliProducts || [])[index];
     if (!p) return;
+    // Otomatik sipariş verme altyapısı için tedarikçi + ürün kimliğini sakla.
+    window._selectedSupplier = 'aliexpress';
+    window._selectedSupplierItemId = p.itemId || p.id || null;
+    window._selectedSupplierVariantId = null;
     document.getElementById('supplierPrice').value = p.priceUsd;
     updateProfitCalc();
     if (p.name) {
@@ -1253,6 +1262,9 @@
       sale_price: salePrice,
       generated_title: genTitle,
       generated_description: genDesc,
+      supplier: window._selectedSupplier || null,
+      supplier_item_id: window._selectedSupplierItemId || null,
+      supplier_variant_id: window._selectedSupplierVariantId || null,
     });
     if (error) {
       showMsg('Kaydedilemedi: ' + error.message, 'error');
