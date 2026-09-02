@@ -54,6 +54,7 @@
     border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
   .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; }
@@ -112,6 +113,9 @@
   .tracking-line { font-size: 12px; margin-top: 8px; }
   .tracking-line a { color: #9aa3b2; text-decoration: underline; cursor: pointer; }
   .tracking-line .tracking-value { color: #6ee7b7; font-weight: 600; }
+  .cj-action-row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .cj-action-btn { font-size: 12px; padding: 7px 12px; }
+  .error-line { color: #f28b8b; font-size: 12px; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -389,6 +393,9 @@
         `<option value="${s}" ${s === o.status ? 'selected' : ''}>${STATUS_LABELS[s]}</option>`
       ).join('');
 
+      const canPlaceCjOrder = o.supplier === 'cj' && (o.status === 'beklemede' || o.status === 'hata');
+      const canSyncTracking = o.supplier === 'cj' && (o.status === 'tedarikciye_verildi' || o.status === 'kargoya_verildi');
+
       return `
         <div class="order-row" data-id="${o.id}">
           <div class="order-top">
@@ -404,6 +411,12 @@
               <button class="icon-btn" title="Siparişi sil" onclick="deleteOrder('${o.id}')">🗑</button>
             </div>
           </div>
+          ${o.status === 'hata' && o.error_message ? '<div class="error-line">Hata: ' + escapeHtml(o.error_message) + '</div>' : ''}
+          ${canPlaceCjOrder || canSyncTracking ? `
+            <div class="cj-action-row">
+              ${canPlaceCjOrder ? `<button class="btn-secondary cj-action-btn" onclick="placeCjOrder('${o.id}', this)">📦 CJ'ye Sipariş Ver</button>` : ''}
+              ${canSyncTracking ? `<button class="btn-secondary cj-action-btn" onclick="syncCjTracking('${o.id}', this)">🔄 Kargo Durumunu Güncelle</button>` : ''}
+            </div>` : ''}
           <div class="tracking-line">
             ${o.tracking_number
               ? 'Kargo takip no: <span class="tracking-value">' + escapeHtml(o.tracking_number) + '</span> <a onclick="editTracking(\'' + o.id + '\', \'' + escapeAttr(o.tracking_number) + '\')">değiştir</a>'
@@ -412,6 +425,64 @@
           </div>
         </div>`;
     }).join('');
+  }
+
+  async function placeCjOrder(orderId, btn) {
+    if (!confirm('CJ Dropshipping\'e gerçek sipariş oluşturulacak. Ödeme OTOMATİK yapılmayacak — CJ panelinden (cjdropshipping.com > Orders) sen onaylayıp ödeyeceksin. Devam edilsin mi?')) return;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    btn.disabled = true;
+    btn.textContent = 'Sipariş veriliyor...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/cj-place-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ orderId, userAccessToken: session.access_token }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      alert('Sipariş CJ\'de oluşturuldu (sipariş no: ' + data.supplierOrderId + ').\n\n' + (data.note || ''));
+      loadOrders();
+    } catch (err) {
+      alert('Sipariş verilemedi: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = "📦 CJ'ye Sipariş Ver";
+    }
+  }
+
+  async function syncCjTracking(orderId, btn) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    btn.disabled = true;
+    btn.textContent = 'Kontrol ediliyor...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/cj-sync-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ orderId, userAccessToken: session.access_token }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      if (data.trackingNumber) {
+        alert('Kargo takip no bulundu: ' + data.trackingNumber);
+      } else {
+        alert('CJ henüz kargo takip numarası vermemiş, daha sonra tekrar dene.');
+      }
+      loadOrders();
+    } catch (err) {
+      alert('Kontrol edilemedi: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 Kargo Durumunu Güncelle';
+    }
   }
 
   async function updateStatus(orderId, status) {
