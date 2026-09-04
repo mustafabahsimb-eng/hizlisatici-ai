@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mağazanı Kur - HızlıSatıcı AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: linear-gradient(180deg, #0a0e1a 0%, #0d1117 100%);
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  .subtitle { color: #8b949e; margin-bottom: 32px; }
+  .card {
+    background: #10151f;
+    border: 1px solid #1f2733;
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  label { display: block; font-size: 14px; color: #c9d1d9; margin-bottom: 8px; font-weight: 600; }
+  input {
+    width: 100%;
+    background: #0a0e1a;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: #e6edf3;
+    font-size: 15px;
+    margin-bottom: 20px;
+  }
+  input:focus { outline: none; border-color: #1D9E75; }
+  button {
+    background: #1D9E75;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 24px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:hover { background: #178a65; }
+  button:disabled { background: #2a3441; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #2a3441; color: #c9d1d9; }
+  .product-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+  .product-item {
+    display: flex; gap: 12px; align-items: center;
+    background: #0a0e1a; border: 1px solid #1f2733; border-radius: 10px; padding: 12px;
+  }
+  .product-item img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: #1f2733; flex-shrink: 0; }
+  .product-item .info { flex: 1; }
+  .product-item .info .name { font-weight: 600; font-size: 14px; }
+  .product-item .info .meta { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .product-item input[type="checkbox"] { width: auto; margin: 0; }
+  .loading { text-align: center; padding: 40px 0; color: #8b949e; }
+  .error-box { background: #2d1418; border: 1px solid #5a2530; color: #ff8a8a; padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+  .success-box { text-align: center; padding: 20px 0; }
+  .success-box .check { font-size: 48px; margin-bottom: 16px; }
+  .store-name-input { font-size: 20px; font-weight: 700; }
+  .step-label { color: #1D9E75; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; }
+  a.store-link { color: #1D9E75; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🏪 Mağazanı Kur</h1>
+  <div class="subtitle">Hobinden yola çıkarak birkaç dakikada hazır bir mağaza oluşturalım</div>
+
+  <div id="step1" class="card">
+    <div class="step-label">1. ADIM</div>
+    <label>Hobin / ilgi alanın ne?</label>
+    <input type="text" id="hobbyInput" placeholder="örn. balık tutma, örgü, ev dekorasyonu...">
+    <label>Bütçen ne kadar? (opsiyonel, TL)</label>
+    <input type="number" id="budgetInput" placeholder="örn. 5000">
+    <button id="suggestBtn" onclick="getSuggestions()">Ürün Önerilerini Getir</button>
+  </div>
+
+  <div id="loadingBox" class="card loading" style="display:none;">
+    AI senin için ürünler araştırıyor, birkaç saniye sürebilir...
+  </div>
+
+  <div id="errorBox" class="error-box" style="display:none;"></div>
+
+  <div id="step2" class="card" style="display:none;">
+    <div class="step-label">2. ADIM</div>
+    <label>Mağaza adı</label>
+    <input type="text" id="storeNameInput" class="store-name-input">
+    <div id="productList" class="product-list"></div>
+    <button id="createBtn" onclick="createStore()">Mağazamı Kur</button>
+    <button class="secondary" style="margin-top:10px;" onclick="location.reload()">Baştan Başla</button>
+  </div>
+
+  <div id="step3" class="card success-box" style="display:none;">
+    <div class="check">✅</div>
+    <h2>Mağazan hazır!</h2>
+    <p style="color:#8b949e; margin: 12px 0;">Ürünlerin panelinde otomatik eklendi.</p>
+    <p>Mağaza adresin: <br><a class="store-link" id="storeLinkText" href="#"></a></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// BURAYA SUPABASE CLIENT KODUNU YAPIŞTIR
+// (dashboard.html dosyasının en başındaki supabase-js script + createClient(...) bloğunu buraya kopyala)
+
+const FUNCTION_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/store-wizard';
+let lastSuggestion = null;
+
+async function getAuthHeader() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    window.location.href = 'index.html';
+    throw new Error('Oturum bulunamadı');
+  }
+  return session.access_token;
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('errorBox').style.display = 'none';
+}
+
+async function getSuggestions() {
+  hideError();
+  const hobby = document.getElementById('hobbyInput').value.trim();
+  const budget = document.getElementById('budgetInput').value;
+
+  if (!hobby) {
+    showError('Lütfen hobi/ilgi alanını yaz.');
+    return;
+  }
+
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('loadingBox').style.display = 'block';
+
+  try {
+    const token = await getAuthHeader();
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ mode: 'suggest', hobby, budget: budget ? Number(budget) : null }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Bir hata oluştu');
+    }
+
+    lastSuggestion = { hobby, budget: budget ? Number(budget) : null, store_slug: data.store_slug, products: data.products };
+
+    document.getElementById('storeNameInput').value = data.store_name || hobby;
+    renderProducts(data.products || []);
+
+    document.getElementById('loadingBox').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+  } catch (err) {
+    document.getElementById('loadingBox').style.display = 'none';
+    document.getElementById('step1').style.display = 'block';
+    showError(err.message);
+  }
+}
+
+function renderProducts(products) {
+  const list = document.getElementById('productList');
+  list.innerHTML = '';
+  products.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'product-item';
+    div.innerHTML = `
+      <input type="checkbox" checked data-index="${i}" class="product-check">
+      <img src="${p.image_url || ''}" onerror="this.style.display='none'">
+      <div class="info">
+        <div class="name">${p.name}</div>
+        <div class="meta">${p.category || ''} · ~${p.estimated_sale_price || '-'} TL</div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function createStore() {
+  hideError();
+  if (!lastSuggestion) return;
+
+  const storeName = document.getElementById('storeNameInput').value.trim();
+  if (!storeName) {
+    showError('Mağaza adı boş olamaz.');
+    return;
+  }
+
+  const checks = document.querySelectorAll('.product-check');
+  const selected = [];
+  checks.forEach((c, i) => {
+    if (c.checked) selected.push(lastSuggestion.products[i]);
+  });
+
+  if (selected.length === 0) {
+    showError('En az bir ürün seçmelisin.');
+    return;
+  }
+
+  const createBtn = document.getElementById('createBtn');
+  createBtn.disabled = true;
+  createBtn.textContent = 'Mağaza kuruluyor...';
+
+  try {
+    const token = await getAuthHeader();
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mode: 'create',
+        hobby: lastSuggestion.hobby,
+        budget: lastSuggestion.budget,
+        store_name: storeName,
+        store_slug: lastSuggestion.store_slug,
+        products: selected,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Bir hata oluştu');
+    }
+
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'block';
+    const link = document.getElementById('storeLinkText');
+    link.textContent = `magaza.html?m=${data.store_slug}`;
+    link.href = `magaza.html?m=${data.store_slug}`;
+  } catch (err) {
+    showError(err.message);
+    createBtn.disabled = false;
+    createBtn.textContent = 'Mağazamı Kur';
+  }
+}
+</script>
+</body>
+</html>
