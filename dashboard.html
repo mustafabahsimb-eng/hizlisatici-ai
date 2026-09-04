@@ -161,6 +161,17 @@
   .score-mid { background: #2a2410; color: #e6c96a; }
   .score-low { background: #2a1414; color: #f28b8b; }
   .score-calc-btn { font-size: 12px; padding: 7px 12px; }
+  .price-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    background: #241a3d;
+    color: #c9a8f5;
+  }
+  .price-calc-btn { font-size: 12px; padding: 7px 12px; }
   .icon-btn-mini {
     background: transparent;
     border: 1px solid #2a3040;
@@ -328,6 +339,11 @@
            <button class="icon-btn-mini" title="Skoru yenile" onclick="calculateWinningScore('${p.id}', this)">🔄</button>`
         : `<button class="btn-secondary score-calc-btn" onclick="calculateWinningScore('${p.id}', this)">🏆 Skor Hesapla</button>`;
 
+      const priceHtml = p.suggested_price != null
+        ? `<span class="price-badge" onclick="showPriceSuggestion('${p.id}')" title="Detay için tıkla">💡 ${symbol}${Number(p.suggested_price).toFixed(2)}</span>
+           <button class="icon-btn-mini" title="Fiyatı yenile" onclick="calculatePriceSuggestion('${p.id}', this)">🔄</button>`
+        : `<button class="btn-secondary price-calc-btn" onclick="calculatePriceSuggestion('${p.id}', this)">💡 Fiyat Öner</button>`;
+
       return `
       <div class="product-row" data-id="${p.id}">
         <div>
@@ -336,6 +352,7 @@
         </div>
         <div class="product-right">
           ${scoreHtml}
+          ${priceHtml}
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">
             ${netProfit !== null ? symbol + netProfit.toFixed(2) : '<span style="color:#9aa3b2; font-weight:400; font-size:12px;">satış fiyatı girilmemiş</span>'}
           </div>
@@ -393,6 +410,78 @@
       '📊 Kâr marjı: ' + m.margin.score + '/100 - ' + m.margin.note,
     ];
     alert(lines.join('\n'));
+  }
+
+  async function calculatePriceSuggestion(productId, btn) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/price-optimize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ productId, userAccessToken: session.access_token }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      loadProducts(session.user.id);
+    } catch (err) {
+      alert('Fiyat önerisi hesaplanamadı: ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  function showPriceSuggestion(productId) {
+    const p = currentProducts.find(x => String(x.id) === String(productId));
+    if (!p || !p.suggested_price_reasoning) return;
+
+    let data;
+    try {
+      data = JSON.parse(p.suggested_price_reasoning);
+    } catch {
+      return;
+    }
+
+    const symbol = currencySymbolFor(p.platform);
+    const lines = [
+      'Önerilen satış fiyatı: ' + symbol + Number(p.suggested_price).toFixed(2),
+      data.currentPrice != null ? 'Mevcut fiyat: ' + symbol + Number(data.currentPrice).toFixed(2) : 'Mevcut fiyat: girilmemiş',
+      '',
+      data.competitorRangeNote ? '🔍 Rakip fiyat notu: ' + data.competitorRangeNote : '',
+      data.reasoning ? '💡 Gerekçe: ' + data.reasoning : '',
+      '',
+      data.currentMarginPct != null ? 'Mevcut marj: %' + data.currentMarginPct.toFixed(1) : '',
+      data.projectedMarginPct != null ? 'Önerilen fiyatla marj: %' + data.projectedMarginPct.toFixed(1) : '',
+    ].filter(line => line !== '');
+
+    const wantsApply = confirm(lines.join('\n') + '\n\nBu fiyatı ürüne uygulamak ister misin?');
+    if (wantsApply) {
+      applySuggestedPrice(productId, p.suggested_price);
+    }
+  }
+
+  async function applySuggestedPrice(productId, price) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const { error } = await supabaseClient
+      .from('products')
+      .update({ sale_price: price })
+      .eq('id', productId);
+
+    if (error) {
+      alert('Fiyat uygulanamadı: ' + error.message);
+      return;
+    }
+
+    loadProducts(session.user.id);
   }
 
   async function deleteProduct(productId) {
