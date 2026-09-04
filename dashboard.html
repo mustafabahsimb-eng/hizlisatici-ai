@@ -51,7 +51,6 @@
     cursor: pointer;
   }
   .logout-btn:hover { border-color: #3a4258; color: #fff; }
-
   main {
     max-width: 1100px;
     margin: 0 auto;
@@ -88,7 +87,6 @@
     white-space: nowrap;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
-
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -104,7 +102,6 @@
   .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
   .stat-value { font-size: 22px; font-weight: 600; color: #fff; }
   .stat-value.green { color: #5DCAA5; }
-
   .product-list {
     background: #141821;
     border-radius: 14px;
@@ -118,7 +115,6 @@
   }
   .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
   .empty-state p { font-size: 14px; margin-bottom: 20px; }
-
   .product-row {
     display: flex;
     justify-content: space-between;
@@ -148,7 +144,6 @@
     flex-shrink: 0;
   }
   .delete-btn:hover { border-color: #f28b8b; color: #f28b8b; background: #2a1414; }
-
   .score-badge {
     font-size: 12px;
     font-weight: 600;
@@ -190,7 +185,6 @@
 </style>
 </head>
 <body>
-
 <header>
   <div class="logo">
     <div class="logo-dot">H</div>
@@ -201,7 +195,6 @@
     <button class="logout-btn" onclick="logout()">Çıkış yap</button>
   </div>
 </header>
-
 <main>
   <div class="top-row">
     <div>
@@ -215,10 +208,10 @@
       <button class="btn-secondary" onclick="window.location.href='report.html'">📊 Kâr-Zarar Raporu</button>
       <button class="btn-secondary" onclick="window.location.href='trends.html'">🔥 Trend ürünler</button>
       <button class="btn-secondary" onclick="window.location.href='briefing.html'">📅 Haftalık Brifing</button>
+      <button class="btn-secondary" onclick="window.location.href='store-builder.html'">🧭 Mağazanı Kur</button>
       <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
   </div>
-
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">Toplam ürün</div>
@@ -233,7 +226,6 @@
       <div class="stat-value green" id="totalProfit">₺0</div>
     </div>
   </div>
-
   <div class="product-list" id="productList">
     <div class="empty-state">
       <h3>Henüz ürün eklemedin</h3>
@@ -242,19 +234,15 @@
     </div>
   </div>
 </main>
-
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
   function currencySymbolFor(platform) {
     return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
   }
-
   let currentProducts = [];
-
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
@@ -264,31 +252,24 @@
     document.getElementById('userEmail').textContent = session.user.email;
     loadProducts(session.user.id);
   }
-
   async function loadProducts(userId) {
     const { data: products, error } = await supabaseClient
       .from('products')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-
     if (error) {
       console.error(error);
       return;
     }
-
     currentProducts = products;
-
     document.getElementById('totalProducts').textContent = products.length;
     document.getElementById('productCountText').textContent =
       products.length === 0 ? 'Henüz ürün yok' : products.length + ' ürün listeleniyor';
-
     if (products.length === 0) return;
-
     const { data: shippingRates } = await supabaseClient
       .from('shipping_rates')
       .select('*');
-
     function getShippingCost(weightKg) {
       if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
       const matches = shippingRates
@@ -296,12 +277,10 @@
         .sort((a, b) => a.price - b.price);
       return matches.length > 0 ? matches[0].price : 0;
     }
-
     let tryProfit = 0;
     let usdProfit = 0;
     let marginSum = 0;
     let marginCount = 0;
-
     const computed = products.map(p => {
       const supplierPrice = p.supplier_price || 0;
       const salePrice = p.sale_price || 0;
@@ -309,13 +288,11 @@
       const symbol = currencySymbolFor(p.platform);
       let netProfit = null;
       let marginPct = null;
-
       if (salePrice > 0) {
         const shippingCost = getShippingCost(p.weight_kg);
         const commissionCost = salePrice * (commissionRate / 100);
         netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
         marginPct = (netProfit / salePrice) * 100;
-
         if (symbol === '$') {
           usdProfit += netProfit;
         } else {
@@ -324,27 +301,22 @@
         marginSum += marginPct;
         marginCount++;
       }
-
       return { p, netProfit, marginPct, symbol };
     });
-
     document.getElementById('totalProfit').textContent =
       usdProfit !== 0 ? '₺' + tryProfit.toFixed(2) + ' + $' + usdProfit.toFixed(2) : '₺' + tryProfit.toFixed(2);
     document.getElementById('avgMargin').textContent =
       marginCount > 0 ? (marginSum / marginCount).toFixed(1) + '%' : '-';
-
     const listEl = document.getElementById('productList');
     listEl.innerHTML = computed.map(({ p, netProfit, marginPct, symbol }) => {
       const scoreHtml = p.winning_score != null
         ? `<span class="score-badge ${scoreLevelClass(p.winning_score)}" onclick="showScoreDetail('${p.id}')" title="Detay için tıkla">🏆 ${p.winning_score}/100</span>
            <button class="icon-btn-mini" title="Skoru yenile" onclick="calculateWinningScore('${p.id}', this)">🔄</button>`
         : `<button class="btn-secondary score-calc-btn" onclick="calculateWinningScore('${p.id}', this)">🏆 Skor Hesapla</button>`;
-
       const priceHtml = p.suggested_price != null
         ? `<span class="price-badge" onclick="showPriceSuggestion('${p.id}')" title="Detay için tıkla">💡 ${symbol}${Number(p.suggested_price).toFixed(2)}</span>
            <button class="icon-btn-mini" title="Fiyatı yenile" onclick="calculatePriceSuggestion('${p.id}', this)">🔄</button>`
         : `<button class="btn-secondary price-calc-btn" onclick="calculatePriceSuggestion('${p.id}', this)">💡 Fiyat Öner</button>`;
-
       return `
       <div class="product-row" data-id="${p.id}">
         <div>
@@ -363,13 +335,11 @@
     `;
     }).join('');
   }
-
   function scoreLevelClass(score) {
     if (score >= 70) return 'score-high';
     if (score >= 40) return 'score-mid';
     return 'score-low';
   }
-
   async function calculateWinningScore(productId, btn) {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
@@ -395,7 +365,6 @@
       btn.innerHTML = originalHtml;
     }
   }
-
   function showScoreDetail(productId) {
     const p = currentProducts.find(x => String(x.id) === String(productId));
     if (!p || !p.winning_score_data) return;
@@ -412,7 +381,6 @@
     ];
     alert(lines.join('\n'));
   }
-
   async function calculatePriceSuggestion(productId, btn) {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
@@ -438,18 +406,15 @@
       btn.innerHTML = originalHtml;
     }
   }
-
   function showPriceSuggestion(productId) {
     const p = currentProducts.find(x => String(x.id) === String(productId));
     if (!p || !p.suggested_price_reasoning) return;
-
     let data;
     try {
       data = JSON.parse(p.suggested_price_reasoning);
     } catch {
       return;
     }
-
     const symbol = currencySymbolFor(p.platform);
     const lines = [
       'Önerilen satış fiyatı: ' + symbol + Number(p.suggested_price).toFixed(2),
@@ -461,62 +426,48 @@
       data.currentMarginPct != null ? 'Mevcut marj: %' + data.currentMarginPct.toFixed(1) : '',
       data.projectedMarginPct != null ? 'Önerilen fiyatla marj: %' + data.projectedMarginPct.toFixed(1) : '',
     ].filter(line => line !== '');
-
     const wantsApply = confirm(lines.join('\n') + '\n\nBu fiyatı ürüne uygulamak ister misin?');
     if (wantsApply) {
       applySuggestedPrice(productId, p.suggested_price);
     }
   }
-
   async function applySuggestedPrice(productId, price) {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
-
     const { error } = await supabaseClient
       .from('products')
       .update({ sale_price: price })
       .eq('id', productId);
-
     if (error) {
       alert('Fiyat uygulanamadı: ' + error.message);
       return;
     }
-
     loadProducts(session.user.id);
   }
-
   async function deleteProduct(productId) {
     if (!confirm('Bu ürünü silmek istediğine emin misin?')) return;
-
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
-
     const { error } = await supabaseClient
       .from('products')
       .delete()
       .eq('id', productId);
-
     if (error) {
       alert('Silinemedi: ' + error.message);
       return;
     }
-
     loadProducts(session.user.id);
   }
-
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
   }
-
   async function logout() {
     await supabaseClient.auth.signOut();
     window.location.href = 'index.html';
   }
-
   init();
 </script>
-
 </body>
 </html>
