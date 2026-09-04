@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HızlıSatıcı AI - Mağazanı Kur</title>
+<title>Mağazanı Kur - HızlıSatıcı AI</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,72 +35,54 @@
     padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
   }
   .logout-btn:hover { border-color: #3a4258; color: #fff; }
-
-  main { max-width: 700px; margin: 0 auto; padding: 40px 24px; }
-  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 14px; }
-  h1 { font-size: 22px; font-weight: 600; color: #fff; }
-  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; }
-
+  main { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 28px; }
+  .card {
+    background: #1c212c; border-radius: 12px; padding: 24px;
+    border: 1px solid #232838; margin-bottom: 18px;
+  }
+  label { display: block; font-size: 14px; color: #e6e8ee; margin-bottom: 8px; font-weight: 500; }
+  input {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px;
+    padding: 12px 14px; color: #e6e8ee; font-size: 15px; margin-bottom: 18px;
+  }
+  input:focus { outline: none; border-color: #1D9E75; }
   .btn-primary {
-    background: #1D9E75; color: #fff; border: none; padding: 12px 20px;
-    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    background: #1D9E75; color: #fff; border: none; padding: 13px 18px;
+    border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
   }
   .btn-primary:hover { background: #178a65; }
-  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-primary:disabled { background: #2a3040; cursor: not-allowed; }
   .btn-secondary {
     background: transparent; color: #9aa3b2; border: 1px solid #2a3040;
-    padding: 12px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
+    padding: 13px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
-
-  .wizard-card {
-    background: #141821; border: 1px solid #232838; border-radius: 14px;
-    padding: 28px; margin-bottom: 20px;
+  .product-list { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+  .product-item {
+    display: flex; gap: 12px; align-items: center;
+    background: #0d0f16; border: 1px solid #232838; border-radius: 10px; padding: 12px;
   }
-  .wizard-card label { display: block; font-size: 14px; font-weight: 500; color: #fff; margin-bottom: 10px; }
-  .wizard-card input[type="text"], .wizard-card input[type="number"], .wizard-card select {
-    width: 100%; background: #0d0f16; border: 1px solid #2a3040; color: #e6e8ee;
-    padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 16px;
+  .product-item img { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #232838; flex-shrink: 0; }
+  .product-item .info { flex: 1; }
+  .product-item .info .pname { font-weight: 500; font-size: 14px; color: #fff; }
+  .product-item .info .meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .product-item input[type="checkbox"] { width: auto; margin: 0; accent-color: #1D9E75; }
+  .loading { text-align: center; padding: 40px 0; color: #9aa3b2; }
+  .error-box {
+    background: #2a1414; border: 1px solid #5a2530; color: #f28b8b;
+    padding: 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px;
   }
-  .budget-row { display: flex; gap: 10px; }
-  .budget-row input { flex: 1; }
-  .budget-row select { width: 90px; flex-shrink: 0; }
-  .step-progress { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
-
-  .hidden { display: none; }
-
-  .result-title { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 20px; }
-  .result-section { margin-bottom: 24px; }
-  .result-section h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 12px; }
-  .product-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
-  .product-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; }
-  .product-card .name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 6px; }
-  .product-card .reasoning { font-size: 13px; color: #9aa3b2; margin-bottom: 8px; line-height: 1.4; }
-  .product-card .cost { font-size: 13px; font-weight: 600; color: #5DCAA5; }
-  .platform-card {
-    background: #141821; border: 1px solid #232838; border-radius: 14px;
-    padding: 18px; font-size: 14px; line-height: 1.6; color: #e6e8ee;
-  }
-  .launch-steps { list-style: none; counter-reset: step; }
-  .launch-steps li {
-    counter-increment: step;
-    background: #1c212c; border: 1px solid #232838; border-radius: 10px;
-    padding: 12px 16px 12px 44px; margin-bottom: 10px; position: relative;
-    font-size: 14px; line-height: 1.5;
-  }
-  .launch-steps li::before {
-    content: counter(step);
-    position: absolute; left: 14px; top: 12px;
-    width: 20px; height: 20px; border-radius: 50%;
-    background: #1D9E75; color: #fff; font-size: 12px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-  }
-
-  .loading-note { text-align: center; color: #9aa3b2; font-size: 14px; padding: 30px 0; }
+  .success-box { text-align: center; padding: 20px 0; }
+  .success-box .check { font-size: 44px; margin-bottom: 14px; }
+  .success-box h2 { color: #fff; margin-bottom: 8px; }
+  .store-name-input { font-size: 18px; font-weight: 600; }
+  .step-label { color: #5DCAA5; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px; }
+  a.store-link { color: #5DCAA5; word-break: break-all; }
 </style>
 </head>
 <body>
-
 <header>
   <div class="logo">
     <div class="logo-dot">H</div>
@@ -111,85 +93,39 @@
     <button class="logout-btn" onclick="logout()">Çıkış yap</button>
   </div>
 </header>
-
 <main>
-  <div class="top-row">
-    <div>
-      <h1>Mağazanı Kur</h1>
-      <div class="subtitle">Hobine göre kişiselleştirilmiş ürün ve başlangıç planı</div>
-    </div>
-    <button class="btn-secondary" onclick="window.location.href='dashboard.html'">← Panele Dön</button>
+  <h1>🏪 Mağazanı Kur</h1>
+  <div class="subtitle">Hobinden yola çıkarak birkaç dakikada hazır bir mağaza oluşturalım</div>
+
+  <div id="step1" class="card">
+    <div class="step-label">1. ADIM</div>
+    <label>Hobin / ilgi alanın ne?</label>
+    <input type="text" id="hobbyInput" placeholder="örn. balık tutma, örgü, ev dekorasyonu...">
+    <label>Bütçen ne kadar? (opsiyonel, TL)</label>
+    <input type="number" id="budgetInput" placeholder="örn. 5000">
+    <button class="btn-primary" id="suggestBtn" onclick="getSuggestions()">Ürün Önerilerini Getir</button>
   </div>
 
-  <div id="wizardContainer">
-    <div class="wizard-card" id="step1Card">
-      <div class="step-progress">Adım 1/3</div>
-      <label for="hobbyInput">Hobin veya ilgi alanın ne?</label>
-      <input type="text" id="hobbyInput" placeholder="Örn: balık tutma, yoga, kahve, evcil hayvanlar...">
-      <button class="btn-primary" onclick="goToStep(2)">Devam et →</button>
-    </div>
-
-    <div class="wizard-card hidden" id="step2Card">
-      <div class="step-progress">Adım 2/3</div>
-      <label for="budgetInput">Bütçen ne kadar?</label>
-      <div class="budget-row">
-        <input type="number" id="budgetInput" placeholder="Örn: 5000" min="0">
-        <select id="currencySelect">
-          <option value="₺">₺</option>
-          <option value="$">$</option>
-        </select>
-      </div>
-      <button class="btn-primary" onclick="goToStep(3)">Devam et →</button>
-    </div>
-
-    <div class="wizard-card hidden" id="step3Card">
-      <div class="step-progress">Adım 3/3</div>
-      <label for="platformSelect">Hangi platformda satmak istersin?</label>
-      <select id="platformSelect">
-        <option value="">Bilmiyorum, sen öner</option>
-        <option value="Trendyol">Trendyol</option>
-        <option value="Hepsiburada">Hepsiburada</option>
-        <option value="N11">N11</option>
-        <option value="Çiçeksepeti">Çiçeksepeti</option>
-        <option value="PTT AVM">PTT AVM</option>
-        <option value="Amazon TR">Amazon TR</option>
-        <option value="Pazarama">Pazarama</option>
-        <option value="Etsy">Etsy</option>
-        <option value="Amazon (Global)">Amazon (Global)</option>
-        <option value="eBay">eBay</option>
-        <option value="Facebook Marketplace">Facebook Marketplace</option>
-        <option value="TikTok Shop">TikTok Shop</option>
-        <option value="Shopify">Shopify</option>
-        <option value="WooCommerce">WooCommerce</option>
-        <option value="Wix">Wix</option>
-      </select>
-      <button class="btn-primary" id="generateBtn" onclick="generatePlan()">🚀 Mağazamı Oluştur</button>
-    </div>
-
-    <div class="wizard-card hidden" id="loadingCard">
-      <div class="loading-note">Hobine uygun ürünler ve başlangıç planın hazırlanıyor, birkaç saniye sürebilir...</div>
-    </div>
+  <div id="loadingBox" class="card loading" style="display:none;">
+    AI senin için ürünler araştırıyor, birkaç saniye sürebilir...
   </div>
 
-  <div id="resultContainer" class="hidden">
-    <div class="result-title" id="resultTitle"></div>
+  <div id="errorBox" class="error-box" style="display:none;"></div>
 
-    <div class="result-section">
-      <h2>🛍️ Önerilen Ürünler</h2>
-      <div class="product-cards" id="productCards"></div>
-    </div>
+  <div id="step2" class="card" style="display:none;">
+    <div class="step-label">2. ADIM</div>
+    <label>Mağaza adı</label>
+    <input type="text" id="storeNameInput" class="store-name-input">
+    <div id="productList" class="product-list"></div>
+    <button class="btn-primary" id="createBtn" onclick="createStore()">Mağazamı Kur</button>
+    <button class="btn-secondary" onclick="location.reload()">Baştan Başla</button>
+  </div>
 
-    <div class="result-section">
-      <h2>🏬 Platform Önerisi</h2>
-      <div class="platform-card" id="platformCard"></div>
-    </div>
-
-    <div class="result-section">
-      <h2>🚀 İlk Hafta Başlangıç Planı</h2>
-      <ol class="launch-steps" id="launchStepsList"></ol>
-    </div>
-
-    <button class="btn-secondary" onclick="resetWizard()">↺ Yeniden Başla</button>
+  <div id="step3" class="card success-box" style="display:none;">
+    <div class="check">✅</div>
+    <h2>Mağazan hazır!</h2>
+    <p style="color:#9aa3b2; margin: 10px 0;">Ürünlerin panelinde otomatik eklendi.</p>
+    <p>Mağaza adresin: <br><a class="store-link" id="storeLinkText" href="#"></a></p>
   </div>
 </main>
 
@@ -198,6 +134,7 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  let lastSuggestion = null;
   let currentSession = null;
 
   async function init() {
@@ -210,37 +147,30 @@
     document.getElementById('userEmail').textContent = session.user.email;
   }
 
-  function goToStep(step) {
-    if (step === 2) {
-      const hobby = document.getElementById('hobbyInput').value.trim();
-      if (!hobby) {
-        alert('Lütfen hobin veya ilgi alanını yaz.');
-        return;
-      }
-      document.getElementById('step1Card').classList.add('hidden');
-      document.getElementById('step2Card').classList.remove('hidden');
-    } else if (step === 3) {
-      const budget = document.getElementById('budgetInput').value;
-      if (!budget || Number(budget) <= 0) {
-        alert('Lütfen geçerli bir bütçe gir.');
-        return;
-      }
-      document.getElementById('step2Card').classList.add('hidden');
-      document.getElementById('step3Card').classList.remove('hidden');
-    }
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+  function hideError() {
+    document.getElementById('errorBox').style.display = 'none';
   }
 
-  async function generatePlan() {
+  async function getSuggestions() {
+    hideError();
     const hobby = document.getElementById('hobbyInput').value.trim();
     const budget = document.getElementById('budgetInput').value;
-    const currency = document.getElementById('currencySelect').value;
-    const platformPreference = document.getElementById('platformSelect').value;
 
-    document.getElementById('step3Card').classList.add('hidden');
-    document.getElementById('loadingCard').classList.remove('hidden');
+    if (!hobby) {
+      showError('Lütfen hobi/ilgi alanını yaz.');
+      return;
+    }
+
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('loadingBox').style.display = 'block';
 
     try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/store-builder', {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/store-wizard', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -248,60 +178,103 @@
           'apikey': SUPABASE_KEY,
         },
         body: JSON.stringify({
+          mode: 'suggest',
           hobby,
-          budget: Number(budget),
-          currency,
-          platformPreference,
+          budget: budget ? Number(budget) : null,
           userAccessToken: currentSession.access_token,
         }),
       });
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      renderResult(data);
+      if (!response.ok) throw new Error(data.error || 'Bir hata oluştu');
+
+      lastSuggestion = { hobby, budget: budget ? Number(budget) : null, store_slug: data.store_slug, products: data.products };
+
+      document.getElementById('storeNameInput').value = data.store_name || hobby;
+      renderProducts(data.products || []);
+
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('step2').style.display = 'block';
     } catch (err) {
-      alert('Plan oluşturulamadı: ' + err.message);
-      document.getElementById('loadingCard').classList.add('hidden');
-      document.getElementById('step3Card').classList.remove('hidden');
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('step1').style.display = 'block';
+      showError(err.message);
     }
   }
 
-  function renderResult(data) {
-    document.getElementById('wizardContainer').classList.add('hidden');
-    document.getElementById('resultContainer').classList.remove('hidden');
-
-    document.getElementById('resultTitle').textContent = data.title;
-
-    const productCards = document.getElementById('productCards');
-    productCards.innerHTML = (data.products || []).map(p => `
-      <div class="product-card">
-        <div class="name">${escapeHtml(p.name || '')}</div>
-        <div class="reasoning">${escapeHtml(p.reasoning || '')}</div>
-        <div class="cost">${escapeHtml(p.estimatedCost || '')}</div>
-      </div>
-    `).join('');
-
-    document.getElementById('platformCard').textContent = data.platformRecommendation || '';
-
-    const launchList = document.getElementById('launchStepsList');
-    launchList.innerHTML = (data.launchSteps || []).map(step => `<li>${escapeHtml(step)}</li>`).join('');
+  function renderProducts(products) {
+    const list = document.getElementById('productList');
+    list.innerHTML = '';
+    products.forEach((p, i) => {
+      const div = document.createElement('div');
+      div.className = 'product-item';
+      div.innerHTML = `
+        <input type="checkbox" checked data-index="${i}" class="product-check">
+        <img src="${p.image_url || ''}" onerror="this.style.display='none'">
+        <div class="info">
+          <div class="pname">${p.name}</div>
+          <div class="meta">${p.category || ''} · ~${p.estimated_sale_price || '-'} TL</div>
+        </div>
+      `;
+      list.appendChild(div);
+    });
   }
 
-  function resetWizard() {
-    document.getElementById('hobbyInput').value = '';
-    document.getElementById('budgetInput').value = '';
-    document.getElementById('platformSelect').value = '';
-    document.getElementById('resultContainer').classList.add('hidden');
-    document.getElementById('wizardContainer').classList.remove('hidden');
-    document.getElementById('loadingCard').classList.add('hidden');
-    document.getElementById('step2Card').classList.add('hidden');
-    document.getElementById('step3Card').classList.add('hidden');
-    document.getElementById('step1Card').classList.remove('hidden');
-  }
+  async function createStore() {
+    hideError();
+    if (!lastSuggestion) return;
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    const storeName = document.getElementById('storeNameInput').value.trim();
+    if (!storeName) {
+      showError('Mağaza adı boş olamaz.');
+      return;
+    }
+
+    const checks = document.querySelectorAll('.product-check');
+    const selected = [];
+    checks.forEach((c, i) => {
+      if (c.checked) selected.push(lastSuggestion.products[i]);
+    });
+
+    if (selected.length === 0) {
+      showError('En az bir ürün seçmelisin.');
+      return;
+    }
+
+    const createBtn = document.getElementById('createBtn');
+    createBtn.disabled = true;
+    createBtn.textContent = 'Mağaza kuruluyor...';
+
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/store-wizard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({
+          mode: 'create',
+          hobby: lastSuggestion.hobby,
+          budget: lastSuggestion.budget,
+          store_name: storeName,
+          store_slug: lastSuggestion.store_slug,
+          products: selected,
+          userAccessToken: currentSession.access_token,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Bir hata oluştu');
+
+      document.getElementById('step2').style.display = 'none';
+      document.getElementById('step3').style.display = 'block';
+      const link = document.getElementById('storeLinkText');
+      link.textContent = `magaza.html?m=${data.store_slug}`;
+      link.href = `magaza.html?m=${data.store_slug}`;
+    } catch (err) {
+      showError(err.message);
+      createBtn.disabled = false;
+      createBtn.textContent = 'Mağazamı Kur';
+    }
   }
 
   async function logout() {
@@ -311,6 +284,5 @@
 
   init();
 </script>
-
 </body>
 </html>
