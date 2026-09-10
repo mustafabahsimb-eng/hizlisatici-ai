@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mağaza</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 20px 20px;
+    text-align: center;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+  header p { font-size: 13px; color: #9aa3b2; margin-top: 6px; }
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: #141821;
+    border: 1px solid #232838;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    background: #1c212c;
+  }
+  .card-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card-name { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; }
+  .card-price { font-size: 15px; font-weight: 700; color: #5DCAA5; margin-top: auto; }
+  .buy-btn {
+    background: #1D9E75;
+    color: #fff;
+    border: none;
+    padding: 9px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .buy-btn:hover { background: #178a65; }
+  .empty-state { text-align: center; color: #9aa3b2; padding: 60px 20px; }
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #141821;
+    border: 1px solid #232838;
+    border-radius: 14px;
+    padding: 22px;
+    max-width: 380px;
+    width: 100%;
+  }
+  .modal h3 { font-size: 16px; color: #fff; margin-bottom: 4px; }
+  .modal .modal-price { font-size: 14px; color: #5DCAA5; margin-bottom: 16px; }
+  .modal label { display: block; font-size: 12px; color: #9aa3b2; margin: 12px 0 5px; }
+  .modal input, .modal textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #232838;
+    background: #0d0f16;
+    color: #e6e8ee;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-actions button {
+    flex: 1;
+    padding: 11px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  .cancel-btn { background: transparent; border: 1px solid #2a3040 !important; color: #9aa3b2; }
+  .submit-btn { background: #1D9E75; color: #fff; }
+  #formMsg { font-size: 13px; margin-top: 10px; min-height: 18px; }
+  #formMsg.err { color: #f28b8b; }
+  #formMsg.ok { color: #5DCAA5; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="storeName">Mağaza</h1>
+  <p id="storeSub">Ürünler yükleniyor...</p>
+</header>
+<main>
+  <div class="grid" id="productGrid"></div>
+</main>
+
+<div class="overlay" id="orderOverlay">
+  <div class="modal">
+    <h3 id="modalProductName"></h3>
+    <div class="modal-price" id="modalProductPrice"></div>
+    <label>Ad Soyad</label>
+    <input id="custName" type="text" placeholder="Adın soyadın">
+    <label>Telefon</label>
+    <input id="custPhone" type="tel" placeholder="05xx xxx xx xx">
+    <label>Adres</label>
+    <textarea id="custAddress" rows="3" placeholder="Teslimat adresin"></textarea>
+    <div class="modal-actions">
+      <button class="cancel-btn" onclick="closeModal()">Vazgeç</button>
+      <button class="submit-btn" id="submitOrderBtn" onclick="submitOrder()">Siparişi Gönder</button>
+    </div>
+    <div id="formMsg"></div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let storeOwnerId = null;
+  let selectedProduct = null;
+
+  function getStoreSlug() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('store');
+  }
+
+  async function init() {
+    const slug = getStoreSlug();
+    if (!slug) {
+      document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
+      document.getElementById('storeSub').textContent = 'Geçersiz mağaza adresi.';
+      return;
+    }
+
+    const { data: store, error: storeError } = await supabaseClient
+      .from('store_settings')
+      .select('*')
+      .eq('store_slug', slug)
+      .maybeSingle();
+
+    if (storeError || !store) {
+      document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
+      document.getElementById('storeSub').textContent = 'Bu adreste bir mağaza yok.';
+      return;
+    }
+
+    storeOwnerId = store.user_id;
+    document.getElementById('storeName').textContent = store.store_name || 'Mağaza';
+    document.getElementById('storeSub').textContent = store.business_name
+      ? store.business_name
+      : 'Ürünlerimize göz at';
+
+    loadProducts();
+  }
+
+  async function loadProducts() {
+    const { data: products, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('user_id', storeOwnerId)
+      .eq('store_visible', true)
+      .order('created_at', { ascending: false });
+
+    const grid = document.getElementById('productGrid');
+
+    if (error || !products || products.length === 0) {
+      grid.innerHTML = '<div class="empty-state">Henüz ürün eklenmemiş.</div>';
+      return;
+    }
+
+    grid.innerHTML = products.map(p => `
+      <div class="card">
+        <img src="${p.image_url || ''}" onerror="this.style.opacity=0" alt="${escapeHtml(p.name || '')}">
+        <div class="card-body">
+          <div class="card-name">${escapeHtml(p.name || 'Ürün')}</div>
+          <div class="card-price">${p.sale_price ? '₺' + Number(p.sale_price).toFixed(2) : ''}</div>
+          <button class="buy-btn" onclick='openModal(${JSON.stringify(p.id)}, ${JSON.stringify(p.name || "Ürün")}, ${p.sale_price || 0})'>Satın Al</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openModal(productId, productName, price) {
+    selectedProduct = { id: productId, name: productName, price: price };
+    document.getElementById('modalProductName').textContent = productName;
+    document.getElementById('modalProductPrice').textContent = price ? '₺' + Number(price).toFixed(2) : '';
+    document.getElementById('custName').value = '';
+    document.getElementById('custPhone').value = '';
+    document.getElementById('custAddress').value = '';
+    document.getElementById('formMsg').textContent = '';
+    document.getElementById('orderOverlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('orderOverlay').classList.remove('open');
+  }
+
+  async function submitOrder() {
+    const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim();
+    const address = document.getElementById('custAddress').value.trim();
+    const msg = document.getElementById('formMsg');
+    const btn = document.getElementById('submitOrderBtn');
+
+    if (!name || !phone || !address) {
+      msg.textContent = 'Lütfen tüm alanları doldur.';
+      msg.className = 'err';
+      return;
+    }
+
+    btn.disabled = true;
+    msg.textContent = '';
+    msg.className = '';
+
+    const { error } = await supabaseClient
+      .from('store_orders')
+      .insert({
+        user_id: storeOwnerId,
+        product_id: selectedProduct.id,
+        customer_name: name,
+        customer_phone: phone,
+        customer_address: address,
+        status: 'pending'
+      });
+
+    btn.disabled = false;
+
+    if (error) {
+      msg.textContent = 'Hata: ' + error.message;
+      msg.className = 'err';
+      return;
+    }
+
+    msg.textContent = 'Siparişin alındı ✓ En kısa sürede seninle iletişime geçilecek.';
+    msg.className = 'ok';
+    setTimeout(closeModal, 2000);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  init();
+</script>
+</body>
+</html>
