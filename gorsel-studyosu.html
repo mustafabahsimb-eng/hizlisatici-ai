@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Görsel Stüdyosu</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #1D9E75; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link {
+    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  }
+  .back-link:hover { color: #fff; }
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 28px; }
+  .section {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .section-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 16px; }
+  .ai-note { font-size: 12px; color: #9aa3b2; margin-bottom: 16px; }
+  .btn-primary {
+    background: #1D9E75; color: #fff; border: none;
+    padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:hover { background: #178a65; }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent; color: #9aa3b2; border: 1px solid #2a3040;
+    padding: 10px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .canvas-wrap {
+    display: flex; align-items: center; justify-content: center;
+    background: #1c212c; border-radius: 10px; padding: 16px; margin-bottom: 18px;
+    background-image: linear-gradient(45deg, #232838 25%, transparent 25%), linear-gradient(-45deg, #232838 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #232838 75%), linear-gradient(-45deg, transparent 75%, #232838 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    min-height: 200px;
+  }
+  #mainCanvas { max-width: 100%; max-height: 480px; border-radius: 6px; }
+  .empty-canvas-note { font-size: 13px; color: #9aa3b2; }
+  .slider-row { margin-bottom: 14px; }
+  .slider-row label { display: flex; justify-content: space-between; font-size: 13px; color: #9aa3b2; margin-bottom: 6px; }
+  .slider-row input[type="range"] { width: 100%; }
+  select {
+    background: #1c212c; border: 1px solid #2a3040; border-radius: 8px;
+    padding: 9px 12px; color: #fff; font-size: 14px; font-family: inherit;
+  }
+  .inline-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  input[type="color"] {
+    width: 40px; height: 36px; border: 1px solid #2a3040; border-radius: 8px; background: #1c212c; cursor: pointer;
+  }
+  input[type="file"] { color: #9aa3b2; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+<main>
+  <h1>🎨 Görsel Stüdyosu</h1>
+  <div class="subtitle">Ürün görselini yükle, düzenle, indir. (AI ile sahneye yerleştirme ve filigran gibi özellikler yakında eklenecek.)</div>
+
+  <div class="section">
+    <div class="section-title">1. Görsel yükle</div>
+    <input type="file" id="imgFileInput" accept="image/*">
+  </div>
+
+  <div class="section">
+    <div class="section-title">2. Önizleme</div>
+    <div class="canvas-wrap">
+      <canvas id="mainCanvas" style="display:none;"></canvas>
+      <div class="empty-canvas-note" id="emptyNote">Önce bir görsel yükle.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">3. Döndür / kırp</div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="rotateBtn" onclick="rotateImage()" disabled>↻ 90° döndür</button>
+      <button class="btn-secondary" id="cropSquareBtn" onclick="cropToSquare()" disabled>◻ Kareye kırp</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">4. Parlaklık / kontrast / doygunluk</div>
+    <div class="slider-row">
+      <label><span>Parlaklık</span><span id="brightnessVal">100%</span></label>
+      <input type="range" id="brightnessSlider" min="50" max="150" value="100" disabled>
+    </div>
+    <div class="slider-row">
+      <label><span>Kontrast</span><span id="contrastVal">100%</span></label>
+      <input type="range" id="contrastSlider" min="50" max="150" value="100" disabled>
+    </div>
+    <div class="slider-row">
+      <label><span>Doygunluk</span><span id="saturateVal">100%</span></label>
+      <input type="range" id="saturateSlider" min="0" max="200" value="100" disabled>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="applyFilterBtn" onclick="applyFilters()" disabled>Uygula</button>
+      <button class="btn-secondary" id="resetFilterBtn" onclick="resetFilters()" disabled>Sıfırla</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">5. Zemin rengi ekle</div>
+    <div class="ai-note">Arka planı şeffaf olan (ör. "Arka plan temizle" ile işlenmiş) görsellerde en iyi sonucu verir.</div>
+    <div class="inline-row">
+      <input type="color" id="bgColorPicker" value="#ffffff">
+      <button class="btn-secondary" id="applyBgBtn" onclick="applyBackgroundColor()" disabled>Zemini uygula</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">6. Boyut şablonu</div>
+    <div class="inline-row">
+      <select id="sizeTemplate">
+        <option value="">Şablon seç...</option>
+        <option value="1000x1000">Trendyol/Pazaryeri Kare (1000x1000)</option>
+        <option value="1080x1080">Instagram Kare (1080x1080)</option>
+        <option value="1080x1350">Instagram Dikey (1080x1350)</option>
+        <option value="1200x628">Facebook/Reklam Yatay (1200x628)</option>
+      </select>
+      <button class="btn-secondary" id="applyTemplateBtn" onclick="applySizeTemplate()" disabled>Şablonu uygula</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">7. İndir</div>
+    <button class="btn-primary" id="downloadBtn" onclick="downloadImage()" disabled>⬇️ PNG olarak indir</button>
+  </div>
+</main>
+<script>
+  const canvas = document.getElementById('mainCanvas');
+  const ctx = canvas.getContext('2d');
+  const emptyNote = document.getElementById('emptyNote');
+  const MAX_DIMENSION = 1600; // performans için yüklenen görseli bu boyutu aşmayacak şekilde küçült
+
+  const allButtons = ['rotateBtn', 'cropSquareBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
+    'applyFilterBtn', 'resetFilterBtn', 'applyBgBtn', 'applyTemplateBtn', 'downloadBtn'];
+
+  function enableControls() {
+    allButtons.forEach(id => document.getElementById(id).disabled = false);
+  }
+
+  document.getElementById('imgFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+          const scale = MAX_DIMENSION / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.style.display = 'block';
+        emptyNote.style.display = 'none';
+        enableControls();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function rotateImage() {
+    const w = canvas.width, h = canvas.height;
+    const rotated = document.createElement('canvas');
+    rotated.width = h;
+    rotated.height = w;
+    const rctx = rotated.getContext('2d');
+    rctx.translate(h / 2, w / 2);
+    rctx.rotate(Math.PI / 2);
+    rctx.drawImage(canvas, -w / 2, -h / 2);
+    canvas.width = rotated.width;
+    canvas.height = rotated.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(rotated, 0, 0);
+  }
+
+  function cropToSquare() {
+    const w = canvas.width, h = canvas.height;
+    const side = Math.min(w, h);
+    const sx = (w - side) / 2;
+    const sy = (h - side) / 2;
+    const cropped = document.createElement('canvas');
+    cropped.width = side;
+    cropped.height = side;
+    cropped.getContext('2d').drawImage(canvas, sx, sy, side, side, 0, 0, side, side);
+    canvas.width = side;
+    canvas.height = side;
+    ctx.clearRect(0, 0, side, side);
+    ctx.drawImage(cropped, 0, 0);
+  }
+
+  ['brightnessSlider', 'contrastSlider', 'saturateSlider'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateFilterLabels);
+  });
+  function updateFilterLabels() {
+    document.getElementById('brightnessVal').textContent = document.getElementById('brightnessSlider').value + '%';
+    document.getElementById('contrastVal').textContent = document.getElementById('contrastSlider').value + '%';
+    document.getElementById('saturateVal').textContent = document.getElementById('saturateSlider').value + '%';
+  }
+  function currentFilterString() {
+    const b = document.getElementById('brightnessSlider').value;
+    const c = document.getElementById('contrastSlider').value;
+    const s = document.getElementById('saturateSlider').value;
+    return `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  }
+  function applyFilters() {
+    const w = canvas.width, h = canvas.height;
+    const filtered = document.createElement('canvas');
+    filtered.width = w;
+    filtered.height = h;
+    const fctx = filtered.getContext('2d');
+    fctx.filter = currentFilterString();
+    fctx.drawImage(canvas, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.filter = 'none';
+    ctx.drawImage(filtered, 0, 0);
+    resetFilters();
+  }
+  function resetFilters() {
+    document.getElementById('brightnessSlider').value = 100;
+    document.getElementById('contrastSlider').value = 100;
+    document.getElementById('saturateSlider').value = 100;
+    updateFilterLabels();
+  }
+
+  function applyBackgroundColor() {
+    const w = canvas.width, h = canvas.height;
+    const color = document.getElementById('bgColorPicker').value;
+    const composited = document.createElement('canvas');
+    composited.width = w;
+    composited.height = h;
+    const cctx = composited.getContext('2d');
+    cctx.fillStyle = color;
+    cctx.fillRect(0, 0, w, h);
+    cctx.drawImage(canvas, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(composited, 0, 0);
+  }
+
+  function applySizeTemplate() {
+    const templateVal = document.getElementById('sizeTemplate').value;
+    if (!templateVal) return;
+    const [targetW, targetH] = templateVal.split('x').map(Number);
+    const srcW = canvas.width, srcH = canvas.height;
+    const scale = Math.max(targetW / srcW, targetH / srcH);
+    const scaledW = srcW * scale;
+    const scaledH = srcH * scale;
+    const offsetX = (targetW - scaledW) / 2;
+    const offsetY = (targetH - scaledH) / 2;
+    const resized = document.createElement('canvas');
+    resized.width = targetW;
+    resized.height = targetH;
+    const rctx = resized.getContext('2d');
+    rctx.drawImage(canvas, offsetX, offsetY, scaledW, scaledH);
+    canvas.width = targetW;
+    canvas.height = targetH;
+    ctx.clearRect(0, 0, targetW, targetH);
+    ctx.drawImage(resized, 0, 0);
+  }
+
+  function downloadImage() {
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'urun-gorseli-duzenlendi.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+</script>
+</body>
+</html>
