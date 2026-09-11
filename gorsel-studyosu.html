@@ -118,7 +118,14 @@
   </div>
 
   <div class="section">
-    <div class="section-title">4. Parlaklık / kontrast / doygunluk</div>
+    <div class="section-title">4. Arka planı temizle</div>
+    <div class="ai-note">Ürünü zeminden ayırıp şeffaf hale getirir. Aşağıdaki "Zemin rengi ekle" adımının işe yaraması için önce bunu yapman gerekiyor.</div>
+    <button class="btn-secondary" id="removeBgBtn" onclick="removeBackgroundStudio()" disabled>🧹 Arka planı temizle</button>
+    <div id="removeBgMsg" style="font-size:12px; color:#f28b8b; margin-top:8px; display:none;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">5. Parlaklık / kontrast / doygunluk</div>
     <div class="slider-row">
       <label><span>Parlaklık</span><span id="brightnessVal">100%</span></label>
       <input type="range" id="brightnessSlider" min="50" max="150" value="100" disabled>
@@ -132,14 +139,14 @@
       <input type="range" id="saturateSlider" min="0" max="200" value="100" disabled>
     </div>
     <div class="btn-row">
-      <button class="btn-primary" id="applyFilterBtn" onclick="applyFilters()" disabled>Uygula</button>
+      <button class="btn-primary" id="applyFilterBtn" onclick="commitFilters()" disabled>Uygula</button>
       <button class="btn-secondary" id="resetFilterBtn" onclick="resetFilters()" disabled>Sıfırla</button>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">5. Zemin rengi ekle</div>
-    <div class="ai-note">Sadece şeffaf (arka planı temizlenmiş) görsellerde görünür bir etki yapar. Önce add-product.html'deki "Ürün görseli (arka plan temizle)" bölümünden görseli temizleyip indir, sonra buraya yükle.</div>
+    <div class="section-title">6. Zemin rengi ekle</div>
+    <div class="ai-note">Sadece şeffaf (yukarıda arka planı temizlenmiş) görsellerde görünür bir etki yapar.</div>
     <div class="inline-row">
       <input type="color" id="bgColorPicker" value="#ffffff">
       <button class="btn-secondary" id="applyBgBtn" onclick="applyBackgroundColor()" disabled>Zemini uygula</button>
@@ -147,7 +154,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">6. Boyut şablonu</div>
+    <div class="section-title">7. Boyut şablonu</div>
     <div class="inline-row">
       <select id="sizeTemplate">
         <option value="">Şablon seç...</option>
@@ -161,21 +168,27 @@
   </div>
 
   <div class="section">
-    <div class="section-title">7. İndir</div>
+    <div class="section-title">8. İndir</div>
     <button class="btn-primary" id="downloadBtn" onclick="downloadImage()" disabled>⬇️ PNG olarak indir</button>
   </div>
 </main>
 <script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d');
   const emptyNote = document.getElementById('emptyNote');
   const MAX_DIMENSION = 1600; // performans için yüklenen görseli bu boyutu aşmayacak şekilde küçült
+  let baseImageData = null; // filtre kaydırıcıları için "temiz" referans - her kalıcı değişiklikten sonra güncellenir
 
-  const allButtons = ['rotateBtn', 'cropSquareBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
+  const allButtons = ['rotateBtn', 'cropSquareBtn', 'removeBgBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
     'applyFilterBtn', 'resetFilterBtn', 'applyBgBtn', 'applyTemplateBtn', 'downloadBtn'];
 
   function enableControls() {
     allButtons.forEach(id => document.getElementById(id).disabled = false);
+  }
+  function captureBaseImageData() {
+    baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   }
 
   document.getElementById('imgFileInput').addEventListener('change', (e) => {
@@ -198,6 +211,8 @@
         canvas.style.display = 'block';
         emptyNote.style.display = 'none';
         enableControls();
+        captureBaseImageData();
+        resetFilters();
       };
       img.src = reader.result;
     };
@@ -217,6 +232,8 @@
     canvas.height = rotated.height;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(rotated, 0, 0);
+    captureBaseImageData();
+    resetFilters();
   }
 
   function cropToSquare() {
@@ -232,10 +249,53 @@
     canvas.height = side;
     ctx.clearRect(0, 0, side, side);
     ctx.drawImage(cropped, 0, 0);
+    captureBaseImageData();
+    resetFilters();
+  }
+
+  async function removeBackgroundStudio() {
+    const btn = document.getElementById('removeBgBtn');
+    const msgEl = document.getElementById('removeBgMsg');
+    btn.disabled = true;
+    btn.textContent = 'Temizleniyor...';
+    msgEl.style.display = 'none';
+    try {
+      const imageBase64 = canvas.toDataURL('image/png');
+      const response = await fetch(SUPABASE_URL + '/functions/v1/remove-background', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ imageBase64 }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        captureBaseImageData();
+        resetFilters();
+      };
+      img.src = data.imageBase64;
+    } catch (err) {
+      msgEl.textContent = 'Hata: ' + err.message;
+      msgEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🧹 Arka planı temizle';
+    }
   }
 
   ['brightnessSlider', 'contrastSlider', 'saturateSlider'].forEach(id => {
-    document.getElementById(id).addEventListener('input', updateFilterLabels);
+    document.getElementById(id).addEventListener('input', () => {
+      updateFilterLabels();
+      renderPreviewFromBase();
+    });
   });
   function updateFilterLabels() {
     document.getElementById('brightnessVal').textContent = document.getElementById('brightnessSlider').value + '%';
@@ -245,26 +305,29 @@
   function clampByte(v) {
     return Math.max(0, Math.min(255, v));
   }
-  // Piksel piksel uygulanan parlaklık/kontrast/doygunluk - tarayıcı/cihaz bağımsız çalışır
-  function applyFilters() {
+  // baseImageData'dan başlayarak kaydırıcı değerlerini uygular - kaydırıcı her hareket ettiğinde
+  // canlı önizleme için çağrılır, henüz kalıcı değişiklik yapmaz.
+  function renderPreviewFromBase() {
+    if (!baseImageData) return;
     const w = canvas.width, h = canvas.height;
     const brightnessPct = parseFloat(document.getElementById('brightnessSlider').value);
     const contrastPct = parseFloat(document.getElementById('contrastSlider').value);
     const saturatePct = parseFloat(document.getElementById('saturateSlider').value);
 
-    const brightnessFactor = brightnessPct / 100;
-    const contrastC = (contrastPct - 100) * 2.55; // yaklaşık -127.5..127.5 aralığına eşle
+    const brightnessOffset = brightnessPct - 100; // -50..+50 arası, toplamsal (daha yumuşak sonuç verir)
+    const contrastC = (contrastPct - 100) * 1.27; // daha yumuşak kontrast eğrisi
     const contrastFactor = (259 * (contrastC + 255)) / (255 * (259 - contrastC));
     const saturateFactor = saturatePct / 100;
 
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      let r = data[i], g = data[i + 1], b = data[i + 2];
+    const src = baseImageData.data;
+    const out = ctx.createImageData(w, h);
+    const data = out.data;
+    for (let i = 0; i < src.length; i += 4) {
+      let r = src[i], g = src[i + 1], b = src[i + 2];
 
-      r *= brightnessFactor;
-      g *= brightnessFactor;
-      b *= brightnessFactor;
+      r += brightnessOffset;
+      g += brightnessOffset;
+      b += brightnessOffset;
 
       r = contrastFactor * (r - 128) + 128;
       g = contrastFactor * (g - 128) + 128;
@@ -278,8 +341,13 @@
       data[i] = clampByte(r);
       data[i + 1] = clampByte(g);
       data[i + 2] = clampByte(b);
+      data[i + 3] = src[i + 3];
     }
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(out, 0, 0);
+  }
+  function commitFilters() {
+    renderPreviewFromBase();
+    captureBaseImageData();
     resetFilters();
   }
   function resetFilters() {
@@ -287,6 +355,7 @@
     document.getElementById('contrastSlider').value = 100;
     document.getElementById('saturateSlider').value = 100;
     updateFilterLabels();
+    renderPreviewFromBase();
   }
 
   function applyBackgroundColor() {
@@ -298,7 +367,7 @@
       if (existingData[i] < 250) { hasTransparency = true; break; }
     }
     if (!hasTransparency) {
-      alert('Bu görselin şeffaf bir alanı yok, bu yüzden zemin rengi görünür bir değişiklik yapmayacak. Önce add-product.html sayfasındaki "Ürün görseli (arka plan temizle)" bölümünden görseli temizleyip indir, sonra buraya yükle.');
+      alert('Bu görselin şeffaf bir alanı yok, bu yüzden zemin rengi görünür bir değişiklik yapmayacak. Önce yukarıdaki "Arka planı temizle" adımını kullan.');
     }
     const composited = document.createElement('canvas');
     composited.width = w;
@@ -309,6 +378,8 @@
     cctx.drawImage(canvas, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(composited, 0, 0);
+    captureBaseImageData();
+    resetFilters();
   }
 
   function applySizeTemplate() {
@@ -330,6 +401,8 @@
     canvas.height = targetH;
     ctx.clearRect(0, 0, targetW, targetH);
     ctx.drawImage(resized, 0, 0);
+    captureBaseImageData();
+    resetFilters();
   }
 
   function downloadImage() {
