@@ -139,7 +139,7 @@
 
   <div class="section">
     <div class="section-title">5. Zemin rengi ekle</div>
-    <div class="ai-note">Arka planı şeffaf olan (ör. "Arka plan temizle" ile işlenmiş) görsellerde en iyi sonucu verir.</div>
+    <div class="ai-note">Sadece şeffaf (arka planı temizlenmiş) görsellerde görünür bir etki yapar. Önce add-product.html'deki "Ürün görseli (arka plan temizle)" bölümünden görseli temizleyip indir, sonra buraya yükle.</div>
     <div class="inline-row">
       <input type="color" id="bgColorPicker" value="#ffffff">
       <button class="btn-secondary" id="applyBgBtn" onclick="applyBackgroundColor()" disabled>Zemini uygula</button>
@@ -242,23 +242,44 @@
     document.getElementById('contrastVal').textContent = document.getElementById('contrastSlider').value + '%';
     document.getElementById('saturateVal').textContent = document.getElementById('saturateSlider').value + '%';
   }
-  function currentFilterString() {
-    const b = document.getElementById('brightnessSlider').value;
-    const c = document.getElementById('contrastSlider').value;
-    const s = document.getElementById('saturateSlider').value;
-    return `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  function clampByte(v) {
+    return Math.max(0, Math.min(255, v));
   }
+  // Piksel piksel uygulanan parlaklık/kontrast/doygunluk - tarayıcı/cihaz bağımsız çalışır
   function applyFilters() {
     const w = canvas.width, h = canvas.height;
-    const filtered = document.createElement('canvas');
-    filtered.width = w;
-    filtered.height = h;
-    const fctx = filtered.getContext('2d');
-    fctx.filter = currentFilterString();
-    fctx.drawImage(canvas, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.filter = 'none';
-    ctx.drawImage(filtered, 0, 0);
+    const brightnessPct = parseFloat(document.getElementById('brightnessSlider').value);
+    const contrastPct = parseFloat(document.getElementById('contrastSlider').value);
+    const saturatePct = parseFloat(document.getElementById('saturateSlider').value);
+
+    const brightnessFactor = brightnessPct / 100;
+    const contrastC = (contrastPct - 100) * 2.55; // yaklaşık -127.5..127.5 aralığına eşle
+    const contrastFactor = (259 * (contrastC + 255)) / (255 * (259 - contrastC));
+    const saturateFactor = saturatePct / 100;
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i], g = data[i + 1], b = data[i + 2];
+
+      r *= brightnessFactor;
+      g *= brightnessFactor;
+      b *= brightnessFactor;
+
+      r = contrastFactor * (r - 128) + 128;
+      g = contrastFactor * (g - 128) + 128;
+      b = contrastFactor * (b - 128) + 128;
+
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = gray + (r - gray) * saturateFactor;
+      g = gray + (g - gray) * saturateFactor;
+      b = gray + (b - gray) * saturateFactor;
+
+      data[i] = clampByte(r);
+      data[i + 1] = clampByte(g);
+      data[i + 2] = clampByte(b);
+    }
+    ctx.putImageData(imageData, 0, 0);
     resetFilters();
   }
   function resetFilters() {
@@ -271,6 +292,14 @@
   function applyBackgroundColor() {
     const w = canvas.width, h = canvas.height;
     const color = document.getElementById('bgColorPicker').value;
+    const existingData = ctx.getImageData(0, 0, w, h).data;
+    let hasTransparency = false;
+    for (let i = 3; i < existingData.length; i += 4) {
+      if (existingData[i] < 250) { hasTransparency = true; break; }
+    }
+    if (!hasTransparency) {
+      alert('Bu görselin şeffaf bir alanı yok, bu yüzden zemin rengi görünür bir değişiklik yapmayacak. Önce add-product.html sayfasındaki "Ürün görseli (arka plan temizle)" bölümünden görseli temizleyip indir, sonra buraya yükle.');
+    }
     const composited = document.createElement('canvas');
     composited.width = w;
     composited.height = h;
