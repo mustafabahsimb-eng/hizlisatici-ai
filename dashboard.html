@@ -87,6 +87,17 @@
     white-space: nowrap;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .alarm-banner {
+    background: #2a1414;
+    border: 1px solid #4a2020;
+    color: #f28b8b;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 13px;
+  }
+  .alarm-summary { cursor: pointer; font-weight: 600; }
+  .alarm-detail-item { padding: 8px 0 0; font-weight: 400; }
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -215,6 +226,10 @@
       <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
   </div>
+  <div class="alarm-banner" id="alarmBanner" style="display:none;">
+    <div class="alarm-summary" id="alarmSummary" onclick="toggleAlarmDetail()"></div>
+    <div id="alarmDetail" style="display:none;"></div>
+  </div>
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">Toplam ürün</div>
@@ -242,6 +257,7 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+  const MARGIN_ALARM_THRESHOLD = 15; // % - bu eşiğin altındaki (ya da negatif) marjlar "tehlikede" sayılır
   function currencySymbolFor(platform) {
     return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
   }
@@ -269,7 +285,10 @@
     document.getElementById('totalProducts').textContent = products.length;
     document.getElementById('productCountText').textContent =
       products.length === 0 ? 'Henüz ürün yok' : products.length + ' ürün listeleniyor';
-    if (products.length === 0) return;
+    if (products.length === 0) {
+      document.getElementById('alarmBanner').style.display = 'none';
+      return;
+    }
     const { data: shippingRates } = await supabaseClient
       .from('shipping_rates')
       .select('*');
@@ -310,6 +329,21 @@
       usdProfit !== 0 ? '₺' + tryProfit.toFixed(2) + ' + $' + usdProfit.toFixed(2) : '₺' + tryProfit.toFixed(2);
     document.getElementById('avgMargin').textContent =
       marginCount > 0 ? (marginSum / marginCount).toFixed(1) + '%' : '-';
+    // Sessiz Alarm: marjı eşiğin altında ya da zararda olan ürünleri tespit et
+    const riskyProducts = computed.filter(({ marginPct }) => marginPct !== null && marginPct < MARGIN_ALARM_THRESHOLD);
+    const alarmBanner = document.getElementById('alarmBanner');
+    const alarmSummary = document.getElementById('alarmSummary');
+    const alarmDetail = document.getElementById('alarmDetail');
+    if (riskyProducts.length > 0) {
+      alarmBanner.style.display = 'block';
+      alarmSummary.textContent = '⚠️ ' + riskyProducts.length + ' üründe marj tehlikede (detay için tıkla)';
+      alarmDetail.innerHTML = riskyProducts.map(({ p, netProfit, marginPct, symbol }) => {
+        const marginText = marginPct < 0 ? 'zararda' : '%' + marginPct.toFixed(1) + ' marj';
+        return '<div class="alarm-detail-item">' + escapeHtml(p.name || 'İsimsiz ürün') + ' — ' + marginText + ' (' + symbol + netProfit.toFixed(2) + ')</div>';
+      }).join('');
+    } else {
+      alarmBanner.style.display = 'none';
+    }
     const listEl = document.getElementById('productList');
     listEl.innerHTML = computed.map(({ p, netProfit, marginPct, symbol }) => {
       const scoreHtml = p.winning_score != null
@@ -337,6 +371,10 @@
       </div>
     `;
     }).join('');
+  }
+  function toggleAlarmDetail() {
+    const detail = document.getElementById('alarmDetail');
+    detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
   }
   function scoreLevelClass(score) {
     if (score >= 70) return 'score-high';
