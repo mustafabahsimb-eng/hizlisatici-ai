@@ -75,6 +75,7 @@
     padding: 11px 18px; border-radius: 8px; font-size: 14px; cursor: pointer;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn-secondary.recording { border-color: #f28b8b; color: #f28b8b; }
   .ai-note { font-size: 12px; color: #9aa3b2; margin-bottom: 16px; }
   .profit-box {
     display: grid;
@@ -175,6 +176,13 @@
 <main>
   <h1>Yeni ürün ekle</h1>
   <div class="subtitle">Ürün bilgilerini gir, AI içerik üretsin, kârını gör.</div>
+  <div class="section">
+    <div class="section-title">🎤 Sesli ürün ekle</div>
+    <div class="ai-note">Mikrofona tıkla ve ürünü anlat — örn: "150 liraya aldığım, yarım kilo bluetooth kulaklığı Trendyol'da 299 liraya satacağım." AI dinleyip formu otomatik doldursun, sonra kontrol edip düzenleyebilirsin.</div>
+    <button class="btn-secondary" id="voiceBtn" onclick="toggleVoiceInput()">🎤 Sesle anlat</button>
+    <div id="voiceStatus" style="font-size:12px; color:#9aa3b2; margin-top:10px; display:none;"></div>
+    <div id="voiceTranscript" style="font-size:12px; color:#e6e8ee; margin-top:8px; display:none; background:#1c212c; border-radius:8px; padding:10px;"></div>
+  </div>
   <div class="section">
     <div class="section-title">Ürün bilgileri</div>
     <div class="form-row">
@@ -760,6 +768,123 @@
       const origBox = document.getElementById('imgBoxOriginal');
       origBox.innerHTML = `<img src="${p.image}">`;
       document.getElementById('removeBgBtn').disabled = false;
+    }
+  }
+  let voiceRecognition = null;
+  let isListening = false;
+  function toggleVoiceInput() {
+    if (isListening) {
+      stopVoiceInput();
+    } else {
+      startVoiceInput();
+    }
+  }
+  function startVoiceInput() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const btn = document.getElementById('voiceBtn');
+    const statusEl = document.getElementById('voiceStatus');
+    const transcriptEl = document.getElementById('voiceTranscript');
+    if (!SpeechRecognition) {
+      showMsg('Tarayıcın sesli girişi desteklemiyor. Chrome kullanmayı dene.', 'error');
+      return;
+    }
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.lang = 'tr-TR';
+    voiceRecognition.continuous = false;
+    voiceRecognition.interimResults = true;
+    let finalTranscript = '';
+    transcriptEl.style.display = 'block';
+    transcriptEl.textContent = '';
+    statusEl.style.display = 'block';
+    statusEl.textContent = '🎙️ Dinliyorum, ürünü anlat...';
+    btn.textContent = '⏹️ Durdur';
+    btn.classList.add('recording');
+    isListening = true;
+    voiceRecognition.onresult = (event) => {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      transcriptEl.textContent = finalTranscript + interimTranscript;
+    };
+    voiceRecognition.onerror = (event) => {
+      statusEl.style.display = 'none';
+      showMsg('Ses tanıma hatası: ' + event.error, 'error');
+      resetVoiceButton();
+    };
+    voiceRecognition.onend = () => {
+      resetVoiceButton();
+      statusEl.style.display = 'none';
+      const text = (finalTranscript || transcriptEl.textContent || '').trim();
+      if (text) {
+        parseVoiceProduct(text);
+      }
+    };
+    voiceRecognition.start();
+  }
+  function stopVoiceInput() {
+    if (voiceRecognition) {
+      voiceRecognition.stop();
+    }
+  }
+  function resetVoiceButton() {
+    isListening = false;
+    const btn = document.getElementById('voiceBtn');
+    btn.textContent = '🎤 Sesle anlat';
+    btn.classList.remove('recording');
+  }
+  async function parseVoiceProduct(text) {
+    const statusEl = document.getElementById('voiceStatus');
+    statusEl.style.display = 'block';
+    statusEl.textContent = '🤖 Anlatılanlar ürün bilgisine çevriliyor...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/voice-product-parse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ text }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      if (data.name) {
+        document.getElementById('productName').value = data.name;
+        lastGeneratedName = data.name;
+      }
+      if (data.supplierPrice != null) {
+        document.getElementById('supplierPrice').value = data.supplierPrice;
+      }
+      if (data.weightKg != null) {
+        document.getElementById('weightKg').value = data.weightKg;
+      }
+      if (data.platform) {
+        const platformSelect = document.getElementById('platform');
+        const optionExists = Array.from(platformSelect.options).some(o => o.value === data.platform);
+        if (optionExists) {
+          platformSelect.value = data.platform;
+          fillCommissionRate();
+          updateCurrencyDisplay();
+        }
+      }
+      if (data.salePrice != null) {
+        document.getElementById('salePrice').value = data.salePrice;
+      }
+      updateProfitCalc();
+      statusEl.style.display = 'none';
+      showMsg('Sesli anlatımdan ürün bilgileri dolduruldu. Kontrol edip düzenleyebilirsin.', 'success');
+      if (data.name) {
+        generateContent(false);
+      }
+    } catch (err) {
+      statusEl.style.display = 'none';
+      showMsg('Sesli ürün bilgisi işlenemedi: ' + err.message, 'error');
     }
   }
   async function generateContent(auto = false) {
