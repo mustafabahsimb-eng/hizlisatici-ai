@@ -3,590 +3,683 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HızlıSatıcı AI - Görsel Stüdyosu</title>
+<title>Görsel Stüdyosu - HızlıSatıcı AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+  :root{
+    --bg-dark:#0b1220;
+    --bg-panel:#111a2e;
+    --bg-panel-2:#16213a;
+    --border:#233150;
+    --text:#e7ecf5;
+    --text-dim:#9aa7c2;
+    --accent:#1D9E75;
+    --accent-hover:#178a65;
+    --danger:#e0554f;
   }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg-dark);
+    color:var(--text);
+    font-family:'Segoe UI',Arial,sans-serif;
+    min-height:100vh;
   }
-  .logo { display: flex; align-items: center; gap: 10px; }
-  .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
+  a{color:var(--accent); text-decoration:none;}
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px;
+    background:var(--bg-panel);
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap; gap:10px;
   }
-  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .back-link {
-    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  header h1{font-size:18px; margin:0; display:flex; align-items:center; gap:8px;}
+  .top-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  button{
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--bg-panel-2);
+    color:var(--text);
+    padding:8px 14px;
+    border-radius:8px;
+    font-size:13px;
+    transition:background .15s, border-color .15s;
   }
-  .back-link:hover { color: #fff; }
-  main {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 32px 24px 80px;
+  button:hover{background:#1c2942; border-color:var(--accent);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#04150f; font-weight:600;}
+  button.primary:hover{background:var(--accent-hover);}
+  button.danger{border-color:var(--danger); color:var(--danger); background:transparent;}
+  button.danger:hover{background:rgba(224,85,79,.12);}
+  button.icon-btn{padding:6px 9px; font-size:15px; line-height:1;}
+  .layout{
+    display:flex;
+    gap:14px;
+    padding:14px;
+    align-items:flex-start;
+    flex-wrap:wrap;
   }
-  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 28px; }
-  .section {
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-    padding: 22px;
-    margin-bottom: 18px;
+  .panel{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px;
   }
-  .section-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 16px; }
-  .ai-note { font-size: 12px; color: #9aa3b2; margin-bottom: 16px; }
-  .btn-primary {
-    background: #1D9E75; color: #fff; border: none;
-    padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+  .sidebar-left{width:250px; flex-shrink:0; display:flex; flex-direction:column; gap:14px;}
+  .sidebar-right{width:230px; flex-shrink:0;}
+  .canvas-wrap{
+    flex:1;
+    min-width:320px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
   }
-  .btn-primary:hover { background: #178a65; }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-secondary {
-    background: transparent; color: #9aa3b2; border: 1px solid #2a3040;
-    padding: 10px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  .canvas-stage{
+    background:repeating-conic-gradient(#1a2540 0% 25%, #10182b 0% 50%) 50% / 20px 20px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:10px;
+    max-width:100%;
+    overflow:auto;
   }
-  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
-  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
-  .canvas-wrap {
-    display: flex; align-items: center; justify-content: center;
-    background: #1c212c; border-radius: 10px; padding: 16px; margin-bottom: 18px;
-    background-image: linear-gradient(45deg, #232838 25%, transparent 25%), linear-gradient(-45deg, #232838 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #232838 75%), linear-gradient(-45deg, transparent 75%, #232838 75%);
-    background-size: 16px 16px;
-    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-    min-height: 200px;
+  .section-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--text-dim); margin:0 0 10px 0; font-weight:600;
   }
-  #canvasStage { position: relative; display: inline-block; line-height: 0; font-size: 0; }
-  #mainCanvas { max-width: 100%; max-height: 480px; border-radius: 6px; display: block; }
-  .empty-canvas-note { font-size: 13px; color: #9aa3b2; }
-  .slider-row { margin-bottom: 14px; }
-  .slider-row label { display: flex; justify-content: space-between; font-size: 13px; color: #9aa3b2; margin-bottom: 6px; }
-  .slider-row input[type="range"] { width: 100%; }
-  select {
-    background: #1c212c; border: 1px solid #2a3040; border-radius: 8px;
-    padding: 9px 12px; color: #fff; font-size: 14px; font-family: inherit;
+  .tool-group{border-top:1px solid var(--border); padding-top:12px; margin-top:12px;}
+  .tool-group:first-child{border-top:none; padding-top:0; margin-top:0;}
+  .btn-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  .btn-grid button{width:100%;}
+  .full-btn{width:100%; margin-bottom:6px;}
+  label.small{font-size:12px; color:var(--text-dim); display:block; margin:8px 0 4px;}
+  input[type=range]{width:100%; accent-color:var(--accent);}
+  input[type=color]{width:100%; height:32px; border:1px solid var(--border); border-radius:6px; background:none; padding:2px;}
+  input[type=text], input[type=number], select{
+    width:100%; padding:6px 8px; border-radius:6px;
+    border:1px solid var(--border); background:var(--bg-panel-2); color:var(--text); font-size:13px;
   }
-  .inline-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-  input[type="color"] {
-    width: 40px; height: 36px; border: 1px solid #2a3040; border-radius: 8px; background: #1c212c; cursor: pointer;
+  .row{display:flex; gap:6px; align-items:center;}
+  .row > *{flex:1;}
+  .hint{font-size:11px; color:var(--text-dim); margin-top:6px; line-height:1.5;}
+  #fileInput{display:none;}
+  .layer-item{
+    display:flex; align-items:center; gap:6px;
+    padding:6px 8px; border-radius:8px; border:1px solid transparent;
+    background:var(--bg-panel-2); margin-bottom:6px; cursor:pointer; font-size:12px;
   }
-  input[type="file"] { color: #9aa3b2; font-size: 13px; }
-
-  /* Kırpma kutusu (telefon tarzı, serbest sürüklenebilir) */
-  #cropOverlay {
-    position: absolute; top: 0; left: 0; display: none; pointer-events: none;
+  .layer-item.active{border-color:var(--accent);}
+  .layer-item span.lname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .layer-actions{display:flex; gap:2px;}
+  .layer-actions button{padding:2px 6px; font-size:11px;}
+  .empty-msg{color:var(--text-dim); font-size:12px; text-align:center; padding:16px 0;}
+  .props-box{border-top:1px solid var(--border); padding-top:12px; margin-top:12px;}
+  #cropBar{display:none; gap:8px; margin-top:8px;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
+    padding:10px 18px; border-radius:8px; font-size:13px; z-index:999;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+    display:none;
   }
-  #cropBox {
-    position: absolute;
-    border: 2px solid #1D9E75;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-    pointer-events: auto;
-    touch-action: none;
-    cursor: move;
+  .spinner{
+    display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.3);
+    border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px;
   }
-  .crop-handle {
-    position: absolute;
-    width: 16px; height: 16px;
-    background: #fff;
-    border: 2px solid #1D9E75;
-    border-radius: 50%;
-    pointer-events: auto;
-    touch-action: none;
-    z-index: 2;
-  }
-  .crop-handle.h-nw { top: -9px; left: -9px; cursor: nwse-resize; }
-  .crop-handle.h-n  { top: -9px; left: 50%; margin-left: -8px; cursor: ns-resize; }
-  .crop-handle.h-ne { top: -9px; right: -9px; cursor: nesw-resize; }
-  .crop-handle.h-e  { top: 50%; right: -9px; margin-top: -8px; cursor: ew-resize; }
-  .crop-handle.h-se { bottom: -9px; right: -9px; cursor: nwse-resize; }
-  .crop-handle.h-s  { bottom: -9px; left: 50%; margin-left: -8px; cursor: ns-resize; }
-  .crop-handle.h-sw { bottom: -9px; left: -9px; cursor: nesw-resize; }
-  .crop-handle.h-w  { top: 50%; left: -9px; margin-top: -8px; cursor: ew-resize; }
-  .crop-hint { font-size: 12px; color: #9aa3b2; margin-bottom: 10px; }
+  @keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="logo">
-    <div class="logo-dot">H</div>
-    <div class="logo-text">HızlıSatıcı AI</div>
-  </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
-</header>
-<main>
   <h1>🎨 Görsel Stüdyosu</h1>
-  <div class="subtitle">Ürün görselini yükle, düzenle, indir. (AI ile sahneye yerleştirme ve filigran gibi özellikler yakında eklenecek.)</div>
-
-  <div class="section">
-    <div class="section-title">1. Görsel yükle</div>
-    <input type="file" id="imgFileInput" accept="image/*">
+  <div class="top-actions">
+    <button id="undoBtn" class="icon-btn" title="Geri al">↶ Geri Al</button>
+    <button id="redoBtn" class="icon-btn" title="Yinele">↷ Yinele</button>
+    <button id="downloadBtn" class="primary">⬇ PNG İndir</button>
+    <a href="dashboard.html"><button>← Panele Dön</button></a>
   </div>
+</header>
 
-  <div class="section">
-    <div class="section-title">2. Önizleme</div>
-    <div class="canvas-wrap">
-      <div id="canvasStage">
-        <canvas id="mainCanvas" style="display:none;"></canvas>
-        <div id="cropOverlay">
-          <div id="cropBox">
-            <div class="crop-handle h-nw" data-h="nw"></div>
-            <div class="crop-handle h-n" data-h="n"></div>
-            <div class="crop-handle h-ne" data-h="ne"></div>
-            <div class="crop-handle h-e" data-h="e"></div>
-            <div class="crop-handle h-se" data-h="se"></div>
-            <div class="crop-handle h-s" data-h="s"></div>
-            <div class="crop-handle h-sw" data-h="sw"></div>
-            <div class="crop-handle h-w" data-h="w"></div>
-          </div>
-        </div>
+<div class="layout">
+
+  <!-- SOL PANEL: ARAÇLAR -->
+  <div class="sidebar-left">
+
+    <div class="panel">
+      <p class="section-title">Görsel</p>
+      <input type="file" id="fileInput" accept="image/*">
+      <button class="full-btn primary" id="uploadBtn">📤 Görsel Yükle</button>
+      <button class="full-btn" id="removeBgBtn">✂️ Arka Planı Temizle</button>
+      <div class="hint" id="removeBgHint"></div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title">Ekle</p>
+      <div class="btn-grid">
+        <button id="addTextBtn">🔤 Metin</button>
+        <button id="addRectBtn">▭ Dikdörtgen</button>
+        <button id="addCircleBtn">◯ Daire</button>
+        <button id="addLineBtn">／ Çizgi</button>
       </div>
-      <div class="empty-canvas-note" id="emptyNote">Önce bir görsel yükle.</div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title">Düzenle</p>
+      <div class="row">
+        <button id="rotateBtn">↻ 90° Döndür</button>
+        <button id="cropToggleBtn">✂ Kırp</button>
+      </div>
+      <div id="cropBar">
+        <button id="cropApplyBtn" class="primary">Kırpmayı Uygula</button>
+        <button id="cropCancelBtn">İptal</button>
+      </div>
+
+      <div class="tool-group">
+        <label class="small">Parlaklık</label>
+        <input type="range" id="brightnessSlider" min="-100" max="100" value="0">
+        <label class="small">Kontrast</label>
+        <input type="range" id="contrastSlider" min="-100" max="100" value="0">
+        <label class="small">Doygunluk</label>
+        <input type="range" id="saturationSlider" min="-100" max="100" value="0">
+        <button class="full-btn" id="resetFiltersBtn" style="margin-top:8px;">Ayarları Sıfırla</button>
+      </div>
+
+      <div class="tool-group">
+        <label class="small">Zemin Rengi</label>
+        <div class="row">
+          <input type="color" id="bgColorPicker" value="#ffffff">
+          <button id="bgColorClearBtn" title="Zemin rengini kaldır">✕</button>
+        </div>
+        <div class="hint">Sadece şeffaf alanlarda görünür (önce arka planı temizle).</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title">Boyut Şablonu</p>
+      <button class="full-btn" data-w="1080" data-h="1080">Trendyol Kare (1080×1080)</button>
+      <button class="full-btn" data-w="1080" data-h="1080">Instagram Kare (1080×1080)</button>
+      <button class="full-btn" data-w="1080" data-h="1350">Instagram Dikey (1080×1350)</button>
+      <button class="full-btn" data-w="1200" data-h="630">Facebook Yatay (1200×630)</button>
+    </div>
+
+  </div>
+
+  <!-- ORTA: CANVAS -->
+  <div class="canvas-wrap">
+    <div class="canvas-stage">
+      <canvas id="mainCanvas"></canvas>
+    </div>
+    <div class="hint">Seçili öğeyi taşımak için sürükle, köşelerden boyutlandır, üstteki tutamaçtan döndür. Silmek için <b>Delete</b> tuşuna bas.</div>
+  </div>
+
+  <!-- SAĞ PANEL: KATMANLAR + ÖZELLİKLER -->
+  <div class="sidebar-right">
+    <div class="panel">
+      <p class="section-title">Katmanlar</p>
+      <div id="layerList"><div class="empty-msg">Henüz öğe yok</div></div>
+    </div>
+
+    <div class="panel" id="propsPanel" style="display:none; margin-top:14px;">
+      <p class="section-title">Seçili Öğe</p>
+      <div id="propsContent"></div>
+      <button class="full-btn danger" id="deleteSelectedBtn" style="margin-top:10px;">🗑 Sil</button>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">3. Döndür / kırp</div>
-    <div class="btn-row">
-      <button class="btn-secondary" id="rotateBtn" onclick="rotateImage()" disabled>↻ 90° döndür</button>
-      <button class="btn-secondary" id="cropStartBtn" onclick="startCrop()" disabled>✂️ Kırp</button>
-      <button class="btn-primary" id="cropConfirmBtn" onclick="confirmCrop()" style="display:none;">✓ Onayla</button>
-      <button class="btn-secondary" id="cropCancelBtn" onclick="cancelCrop()" style="display:none;">✕ İptal</button>
-    </div>
-    <div class="crop-hint" id="cropHint" style="display:none;">Kutunun köşelerinden veya kenarlarından sürükleyerek istediğin alanı seç, ortasından tutup taşıyabilirsin. Bitince ✓ Onayla'ya bas.</div>
-  </div>
+</div>
 
-  <div class="section">
-    <div class="section-title">4. Arka planı temizle</div>
-    <div class="ai-note">Ürünü zeminden ayırıp şeffaf hale getirir. Aşağıdaki "Zemin rengi ekle" adımının işe yaraması için önce bunu yapman gerekiyor.</div>
-    <button class="btn-secondary" id="removeBgBtn" onclick="removeBackgroundStudio()" disabled>🧹 Arka planı temizle</button>
-    <div id="removeBgMsg" style="font-size:12px; color:#f28b8b; margin-top:8px; display:none;"></div>
-  </div>
+<div class="toast" id="toast"></div>
 
-  <div class="section">
-    <div class="section-title">5. Parlaklık / kontrast / doygunluk</div>
-    <div class="slider-row">
-      <label><span>Parlaklık</span><span id="brightnessVal">100%</span></label>
-      <input type="range" id="brightnessSlider" min="50" max="150" value="100" disabled>
-    </div>
-    <div class="slider-row">
-      <label><span>Kontrast</span><span id="contrastVal">100%</span></label>
-      <input type="range" id="contrastSlider" min="50" max="150" value="100" disabled>
-    </div>
-    <div class="slider-row">
-      <label><span>Doygunluk</span><span id="saturateVal">100%</span></label>
-      <input type="range" id="saturateSlider" min="0" max="200" value="100" disabled>
-    </div>
-    <div class="btn-row">
-      <button class="btn-primary" id="applyFilterBtn" onclick="commitFilters()" disabled>Uygula</button>
-      <button class="btn-secondary" id="resetFilterBtn" onclick="resetFilters()" disabled>Sıfırla</button>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">6. Zemin rengi ekle</div>
-    <div class="ai-note">Sadece şeffaf (yukarıda arka planı temizlenmiş) görsellerde görünür bir etki yapar.</div>
-    <div class="inline-row">
-      <input type="color" id="bgColorPicker" value="#ffffff">
-      <button class="btn-secondary" id="applyBgBtn" onclick="applyBackgroundColor()" disabled>Zemini uygula</button>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">7. Boyut şablonu</div>
-    <div class="inline-row">
-      <select id="sizeTemplate">
-        <option value="">Şablon seç...</option>
-        <option value="1000x1000">Trendyol/Pazaryeri Kare (1000x1000)</option>
-        <option value="1080x1080">Instagram Kare (1080x1080)</option>
-        <option value="1080x1350">Instagram Dikey (1080x1350)</option>
-        <option value="1200x628">Facebook/Reklam Yatay (1200x628)</option>
-      </select>
-      <button class="btn-secondary" id="applyTemplateBtn" onclick="applySizeTemplate()" disabled>Şablonu uygula</button>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">8. İndir</div>
-    <button class="btn-primary" id="downloadBtn" onclick="downloadImage()" disabled>⬇️ PNG olarak indir</button>
-  </div>
-</main>
 <script>
-  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const canvas = document.getElementById('mainCanvas');
-  const ctx = canvas.getContext('2d');
-  const emptyNote = document.getElementById('emptyNote');
-  const MAX_DIMENSION = 1600; // performans için yüklenen görseli bu boyutu aşmayacak şekilde küçült
-  let baseImageData = null; // filtre kaydırıcıları için "temiz" referans - her kalıcı değişiklikten sonra güncellenir
+/* ============== Supabase ============== */
+const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const allButtons = ['rotateBtn', 'cropStartBtn', 'removeBgBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
-    'applyFilterBtn', 'resetFilterBtn', 'applyBgBtn', 'applyTemplateBtn', 'downloadBtn'];
+let currentUserAccessToken = null;
 
-  function enableControls() {
-    allButtons.forEach(id => document.getElementById(id).disabled = false);
+async function initAuth(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(!session){
+    window.location.href = "index.html";
+    return;
   }
-  function captureBaseImageData() {
-    baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  }
+  currentUserAccessToken = session.access_token;
+}
 
-  document.getElementById('imgFileInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-          const scale = MAX_DIMENSION / Math.max(w, h);
-          w = Math.round(w * scale);
-          h = Math.round(h * scale);
-        }
-        canvas.width = w;
-        canvas.height = h;
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.style.display = 'block';
-        emptyNote.style.display = 'none';
-        enableControls();
-        captureBaseImageData();
-        resetFilters();
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+/* ============== Toast ============== */
+let toastTimer = null;
+function showToast(msg, ms=2500){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.style.display='none', ms);
+}
+
+/* ============== Fabric Canvas ============== */
+const canvas = new fabric.Canvas('mainCanvas', {
+  width: 800,
+  height: 800,
+  backgroundColor: null,
+  preserveObjectStacking: true
+});
+
+let baseImage = null; // yüklenen / düzenlenen ana ürün görseli (fabric.Image)
+
+/* ============== Undo / Redo ============== */
+let undoStack = [];
+let redoStack = [];
+let isRestoring = false;
+const HISTORY_LIMIT = 40;
+
+function snapshotState(){
+  if(isRestoring) return;
+  const json = JSON.stringify(canvas.toJSON(['selectable','evented']));
+  undoStack.push(json);
+  if(undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoButtons();
+}
+
+function restoreFromJSON(json){
+  isRestoring = true;
+  canvas.loadFromJSON(json, ()=>{
+    canvas.renderAll();
+    // baseImage referansını yeniden bul (ilk eklenen image objesi)
+    const imgs = canvas.getObjects('image');
+    baseImage = imgs.length ? imgs[0] : null;
+    isRestoring = false;
+    refreshLayerList();
   });
+}
 
-  function rotateImage() {
-    const w = canvas.width, h = canvas.height;
-    const rotated = document.createElement('canvas');
-    rotated.width = h;
-    rotated.height = w;
-    const rctx = rotated.getContext('2d');
-    rctx.translate(h / 2, w / 2);
-    rctx.rotate(Math.PI / 2);
-    rctx.drawImage(canvas, -w / 2, -h / 2);
-    canvas.width = rotated.width;
-    canvas.height = rotated.height;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(rotated, 0, 0);
-    captureBaseImageData();
-    resetFilters();
+function undo(){
+  if(undoStack.length < 2) return; // en az 1 önceki state kalmalı
+  const current = undoStack.pop();
+  redoStack.push(current);
+  const prev = undoStack[undoStack.length - 1];
+  restoreFromJSON(prev);
+  updateUndoRedoButtons();
+}
+
+function redo(){
+  if(redoStack.length === 0) return;
+  const next = redoStack.pop();
+  undoStack.push(next);
+  restoreFromJSON(next);
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons(){
+  document.getElementById('undoBtn').disabled = undoStack.length < 2;
+  document.getElementById('redoBtn').disabled = redoStack.length === 0;
+}
+
+canvas.on('object:added', ()=>{ snapshotState(); refreshLayerList(); });
+canvas.on('object:removed', ()=>{ snapshotState(); refreshLayerList(); });
+canvas.on('object:modified', ()=>{ snapshotState(); refreshLayerList(); });
+
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('redoBtn').addEventListener('click', redo);
+
+document.addEventListener('keydown', (e)=>{
+  const tag = (e.target.tagName || '').toLowerCase();
+  if(tag === 'input' || tag === 'textarea') return;
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
+  if((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); }
+  if(e.key === 'Delete' || e.key === 'Backspace'){
+    const active = canvas.getActiveObject();
+    if(active){ e.preventDefault(); canvas.remove(active); canvas.discardActiveObject(); canvas.renderAll(); }
   }
+});
 
-  // ---- Serbest kırpma (telefon tarzı, sürüklenebilir kutu) ----
-  let cropState = null; // { left, top, width, height, stageW, stageH }
-  let dragInfo = null;
+/* ============== Görsel Yükleme ============== */
+document.getElementById('uploadBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
 
-  function startCrop() {
-    if (!canvas.width) return;
-    const rect = canvas.getBoundingClientRect();
-    const dispW = rect.width, dispH = rect.height;
-    const overlay = document.getElementById('cropOverlay');
-    overlay.style.width = dispW + 'px';
-    overlay.style.height = dispH + 'px';
-    overlay.style.display = 'block';
-
-    const marginX = dispW * 0.12, marginY = dispH * 0.12;
-    cropState = {
-      left: marginX,
-      top: marginY,
-      width: dispW - marginX * 2,
-      height: dispH - marginY * 2,
-      stageW: dispW,
-      stageH: dispH,
-    };
-    renderCropBox();
-
-    document.getElementById('cropStartBtn').style.display = 'none';
-    document.getElementById('cropConfirmBtn').style.display = 'inline-block';
-    document.getElementById('cropCancelBtn').style.display = 'inline-block';
-    document.getElementById('cropHint').style.display = 'block';
-    document.getElementById('rotateBtn').disabled = true;
-  }
-
-  function renderCropBox() {
-    const box = document.getElementById('cropBox');
-    box.style.left = cropState.left + 'px';
-    box.style.top = cropState.top + 'px';
-    box.style.width = cropState.width + 'px';
-    box.style.height = cropState.height + 'px';
-  }
-
-  function closeCropUI() {
-    document.getElementById('cropOverlay').style.display = 'none';
-    document.getElementById('cropStartBtn').style.display = 'inline-block';
-    document.getElementById('cropConfirmBtn').style.display = 'none';
-    document.getElementById('cropCancelBtn').style.display = 'none';
-    document.getElementById('cropHint').style.display = 'none';
-    document.getElementById('rotateBtn').disabled = false;
-    cropState = null;
-  }
-
-  function cancelCrop() {
-    closeCropUI();
-  }
-
-  function confirmCrop() {
-    if (!cropState) return;
-    const scaleX = canvas.width / cropState.stageW;
-    const scaleY = canvas.height / cropState.stageH;
-    const sx = Math.round(cropState.left * scaleX);
-    const sy = Math.round(cropState.top * scaleY);
-    const sw = Math.max(1, Math.round(cropState.width * scaleX));
-    const sh = Math.max(1, Math.round(cropState.height * scaleY));
-
-    const cropped = document.createElement('canvas');
-    cropped.width = sw;
-    cropped.height = sh;
-    cropped.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-    canvas.width = sw;
-    canvas.height = sh;
-    ctx.clearRect(0, 0, sw, sh);
-    ctx.drawImage(cropped, 0, 0);
-    captureBaseImageData();
-    resetFilters();
-    closeCropUI();
-  }
-
-  function clampNum(v, min, max) {
-    return Math.max(min, Math.min(max, v));
-  }
-
-  function startDrag(e, mode) {
-    e.preventDefault();
-    dragInfo = {
-      mode,
-      startX: e.clientX,
-      startY: e.clientY,
-      orig: { left: cropState.left, top: cropState.top, width: cropState.width, height: cropState.height },
-    };
-    document.addEventListener('pointermove', onDrag);
-    document.addEventListener('pointerup', endDrag);
-  }
-
-  function onDrag(e) {
-    if (!dragInfo || !cropState) return;
-    const dx = e.clientX - dragInfo.startX;
-    const dy = e.clientY - dragInfo.startY;
-    const o = dragInfo.orig;
-    const stageW = cropState.stageW, stageH = cropState.stageH;
-    const MIN_CROP = 24;
-    let left = o.left, top = o.top, width = o.width, height = o.height;
-
-    if (dragInfo.mode === 'move') {
-      left = clampNum(o.left + dx, 0, stageW - o.width);
-      top = clampNum(o.top + dy, 0, stageH - o.height);
-    } else {
-      let right = o.left + o.width, bottom = o.top + o.height;
-      if (dragInfo.mode.includes('w')) left = clampNum(o.left + dx, 0, right - MIN_CROP);
-      if (dragInfo.mode.includes('e')) right = clampNum(right + dx, left + MIN_CROP, stageW);
-      if (dragInfo.mode.includes('n')) top = clampNum(o.top + dy, 0, bottom - MIN_CROP);
-      if (dragInfo.mode.includes('s')) bottom = clampNum(bottom + dy, top + MIN_CROP, stageH);
-      width = right - left;
-      height = bottom - top;
-    }
-    cropState.left = left;
-    cropState.top = top;
-    cropState.width = width;
-    cropState.height = height;
-    renderCropBox();
-  }
-
-  function endDrag() {
-    dragInfo = null;
-    document.removeEventListener('pointermove', onDrag);
-    document.removeEventListener('pointerup', endDrag);
-  }
-
-  document.getElementById('cropBox').addEventListener('pointerdown', (e) => {
-    if (e.target.classList.contains('crop-handle')) return;
-    startDrag(e, 'move');
-  });
-  document.querySelectorAll('.crop-handle').forEach((h) => {
-    h.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      startDrag(e, h.dataset.h);
-    });
-  });
-  // ---- /Serbest kırpma ----
-
-  async function removeBackgroundStudio() {
-    const btn = document.getElementById('removeBgBtn');
-    const msgEl = document.getElementById('removeBgMsg');
-    btn.disabled = true;
-    btn.textContent = 'Temizleniyor...';
-    msgEl.style.display = 'none';
-    try {
-      const imageBase64 = canvas.toDataURL('image/png');
-      const response = await fetch(SUPABASE_URL + '/functions/v1/remove-background', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
-        body: JSON.stringify({ imageBase64 }),
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    fabric.Image.fromURL(ev.target.result, (img)=>{
+      // canvas'a sığacak şekilde ölçekle
+      const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+      img.set({
+        left: canvas.width/2,
+        top: canvas.height/2,
+        originX: 'center',
+        originY: 'center',
+        scaleX: scale,
+        scaleY: scale,
+        cornerColor: '#1D9E75',
+        cornerStyle: 'circle',
+        transparentCorners: false
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        captureBaseImageData();
-        resetFilters();
-      };
-      img.src = data.imageBase64;
-    } catch (err) {
-      msgEl.textContent = 'Hata: ' + err.message;
-      msgEl.style.display = 'block';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '🧹 Arka planı temizle';
-    }
-  }
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      baseImage = img;
+      canvas.renderAll();
+      showToast('Görsel yüklendi');
+    }, { crossOrigin: 'anonymous' });
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
 
-  ['brightnessSlider', 'contrastSlider', 'saturateSlider'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      updateFilterLabels();
-      renderPreviewFromBase();
-    });
+/* ============== Metin / Şekil Ekleme ============== */
+document.getElementById('addTextBtn').addEventListener('click', ()=>{
+  const text = new fabric.IText('Metninizi yazın', {
+    left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
+    fontSize: 42, fill: '#ffffff', fontFamily: 'Arial',
+    cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
   });
-  function updateFilterLabels() {
-    document.getElementById('brightnessVal').textContent = document.getElementById('brightnessSlider').value + '%';
-    document.getElementById('contrastVal').textContent = document.getElementById('contrastSlider').value + '%';
-    document.getElementById('saturateVal').textContent = document.getElementById('saturateSlider').value + '%';
-  }
-  function clampByte(v) {
-    return Math.max(0, Math.min(255, v));
-  }
-  // baseImageData'dan başlayarak kaydırıcı değerlerini uygular - kaydırıcı her hareket ettiğinde
-  // canlı önizleme için çağrılır, henüz kalıcı değişiklik yapmaz.
-  function renderPreviewFromBase() {
-    if (!baseImageData) return;
-    const w = canvas.width, h = canvas.height;
-    const brightnessPct = parseFloat(document.getElementById('brightnessSlider').value);
-    const contrastPct = parseFloat(document.getElementById('contrastSlider').value);
-    const saturatePct = parseFloat(document.getElementById('saturateSlider').value);
+  canvas.add(text);
+  canvas.setActiveObject(text);
+  canvas.renderAll();
+});
 
-    const brightnessOffset = brightnessPct - 100; // -50..+50 arası, toplamsal (daha yumuşak sonuç verir)
-    const contrastC = (contrastPct - 100) * 1.27; // daha yumuşak kontrast eğrisi
-    const contrastFactor = (259 * (contrastC + 255)) / (255 * (259 - contrastC));
-    const saturateFactor = saturatePct / 100;
+document.getElementById('addRectBtn').addEventListener('click', ()=>{
+  const rect = new fabric.Rect({
+    left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
+    width: 200, height: 140, fill: '#1D9E75',
+    cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+  });
+  canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
+});
 
-    const src = baseImageData.data;
-    const out = ctx.createImageData(w, h);
-    const data = out.data;
-    for (let i = 0; i < src.length; i += 4) {
-      let r = src[i], g = src[i + 1], b = src[i + 2];
+document.getElementById('addCircleBtn').addEventListener('click', ()=>{
+  const circle = new fabric.Circle({
+    left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
+    radius: 90, fill: '#1D9E75',
+    cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+  });
+  canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
+});
 
-      r += brightnessOffset;
-      g += brightnessOffset;
-      b += brightnessOffset;
+document.getElementById('addLineBtn').addEventListener('click', ()=>{
+  const line = new fabric.Line([50,50,250,50], {
+    left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
+    stroke: '#ffffff', strokeWidth: 6,
+    cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+  });
+  canvas.add(line); canvas.setActiveObject(line); canvas.renderAll();
+});
 
-      r = contrastFactor * (r - 128) + 128;
-      g = contrastFactor * (g - 128) + 128;
-      b = contrastFactor * (b - 128) + 128;
+/* ============== Döndür (90°) ============== */
+document.getElementById('rotateBtn').addEventListener('click', ()=>{
+  const target = canvas.getActiveObject() || baseImage;
+  if(!target){ showToast('Önce bir görsel yükle veya öğe seç'); return; }
+  target.rotate(((target.angle || 0) + 90) % 360);
+  canvas.renderAll();
+  snapshotState();
+});
 
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      r = gray + (r - gray) * saturateFactor;
-      g = gray + (g - gray) * saturateFactor;
-      b = gray + (b - gray) * saturateFactor;
+/* ============== Kırpma ============== */
+let cropRect = null;
 
-      data[i] = clampByte(r);
-      data[i + 1] = clampByte(g);
-      data[i + 2] = clampByte(b);
-      data[i + 3] = src[i + 3];
+document.getElementById('cropToggleBtn').addEventListener('click', ()=>{
+  if(!baseImage){ showToast('Önce bir görsel yükle'); return; }
+  if(cropRect){ cancelCrop(); return; }
+  const b = baseImage.getBoundingRect();
+  cropRect = new fabric.Rect({
+    left: b.left + b.width*0.1,
+    top: b.top + b.height*0.1,
+    width: b.width*0.8,
+    height: b.height*0.8,
+    fill: 'rgba(29,158,117,0.15)',
+    stroke: '#1D9E75',
+    strokeDashArray: [6,4],
+    strokeWidth: 2,
+    cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false,
+    lockRotation:true
+  });
+  cropRect.setControlsVisibility({ mtr:false });
+  canvas.add(cropRect);
+  canvas.setActiveObject(cropRect);
+  canvas.renderAll();
+  document.getElementById('cropBar').style.display = 'flex';
+});
+
+function cancelCrop(){
+  if(cropRect){ canvas.remove(cropRect); cropRect = null; canvas.renderAll(); }
+  document.getElementById('cropBar').style.display = 'none';
+}
+
+document.getElementById('cropCancelBtn').addEventListener('click', cancelCrop);
+
+document.getElementById('cropApplyBtn').addEventListener('click', ()=>{
+  if(!cropRect || !baseImage) return;
+  const rectBounds = cropRect.getBoundingRect();
+  // absolute positioned clipPath kullanarak, ekranda çizilen dikdörtgeni doğrudan kırpma alanı yapıyoruz
+  const absClip = new fabric.Rect({
+    left: rectBounds.left,
+    top: rectBounds.top,
+    width: rectBounds.width,
+    height: rectBounds.height,
+    absolutePositioned: true
+  });
+  baseImage.clipPath = absClip;
+  canvas.remove(cropRect);
+  cropRect = null;
+  canvas.renderAll();
+  document.getElementById('cropBar').style.display = 'none';
+  snapshotState();
+  showToast('Kırpma uygulandı');
+});
+
+/* ============== Parlaklık / Kontrast / Doygunluk ============== */
+function applyImageFilters(){
+  if(!baseImage) return;
+  const b = parseInt(document.getElementById('brightnessSlider').value, 10) / 100;
+  const c = parseInt(document.getElementById('contrastSlider').value, 10) / 100;
+  const s = parseInt(document.getElementById('saturationSlider').value, 10) / 100;
+  baseImage.filters = [
+    new fabric.Image.filters.Brightness({ brightness: b }),
+    new fabric.Image.filters.Contrast({ contrast: c }),
+    new fabric.Image.filters.Saturation({ saturation: s })
+  ];
+  baseImage.applyFilters();
+  canvas.renderAll();
+}
+
+['brightnessSlider','contrastSlider','saturationSlider'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', applyImageFilters);
+  document.getElementById(id).addEventListener('change', ()=> snapshotState());
+});
+
+document.getElementById('resetFiltersBtn').addEventListener('click', ()=>{
+  document.getElementById('brightnessSlider').value = 0;
+  document.getElementById('contrastSlider').value = 0;
+  document.getElementById('saturationSlider').value = 0;
+  if(baseImage){ baseImage.filters = []; baseImage.applyFilters(); canvas.renderAll(); snapshotState(); }
+});
+
+/* ============== Zemin Rengi ============== */
+document.getElementById('bgColorPicker').addEventListener('input', (e)=>{
+  canvas.backgroundColor = e.target.value;
+  canvas.renderAll();
+});
+document.getElementById('bgColorPicker').addEventListener('change', ()=> snapshotState());
+document.getElementById('bgColorClearBtn').addEventListener('click', ()=>{
+  canvas.backgroundColor = null;
+  canvas.renderAll();
+  snapshotState();
+});
+
+/* ============== Boyut Şablonları ============== */
+document.querySelectorAll('.sidebar-left [data-w]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const w = parseInt(btn.dataset.w,10), h = parseInt(btn.dataset.h,10);
+    canvas.setWidth(w);
+    canvas.setHeight(h);
+    if(baseImage){
+      const scale = Math.min(w / baseImage.width, h / baseImage.height, 1);
+      baseImage.set({ left: w/2, top: h/2, scaleX: scale, scaleY: scale });
     }
-    ctx.putImageData(out, 0, 0);
-  }
-  function commitFilters() {
-    renderPreviewFromBase();
-    captureBaseImageData();
-    resetFilters();
-  }
-  function resetFilters() {
-    document.getElementById('brightnessSlider').value = 100;
-    document.getElementById('contrastSlider').value = 100;
-    document.getElementById('saturateSlider').value = 100;
-    updateFilterLabels();
-    renderPreviewFromBase();
-  }
+    canvas.renderAll();
+    snapshotState();
+    showToast(`Boyut ${w}×${h} olarak ayarlandı`);
+  });
+});
 
-  function applyBackgroundColor() {
-    const w = canvas.width, h = canvas.height;
-    const color = document.getElementById('bgColorPicker').value;
-    const existingData = ctx.getImageData(0, 0, w, h).data;
-    let hasTransparency = false;
-    for (let i = 3; i < existingData.length; i += 4) {
-      if (existingData[i] < 250) { hasTransparency = true; break; }
-    }
-    if (!hasTransparency) {
-      alert('Bu görselin şeffaf bir alanı yok, bu yüzden zemin rengi görünür bir değişiklik yapmayacak. Önce yukarıdaki "Arka planı temizle" adımını kullan.');
-    }
-    const composited = document.createElement('canvas');
-    composited.width = w;
-    composited.height = h;
-    const cctx = composited.getContext('2d');
-    cctx.fillStyle = color;
-    cctx.fillRect(0, 0, w, h);
-    cctx.drawImage(canvas, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(composited, 0, 0);
-    captureBaseImageData();
-    resetFilters();
-  }
+/* ============== Arka Planı Temizle (mevcut Edge Function) ============== */
+document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
+  if(!baseImage){ showToast('Önce bir görsel yükle'); return; }
+  const btn = document.getElementById('removeBgBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> İşleniyor...';
+  try{
+    // görselin mevcut halini (filtreler dahil) base64 olarak al
+    const dataUrl = baseImage.toDataURL({ format: 'png' });
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/remove-background`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({ image: dataUrl, userAccessToken: currentUserAccessToken })
+    });
+    if(!res.ok){ throw new Error(`Sunucu hatası: ${res.status}`); }
+    const data = await res.json();
+    const resultUrl = data.image || data.result || data.url;
+    if(!resultUrl) throw new Error('Beklenmeyen yanıt formatı');
 
-  function applySizeTemplate() {
-    const templateVal = document.getElementById('sizeTemplate').value;
-    if (!templateVal) return;
-    const [targetW, targetH] = templateVal.split('x').map(Number);
-    const srcW = canvas.width, srcH = canvas.height;
-    const scale = Math.max(targetW / srcW, targetH / srcH);
-    const scaledW = srcW * scale;
-    const scaledH = srcH * scale;
-    const offsetX = (targetW - scaledW) / 2;
-    const offsetY = (targetH - scaledH) / 2;
-    const resized = document.createElement('canvas');
-    resized.width = targetW;
-    resized.height = targetH;
-    const rctx = resized.getContext('2d');
-    rctx.drawImage(canvas, offsetX, offsetY, scaledW, scaledH);
-    canvas.width = targetW;
-    canvas.height = targetH;
-    ctx.clearRect(0, 0, targetW, targetH);
-    ctx.drawImage(resized, 0, 0);
-    captureBaseImageData();
-    resetFilters();
-  }
+    fabric.Image.fromURL(resultUrl, (newImg)=>{
+      const old = baseImage;
+      newImg.set({
+        left: old.left, top: old.top, originX: old.originX, originY: old.originY,
+        scaleX: old.scaleX, scaleY: old.scaleY, angle: old.angle,
+        cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+      });
+      // önceki parlaklık/kontrast/doygunluk ayarlarını yeni görsele de uygula
+      if(old.filters && old.filters.length){
+        newImg.filters = old.filters;
+        newImg.applyFilters();
+      }
+      canvas.remove(old);
+      canvas.add(newImg);
+      canvas.setActiveObject(newImg);
+      baseImage = newImg;
+      canvas.renderAll();
+      showToast('Arka plan temizlendi');
+    }, { crossOrigin: 'anonymous' });
 
-  function downloadImage() {
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'urun-gorseli-duzenlendi.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+  }catch(err){
+    console.error(err);
+    showToast('Hata: ' + err.message, 4000);
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = original;
   }
+});
+
+/* ============== Katman Paneli ============== */
+function refreshLayerList(){
+  const list = document.getElementById('layerList');
+  const objects = canvas.getObjects().slice().reverse();
+  if(objects.length === 0){
+    list.innerHTML = '<div class="empty-msg">Henüz öğe yok</div>';
+    return;
+  }
+  const active = canvas.getActiveObject();
+  list.innerHTML = '';
+  objects.forEach((obj)=>{
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (obj === active ? ' active' : '');
+    const label = obj.type === 'i-text' ? ('🔤 ' + (obj.text||'').slice(0,14))
+      : obj.type === 'image' ? '🖼️ Görsel'
+      : obj.type === 'rect' ? '▭ Dikdörtgen'
+      : obj.type === 'circle' ? '◯ Daire'
+      : obj.type === 'line' ? '／ Çizgi'
+      : obj.type;
+    div.innerHTML = `<span class="lname">${label}</span>
+      <div class="layer-actions">
+        <button data-act="up" title="Öne al">↑</button>
+        <button data-act="down" title="Arkaya gönder">↓</button>
+        <button data-act="del" title="Sil">🗑</button>
+      </div>`;
+    div.querySelector('.lname').addEventListener('click', ()=>{
+      canvas.setActiveObject(obj); canvas.renderAll(); refreshLayerList();
+    });
+    div.querySelector('[data-act="up"]').addEventListener('click', (e)=>{ e.stopPropagation(); obj.bringForward(); canvas.renderAll(); refreshLayerList(); });
+    div.querySelector('[data-act="down"]').addEventListener('click', (e)=>{ e.stopPropagation(); obj.sendBackwards(); canvas.renderAll(); refreshLayerList(); });
+    div.querySelector('[data-act="del"]').addEventListener('click', (e)=>{ e.stopPropagation(); canvas.remove(obj); canvas.renderAll(); refreshLayerList(); });
+    list.appendChild(div);
+  });
+}
+
+/* ============== Seçili Öğe Özellik Paneli ============== */
+function refreshPropsPanel(){
+  const panel = document.getElementById('propsPanel');
+  const content = document.getElementById('propsContent');
+  const obj = canvas.getActiveObject();
+  if(!obj){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  content.innerHTML = '';
+
+  if(obj.type === 'i-text'){
+    content.innerHTML = `
+      <label class="small">Yazı Boyutu</label>
+      <input type="number" id="propFontSize" value="${obj.fontSize}" min="8" max="300">
+      <label class="small">Renk</label>
+      <input type="color" id="propColor" value="${obj.fill || '#ffffff'}">
+    `;
+    document.getElementById('propFontSize').addEventListener('input', (e)=>{
+      obj.set('fontSize', parseInt(e.target.value,10)||42); canvas.renderAll();
+    });
+    document.getElementById('propColor').addEventListener('input', (e)=>{
+      obj.set('fill', e.target.value); canvas.renderAll();
+    });
+  } else if(obj.type === 'rect' || obj.type === 'circle'){
+    content.innerHTML = `
+      <label class="small">Dolgu Rengi</label>
+      <input type="color" id="propFill" value="${obj.fill}">
+    `;
+    document.getElementById('propFill').addEventListener('input', (e)=>{
+      obj.set('fill', e.target.value); canvas.renderAll();
+    });
+  } else if(obj.type === 'line'){
+    content.innerHTML = `
+      <label class="small">Çizgi Rengi</label>
+      <input type="color" id="propStroke" value="${obj.stroke}">
+    `;
+    document.getElementById('propStroke').addEventListener('input', (e)=>{
+      obj.set('stroke', e.target.value); canvas.renderAll();
+    });
+  } else {
+    content.innerHTML = '<div class="hint">Bu öğe için özel ayar yok.</div>';
+  }
+}
+
+document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
+  const obj = canvas.getActiveObject();
+  if(obj){ canvas.remove(obj); canvas.discardActiveObject(); canvas.renderAll(); }
+});
+
+canvas.on('selection:created', ()=>{ refreshPropsPanel(); refreshLayerList(); });
+canvas.on('selection:updated', ()=>{ refreshPropsPanel(); refreshLayerList(); });
+canvas.on('selection:cleared', ()=>{ document.getElementById('propsPanel').style.display='none'; refreshLayerList(); });
+
+/* ============== İndir ============== */
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  canvas.discardActiveObject();
+  canvas.renderAll();
+  const dataUrl = canvas.toDataURL({ format: 'png', quality: 1 });
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'gorsel-studyosu-' + Date.now() + '.png';
+  a.click();
+});
+
+/* ============== Başlat ============== */
+initAuth();
+updateUndoRedoButtons();
+snapshotState(); // boş canvas'ı ilk state olarak kaydet
 </script>
 </body>
 </html>
