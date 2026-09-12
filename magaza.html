@@ -3,270 +3,277 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mağaza</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title id="pageTitle">Mağaza - HızlıSatıcı AI</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+  :root{
+    --bg-dark:#0b1220;
+    --bg-panel:#111a2e;
+    --bg-panel-2:#16213a;
+    --border:#233150;
+    --text:#e7ecf5;
+    --text-dim:#9aa7c2;
+    --accent:#1D9E75;
+    --accent-hover:#178a65;
+    --danger:#e0554f;
   }
-  header {
-    padding: 28px 20px 20px;
-    text-align: center;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg-dark);
+    color:var(--text);
+    font-family:'Segoe UI',Arial,sans-serif;
+    min-height:100vh;
   }
-  header h1 { font-size: 24px; font-weight: 700; color: #fff; }
-  header p { font-size: 13px; color: #9aa3b2; margin-top: 6px; }
-  main {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 24px 16px 60px;
+  header{
+    padding:28px 20px;
+    background:var(--bg-panel);
+    border-bottom:1px solid var(--border);
+    text-align:center;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 14px;
+  header h1{margin:0 0 6px 0; font-size:26px;}
+  header p{margin:0; color:var(--text-dim); font-size:14px;}
+  .wrap{max-width:1100px; margin:0 auto; padding:24px 16px 60px;}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(220px,1fr));
+    gap:18px;
   }
-  .card {
-    background: #141821;
-    border: 1px solid #232838;
-    border-radius: 14px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+  .card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
   }
-  .card img {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    background: #1c212c;
+  .card img{width:100%; aspect-ratio:1/1; object-fit:cover; background:var(--bg-panel-2); display:block;}
+  .card-body{padding:14px; display:flex; flex-direction:column; gap:8px; flex:1;}
+  .card-title{font-size:15px; font-weight:600; line-height:1.35; min-height:40px;}
+  .card-desc{font-size:12px; color:var(--text-dim); line-height:1.5; flex:1;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .card-price{font-size:18px; font-weight:700; color:var(--accent);}
+  button{
+    cursor:pointer; border:1px solid var(--border); background:var(--bg-panel-2);
+    color:var(--text); padding:10px 14px; border-radius:8px; font-size:14px;
   }
-  .card-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-  .card-name { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; }
-  .card-price { font-size: 15px; font-weight: 700; color: #5DCAA5; margin-top: auto; }
-  .buy-btn {
-    background: #1D9E75;
-    color: #fff;
-    border: none;
-    padding: 9px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
+  button.primary{background:var(--accent); border-color:var(--accent); color:#04150f; font-weight:600;}
+  button.primary:hover{background:var(--accent-hover);}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  .empty-msg{text-align:center; color:var(--text-dim); padding:60px 20px; font-size:15px;}
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(4,8,16,.7);
+    align-items:center; justify-content:center; padding:16px; z-index:999;
   }
-  .buy-btn:hover { background: #178a65; }
-  .empty-state { text-align: center; color: #9aa3b2; padding: 60px 20px; }
-  .overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    z-index: 10;
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:14px;
+    padding:22px; width:100%; max-width:420px;
   }
-  .overlay.open { display: flex; }
-  .modal {
-    background: #141821;
-    border: 1px solid #232838;
-    border-radius: 14px;
-    padding: 22px;
-    max-width: 380px;
-    width: 100%;
+  .modal h3{margin:0 0 4px 0;}
+  .modal .modal-product{color:var(--text-dim); font-size:13px; margin-bottom:16px;}
+  .modal label{font-size:12px; color:var(--text-dim); display:block; margin:10px 0 4px;}
+  .modal input, .modal textarea{
+    width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--border);
+    background:var(--bg-panel-2); color:var(--text); font-size:14px; font-family:inherit;
   }
-  .modal h3 { font-size: 16px; color: #fff; margin-bottom: 4px; }
-  .modal .modal-price { font-size: 14px; color: #5DCAA5; margin-bottom: 16px; }
-  .modal label { display: block; font-size: 12px; color: #9aa3b2; margin: 12px 0 5px; }
-  .modal input, .modal textarea {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #232838;
-    background: #0d0f16;
-    color: #e6e8ee;
-    font-size: 14px;
-    font-family: inherit;
+  .modal textarea{resize:vertical; min-height:60px;}
+  .modal-actions{display:flex; gap:8px; margin-top:18px;}
+  .modal-actions button{flex:1;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
+    padding:10px 18px; border-radius:8px; font-size:13px; z-index:1000;
+    box-shadow:0 4px 20px rgba(0,0,0,.4); display:none; max-width:90%; text-align:center;
   }
-  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-  .modal-actions button {
-    flex: 1;
-    padding: 11px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-  }
-  .cancel-btn { background: transparent; border: 1px solid #2a3040 !important; color: #9aa3b2; }
-  .submit-btn { background: #1D9E75; color: #fff; }
-  #formMsg { font-size: 13px; margin-top: 10px; min-height: 18px; }
-  #formMsg.err { color: #f28b8b; }
-  #formMsg.ok { color: #5DCAA5; }
+  .loading{text-align:center; padding:60px 20px; color:var(--text-dim);}
 </style>
 </head>
 <body>
-<header>
-  <h1 id="storeName">Mağaza</h1>
-  <p id="storeSub">Ürünler yükleniyor...</p>
-</header>
-<main>
-  <div class="grid" id="productGrid"></div>
-</main>
 
-<div class="overlay" id="orderOverlay">
+<header>
+  <h1 id="storeName">Mağaza yükleniyor...</h1>
+  <p id="storeSub"></p>
+</header>
+
+<div class="wrap">
+  <div id="content" class="loading">Yükleniyor...</div>
+</div>
+
+<div class="modal-overlay" id="orderModalOverlay">
   <div class="modal">
-    <h3 id="modalProductName"></h3>
-    <div class="modal-price" id="modalProductPrice"></div>
-    <label>Ad Soyad</label>
-    <input id="custName" type="text" placeholder="Adın soyadın">
-    <label>Telefon</label>
-    <input id="custPhone" type="tel" placeholder="05xx xxx xx xx">
-    <label>Adres</label>
-    <textarea id="custAddress" rows="3" placeholder="Teslimat adresin"></textarea>
-    <div class="modal-actions">
-      <button class="cancel-btn" onclick="closeModal()">Vazgeç</button>
-      <button class="submit-btn" id="submitOrderBtn" onclick="submitOrder()">Siparişi Gönder</button>
-    </div>
-    <div id="formMsg"></div>
+    <h3>Sipariş Ver</h3>
+    <div class="modal-product" id="modalProductName"></div>
+    <form id="orderForm">
+      <label>Ad Soyad</label>
+      <input type="text" id="orderName" required>
+      <label>Telefon</label>
+      <input type="tel" id="orderPhone" required>
+      <label>Adres</label>
+      <textarea id="orderAddress" required></textarea>
+      <label>Adet</label>
+      <input type="number" id="orderQty" value="1" min="1">
+      <div class="modal-actions">
+        <button type="button" id="orderCancelBtn">Vazgeç</button>
+        <button type="submit" class="primary" id="orderSubmitBtn">Siparişi Gönder</button>
+      </div>
+    </form>
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
-  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
 
-  let storeOwnerId = null;
-  let selectedProduct = null;
+let toastTimer = null;
+function showToast(msg, ms=3000){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.style.display='none', ms);
+}
 
-  function getStoreSlug() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('store');
+const params = new URLSearchParams(window.location.search);
+const slug = params.get('slug') || params.get('magaza');
+
+let currentStore = null;
+let currentProducts = [];
+
+function formatPrice(p){
+  const n = parseFloat(p);
+  if(isNaN(n)) return '';
+  return '₺' + n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getStoreName(store){
+  return store.store_name || store.name || store.magaza_adi || store.title || 'Mağaza';
+}
+
+function renderStore(){
+  const nameEl = document.getElementById('storeName');
+  const subEl = document.getElementById('storeSub');
+  nameEl.textContent = getStoreName(currentStore);
+  document.title = getStoreName(currentStore) + ' - HızlıSatıcı AI';
+  subEl.textContent = currentProducts.length + ' ürün';
+}
+
+function renderProducts(){
+  const content = document.getElementById('content');
+  if(currentProducts.length === 0){
+    content.innerHTML = '<div class="empty-msg">Bu mağazada henüz ürün yok.</div>';
+    return;
   }
-
-  async function init() {
-    const slug = getStoreSlug();
-    if (!slug) {
-      document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
-      document.getElementById('storeSub').textContent = 'Geçersiz mağaza adresi.';
-      return;
-    }
-
-    const { data: store, error: storeError } = await supabaseClient
-      .from('store_settings')
-      .select('*')
-      .eq('store_slug', slug)
-      .maybeSingle();
-
-    if (storeError || !store) {
-      document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
-      document.getElementById('storeSub').textContent = 'Bu adreste bir mağaza yok.';
-      return;
-    }
-
-    storeOwnerId = store.user_id;
-    document.getElementById('storeName').textContent = store.store_name || 'Mağaza';
-    document.getElementById('storeSub').textContent = store.business_name
-      ? store.business_name
-      : 'Ürünlerimize göz at';
-
-    loadProducts();
-  }
-
-  async function loadProducts() {
-    const { data: products, error } = await supabaseClient
-      .from('products')
-      .select('*')
-      .eq('user_id', storeOwnerId)
-      .eq('store_visible', true)
-      .order('created_at', { ascending: false });
-
-    const grid = document.getElementById('productGrid');
-
-    if (error || !products || products.length === 0) {
-      grid.innerHTML = '<div class="empty-state">Henüz ürün eklenmemiş.</div>';
-      return;
-    }
-
-    grid.innerHTML = products.map(p => `
-      <div class="card">
-        <img src="${p.image_url || ''}" onerror="this.style.opacity=0" alt="${escapeHtml(p.name || '')}">
-        <div class="card-body">
-          <div class="card-name">${escapeHtml(p.name || 'Ürün')}</div>
-          <div class="card-price">${p.sale_price ? '₺' + Number(p.sale_price).toFixed(2) : ''}</div>
-          <button class="buy-btn" onclick='openModal(${JSON.stringify(p.id)}, ${JSON.stringify(p.name || "Ürün")}, ${p.sale_price || 0})'>Satın Al</button>
-        </div>
+  content.innerHTML = '<div class="grid" id="productGrid"></div>';
+  const grid = document.getElementById('productGrid');
+  const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%2316213a'/%3E%3C/svg%3E";
+  currentProducts.forEach(p=>{
+    const title = p.generated_title || p.name || 'Ürün';
+    const desc = (p.generated_description || '').replace(/<[^>]*>/g, '').slice(0, 140);
+    const img = p.image_url || placeholderImg;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <img src="${img}" alt="${title}">
+      <div class="card-body">
+        <div class="card-title">${title}</div>
+        <div class="card-desc">${desc}</div>
+        <div class="card-price">${formatPrice(p.sale_price)}</div>
+        <button class="primary" data-id="${p.id}">Satın Al</button>
       </div>
-    `).join('');
+    `;
+    card.querySelector('button').addEventListener('click', ()=> openOrderModal(p));
+    grid.appendChild(card);
+  });
+}
+
+async function loadStore(){
+  if(!slug){
+    document.getElementById('content').innerHTML = '<div class="empty-msg">Mağaza adresi eksik.</div>';
+    document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
+    return;
   }
-
-  function openModal(productId, productName, price) {
-    selectedProduct = { id: productId, name: productName, price: price };
-    document.getElementById('modalProductName').textContent = productName;
-    document.getElementById('modalProductPrice').textContent = price ? '₺' + Number(price).toFixed(2) : '';
-    document.getElementById('custName').value = '';
-    document.getElementById('custPhone').value = '';
-    document.getElementById('custAddress').value = '';
-    document.getElementById('formMsg').textContent = '';
-    document.getElementById('orderOverlay').classList.add('open');
+  try{
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-store?slug=${encodeURIComponent(slug)}`, {
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      }
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ throw new Error(data.error || 'Mağaza yüklenemedi'); }
+    currentStore = data.store;
+    currentProducts = data.products || [];
+    renderStore();
+    renderProducts();
+  }catch(err){
+    console.error(err);
+    document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
+    document.getElementById('content').innerHTML = `<div class="empty-msg">${err.message}</div>`;
   }
+}
 
-  function closeModal() {
-    document.getElementById('orderOverlay').classList.remove('open');
-  }
+/* ============== Sipariş Modalı ============== */
+let selectedProduct = null;
 
-  async function submitOrder() {
-    const name = document.getElementById('custName').value.trim();
-    const phone = document.getElementById('custPhone').value.trim();
-    const address = document.getElementById('custAddress').value.trim();
-    const msg = document.getElementById('formMsg');
-    const btn = document.getElementById('submitOrderBtn');
+function openOrderModal(product){
+  selectedProduct = product;
+  document.getElementById('modalProductName').textContent = product.generated_title || product.name || 'Ürün';
+  document.getElementById('orderForm').reset();
+  document.getElementById('orderQty').value = 1;
+  document.getElementById('orderModalOverlay').classList.add('open');
+}
 
-    if (!name || !phone || !address) {
-      msg.textContent = 'Lütfen tüm alanları doldur.';
-      msg.className = 'err';
-      return;
-    }
+function closeOrderModal(){
+  document.getElementById('orderModalOverlay').classList.remove('open');
+  selectedProduct = null;
+}
 
-    btn.disabled = true;
-    msg.textContent = '';
-    msg.className = '';
+document.getElementById('orderCancelBtn').addEventListener('click', closeOrderModal);
+document.getElementById('orderModalOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'orderModalOverlay') closeOrderModal();
+});
 
-    const { error } = await supabaseClient
-      .from('store_orders')
-      .insert({
-        user_id: storeOwnerId,
+document.getElementById('orderForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!selectedProduct) return;
+  const submitBtn = document.getElementById('orderSubmitBtn');
+  const original = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Gönderiliyor...';
+  try{
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-store-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({
+        store_slug: slug,
         product_id: selectedProduct.id,
-        customer_name: name,
-        customer_phone: phone,
-        customer_address: address,
-        status: 'pending'
-      });
-
-    btn.disabled = false;
-
-    if (error) {
-      msg.textContent = 'Hata: ' + error.message;
-      msg.className = 'err';
-      return;
-    }
-
-    msg.textContent = 'Siparişin alındı ✓ En kısa sürede seninle iletişime geçilecek.';
-    msg.className = 'ok';
-    setTimeout(closeModal, 2000);
+        customer_name: document.getElementById('orderName').value,
+        customer_phone: document.getElementById('orderPhone').value,
+        customer_address: document.getElementById('orderAddress').value,
+        quantity: parseInt(document.getElementById('orderQty').value, 10) || 1
+      })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ throw new Error(data.error || 'Sipariş gönderilemedi'); }
+    closeOrderModal();
+    showToast('Siparişiniz alındı! En kısa sürede iletişime geçilecek.', 4000);
+  }catch(err){
+    console.error(err);
+    showToast('Hata: ' + err.message, 4000);
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = original;
   }
+});
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  init();
+/* ============== Başlat ============== */
+loadStore();
 </script>
 </body>
 </html>
