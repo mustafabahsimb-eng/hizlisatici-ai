@@ -59,7 +59,7 @@
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
   .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
   .canvas-wrap {
     display: flex; align-items: center; justify-content: center;
     background: #1c212c; border-radius: 10px; padding: 16px; margin-bottom: 18px;
@@ -68,7 +68,8 @@
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
     min-height: 200px;
   }
-  #mainCanvas { max-width: 100%; max-height: 480px; border-radius: 6px; }
+  #canvasStage { position: relative; display: inline-block; line-height: 0; font-size: 0; }
+  #mainCanvas { max-width: 100%; max-height: 480px; border-radius: 6px; display: block; }
   .empty-canvas-note { font-size: 13px; color: #9aa3b2; }
   .slider-row { margin-bottom: 14px; }
   .slider-row label { display: flex; justify-content: space-between; font-size: 13px; color: #9aa3b2; margin-bottom: 6px; }
@@ -82,6 +83,38 @@
     width: 40px; height: 36px; border: 1px solid #2a3040; border-radius: 8px; background: #1c212c; cursor: pointer;
   }
   input[type="file"] { color: #9aa3b2; font-size: 13px; }
+
+  /* Kırpma kutusu (telefon tarzı, serbest sürüklenebilir) */
+  #cropOverlay {
+    position: absolute; top: 0; left: 0; display: none; pointer-events: none;
+  }
+  #cropBox {
+    position: absolute;
+    border: 2px solid #1D9E75;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: move;
+  }
+  .crop-handle {
+    position: absolute;
+    width: 16px; height: 16px;
+    background: #fff;
+    border: 2px solid #1D9E75;
+    border-radius: 50%;
+    pointer-events: auto;
+    touch-action: none;
+    z-index: 2;
+  }
+  .crop-handle.h-nw { top: -9px; left: -9px; cursor: nwse-resize; }
+  .crop-handle.h-n  { top: -9px; left: 50%; margin-left: -8px; cursor: ns-resize; }
+  .crop-handle.h-ne { top: -9px; right: -9px; cursor: nesw-resize; }
+  .crop-handle.h-e  { top: 50%; right: -9px; margin-top: -8px; cursor: ew-resize; }
+  .crop-handle.h-se { bottom: -9px; right: -9px; cursor: nwse-resize; }
+  .crop-handle.h-s  { bottom: -9px; left: 50%; margin-left: -8px; cursor: ns-resize; }
+  .crop-handle.h-sw { bottom: -9px; left: -9px; cursor: nesw-resize; }
+  .crop-handle.h-w  { top: 50%; left: -9px; margin-top: -8px; cursor: ew-resize; }
+  .crop-hint { font-size: 12px; color: #9aa3b2; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -104,7 +137,21 @@
   <div class="section">
     <div class="section-title">2. Önizleme</div>
     <div class="canvas-wrap">
-      <canvas id="mainCanvas" style="display:none;"></canvas>
+      <div id="canvasStage">
+        <canvas id="mainCanvas" style="display:none;"></canvas>
+        <div id="cropOverlay">
+          <div id="cropBox">
+            <div class="crop-handle h-nw" data-h="nw"></div>
+            <div class="crop-handle h-n" data-h="n"></div>
+            <div class="crop-handle h-ne" data-h="ne"></div>
+            <div class="crop-handle h-e" data-h="e"></div>
+            <div class="crop-handle h-se" data-h="se"></div>
+            <div class="crop-handle h-s" data-h="s"></div>
+            <div class="crop-handle h-sw" data-h="sw"></div>
+            <div class="crop-handle h-w" data-h="w"></div>
+          </div>
+        </div>
+      </div>
       <div class="empty-canvas-note" id="emptyNote">Önce bir görsel yükle.</div>
     </div>
   </div>
@@ -113,8 +160,11 @@
     <div class="section-title">3. Döndür / kırp</div>
     <div class="btn-row">
       <button class="btn-secondary" id="rotateBtn" onclick="rotateImage()" disabled>↻ 90° döndür</button>
-      <button class="btn-secondary" id="cropSquareBtn" onclick="cropToSquare()" disabled>◻ Kareye kırp</button>
+      <button class="btn-secondary" id="cropStartBtn" onclick="startCrop()" disabled>✂️ Kırp</button>
+      <button class="btn-primary" id="cropConfirmBtn" onclick="confirmCrop()" style="display:none;">✓ Onayla</button>
+      <button class="btn-secondary" id="cropCancelBtn" onclick="cancelCrop()" style="display:none;">✕ İptal</button>
     </div>
+    <div class="crop-hint" id="cropHint" style="display:none;">Kutunun köşelerinden veya kenarlarından sürükleyerek istediğin alanı seç, ortasından tutup taşıyabilirsin. Bitince ✓ Onayla'ya bas.</div>
   </div>
 
   <div class="section">
@@ -181,7 +231,7 @@
   const MAX_DIMENSION = 1600; // performans için yüklenen görseli bu boyutu aşmayacak şekilde küçült
   let baseImageData = null; // filtre kaydırıcıları için "temiz" referans - her kalıcı değişiklikten sonra güncellenir
 
-  const allButtons = ['rotateBtn', 'cropSquareBtn', 'removeBgBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
+  const allButtons = ['rotateBtn', 'cropStartBtn', 'removeBgBtn', 'brightnessSlider', 'contrastSlider', 'saturateSlider',
     'applyFilterBtn', 'resetFilterBtn', 'applyBgBtn', 'applyTemplateBtn', 'downloadBtn'];
 
   function enableControls() {
@@ -236,22 +286,142 @@
     resetFilters();
   }
 
-  function cropToSquare() {
-    const w = canvas.width, h = canvas.height;
-    const side = Math.min(w, h);
-    const sx = (w - side) / 2;
-    const sy = (h - side) / 2;
+  // ---- Serbest kırpma (telefon tarzı, sürüklenebilir kutu) ----
+  let cropState = null; // { left, top, width, height, stageW, stageH }
+  let dragInfo = null;
+
+  function startCrop() {
+    if (!canvas.width) return;
+    const rect = canvas.getBoundingClientRect();
+    const dispW = rect.width, dispH = rect.height;
+    const overlay = document.getElementById('cropOverlay');
+    overlay.style.width = dispW + 'px';
+    overlay.style.height = dispH + 'px';
+    overlay.style.display = 'block';
+
+    const marginX = dispW * 0.12, marginY = dispH * 0.12;
+    cropState = {
+      left: marginX,
+      top: marginY,
+      width: dispW - marginX * 2,
+      height: dispH - marginY * 2,
+      stageW: dispW,
+      stageH: dispH,
+    };
+    renderCropBox();
+
+    document.getElementById('cropStartBtn').style.display = 'none';
+    document.getElementById('cropConfirmBtn').style.display = 'inline-block';
+    document.getElementById('cropCancelBtn').style.display = 'inline-block';
+    document.getElementById('cropHint').style.display = 'block';
+    document.getElementById('rotateBtn').disabled = true;
+  }
+
+  function renderCropBox() {
+    const box = document.getElementById('cropBox');
+    box.style.left = cropState.left + 'px';
+    box.style.top = cropState.top + 'px';
+    box.style.width = cropState.width + 'px';
+    box.style.height = cropState.height + 'px';
+  }
+
+  function closeCropUI() {
+    document.getElementById('cropOverlay').style.display = 'none';
+    document.getElementById('cropStartBtn').style.display = 'inline-block';
+    document.getElementById('cropConfirmBtn').style.display = 'none';
+    document.getElementById('cropCancelBtn').style.display = 'none';
+    document.getElementById('cropHint').style.display = 'none';
+    document.getElementById('rotateBtn').disabled = false;
+    cropState = null;
+  }
+
+  function cancelCrop() {
+    closeCropUI();
+  }
+
+  function confirmCrop() {
+    if (!cropState) return;
+    const scaleX = canvas.width / cropState.stageW;
+    const scaleY = canvas.height / cropState.stageH;
+    const sx = Math.round(cropState.left * scaleX);
+    const sy = Math.round(cropState.top * scaleY);
+    const sw = Math.max(1, Math.round(cropState.width * scaleX));
+    const sh = Math.max(1, Math.round(cropState.height * scaleY));
+
     const cropped = document.createElement('canvas');
-    cropped.width = side;
-    cropped.height = side;
-    cropped.getContext('2d').drawImage(canvas, sx, sy, side, side, 0, 0, side, side);
-    canvas.width = side;
-    canvas.height = side;
-    ctx.clearRect(0, 0, side, side);
+    cropped.width = sw;
+    cropped.height = sh;
+    cropped.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    canvas.width = sw;
+    canvas.height = sh;
+    ctx.clearRect(0, 0, sw, sh);
     ctx.drawImage(cropped, 0, 0);
     captureBaseImageData();
     resetFilters();
+    closeCropUI();
   }
+
+  function clampNum(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function startDrag(e, mode) {
+    e.preventDefault();
+    dragInfo = {
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      orig: { left: cropState.left, top: cropState.top, width: cropState.width, height: cropState.height },
+    };
+    document.addEventListener('pointermove', onDrag);
+    document.addEventListener('pointerup', endDrag);
+  }
+
+  function onDrag(e) {
+    if (!dragInfo || !cropState) return;
+    const dx = e.clientX - dragInfo.startX;
+    const dy = e.clientY - dragInfo.startY;
+    const o = dragInfo.orig;
+    const stageW = cropState.stageW, stageH = cropState.stageH;
+    const MIN_CROP = 24;
+    let left = o.left, top = o.top, width = o.width, height = o.height;
+
+    if (dragInfo.mode === 'move') {
+      left = clampNum(o.left + dx, 0, stageW - o.width);
+      top = clampNum(o.top + dy, 0, stageH - o.height);
+    } else {
+      let right = o.left + o.width, bottom = o.top + o.height;
+      if (dragInfo.mode.includes('w')) left = clampNum(o.left + dx, 0, right - MIN_CROP);
+      if (dragInfo.mode.includes('e')) right = clampNum(right + dx, left + MIN_CROP, stageW);
+      if (dragInfo.mode.includes('n')) top = clampNum(o.top + dy, 0, bottom - MIN_CROP);
+      if (dragInfo.mode.includes('s')) bottom = clampNum(bottom + dy, top + MIN_CROP, stageH);
+      width = right - left;
+      height = bottom - top;
+    }
+    cropState.left = left;
+    cropState.top = top;
+    cropState.width = width;
+    cropState.height = height;
+    renderCropBox();
+  }
+
+  function endDrag() {
+    dragInfo = null;
+    document.removeEventListener('pointermove', onDrag);
+    document.removeEventListener('pointerup', endDrag);
+  }
+
+  document.getElementById('cropBox').addEventListener('pointerdown', (e) => {
+    if (e.target.classList.contains('crop-handle')) return;
+    startDrag(e, 'move');
+  });
+  document.querySelectorAll('.crop-handle').forEach((h) => {
+    h.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      startDrag(e, h.dataset.h);
+    });
+  });
+  // ---- /Serbest kırpma ----
 
   async function removeBackgroundStudio() {
     const btn = document.getElementById('removeBgBtn');
