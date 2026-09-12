@@ -339,9 +339,8 @@ document.addEventListener('keydown', (e)=>{
 /* ============== Görsel Yükleme ============== */
 document.getElementById('uploadBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
 
-document.getElementById('fileInput').addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
+function loadImageFile(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return;
   const reader = new FileReader();
   reader.onload = (ev)=>{
     fabric.Image.fromURL(ev.target.result, (img)=>{
@@ -366,7 +365,40 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
     }, { crossOrigin: 'anonymous' });
   };
   reader.readAsDataURL(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  loadImageFile(file);
   e.target.value = '';
+});
+
+/* ============== Sürükle-Bırak ile Görsel Yükleme ============== */
+// Tarayıcının varsayılan davranışı (sayfayı terk edip görseli doğrudan açması) tüm sayfada engelleniyor,
+// böylece dosya nereye bırakılırsa bırakılsın editör ekranı kaybolmuyor.
+['dragenter','dragover','dragleave','drop'].forEach(evtName=>{
+  window.addEventListener(evtName, (e)=>{ e.preventDefault(); e.stopPropagation(); });
+  document.body.addEventListener(evtName, (e)=>{ e.preventDefault(); e.stopPropagation(); });
+});
+
+const canvasStageEl = document.querySelector('.canvas-stage');
+
+['dragenter','dragover'].forEach(evtName=>{
+  canvasStageEl.addEventListener(evtName, (e)=>{
+    e.preventDefault();
+    canvasStageEl.style.borderColor = '#1D9E75';
+  });
+});
+['dragleave','drop'].forEach(evtName=>{
+  canvasStageEl.addEventListener(evtName, (e)=>{
+    e.preventDefault();
+    canvasStageEl.style.borderColor = '';
+  });
+});
+canvasStageEl.addEventListener('drop', (e)=>{
+  e.preventDefault();
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  loadImageFile(file);
 });
 
 /* ============== Metin / Şekil Ekleme ============== */
@@ -384,7 +416,7 @@ document.getElementById('addTextBtn').addEventListener('click', ()=>{
 document.getElementById('addRectBtn').addEventListener('click', ()=>{
   const rect = new fabric.Rect({
     left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
-    width: 200, height: 140, fill: '#1D9E75',
+    width: 200, height: 140, fill: 'transparent', stroke: '#ffffff', strokeWidth: 3,
     cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
   });
   canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
@@ -393,7 +425,7 @@ document.getElementById('addRectBtn').addEventListener('click', ()=>{
 document.getElementById('addCircleBtn').addEventListener('click', ()=>{
   const circle = new fabric.Circle({
     left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
-    radius: 90, fill: '#1D9E75',
+    radius: 90, fill: 'transparent', stroke: '#ffffff', strokeWidth: 3,
     cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
   });
   canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
@@ -636,12 +668,29 @@ function refreshPropsPanel(){
       obj.set('fill', e.target.value); canvas.renderAll();
     });
   } else if(obj.type === 'rect' || obj.type === 'circle'){
+    const currentFill = (obj.fill && obj.fill !== 'transparent') ? obj.fill : '#1D9E75';
     content.innerHTML = `
+      <label class="small">Kenarlık Rengi</label>
+      <input type="color" id="propStroke" value="${obj.stroke || '#ffffff'}">
+      <label class="small">Kenarlık Kalınlığı</label>
+      <input type="range" id="propStrokeWidth" min="0" max="20" value="${obj.strokeWidth || 0}">
       <label class="small">Dolgu Rengi</label>
-      <input type="color" id="propFill" value="${obj.fill}">
+      <div class="row">
+        <input type="color" id="propFill" value="${currentFill}">
+        <button id="propFillClear" title="Dolguyu kaldır (içi boş)">✕</button>
+      </div>
     `;
+    document.getElementById('propStroke').addEventListener('input', (e)=>{
+      obj.set('stroke', e.target.value); canvas.renderAll();
+    });
+    document.getElementById('propStrokeWidth').addEventListener('input', (e)=>{
+      obj.set('strokeWidth', parseInt(e.target.value,10)||0); canvas.renderAll();
+    });
     document.getElementById('propFill').addEventListener('input', (e)=>{
       obj.set('fill', e.target.value); canvas.renderAll();
+    });
+    document.getElementById('propFillClear').addEventListener('click', ()=>{
+      obj.set('fill', 'transparent'); canvas.renderAll();
     });
   } else if(obj.type === 'line'){
     content.innerHTML = `
