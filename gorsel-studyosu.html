@@ -542,11 +542,11 @@ document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
       },
-      body: JSON.stringify({ image: dataUrl, userAccessToken: currentUserAccessToken })
+      body: JSON.stringify({ imageBase64: dataUrl })
     });
-    if(!res.ok){ throw new Error(`Sunucu hatası: ${res.status}`); }
-    const data = await res.json();
-    const resultUrl = data.image || data.result || data.url;
+    const data = await res.json().catch(()=> ({}));
+    if(!res.ok){ throw new Error(data.error || `Sunucu hatası: ${res.status}`); }
+    const resultUrl = data.imageBase64;
     if(!resultUrl) throw new Error('Beklenmeyen yanıt formatı');
 
     fabric.Image.fromURL(resultUrl, (newImg)=>{
