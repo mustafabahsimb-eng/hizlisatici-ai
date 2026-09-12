@@ -374,29 +374,30 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
 });
 
 /* ============== Sürükle-Bırak ile Görsel Yükleme ============== */
-// Tarayıcının varsayılan davranışı (sayfayı terk edip görseli doğrudan açması) tüm sayfada engelleniyor,
-// böylece dosya nereye bırakılırsa bırakılsın editör ekranı kaybolmuyor.
-['dragenter','dragover','dragleave','drop'].forEach(evtName=>{
-  window.addEventListener(evtName, (e)=>{ e.preventDefault(); e.stopPropagation(); });
-  document.body.addEventListener(evtName, (e)=>{ e.preventDefault(); e.stopPropagation(); });
-});
-
+// Tüm SAYFA (sadece küçük canvas kutusu değil) geçerli bırakma alanı - hedefi tutturmak kolay olsun diye.
+// Tarayıcının varsayılan davranışı (sayfayı terk edip görseli doğrudan açması) engelleniyor,
+// böylece sekme çubuğuna çok yakın olmadığın sürece dosya nereye bırakılırsa bırakılsın editör ekranı kaybolmuyor.
 const canvasStageEl = document.querySelector('.canvas-stage');
+let dragDepth = 0;
 
-['dragenter','dragover'].forEach(evtName=>{
-  canvasStageEl.addEventListener(evtName, (e)=>{
+['dragenter','dragover','dragleave','drop'].forEach(evtName=>{
+  document.documentElement.addEventListener(evtName, (e)=>{
     e.preventDefault();
-    canvasStageEl.style.borderColor = '#1D9E75';
+    e.stopPropagation();
   });
 });
-['dragleave','drop'].forEach(evtName=>{
-  canvasStageEl.addEventListener(evtName, (e)=>{
-    e.preventDefault();
-    canvasStageEl.style.borderColor = '';
-  });
+
+document.documentElement.addEventListener('dragenter', ()=>{
+  dragDepth++;
+  canvasStageEl.style.borderColor = '#1D9E75';
 });
-canvasStageEl.addEventListener('drop', (e)=>{
-  e.preventDefault();
+document.documentElement.addEventListener('dragleave', ()=>{
+  dragDepth = Math.max(0, dragDepth - 1);
+  if(dragDepth === 0) canvasStageEl.style.borderColor = '';
+});
+document.documentElement.addEventListener('drop', (e)=>{
+  dragDepth = 0;
+  canvasStageEl.style.borderColor = '';
   const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   loadImageFile(file);
 });
