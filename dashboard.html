@@ -155,6 +155,32 @@
     flex-shrink: 0;
   }
   .delete-btn:hover { border-color: #f28b8b; color: #f28b8b; background: #2a1414; }
+  .bulk-actions-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: #1c212c;
+    border: 1px solid #2a3040;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #e6e8ee;
+  }
+  .bulk-actions-bar label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .bulk-actions-bar input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+  .bulk-delete-controls { display: none; align-items: center; gap: 12px; }
+  .btn-danger {
+    background: #2a1414;
+    color: #f28b8b;
+    border: 1px solid #4a2020;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-danger:hover { background: #3a1a1a; }
+  .product-checkbox { width: 16px; height: 16px; cursor: pointer; margin-top: 3px; flex-shrink: 0; }
   .score-badge {
     font-size: 12px;
     font-weight: 600;
@@ -245,6 +271,16 @@
       <div class="stat-value green" id="totalProfit">₺0</div>
     </div>
   </div>
+  <div class="bulk-actions-bar" id="bulkActionsBar">
+    <label>
+      <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+      <span>Tümünü seç</span>
+    </label>
+    <div class="bulk-delete-controls" id="bulkDeleteControls">
+      <span id="selectedCountText"></span>
+      <button class="btn-danger" onclick="bulkDeleteProducts()">🗑 Seçilenleri sil</button>
+    </div>
+  </div>
   <div class="product-list" id="productList">
     <div class="empty-state">
       <h3>Henüz ürün eklemedin</h3>
@@ -263,6 +299,7 @@
     return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
   }
   let currentProducts = [];
+  let selectedProductIds = new Set();
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {
@@ -283,9 +320,13 @@
       return;
     }
     currentProducts = products;
+    // Silinmiş/artık listede olmayan ürünlerin seçimini temizle
+    const existingIds = new Set(products.map(p => String(p.id)));
+    selectedProductIds = new Set(Array.from(selectedProductIds).filter(id => existingIds.has(id)));
     document.getElementById('totalProducts').textContent = products.length;
     document.getElementById('productCountText').textContent =
       products.length === 0 ? 'Henüz ürün yok' : products.length + ' ürün listeleniyor';
+    document.getElementById('bulkActionsBar').style.display = products.length > 0 ? 'flex' : 'none';
     if (products.length === 0) {
       document.getElementById('alarmBanner').style.display = 'none';
       return;
@@ -357,9 +398,12 @@
         : `<button class="btn-secondary price-calc-btn" onclick="calculatePriceSuggestion('${p.id}', this)">💡 Fiyat Öner</button>`;
       return `
       <div class="product-row" data-id="${p.id}">
-        <div>
-          <div class="product-name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
-          <div class="product-meta">${escapeHtml(p.platform || '-')}${marginPct !== null ? ' · %' + marginPct.toFixed(1) + ' marj' : ''}</div>
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <input type="checkbox" class="product-checkbox" data-id="${p.id}" ${selectedProductIds.has(String(p.id)) ? 'checked' : ''} onchange="toggleProductSelect('${p.id}', this)">
+          <div>
+            <div class="product-name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
+            <div class="product-meta">${escapeHtml(p.platform || '-')}${marginPct !== null ? ' · %' + marginPct.toFixed(1) + ' marj' : ''}</div>
+          </div>
         </div>
         <div class="product-right">
           ${scoreHtml}
@@ -372,6 +416,55 @@
       </div>
     `;
     }).join('');
+    updateBulkBar();
+  }
+  function toggleProductSelect(id, checkbox) {
+    const key = String(id);
+    if (checkbox.checked) {
+      selectedProductIds.add(key);
+    } else {
+      selectedProductIds.delete(key);
+    }
+    updateBulkBar();
+  }
+  function toggleSelectAll(checkbox) {
+    selectedProductIds = new Set();
+    if (checkbox.checked) {
+      currentProducts.forEach(p => selectedProductIds.add(String(p.id)));
+    }
+    document.querySelectorAll('.product-checkbox').forEach(cb => { cb.checked = checkbox.checked; });
+    updateBulkBar();
+  }
+  function updateBulkBar() {
+    const controls = document.getElementById('bulkDeleteControls');
+    const countText = document.getElementById('selectedCountText');
+    const selectAllCb = document.getElementById('selectAllCheckbox');
+    if (selectedProductIds.size > 0) {
+      controls.style.display = 'flex';
+      countText.textContent = selectedProductIds.size + ' ürün seçildi';
+    } else {
+      controls.style.display = 'none';
+    }
+    if (selectAllCb) {
+      selectAllCb.checked = currentProducts.length > 0 && selectedProductIds.size === currentProducts.length;
+    }
+  }
+  async function bulkDeleteProducts() {
+    const ids = Array.from(selectedProductIds);
+    if (ids.length === 0) return;
+    if (!confirm(ids.length + ' ürünü silmek istediğine emin misin? Bu işlem geri alınamaz.')) return;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    const { error } = await supabaseClient
+      .from('products')
+      .delete()
+      .in('id', ids);
+    if (error) {
+      alert('Silinemedi: ' + error.message);
+      return;
+    }
+    selectedProductIds = new Set();
+    loadProducts(session.user.id);
   }
   function toggleAlarmDetail() {
     const detail = document.getElementById('alarmDetail');
