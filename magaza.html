@@ -120,6 +120,20 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="askModalOverlay">
+  <div class="modal">
+    <h3>❓ Soru Sor</h3>
+    <div class="modal-product" id="askModalProductName"></div>
+    <div id="askAnswerBox" style="display:none; background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:13px; line-height:1.5; margin-bottom:12px; white-space:pre-wrap;"></div>
+    <label>Sorunuz</label>
+    <textarea id="askQuestionInput" placeholder="Örn: Kargo ne zaman gelir?"></textarea>
+    <div class="modal-actions">
+      <button type="button" id="askCancelBtn">Kapat</button>
+      <button type="button" class="primary" id="askSubmitBtn">Gönder</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -180,10 +194,14 @@ function renderProducts(){
         <div class="card-title">${title}</div>
         <div class="card-desc">${desc}</div>
         <div class="card-price">${formatPrice(p.sale_price)}</div>
-        <button class="primary" data-id="${p.id}">Satın Al</button>
+        <div style="display:flex; gap:8px;">
+          <button class="primary buy-btn" data-id="${p.id}" style="flex:1;">Satın Al</button>
+          <button class="ask-btn" data-id="${p.id}">❓ Soru Sor</button>
+        </div>
       </div>
     `;
-    card.querySelector('button').addEventListener('click', ()=> openOrderModal(p));
+    card.querySelector('.buy-btn').addEventListener('click', ()=> openOrderModal(p));
+    card.querySelector('.ask-btn').addEventListener('click', ()=> openAskModal(p));
     grid.appendChild(card);
   });
 }
@@ -269,6 +287,73 @@ document.getElementById('orderForm').addEventListener('submit', async (e)=>{
   }finally{
     submitBtn.disabled = false;
     submitBtn.textContent = original;
+  }
+});
+
+/* ============== Soru Sor Modalı ============== */
+let askSelectedProduct = null;
+
+function openAskModal(product){
+  askSelectedProduct = product;
+  document.getElementById('askModalProductName').textContent = product.generated_title || product.name || 'Ürün';
+  document.getElementById('askQuestionInput').value = '';
+  const answerBox = document.getElementById('askAnswerBox');
+  answerBox.style.display = 'none';
+  answerBox.textContent = '';
+  document.getElementById('askModalOverlay').classList.add('open');
+}
+
+function closeAskModal(){
+  document.getElementById('askModalOverlay').classList.remove('open');
+  askSelectedProduct = null;
+}
+
+document.getElementById('askCancelBtn').addEventListener('click', closeAskModal);
+document.getElementById('askModalOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'askModalOverlay') closeAskModal();
+});
+
+document.getElementById('askSubmitBtn').addEventListener('click', async ()=>{
+  if(!askSelectedProduct) return;
+  const question = document.getElementById('askQuestionInput').value.trim();
+  if(!question){
+    showToast('Önce bir soru yaz.');
+    return;
+  }
+  const btn = document.getElementById('askSubmitBtn');
+  const answerBox = document.getElementById('askAnswerBox');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Yanıtlanıyor...';
+  answerBox.style.display = 'block';
+  answerBox.textContent = '🤖 Düşünüyor...';
+  try{
+    const desc = (askSelectedProduct.generated_description || '').replace(/<[^>]*>/g, '');
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-support-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({
+        productName: askSelectedProduct.generated_title || askSelectedProduct.name,
+        productDescription: desc,
+        salePrice: askSelectedProduct.sale_price,
+        currency: '₺',
+        storeName: getStoreName(currentStore),
+        question
+      })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.error){ throw new Error(data.error || 'Cevap alınamadı'); }
+    answerBox.textContent = data.answer || 'Cevap alınamadı.';
+  }catch(err){
+    console.error(err);
+    answerBox.textContent = 'Hata: ' + err.message;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = original;
   }
 });
 
