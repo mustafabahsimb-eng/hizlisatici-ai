@@ -226,6 +226,16 @@
         <span id="action-walmart"></span>
       </div>
     </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">WooCommerce</div>
+        <div class="acc-desc">Kendi WordPress/WooCommerce mağazan varsa doğrudan bağla — pazaryeri değil, kendi sitendir</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none" id="status-woocommerce">yükleniyor...</span>
+        <span id="action-woocommerce"></span>
+      </div>
+    </div>
   </div>
 
   <div class="section-title">Tedarikçiler</div>
@@ -328,6 +338,12 @@
       hasVerify: true,
       verifyFn: 'walmart-verify',
       panelHint: 'Walmart Seller Center panelinden (Settings > API Keys / Get API Access) aldığın Client ID\'yi API Key alanına, Client Secret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için istediğini yazabilirsin, doğrulamada kullanılmıyor.',
+    },
+    woocommerce: {
+      name: 'WooCommerce',
+      hasVerify: true,
+      verifyFn: 'woocommerce-verify',
+      panelHint: 'Mağaza adresini (örn: benimmagazam.com) Satıcı ID alanına yaz. WordPress panelinden (WooCommerce > Ayarlar > Gelişmiş > REST API) ürettiğin Consumer Key\'i API Key alanına, Consumer Secret\'i API Secret alanına gir.',
     },
   };
 
