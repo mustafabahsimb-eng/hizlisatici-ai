@@ -289,10 +289,15 @@
     trendyol: {
       name: 'Trendyol',
       hasVerify: true,
-      verifyFn: 'trendyol-verifytrendyol-verify',
+      verifyFn: 'trendyol-verify',
       panelHint: 'Trendyol panelinden (Hesabım > Entegrasyon Bilgileri) aldığın Satıcı ID, API Key ve API Secret bilgilerini gir, bağlantıyı hemen doğrulayalım.',
     },
-    hepsiburada: { name: 'Hepsiburada', hasVerify: false },
+    hepsiburada: {
+      name: 'Hepsiburada',
+      hasVerify: true,
+      verifyFn: 'hepsiburada-verify',
+      panelHint: 'Hepsiburada Merchant panelinden (Hesabım > Entegrasyon Bilgileri > API Anahtarı) aldığın Mağaza ID\'yi Satıcı ID alanına, kullanıcı adını API Key alanına, şifreni de API Secret alanına gir, bağlantıyı hemen doğrulayalım.',
+    },
     n11: {
       name: 'N11',
       hasVerify: true,
