@@ -219,11 +219,11 @@
     <div class="acc-row">
       <div class="acc-info">
         <div class="acc-name">Walmart Marketplace</div>
-        <div class="acc-desc">Walmart'ın satıcı platformu — onaylı satıcılar ürünlerini Walmart.com üzerinden listeleyebilir</div>
+        <div class="acc-desc">Walmart'ın satıcı platformu — onaylı satıcılar ürünlerini Walmart.com üzerinden listeleyebilir · <a href="https://marketplace.walmart.com/" target="_blank" rel="noopener" class="inline-link">hesabın yoksa aç</a></div>
       </div>
       <div class="acc-right">
-        <span class="acc-status none">hesap yok</span>
-        <a class="acc-btn" href="https://marketplace.walmart.com/" target="_blank" rel="noopener">Başvur</a>
+        <span class="acc-status none" id="status-walmart">yükleniyor...</span>
+        <span id="action-walmart"></span>
       </div>
     </div>
   </div>
@@ -322,6 +322,12 @@
       hasVerify: true,
       verifyFn: 'pazarama-verify',
       panelHint: 'Pazarama satıcı panelinden (isortagim.pazarama.com > mağaza adın > Hesap Bilgileri > Entegrasyon Bilgileri) aldığın API Key\'i API Key alanına, API Secret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için istediğini yazabilirsin, doğrulamada kullanılmıyor.',
+    },
+    walmart: {
+      name: 'Walmart Marketplace',
+      hasVerify: true,
+      verifyFn: 'walmart-verify',
+      panelHint: 'Walmart Seller Center panelinden (Settings > API Keys / Get API Access) aldığın Client ID\'yi API Key alanına, Client Secret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için istediğini yazabilirsin, doğrulamada kullanılmıyor.',
     },
   };
 
