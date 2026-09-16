@@ -64,6 +64,14 @@
   input:focus, select:focus, textarea:focus { border-color: #1D9E75; }
   textarea { resize: vertical; min-height: 70px; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .platform-check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .platform-check-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #1c212c; border: 1px solid #2a3040; border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; color: #e6e8ee; cursor: pointer;
+  }
+  .platform-check-item:hover { border-color: #3a4258; }
+  .platform-check-item input { width: auto; margin: 0; }
   .btn-primary {
     background: #1D9E75; color: #fff; border: none;
     padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -205,7 +213,7 @@
     <div class="two-col">
       <div class="form-row">
         <label for="platform">Platform</label>
-        <select id="platform" onchange="fillCommissionRate(); updateCurrencyDisplay();">
+        <select id="platform" onchange="fillCommissionRate(); updateCurrencyDisplay(); renderAdditionalPlatformCheckboxes();">
           <option value="">Seç...</option>
           <optgroup label="Türkiye">
             <option value="Trendyol">Trendyol</option>
@@ -236,6 +244,13 @@
           ⚠️ Bu tahmini bir orandır. Kesin oranı platformun satıcı panelinden doğrula.
         </div>
       </div>
+    </div>
+    <div class="form-row" id="multiPlatformSection" style="display:none;">
+      <label>Ayrıca şu platformlarda da yayınla (opsiyonel)</label>
+      <div style="font-size:11px; color:#9aa3b2; margin-bottom:8px;">
+        İşaretlediğin her platform için aynı ürün, o platformun kendi komisyon oranıyla ayrı ayrı kaydedilir (ürün adı, açıklama, görsel, tedarikçi bilgisi aynı kalır). Yukarıdaki satış fiyatı ile aynı para birimi grubundaki (₺ ya da $) platformlar listelenir.
+      </div>
+      <div id="multiPlatformList" class="platform-check-grid"></div>
     </div>
     <div class="form-row">
       <label for="salePrice">Satış fiyatı (<span id="saleCurrency">₺</span>) — kâr hesabı için</label>
@@ -510,6 +525,34 @@
   const FLAT_RATE_PLATFORMS = ['Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop'];
   // Uluslararası platformlarda fiyatlar $ (dolar), Türkiye platformlarında ₺ (TL) olarak gösterilir
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+  const TR_PLATFORMS = ['Trendyol', 'Hepsiburada', 'N11', 'Çiçeksepeti', 'PTT AVM', 'Amazon TR', 'Pazarama'];
+  // Çoklu platform paylaşımı: seçili ana platformla aynı para birimi grubundaki
+  // diğer platformları tik kutusu olarak gösterir, "Diğer" için gösterilmez.
+  function renderAdditionalPlatformCheckboxes() {
+    const primary = document.getElementById('platform').value;
+    const sectionEl = document.getElementById('multiPlatformSection');
+    const listEl = document.getElementById('multiPlatformList');
+    const previouslyChecked = Array.from(document.querySelectorAll('.extraPlatformCheck:checked')).map(cb => cb.value);
+    if (!primary || primary === 'Diğer') {
+      sectionEl.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+    const group = INTERNATIONAL_PLATFORMS.includes(primary) ? INTERNATIONAL_PLATFORMS : TR_PLATFORMS;
+    const others = group.filter(p => p !== primary);
+    if (others.length === 0) {
+      sectionEl.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+    listEl.innerHTML = others.map(p => `
+      <label class="platform-check-item">
+        <input type="checkbox" value="${p}" class="extraPlatformCheck" ${previouslyChecked.includes(p) ? 'checked' : ''}>
+        <span>${p}</span>
+      </label>
+    `).join('');
+    sectionEl.style.display = 'block';
+  }
   function currencySymbolFor(platform) {
     return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
   }
@@ -871,6 +914,7 @@
           platformSelect.value = data.platform;
           fillCommissionRate();
           updateCurrencyDisplay();
+          renderAdditionalPlatformCheckboxes();
         }
       }
       if (data.salePrice != null) {
@@ -1377,20 +1421,34 @@
     const btn = document.getElementById('saveBtn');
     btn.disabled = true;
     btn.textContent = 'Kaydediliyor...';
-    const { error } = await supabaseClient.from('products').insert({
-      user_id: currentUser.id,
-      name: productName,
-      supplier_price: supplierPrice,
-      weight_kg: weightKg,
-      platform: platform,
-      commission_rate: commissionRate,
-      sale_price: salePrice,
-      generated_title: genTitle,
-      generated_description: genDesc,
-      supplier: window._selectedSupplier || null,
-      supplier_item_id: window._selectedSupplierItemId || null,
-      supplier_variant_id: window._selectedSupplierVariantId || null,
+    // Çoklu platform paylaşımı: ana platform + işaretlenen ek platformlar için
+    // aynı ürünü, her platformun kendi komisyon oranıyla ayrı satır olarak kaydet.
+    const extraPlatforms = Array.from(document.querySelectorAll('.extraPlatformCheck:checked')).map(cb => cb.value);
+    const allPlatforms = platform ? [platform, ...extraPlatforms] : [null];
+    const rows = allPlatforms.map(p => {
+      let rowCommission = commissionRate;
+      if (p && p !== platform) {
+        const table = COMMISSION_TABLE[p];
+        if (table) {
+          rowCommission = (detectedCategory && table[detectedCategory] !== undefined) ? table[detectedCategory] : table['Diğer'];
+        }
+      }
+      return {
+        user_id: currentUser.id,
+        name: productName,
+        supplier_price: supplierPrice,
+        weight_kg: weightKg,
+        platform: p,
+        commission_rate: rowCommission,
+        sale_price: salePrice,
+        generated_title: genTitle,
+        generated_description: genDesc,
+        supplier: window._selectedSupplier || null,
+        supplier_item_id: window._selectedSupplierItemId || null,
+        supplier_variant_id: window._selectedSupplierVariantId || null,
+      };
     });
+    const { error } = await supabaseClient.from('products').insert(rows);
     if (error) {
       showMsg('Kaydedilemedi: ' + error.message, 'error');
       btn.disabled = false;
@@ -1398,7 +1456,9 @@
       return;
     }
     const box = document.getElementById('msgBox');
-    box.innerHTML = 'Ürün kaydedildi! Panele yönlendiriliyorsun... Otomatik geçmezse <a href="dashboard.html" style="color:#6ee7b7; text-decoration:underline;">buraya tıkla</a>.';
+    box.innerHTML = (rows.length > 1
+      ? 'Ürün ' + rows.length + ' platformda kaydedildi! Panele yönlendiriliyorsun... Otomatik geçmezse <a href="dashboard.html" style="color:#6ee7b7; text-decoration:underline;">buraya tıkla</a>.'
+      : 'Ürün kaydedildi! Panele yönlendiriliyorsun... Otomatik geçmezse <a href="dashboard.html" style="color:#6ee7b7; text-decoration:underline;">buraya tıkla</a>.');
     box.className = 'msg success';
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
   }
