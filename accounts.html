@@ -236,6 +236,16 @@
         <span id="action-woocommerce"></span>
       </div>
     </div>
+    <div class="acc-row">
+      <div class="acc-info">
+        <div class="acc-name">Etsy</div>
+        <div class="acc-desc">El yapımı, vintage ve özel ürünlere odaklı global pazaryeri · <a href="https://www.etsy.com/sell" target="_blank" rel="noopener" class="inline-link">hesabın yoksa aç</a></div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none" id="status-etsy">yükleniyor...</span>
+        <span id="action-etsy"></span>
+      </div>
+    </div>
   </div>
 
   <div class="section-title">Tedarikçiler</div>
@@ -564,11 +574,105 @@
     await renderCJStatus();
   }
 
+  function generateRandomString(length) {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, (dec) => ('0' + dec.toString(16)).substr(-2)).join('');
+  }
+
+  function base64UrlEncode(buffer) {
+    let str = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function generateCodeChallenge(verifier) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return base64UrlEncode(digest);
+  }
+
+  async function connectEtsy() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+
+    const codeVerifier = generateRandomString(64);
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const state = generateRandomString(16);
+
+    sessionStorage.setItem('etsy_code_verifier', codeVerifier);
+    sessionStorage.setItem('etsy_oauth_state', state);
+
+    const clientId = '1z497h37rk069va5r0xvxqw3';
+    const redirectUri = 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/etsy-callback.html';
+    const scope = 'listings_r listings_w transactions_r shops_r';
+
+    const authUrl = 'https://www.etsy.com/oauth/connect?' + new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: scope,
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    }).toString();
+
+    window.location.href = authUrl;
+  }
+
+  async function renderEtsyStatus() {
+    const statusEl = document.getElementById('status-etsy');
+    const actionEl = document.getElementById('action-etsy');
+    if (!statusEl || !actionEl) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const { data, error } = await supabaseClient
+      .from('platform_tokens')
+      .select('access_token')
+      .eq('user_id', session.user.id)
+      .eq('platform', 'etsy')
+      .maybeSingle();
+
+    if (!error && data) {
+      statusEl.textContent = 'bağlı';
+      statusEl.className = 'acc-status connected';
+      actionEl.innerHTML = '<button class="acc-btn secondary" onclick="disconnectEtsy()">Kaldır</button>';
+    } else {
+      statusEl.textContent = 'hesap yok';
+      statusEl.className = 'acc-status none';
+      actionEl.innerHTML = '<button class="acc-btn" onclick="connectEtsy()">Etsy\'ye Bağlan</button>';
+    }
+  }
+
+  async function disconnectEtsy() {
+    if (!confirm('Etsy bağlantını kaldırmak istediğine emin misin?')) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+
+    const { error } = await supabaseClient
+      .from('platform_tokens')
+      .delete()
+      .eq('user_id', session.user.id)
+      .eq('platform', 'etsy');
+
+    if (error) {
+      alert('Kaldırma başarısız: ' + error.message);
+      return;
+    }
+    await renderEtsyStatus();
+  }
+
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
     await renderCJStatus();
     await renderAllStoreStatuses();
+    await renderEtsyStatus();
   }
   init();
 </script>
