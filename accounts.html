@@ -293,7 +293,12 @@
       panelHint: 'Trendyol panelinden (Hesabım > Entegrasyon Bilgileri) aldığın Satıcı ID, API Key ve API Secret bilgilerini gir, bağlantıyı hemen doğrulayalım.',
     },
     hepsiburada: { name: 'Hepsiburada', hasVerify: false },
-    n11: { name: 'N11', hasVerify: false },
+    n11: {
+      name: 'N11',
+      hasVerify: true,
+      verifyFn: 'n11-verify',
+      panelHint: 'N11 mağaza panelinden (so.n11.com > Bilgilerim > API Hesapları) aldığın appKey\'i API Key alanına, appSecret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için mağaza adını/numaranı yazabilirsin, N11\'e gönderilmiyor.',
+    },
     ciceksepeti: { name: 'Çiçeksepeti', hasVerify: false },
     pttavm: { name: 'PTT AVM', hasVerify: false },
     amazontr: { name: 'Amazon TR', hasVerify: false },
