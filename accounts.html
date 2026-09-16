@@ -310,7 +310,12 @@
       verifyFn: 'ciceksepeti-verify',
       panelHint: 'Çiçeksepeti satıcı panelinden (seller.ciceksepeti.com > Ürünlerim > Ürün Listesi > Api Erişim) aldığın Satıcı ID\'yi Satıcı ID alanına, API Key\'ini API Key alanına gir. Çiçeksepeti\'nde ayrı bir "secret" olmadığı için API Secret alanına da aynı API Key\'i yazabilirsin, form gereği dolu olması yeterli.',
     },
-    pttavm: { name: 'PTT AVM', hasVerify: false },
+    pttavm: {
+      name: 'PTT AVM',
+      hasVerify: true,
+      verifyFn: 'rpttavm-verify',
+      panelHint: 'PTT AVM satıcı panelinden (Ayarlar > Web Servis / Entegrasyon Ayarları) aldığın kullanıcı adını API Key alanına, şifreni API Secret alanına gir. Satıcı ID alanına da kendi takibin için istediğini yazabilirsin, doğrulamada kullanılmıyor.',
+    },
     amazontr: { name: 'Amazon TR', hasVerify: false },
     pazarama: {
       name: 'Pazarama',
