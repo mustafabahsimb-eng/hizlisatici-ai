@@ -286,8 +286,18 @@
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const CONNECT_PLATFORMS = {
-    trendyol: { name: 'Trendyol', hasVerify: true },
-    hepsiburada: { name: 'Hepsiburada', hasVerify: false },
+    trendyol: {
+      name: 'Trendyol',
+      hasVerify: true,
+      verifyFn: 'trendyol-verifytrendyol-verify',
+      panelHint: 'Trendyol panelinden (Hesabım > Entegrasyon Bilgileri) aldığın Satıcı ID, API Key ve API Secret bilgilerini gir, bağlantıyı hemen doğrulayalım.',
+    },
+    hepsiburada: {
+      name: 'Hepsiburada',
+      hasVerify: true,
+      verifyFn: 'hepsiburada-verify',
+      panelHint: 'Hepsiburada Merchant panelinden (Hesabım > Entegrasyon Bilgileri > API Anahtarı) aldığın Mağaza ID\'yi Satıcı ID alanına, kullanıcı adını API Key alanına, şifreni de API Secret alanına gir.',
+    },
     n11: { name: 'N11', hasVerify: false },
     ciceksepeti: { name: 'Çiçeksepeti', hasVerify: false },
     pttavm: { name: 'PTT AVM', hasVerify: false },
@@ -302,7 +312,7 @@
     const info = CONNECT_PLATFORMS[platform];
     document.getElementById('connectModalTitle').textContent = info.name + ' Mağazanı Bağla';
     document.getElementById('connectModalSub').textContent = info.hasVerify
-      ? 'Trendyol panelinden (Hesabım > Entegrasyon Bilgileri) aldığın Satıcı ID, API Key ve API Secret bilgilerini gir, bağlantıyı hemen doğrulayalım.'
+      ? info.panelHint
       : info.name + ' için otomatik doğrulama henüz eklenmedi. Bilgilerini şimdiden güvenle kaydedebilirsin, entegrasyon hazır olduğunda otomatik aktif olacak.';
     document.getElementById('connectSellerId').value = '';
     document.getElementById('connectApiKey').value = '';
@@ -340,7 +350,7 @@
 
     if (info.hasVerify) {
       try {
-        const res = await fetch(SUPABASE_URL + '/functions/v1/trendyol-verifytrendyol-verify', {
+        const res = await fetch(SUPABASE_URL + '/functions/v1/' + info.verifyFn, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
