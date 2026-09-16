@@ -304,10 +304,20 @@
       verifyFn: 'n11-verify',
       panelHint: 'N11 mağaza panelinden (so.n11.com > Bilgilerim > API Hesapları) aldığın appKey\'i API Key alanına, appSecret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için mağaza adını/numaranı yazabilirsin, N11\'e gönderilmiyor.',
     },
-    ciceksepeti: { name: 'Çiçeksepeti', hasVerify: false },
+    ciceksepeti: {
+      name: 'Çiçeksepeti',
+      hasVerify: true,
+      verifyFn: 'ciceksepeti-verify',
+      panelHint: 'Çiçeksepeti satıcı panelinden (seller.ciceksepeti.com > Ürünlerim > Ürün Listesi > Api Erişim) aldığın Satıcı ID\'yi Satıcı ID alanına, API Key\'ini API Key alanına gir. Çiçeksepeti\'nde ayrı bir "secret" olmadığı için API Secret alanına da aynı API Key\'i yazabilirsin, form gereği dolu olması yeterli.',
+    },
     pttavm: { name: 'PTT AVM', hasVerify: false },
     amazontr: { name: 'Amazon TR', hasVerify: false },
-    pazarama: { name: 'Pazarama', hasVerify: false },
+    pazarama: {
+      name: 'Pazarama',
+      hasVerify: true,
+      verifyFn: 'pazarama-verify',
+      panelHint: 'Pazarama satıcı panelinden (isortagim.pazarama.com > mağaza adın > Hesap Bilgileri > Entegrasyon Bilgileri) aldığın API Key\'i API Key alanına, API Secret\'i API Secret alanına gir. Satıcı ID alanına da kendi takibin için istediğini yazabilirsin, doğrulamada kullanılmıyor.',
+    },
   };
 
   let currentConnectPlatform = null;
