@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wix Yetkilendirme</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body {
+    background: #0f1117;
+    color: #fff;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+  }
+  .box {
+    max-width: 480px;
+    width: 100%;
+    background: #171a23;
+    border: 1px solid #2a2f3d;
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+  }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  p { color: #9aa1b2; font-size: 14px; line-height: 1.5; }
+  .spinner {
+    width: 32px; height: 32px; margin: 16px auto;
+    border: 3px solid #2a2f3d; border-top-color: #22c55e;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ok { color: #4ade80; }
+  .err { color: #f87171; }
+  .btn {
+    display: inline-block; margin-top: 18px;
+    background: #22c55e; color: #06280f; text-decoration: none;
+    padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  }
+  .btn:hover { background: #16a34a; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1 id="title">Wix Bağlantısı Kontrol Ediliyor</h1>
+    <div class="spinner" id="spinner"></div>
+    <p id="message">Lütfen bekle, mağazanı doğruluyoruz...</p>
+    <a class="btn" href="accounts.html" id="backBtn" style="display:none;">Hesaplarım'a Dön</a>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const titleEl = document.getElementById('title');
+    const spinnerEl = document.getElementById('spinner');
+    const messageEl = document.getElementById('message');
+    const backBtn = document.getElementById('backBtn');
+
+    function showResult(success, text) {
+      spinnerEl.style.display = 'none';
+      backBtn.style.display = 'inline-block';
+      if (success) {
+        titleEl.textContent = 'Wix Bağlandı';
+        messageEl.className = 'ok';
+        messageEl.textContent = text;
+      } else {
+        titleEl.textContent = 'Bağlantı Başarısız';
+        messageEl.className = 'err';
+        messageEl.textContent = text;
+      }
+    }
+
+    async function run() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const oauthError = params.get('error');
+
+      if (oauthError) {
+        showResult(false, 'Wix izin vermedi: ' + oauthError);
+        return;
+      }
+
+      if (!code) {
+        showResult(false, 'URL\'de "code" parametresi bulunamadı. Hesaplarım sayfasından "Mağazanı Bağla" adımını tekrar dene.');
+        return;
+      }
+
+      const savedState = sessionStorage.getItem('wix_oauth_state');
+
+      if (savedState && state && savedState !== state) {
+        showResult(false, 'Güvenlik doğrulaması başarısız oldu (state uyuşmuyor). Lütfen tekrar dene.');
+        return;
+      }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        showResult(false, 'Oturumun sona ermiş görünüyor. Giriş yapıp tekrar dene.');
+        return;
+      }
+
+      try {
+        const res = await fetch(SUPABASE_URL + '/functions/v1/wix-token-exchange', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'apikey': SUPABASE_KEY,
+          },
+          body: JSON.stringify({ code, userId: session.user.id }),
+        });
+        const result = await res.json();
+
+        sessionStorage.removeItem('wix_oauth_state');
+
+        if (result.connected === true) {
+          showResult(true, 'Wix mağazan başarıyla bağlandı.');
+        } else {
+          showResult(false, result.error || 'Bağlantı doğrulanamadı.');
+        }
+      } catch (e) {
+        showResult(false, 'Bir hata oluştu: ' + e.message);
+      }
+    }
+
+    run();
+  </script>
+</body>
+</html>
