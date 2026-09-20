@@ -170,6 +170,12 @@
   .dd-item input { width: 16px; height: 16px; accent-color: #1D9E75; flex-shrink: 0; cursor: pointer; }
   .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #4a5468; flex-shrink: 0; }
   .dd-sum { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.5; max-width: 420px; }
+  .pub-box { margin-top: 22px; padding-top: 18px; border-top: 1px solid #232838; }
+  .pub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .pub-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #2a3040; border-radius: 8px; font-size: 13px; color: #e6e8ee; cursor: pointer; margin: 0; }
+  .pub-item:hover { border-color: #3a4258; }
+  .pub-item input { width: auto; margin: 0; }
+  .pub-item small { color: #9aa3b2; }
 </style>
 </head>
 <body>
@@ -268,6 +274,27 @@
         <button class="btn danger" onclick="deleteCurrent()">Taslağı sil</button>
       </div>
       <div id="rMsg"></div>
+
+      <div class="pub-box" id="pubBox">
+        <div id="pubShopsInfo"></div>
+        <div id="pubForm" style="display:none">
+          <div class="fields">
+            <div><label>Platform</label><select id="pubMain" onchange="renderPubExtra()"></select></div>
+          </div>
+          <div id="pubExtraWrap" style="display:none">
+            <label>Ayrıca şu platformlarda da yayınla (opsiyonel)</label>
+            <div class="hint" style="margin-top:0">İşaretlediğin her platform için aynı ürün (aynı tasarım, varyantlar ve fiyatlar) o mağazada da oluşturulup yayınlanır.</div>
+            <div class="pub-grid" id="pubExtra"></div>
+          </div>
+          <div class="warn-box">Yabancı platformlarda ilan İngilizce olmalı, yoksa aramada görünmez. Aşağıdaki "İngilizceye çevir" butonu başlık, açıklama ve etiketleri çevirir; yayınlamadan önce kontrol edip düzenleyebilirsin. Etsy mağazanın dilini de Etsy panelinden İngilizce yapmalısın.</div>
+          <div class="row" style="margin-bottom:12px"><button class="btn secondary" id="pubTransBtn" onclick="translatePub()">İngilizceye çevir</button></div>
+          <div style="margin-bottom:12px"><label>Başlık (EN)</label><input type="text" id="pubTitle" maxlength="140" placeholder="İngilizce başlık (en fazla 140 karakter)"></div>
+          <div style="margin-bottom:12px"><label>Açıklama (EN)</label><textarea id="pubDesc" placeholder="İngilizce açıklama"></textarea></div>
+          <div style="margin-bottom:12px"><label>Etiketler (EN, virgülle ayır, en fazla 13 tane, her biri 20 karakteri geçmesin)</label><input type="text" id="pubTags" placeholder="etiket1, etiket2, etiket3"></div>
+          <div class="row"><button class="btn" id="pubBtn" onclick="publishProduct()">Yayınla</button></div>
+        </div>
+        <div id="pubMsg"></div>
+      </div>
     </div>
 
     <!-- Taslaklarım -->
@@ -329,7 +356,8 @@
     variants: [], optionKeys: [], optionValues: {}, selectedOpts: {},
     placeholders: [], shipping: null,
     designs: {},
-    product: null, prices: {}
+    product: null, prices: {},
+    pubShops: null, pubForId: null
   };
 
   const $ = (id) => document.getElementById(id);
@@ -871,6 +899,13 @@
     recalcAll();
     renderShipping();
 
+    if (S.pubForId !== p.id) {
+      S.pubForId = p.id;
+      $('pubTitle').value = ''; $('pubDesc').value = ''; $('pubTags').value = '';
+      $('pubMsg').innerHTML = '';
+    }
+    if (S.pubShops === null) loadPubShops();
+
     if (!noScroll) $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (poll && !uniqueImages(p.images).length) pollMockups(p.id, 0);
   }
@@ -953,6 +988,133 @@
       $('rMsg').innerHTML = '<div class="ok-box">Fiyatlar Printify\'a kaydedildi.</div>';
       loadMyProducts();
     } catch (e) { toast(e.message, 'err'); }
+  }
+
+  // ---------- Yayınla (bağlı mağazalar) ----------
+  const CHANNEL_NAMES = {
+    etsy: 'Etsy', shopify: 'Shopify', woocommerce: 'WooCommerce', ebay: 'eBay', wix: 'Wix',
+    tiktok: 'TikTok Shop', amazon: 'Amazon', bigcartel: 'Big Cartel', prestashop: 'PrestaShop',
+    bigcommerce: 'BigCommerce', squarespace: 'Squarespace'
+  };
+  function channelName(c) { return CHANNEL_NAMES[String(c || '').toLowerCase()] || c || ''; }
+  function shopLabel(s) {
+    const ch = channelName(s.sales_channel);
+    return s.title + (ch ? ' (' + ch + ')' : '');
+  }
+
+  async function loadPubShops() {
+    const info = $('pubShopsInfo');
+    info.innerHTML = '<div class="hint">Bağlı mağazalar kontrol ediliyor...</div>';
+    try {
+      const r = await callFn('printify-connect', { action: 'list_shops' });
+      S.pubShops = (r.shops || []).filter((s) => s.sales_channel && String(s.sales_channel).toLowerCase() !== 'disconnected');
+      renderPubShops();
+    } catch (e) {
+      S.pubShops = null;
+      info.innerHTML = '<div class="err">' + esc(e.message) + '</div><button class="btn secondary small" onclick="loadPubShops()">Tekrar dene</button>';
+    }
+  }
+
+  function renderPubShops() {
+    const info = $('pubShopsInfo');
+    const shops = S.pubShops || [];
+    if (!shops.length) {
+      $('pubForm').style.display = 'none';
+      info.innerHTML =
+        '<div class="warn-box">Printify hesabında bir satış kanalına (Etsy, Shopify vb.) bağlı mağaza görünmüyor. ' +
+        'Printify panelinde <b>My stores</b> bölümünden <b>Add new store</b> ile Etsy mağazanı bağla, sonra aşağıdaki butona bas.</div>' +
+        '<button class="btn secondary small" onclick="loadPubShops()">Yeniledim, tekrar kontrol et</button>';
+      return;
+    }
+    info.innerHTML = '<div class="row" style="margin-bottom:12px"><span class="hint" style="margin:0">Printify\'a bağlı ' + shops.length + ' mağaza bulundu.</span>' +
+      '<button class="btn secondary small" onclick="loadPubShops()">Yenile</button></div>';
+    const prev = $('pubMain').value;
+    $('pubMain').innerHTML = shops.map((s) => '<option value="' + esc(s.id) + '">' + esc(shopLabel(s)) + '</option>').join('');
+    if (prev && shops.some((s) => String(s.id) === String(prev))) $('pubMain').value = prev;
+    $('pubForm').style.display = 'block';
+    renderPubExtra();
+  }
+
+  function renderPubExtra() {
+    const main = $('pubMain').value;
+    const others = (S.pubShops || []).filter((s) => String(s.id) !== String(main));
+    const wrap = $('pubExtraWrap');
+    const checked = Array.from(document.querySelectorAll('.pubExtraCheck:checked')).map((c) => c.value);
+    if (!others.length) { wrap.style.display = 'none'; $('pubExtra').innerHTML = ''; return; }
+    wrap.style.display = 'block';
+    $('pubExtra').innerHTML = others.map((s) =>
+      '<label class="pub-item"><input type="checkbox" class="pubExtraCheck" value="' + esc(s.id) + '"' + (checked.indexOf(String(s.id)) >= 0 ? ' checked' : '') + '>' +
+      '<span>' + esc(s.title) + ' <small>' + esc(channelName(s.sales_channel)) + '</small></span></label>'
+    ).join('');
+  }
+
+  async function translatePub() {
+    if (!S.product) return;
+    const btn = $('pubTransBtn');
+    btn.disabled = true; btn.textContent = 'Çevriliyor...';
+    try {
+      const title = S.product.title || '';
+      const description = S.product.description || title;
+      const res = await fetch(FN + 'translate-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ title: title, description: description, tags: '', productName: title })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      $('pubTitle').value = data.titleEn || '';
+      $('pubDesc').value = data.descriptionEn || '';
+      $('pubTags').value = (data.tagsEn || []).join(', ');
+      toast('Çeviri hazır, kontrol edip düzenleyebilirsin', 'good');
+    } catch (e) {
+      toast('Çeviri yapılamadı: ' + e.message, 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'İngilizceye çevir';
+    }
+  }
+
+  async function publishProduct() {
+    if (!S.product) return;
+    const title = $('pubTitle').value.trim();
+    const description = $('pubDesc').value.trim();
+    const tags = $('pubTags').value.split(',').map((t) => t.trim()).filter(Boolean);
+    const main = $('pubMain').value;
+    if (!main) { toast('Platform seç', 'err'); return; }
+    if (!title || !description) { toast('Önce "İngilizceye çevir" butonuna bas ya da başlık ve açıklamayı doldur', 'err'); return; }
+    if (tags.length > 13) { toast('En fazla 13 etiket olabilir', 'err'); return; }
+    if (/[çğıöşüÇĞİÖŞÜ]/.test(title + ' ' + description) &&
+        !confirm('Başlık ya da açıklamada Türkçe karakter var. Yabancı platformda ilan İngilizce olmalı. Yine de yayınlansın mı?')) return;
+
+    const targets = [main].concat(Array.from(document.querySelectorAll('.pubExtraCheck:checked')).map((c) => c.value));
+    const names = targets.map((id) => {
+      const sh = (S.pubShops || []).find((x) => String(x.id) === String(id));
+      return sh ? shopLabel(sh) : id;
+    });
+    if (!confirm('Bu ürün şu mağazalarda GERÇEKTEN yayınlanacak:\n\n' + names.join('\n') + '\n\nMağazanda canlı ilan oluşur ve platform ilan ücreti alabilir (örneğin Etsy, ilan başına yaklaşık 0,20 $). Devam edilsin mi?')) return;
+
+    const btn = $('pubBtn');
+    btn.disabled = true; btn.textContent = 'Yayınlanıyor...';
+    $('pubMsg').innerHTML = '<div class="hint">Printify\'a gönderiliyor, biraz sürebilir...</div>';
+    try {
+      const r = await callFn('printify-publish', {
+        action: 'publish', productId: String(S.product.id), sourceShopId: String(S.shopId),
+        targetShopIds: targets, title: title, description: description, tags: tags
+      });
+      let h = '';
+      (r.results || []).forEach((x) => {
+        const sh = (S.pubShops || []).find((y) => String(y.id) === String(x.shopId));
+        const nm = sh ? shopLabel(sh) : x.shopId;
+        h += x.ok
+          ? '<div class="ok-box"><b>' + esc(nm) + ':</b> yayın isteği Printify\'a gönderildi. İlanın mağazada görünmesi birkaç dakika sürebilir.</div>'
+          : '<div class="err"><b>' + esc(nm) + ':</b> ' + esc(x.error || 'Yayınlanamadı') + '</div>';
+      });
+      $('pubMsg').innerHTML = h;
+      loadMyProducts();
+    } catch (e) {
+      $('pubMsg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Yayınla';
+    }
   }
 
   async function addToPanel() {
