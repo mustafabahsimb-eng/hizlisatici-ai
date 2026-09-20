@@ -544,9 +544,9 @@
           if (S.optionValues[k].indexOf(v.options[k]) === -1) S.optionValues[k].push(v.options[k]);
         });
       });
+      // Hiçbir renk/beden kendiliğinden seçili gelmez, seçimi kullanıcı yapar
       S.optionKeys.forEach((k) => {
-        const isColor = /colou?r/i.test(k);
-        S.selectedOpts[k] = new Set(isColor ? S.optionValues[k].slice(0, 3) : S.optionValues[k]);
+        S.selectedOpts[k] = new Set();
       });
       if (!S.variants.length) { $('optBody').innerHTML = '<div class="err">Bu sağlayıcıda stokta varyant yok. Başka bir sağlayıcı seç.</div>'; return; }
       renderOptions();
