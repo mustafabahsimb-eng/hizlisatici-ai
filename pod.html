@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - POD Stüdyosu</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+
+  main { max-width: 980px; margin: 0 auto; padding: 28px 20px 90px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 22px; line-height: 1.5; }
+
+  .card {
+    background: #141821; border: 1px solid #232838; border-radius: 14px;
+    padding: 20px; margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step {
+    width: 22px; height: 22px; border-radius: 50%; background: #1D9E75; color: #fff;
+    font-size: 12px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .hint { font-size: 13px; color: #9aa3b2; margin: 6px 0 12px; line-height: 1.55; }
+  .err { font-size: 13px; color: #f5a3a3; background: #2e1414; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .ok-box { font-size: 13px; color: #6ee7b7; background: #123222; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .warn-box { font-size: 13px; color: #f2d16b; background: #2e2712; border-radius: 8px; padding: 10px 12px; margin: 8px 0; line-height: 1.5; }
+
+  label { display: block; font-size: 12px; color: #9aa3b2; margin-bottom: 5px; }
+  input[type=text], input[type=password], input[type=number], textarea, select {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; color: #e6e8ee;
+    border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #1D9E75; }
+  textarea { min-height: 70px; resize: vertical; }
+  input[type=range] { width: 100%; accent-color: #1D9E75; }
+  input[type=file] { font-size: 13px; color: #9aa3b2; width: 100%; }
+
+  .btn {
+    background: #1D9E75; color: #fff; border: none; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
+  }
+  .btn:hover { background: #178a65; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary { background: transparent; color: #9aa3b2; border: 1px solid #2a3040; }
+  .btn.secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn.danger { background: transparent; color: #f5a3a3; border: 1px solid #5a2a2a; }
+  .btn.danger:hover { background: #2e1414; }
+  .btn.small { padding: 6px 12px; font-size: 12px; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row.end { justify-content: flex-end; }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; }
+  .badge.ok { background: #123222; color: #6ee7b7; }
+
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; align-items: end; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .chip {
+    padding: 6px 13px; border-radius: 16px; border: 1px solid #2a3040; font-size: 13px;
+    cursor: pointer; color: #9aa3b2; user-select: none;
+  }
+  .chip:hover { border-color: #3a4258; color: #fff; }
+  .chip.on { background: #123222; border-color: #1D9E75; color: #6ee7b7; }
+
+  .bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+  .bp {
+    background: #0d0f16; border: 1px solid #232838; border-radius: 10px; overflow: hidden;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .bp:hover { border-color: #1D9E75; }
+  .bp.sel { border-color: #1D9E75; box-shadow: 0 0 0 1px #1D9E75; }
+  .bp img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #1a1f2c; }
+  .bp-t { font-size: 12px; color: #fff; padding: 8px 10px 2px; line-height: 1.35; }
+  .bp-b { font-size: 11px; color: #9aa3b2; padding: 0 10px 8px; }
+
+  .prov-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 10px; }
+  .prov {
+    background: #0d0f16; border: 1px solid #232838; border-radius: 10px; padding: 12px 14px; cursor: pointer;
+  }
+  .prov:hover { border-color: #1D9E75; }
+  .prov.sel { border-color: #1D9E75; background: #0f1f19; }
+  .prov-t { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+  .prov-m { font-size: 11px; color: #9aa3b2; }
+
+  .opt-block { margin-bottom: 14px; }
+  .opt-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .opt-name { font-size: 13px; font-weight: 600; color: #fff; }
+  .linkbtn { background: none; border: none; color: #1D9E75; font-size: 12px; cursor: pointer; margin-left: 10px; font-family: inherit; }
+
+  .design-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 10px; }
+  .design {
+    background: #0d0f16; border: 1px solid #232838; border-radius: 12px; padding: 14px;
+  }
+  .design-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  .design canvas { width: 100%; max-width: 280px; border-radius: 8px; display: block; margin: 8px 0; background: #e9ecf3; }
+  .ctl { margin-top: 8px; }
+  .ctl-row { display: grid; grid-template-columns: 80px 1fr 44px; gap: 8px; align-items: center; margin-bottom: 4px; font-size: 12px; color: #9aa3b2; }
+  .ctl-row span:last-child { text-align: right; color: #e6e8ee; }
+
+  .mock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 10px 0 14px; }
+  .mock-grid img { width: 100%; border-radius: 8px; background: #1a1f2c; aspect-ratio: 1; object-fit: cover; }
+
+  .tbl-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid #232838; border-radius: 10px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: left; color: #9aa3b2; font-weight: 600; font-size: 12px; padding: 10px 12px; background: #0d0f16; white-space: nowrap; }
+  .tbl td { padding: 8px 12px; border-top: 1px solid #232838; white-space: nowrap; }
+  .tbl input { width: 96px; padding: 6px 8px; }
+  .pos { color: #6ee7b7; }
+  .neg { color: #f5a3a3; }
+
+  .my-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; }
+  .my { background: #0d0f16; border: 1px solid #232838; border-radius: 10px; overflow: hidden; }
+  .my img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #1a1f2c; }
+  .my-t { font-size: 12px; color: #fff; padding: 8px 10px; line-height: 1.35; min-height: 44px; }
+  .my-a { display: flex; gap: 6px; padding: 0 10px 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #232838; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 50; max-width: 90vw; line-height: 1.45;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.err { background: #5a1f1f; }
+  .toast.good { background: #14532d; }
+  .status-line { font-size: 13px; color: #f2d16b; margin-left: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+
+<main>
+  <h1>POD Stüdyosu</h1>
+  <div class="subtitle">Tişört, kupa, hoodie gibi ürünlere kendi tasarımını bas. Sipariş gelince Printify üretir ve müşteriye gönderir, sen stok tutmazsın.</div>
+
+  <!-- Printify bağlantısı -->
+  <div class="card">
+    <h2>Printify hesabın</h2>
+    <div id="connectBody"><div class="hint">Kontrol ediliyor...</div></div>
+  </div>
+
+  <div id="studio" style="display:none">
+
+    <!-- 1. Ürün türü -->
+    <div class="card">
+      <h2><span class="step">1</span> Ürün türünü seç</h2>
+      <div class="hint">Hızlı seçim yap ya da aşağıya yazarak ara (Türkçe veya İngilizce).</div>
+      <div class="chips" id="quickChips"></div>
+      <div class="row">
+        <div style="flex:1; min-width:200px"><input type="text" id="bpQuery" placeholder="Örn: tişört, kupa, poster, phone case..." onkeydown="if(event.key==='Enter')searchTyped()"></div>
+        <button class="btn" onclick="searchTyped()">Ara</button>
+      </div>
+      <div class="bp-grid" id="bpGrid"></div>
+    </div>
+
+    <!-- 2. Sağlayıcı -->
+    <div class="card" id="provCard" style="display:none">
+      <h2><span class="step">2</span> Baskı sağlayıcısını seç</h2>
+      <div class="hint">Aynı ürünü farklı baskı atölyeleri üretir. Fiyat, kalite ve üretim yeri sağlayıcıya göre değişir. Maliyeti taslak oluşturunca net göreceksin, istersen farklı sağlayıcıyla tekrar deneyebilirsin.</div>
+      <div class="prov-list" id="provList"></div>
+    </div>
+
+    <!-- 3. Renk / beden -->
+    <div class="card" id="optCard" style="display:none">
+      <h2><span class="step">3</span> Renk ve bedenleri seç</h2>
+      <div class="hint">Seçtiklerinin kombinasyonları satışa açılır. En fazla 100 varyant seçebilirsin.</div>
+      <div id="optBody"></div>
+      <div class="hint" id="variantCount"></div>
+    </div>
+
+    <!-- 4. Tasarım -->
+    <div class="card" id="designCard" style="display:none">
+      <h2><span class="step">4</span> Tasarımını yükle</h2>
+      <div class="hint">Şeffaf arka planlı PNG en iyi sonucu verir. Baskı yapmak istediğin her alan için ayrı tasarım yükleyebilirsin (ör. ön ve arka). Boş bıraktığın alana baskı yapılmaz.</div>
+      <div class="design-grid" id="designGrid"></div>
+    </div>
+
+    <!-- 5. Ürün bilgisi -->
+    <div class="card" id="infoCard" style="display:none">
+      <h2><span class="step">5</span> Ürün bilgisi ve taslak</h2>
+      <div class="hint">Printify'da yayınlanmamış bir taslak oluşturulur. Gerçek maliyetler bu taslaktan okunur, sonra fiyatını kâra göre ayarlarsın.</div>
+      <div style="margin-bottom:12px"><label>Ürün başlığı</label><input type="text" id="pTitle" placeholder="Örn: Komik Kedi Baskılı Unisex Tişört"></div>
+      <div style="margin-bottom:12px"><label>Açıklama</label><textarea id="pDesc" placeholder="Ürün açıklaması (boş bırakırsan başlık kullanılır)"></textarea></div>
+      <div class="fields">
+        <div><label>Başlangıç satış fiyatı ($)</label><input type="number" id="pPrice" value="29.99" step="0.01" min="1"></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="draftBtn" onclick="createDraft()">Taslak oluştur ve gerçek maliyeti göster</button>
+        <span class="status-line" id="draftStatus"></span>
+      </div>
+    </div>
+
+    <!-- 6. Sonuç -->
+    <div class="card" id="resultCard" style="display:none">
+      <h2><span class="step">6</span> Taslak ürün ve gerçek maliyet</h2>
+      <div class="hint" id="rInfo"></div>
+      <div class="mock-grid" id="rMock"></div>
+      <div class="fields">
+        <div><label>Satış platformu (komisyon için)</label><select id="platformSel" onchange="onPlatformChange()"></select></div>
+        <div><label>Komisyon % (tahmini, değiştirebilirsin)</label><input type="number" id="commission" step="0.1" min="0" oninput="recalcAll()"></div>
+        <div><label>Hedef net marj %</label><input type="number" id="targetMargin" value="35" step="1" min="1" max="80"></div>
+        <div><button class="btn secondary" onclick="applyMargin()">Tüm fiyatlara uygula</button></div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Varyant</th><th>Printify maliyeti</th><th>Satış fiyatı ($)</th><th>Net kâr</th><th>Net marj</th></tr></thead>
+          <tbody id="rBody"></tbody>
+        </table>
+      </div>
+      <div class="hint">Net kâr = satış fiyatı − platform komisyonu − Printify maliyeti. Kargo ücretini Printify siparişte ayrıca keser, müşteriden tahsil etmek istersen fiyata yansıt.</div>
+      <div id="rShip"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="savePrices()">Fiyatları Printify'a kaydet</button>
+        <button class="btn" onclick="addToPanel()">Panele ürün olarak ekle</button>
+        <button class="btn danger" onclick="deleteCurrent()">Taslağı sil</button>
+      </div>
+      <div id="rMsg"></div>
+    </div>
+
+    <!-- Taslaklarım -->
+    <div class="card">
+      <h2>Printify'daki ürünlerim</h2>
+      <div class="hint">Bu mağazada oluşturduğun ürünler. "Aç" ile fiyatlarını düzenleyebilirsin.</div>
+      <div class="my-grid" id="myGrid"><div class="hint">Yükleniyor...</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const FN = SUPABASE_URL + '/functions/v1/';
+
+  // Tahmini komisyonlar (yüzde). Kullanıcı değiştirebilir.
+  const PLATFORMS = {
+    'Etsy': 9.5,
+    'Amazon Global': 15,
+    'eBay': 13,
+    'Facebook Marketplace': 5,
+    'TikTok Shop': 6,
+    'Shopify': 3,
+    'WooCommerce': 3,
+    'Wix': 3
+  };
+
+  const QUICK = [
+    { label: 'Tişört', q: ['tee', 't-shirt'] },
+    { label: 'Kupa', q: ['mug'] },
+    { label: 'Hoodie', q: ['hoodie'] },
+    { label: 'Sweatshirt', q: ['sweatshirt'] },
+    { label: 'Poster', q: ['poster'] },
+    { label: 'Tablo / Kanvas', q: ['canvas'] },
+    { label: 'Çanta', q: ['tote', 'bag'] },
+    { label: 'Telefon kılıfı', q: ['phone case'] },
+    { label: 'Şapka', q: ['cap', 'hat'] },
+    { label: 'Yastık', q: ['pillow'] },
+    { label: 'Sticker', q: ['sticker'] },
+    { label: 'Defter', q: ['notebook', 'journal'] }
+  ];
+
+  const POS_LABELS = {
+    front: 'Ön', back: 'Arka', left: 'Sol', right: 'Sağ', neck: 'Yaka', neck_label: 'Yaka etiketi',
+    left_sleeve: 'Sol kol', right_sleeve: 'Sağ kol', front_left: 'Ön sol', front_right: 'Ön sağ',
+    pocket: 'Cep', default: 'Ana baskı', top: 'Üst', bottom: 'Alt'
+  };
+  const OPT_LABELS = { color: 'Renk', colour: 'Renk', size: 'Beden', sizes: 'Beden' };
+
+  let session = null;
+  const S = {
+    shopId: null, shopTitle: null,
+    blueprints: [], blueprint: null,
+    providers: [], provider: null,
+    variants: [], optionKeys: [], optionValues: {}, selectedOpts: {},
+    placeholders: [], shipping: null,
+    designs: {},
+    product: null, prices: {}
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (cents) => '$' + (Number(cents || 0) / 100).toFixed(2);
+  const posLabel = (p) => POS_LABELS[p] || String(p).replace(/_/g, ' ');
+
+  let toastTimer;
+  function toast(msg, type) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (type || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast'; }, type === 'err' ? 8000 : 3500);
+  }
+
+  async function callFn(name, payload) {
+    const { data: { session: s } } = await supabaseClient.auth.getSession();
+    if (!s) { window.location.href = 'index.html'; throw new Error('Oturum bitti, tekrar giriş yap'); }
+    session = s;
+    const res = await fetch(FN + name, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify(Object.assign({}, payload, { userAccessToken: s.access_token }))
+    });
+    let data;
+    try { data = await res.json(); } catch (e) { throw new Error('Sunucu yanıtı okunamadı (' + res.status + ')'); }
+    if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+    return data;
+  }
+
+  // ---------- Printify bağlantısı ----------
+  async function loadConnection() {
+    const box = $('connectBody');
+    box.innerHTML = '<div class="hint">Kontrol ediliyor...</div>';
+    try {
+      const st = await callFn('printify-connect', { action: 'status' });
+      if (!st.connected) { renderConnectForm(); $('studio').style.display = 'none'; return; }
+      if (st.shop_id) {
+        S.shopId = st.shop_id; S.shopTitle = st.shop_title;
+        renderConnected();
+        $('studio').style.display = 'block';
+        loadMyProducts();
+        return;
+      }
+      $('studio').style.display = 'none';
+      await renderShopPicker();
+    } catch (e) {
+      box.innerHTML = '<div class="err">' + esc(e.message) + '</div><button class="btn secondary small" onclick="loadConnection()">Tekrar dene</button>';
+    }
+  }
+
+  function renderConnectForm() {
+    $('connectBody').innerHTML =
+      '<div class="hint">Printify hesabını bağlamak için bir API token gerekir:<br>' +
+      '1) printify.com adresinde ücretsiz hesap aç.<br>' +
+      '2) Hesap ayarlarında <b>Connections</b> bölümünde <b>Personal access token</b> oluştur (tüm izinleri seç).<br>' +
+      '3) Token\'ı aşağıya yapıştır. Token sadece sunucuda saklanır, tarayıcıya geri gönderilmez.</div>' +
+      '<div class="row"><div style="flex:1; min-width:240px"><input type="password" id="pfToken" placeholder="Printify token"></div>' +
+      '<button class="btn" id="pfConnectBtn" onclick="connectPrintify()">Bağla</button></div>';
+  }
+
+  async function connectPrintify() {
+    const token = $('pfToken').value.trim();
+    if (!token) { toast('Token boş', 'err'); return; }
+    const btn = $('pfConnectBtn');
+    btn.disabled = true; btn.textContent = 'Doğrulanıyor...';
+    try {
+      await callFn('printify-connect', { action: 'connect', apiToken: token });
+      toast('Printify bağlandı', 'good');
+      await loadConnection();
+    } catch (e) {
+      toast(e.message, 'err');
+      btn.disabled = false; btn.textContent = 'Bağla';
+    }
+  }
+
+  async function renderShopPicker() {
+    const box = $('connectBody');
+    const r = await callFn('printify-connect', { action: 'list_shops' });
+    if (!r.shops.length) {
+      box.innerHTML =
+        '<div class="warn-box">Token geçerli ama Printify hesabında henüz mağaza yok. Printify panelinde <b>Manage my stores</b> bölümüne gidip <b>Add new store</b> ile bir mağaza ekle (manuel sipariş / API türü olan yeterli). Sonra aşağıdaki butona bas.</div>' +
+        '<div class="row"><button class="btn" onclick="loadConnection()">Yeniledim, kontrol et</button>' +
+        '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
+      return;
+    }
+    let opts = '';
+    r.shops.forEach((s) => {
+      opts += '<option value="' + esc(s.id) + '">' + esc(s.title) + (s.sales_channel ? ' (' + esc(s.sales_channel) + ')' : '') + '</option>';
+    });
+    box.innerHTML =
+      '<div class="hint">Birden fazla mağazan var. Hangisini kullanalım?</div>' +
+      '<div class="row"><div style="flex:1; min-width:220px"><select id="shopSel">' + opts + '</select></div>' +
+      '<button class="btn" onclick="selectShop()">Bu mağazayı kullan</button>' +
+      '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
+  }
+
+  async function selectShop() {
+    try {
+      await callFn('printify-connect', { action: 'select_shop', shopId: $('shopSel').value });
+      await loadConnection();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function renderConnected() {
+    $('connectBody').innerHTML =
+      '<div class="row"><span class="badge ok">bağlı</span><b style="color:#fff">' + esc(S.shopTitle || 'Printify mağazası') + '</b>' +
+      '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
+  }
+
+  async function disconnectPrintify() {
+    if (!confirm('Printify bağlantısı kaldırılsın mı? (Printify\'daki ürünlerin silinmez)')) return;
+    try {
+      await callFn('printify-connect', { action: 'disconnect' });
+      S.shopId = null;
+      toast('Bağlantı kaldırıldı');
+      await loadConnection();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  // ---------- 1. Ürün türü ----------
+  function renderQuickChips() {
+    let h = '';
+    QUICK.forEach((c, i) => { h += '<span class="chip" onclick="quickSearch(' + i + ')">' + esc(c.label) + '</span>'; });
+    $('quickChips').innerHTML = h;
+  }
+  function quickSearch(i) { runSearch(QUICK[i].q); }
+  function searchTyped() {
+    const q = $('bpQuery').value.trim();
+    if (!q) { toast('Aramak için bir şey yaz veya hızlı seçimlerden birine tıkla', 'err'); return; }
+    runSearch([q]);
+  }
+
+  async function runSearch(queries) {
+    const grid = $('bpGrid');
+    grid.innerHTML = '<div class="hint">Aranıyor...</div>';
+    try {
+      const seen = new Set();
+      const list = [];
+      for (const q of queries) {
+        const r = await callFn('printify-catalog', { action: 'search', query: q });
+        r.blueprints.forEach((b) => { if (!seen.has(b.id)) { seen.add(b.id); list.push(b); } });
+      }
+      S.blueprints = list.slice(0, 48);
+      if (!S.blueprints.length) { grid.innerHTML = '<div class="hint">Sonuç bulunamadı. Başka bir kelime dene.</div>'; return; }
+      let h = '';
+      S.blueprints.forEach((b, i) => {
+        h += '<div class="bp" id="bp' + i + '" onclick="pickBlueprint(' + i + ')">' +
+          (b.image ? '<img loading="lazy" src="' + esc(b.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
+          '<div class="bp-t">' + esc(b.title) + '</div><div class="bp-b">' + esc(b.brand || '') + '</div></div>';
+      });
+      grid.innerHTML = h;
+    } catch (e) {
+      grid.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ---------- 2. Sağlayıcı ----------
+  async function pickBlueprint(i) {
+    S.blueprint = S.blueprints[i];
+    S.provider = null; S.variants = []; S.designs = {}; S.placeholders = [];
+    document.querySelectorAll('.bp').forEach((el) => el.classList.remove('sel'));
+    const el = $('bp' + i); if (el) el.classList.add('sel');
+    ['optCard', 'designCard', 'infoCard'].forEach((id) => { $(id).style.display = 'none'; });
+    $('pTitle').value = '';
+    $('provCard').style.display = 'block';
+    $('provList').innerHTML = '<div class="hint">Sağlayıcılar yükleniyor...</div>';
+    $('provCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      const r = await callFn('printify-catalog', { action: 'providers', blueprintId: S.blueprint.id });
+      S.providers = r.providers;
+      if (!S.providers.length) { $('provList').innerHTML = '<div class="hint">Bu ürün için sağlayıcı bulunamadı.</div>'; return; }
+      let h = '';
+      S.providers.forEach((p, j) => {
+        h += '<div class="prov" id="prov' + j + '" onclick="pickProvider(' + j + ')"><div class="prov-t">' + esc(p.title) + '</div>' +
+          '<div class="prov-m">' + esc((p.decoration_methods || []).join(', ')) + '</div></div>';
+      });
+      $('provList').innerHTML = h;
+    } catch (e) {
+      $('provList').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ---------- 3. Varyantlar ----------
+  async function pickProvider(j) {
+    S.provider = S.providers[j];
+    S.designs = {};
+    document.querySelectorAll('.prov').forEach((el) => el.classList.remove('sel'));
+    const el = $('prov' + j); if (el) el.classList.add('sel');
+    $('optCard').style.display = 'block';
+    $('optBody').innerHTML = '<div class="hint">Renk ve bedenler yükleniyor...</div>';
+    $('designCard').style.display = 'none';
+    $('infoCard').style.display = 'none';
+    $('optCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      const r = await callFn('printify-catalog', { action: 'variants', blueprintId: S.blueprint.id, providerId: S.provider.id });
+      S.variants = r.variants;
+      S.shipping = r.shipping;
+      const seenPos = new Set();
+      S.placeholders = [];
+      (r.placeholders || []).forEach((p) => { if (!seenPos.has(p.position)) { seenPos.add(p.position); S.placeholders.push(p); } });
+
+      S.optionKeys = []; S.optionValues = {}; S.selectedOpts = {};
+      S.variants.forEach((v) => {
+        Object.keys(v.options || {}).forEach((k) => {
+          if (!S.optionValues[k]) { S.optionValues[k] = []; S.optionKeys.push(k); }
+          if (S.optionValues[k].indexOf(v.options[k]) === -1) S.optionValues[k].push(v.options[k]);
+        });
+      });
+      S.optionKeys.forEach((k) => {
+        const isColor = /colou?r/i.test(k);
+        S.selectedOpts[k] = new Set(isColor ? S.optionValues[k].slice(0, 3) : S.optionValues[k]);
+      });
+      if (!S.variants.length) { $('optBody').innerHTML = '<div class="err">Bu sağlayıcıda stokta varyant yok. Başka bir sağlayıcı seç.</div>'; return; }
+      renderOptions();
+      renderDesigns();
+      $('designCard').style.display = 'block';
+      $('infoCard').style.display = 'block';
+      if (!$('pTitle').value) $('pTitle').value = S.blueprint.title;
+    } catch (e) {
+      $('optBody').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+    }
+  }
+
+  function renderOptions() {
+    let h = '';
+    S.optionKeys.forEach((k, ki) => {
+      h += '<div class="opt-block"><div class="opt-head"><span class="opt-name">' + esc(OPT_LABELS[k.toLowerCase()] || k) + '</span>' +
+        '<span><button class="linkbtn" onclick="setAllOpt(' + ki + ',true)">Tümünü seç</button><button class="linkbtn" onclick="setAllOpt(' + ki + ',false)">Temizle</button></span></div><div class="chips">';
+      S.optionValues[k].forEach((val, vi) => {
+        const on = S.selectedOpts[k].has(val);
+        h += '<span class="chip' + (on ? ' on' : '') + '" onclick="toggleOpt(' + ki + ',' + vi + ')">' + esc(val) + '</span>';
+      });
+      h += '</div></div>';
+    });
+    $('optBody').innerHTML = h || '<div class="hint">Bu üründe seçilecek renk/beden yok, tüm varyantlar kullanılacak.</div>';
+    updateVariantCount();
+  }
+  function toggleOpt(ki, vi) {
+    const k = S.optionKeys[ki]; const val = S.optionValues[k][vi];
+    if (S.selectedOpts[k].has(val)) S.selectedOpts[k].delete(val); else S.selectedOpts[k].add(val);
+    renderOptions();
+  }
+  function setAllOpt(ki, on) {
+    const k = S.optionKeys[ki];
+    S.selectedOpts[k] = new Set(on ? S.optionValues[k] : []);
+    renderOptions();
+  }
+  function selectedVariantIds() {
+    return S.variants.filter((v) => S.optionKeys.every((k) => S.selectedOpts[k].has((v.options || {})[k]))).map((v) => v.id);
+  }
+  function updateVariantCount() {
+    const n = selectedVariantIds().length;
+    const el = $('variantCount');
+    el.innerHTML = n + ' varyant seçili' + (n > 100 ? ' <span class="neg">(en fazla 100 olabilir, seçimini azalt)</span>' : '');
+  }
+
+  // ---------- 4. Tasarım ----------
+  function renderDesigns() {
+    let h = '';
+    if (!S.placeholders.length) {
+      $('designGrid').innerHTML = '<div class="err">Bu sağlayıcı için baskı alanı bilgisi gelmedi. Başka bir sağlayıcı dene.</div>';
+      return;
+    }
+    S.placeholders.forEach((pos, idx) => {
+      const cw = 280;
+      const ch = Math.max(120, Math.min(420, Math.round(cw * pos.height / pos.width)));
+      h += '<div class="design"><div class="design-title">' + esc(posLabel(pos.position)) + ' <span style="color:#9aa3b2;font-weight:400;font-size:11px">(' + pos.width + '×' + pos.height + ' px)</span></div>' +
+        '<input type="file" accept="image/png,image/jpeg,image/webp" onchange="onDesignFile(' + idx + ', this)">' +
+        '<canvas id="cv' + idx + '" width="' + cw + '" height="' + ch + '"></canvas>' +
+        '<div id="ctl' + idx + '" class="ctl" style="display:none">' +
+        sliderRow(idx, 'scale', 'Boyut', 5, 200, 100) +
+        sliderRow(idx, 'x', 'Yatay', 0, 100, 50) +
+        sliderRow(idx, 'y', 'Dikey', 0, 100, 50) +
+        sliderRow(idx, 'angle', 'Döndür', -180, 180, 0) +
+        '<div class="hint" id="q' + idx + '" style="margin:6px 0"></div>' +
+        '<button class="btn danger small" onclick="removeDesign(' + idx + ')">Bu tasarımı kaldır</button></div></div>';
+    });
+    $('designGrid').innerHTML = h;
+    S.placeholders.forEach((_, idx) => drawPreview(idx));
+  }
+  function sliderRow(idx, key, label, min, max, val) {
+    return '<div class="ctl-row"><span>' + label + '</span><input type="range" min="' + min + '" max="' + max + '" value="' + val + '" id="sl_' + key + idx + '" oninput="onSlider(' + idx + ',\'' + key + '\',this.value)"><span id="sv_' + key + idx + '">' + val + '</span></div>';
+  }
+
+  function loadImageFromFile(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Görsel açılamadı')); };
+      img.src = url;
+    });
+  }
+
+  // Görseli en fazla ~4 MB olacak şekilde küçültür (Printify'a base64 olarak gönderilecek)
+  async function prepareDesign(file) {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Sadece PNG, JPG veya WEBP yükleyebilirsin');
+    const src = await loadImageFromFile(file);
+    const isJpeg = file.type === 'image/jpeg';
+    const LIMIT = 4 * 1024 * 1024;
+    let maxDim = 4000;
+    for (let attempt = 0; attempt < 7; attempt++) {
+      const k = Math.min(1, maxDim / Math.max(src.naturalWidth, src.naturalHeight));
+      const w = Math.max(1, Math.round(src.naturalWidth * k));
+      const h = Math.max(1, Math.round(src.naturalHeight * k));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(src, 0, 0, w, h);
+      const dataUrl = isJpeg ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
+      const bytes = (dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75;
+      if (bytes <= LIMIT) {
+        const base = (file.name.replace(/\.[^.]+$/, '') || 'tasarim').replace(/[^\w\-]+/g, '_');
+        return { img: c, dataUrl: dataUrl, w: w, h: h, fileName: base + (isJpeg ? '.jpg' : '.png') };
+      }
+      maxDim = Math.round(Math.max(w, h) * 0.75);
+    }
+    throw new Error('Görsel çok büyük, küçültülemedi. Daha küçük bir dosya dene.');
+  }
+
+  async function onDesignFile(idx, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const d = await prepareDesign(file);
+      const pos = S.placeholders[idx];
+      const fitScale = Math.min(1, (pos.height * d.w) / (pos.width * d.h));
+      d.x = 0.5; d.y = 0.5; d.scale = fitScale; d.angle = 0;
+      S.designs[idx] = d;
+      $('ctl' + idx).style.display = 'block';
+      setSlider(idx, 'scale', Math.round(d.scale * 100));
+      setSlider(idx, 'x', 50); setSlider(idx, 'y', 50); setSlider(idx, 'angle', 0);
+      drawPreview(idx);
+    } catch (e) {
+      toast(e.message, 'err');
+      input.value = '';
+    }
+  }
+  function setSlider(idx, key, val) {
+    $('sl_' + key + idx).value = val;
+    $('sv_' + key + idx).textContent = val;
+  }
+  function onSlider(idx, key, raw) {
+    const d = S.designs[idx]; if (!d) return;
+    const v = Number(raw);
+    $('sv_' + key + idx).textContent = v;
+    if (key === 'scale') d.scale = v / 100;
+    if (key === 'x') d.x = v / 100;
+    if (key === 'y') d.y = v / 100;
+    if (key === 'angle') d.angle = v;
+    drawPreview(idx);
+  }
+  function removeDesign(idx) {
+    delete S.designs[idx];
+    $('ctl' + idx).style.display = 'none';
+    const inputs = $('designGrid').querySelectorAll('input[type=file]');
+    if (inputs[idx]) inputs[idx].value = '';
+    drawPreview(idx);
+  }
+  function drawPreview(idx) {
+    const cv = $('cv' + idx); if (!cv) return;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#e9ecf3';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.strokeStyle = '#b8bfcf';
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(0.5, 0.5, cv.width - 1, cv.height - 1);
+    ctx.setLineDash([]);
+    const d = S.designs[idx];
+    const q = $('q' + idx);
+    if (!d) {
+      ctx.fillStyle = '#8a92a6'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Baskı alanı', cv.width / 2, cv.height / 2);
+      if (q) q.textContent = '';
+      return;
+    }
+    const dw = d.scale * cv.width;
+    const dh = dw * d.h / d.w;
+    ctx.save();
+    ctx.translate(d.x * cv.width, d.y * cv.height);
+    ctx.rotate(d.angle * Math.PI / 180);
+    ctx.drawImage(d.img, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+    if (q) {
+      const pos = S.placeholders[idx];
+      const printedPx = d.scale * pos.width;
+      const quality = Math.min(100, Math.round(d.w / printedPx * 100));
+      q.innerHTML = 'Baskı kalitesi: <b class="' + (quality >= 60 ? 'pos' : 'neg') + '">%' + quality + '</b>' + (quality < 60 ? ' (düşük çözünürlük, baskı bulanık çıkabilir. Daha büyük bir görsel yükle veya boyutu küçült)' : '');
+    }
+  }
+
+  // ---------- 5. Taslak ----------
+  function setDraftStatus(t) { $('draftStatus').textContent = t || ''; }
+
+  async function createDraft() {
+    const title = $('pTitle').value.trim();
+    const description = $('pDesc').value.trim();
+    const ids = selectedVariantIds();
+    const idxs = Object.keys(S.designs).map(Number);
+    if (!S.blueprint || !S.provider) { toast('Önce ürün türü ve sağlayıcı seç', 'err'); return; }
+    if (!title) { toast('Ürün başlığı boş', 'err'); return; }
+    if (!ids.length) { toast('En az bir renk/beden seç', 'err'); return; }
+    if (ids.length > 100) { toast('En fazla 100 varyant seçebilirsin', 'err'); return; }
+    if (!idxs.length) { toast('En az bir baskı alanına tasarım yükle', 'err'); return; }
+    const btn = $('draftBtn');
+    btn.disabled = true;
+    try {
+      const placements = [];
+      let n = 0;
+      for (const idx of idxs) {
+        n++;
+        setDraftStatus('Tasarım yükleniyor (' + n + '/' + idxs.length + ')...');
+        const d = S.designs[idx];
+        const up = await callFn('printify-create-product', { action: 'upload_image', fileName: d.fileName, imageBase64: d.dataUrl });
+        placements.push({ position: S.placeholders[idx].position, imageId: up.image.id, x: d.x, y: d.y, scale: d.scale, angle: d.angle });
+      }
+      setDraftStatus('Printify\'da taslak ürün oluşturuluyor...');
+      const price = Number($('pPrice').value) || 29.99;
+      const r = await callFn('printify-create-product', {
+        action: 'create_draft', title: title, description: description || title,
+        blueprintId: S.blueprint.id, providerId: S.provider.id,
+        variantIds: ids, placements: placements, price: Math.round(price * 100)
+      });
+      S.product = r.product;
+      initPrices();
+      renderResults(true);
+      loadMyProducts();
+      toast('Taslak oluşturuldu', 'good');
+    } catch (e) {
+      toast(e.message, 'err');
+    } finally {
+      btn.disabled = false;
+      setDraftStatus('');
+    }
+  }
+
+  function initPrices() {
+    S.prices = {};
+    (S.product.variants || []).filter((v) => v.is_enabled).forEach((v) => { S.prices[v.id] = (v.price || 0) / 100; });
+  }
+
+  // ---------- 6. Sonuç ----------
+  function uniqueImages(images) {
+    const seen = new Set(); const out = [];
+    (images || []).forEach((i) => { if (i.src && !seen.has(i.src)) { seen.add(i.src); out.push(i.src); } });
+    return out.slice(0, 8);
+  }
+
+  function renderMockups() {
+    const imgs = uniqueImages(S.product.images);
+    $('rMock').innerHTML = imgs.length
+      ? imgs.map((s) => '<img loading="lazy" src="' + esc(s) + '" alt="">').join('')
+      : '<div class="hint">Mockup görselleri hazırlanıyor...</div>';
+  }
+
+  function renderResults(poll, noScroll) {
+    const p = S.product;
+    $('resultCard').style.display = 'block';
+    $('rInfo').innerHTML = '<b style="color:#fff">' + esc(p.title) + '</b> - Printify taslağı (yayınlanmadı). Maliyetler Printify\'ın gerçek fiyatlarıdır.';
+    $('rMsg').innerHTML = '';
+    renderMockups();
+
+    const sel = $('platformSel');
+    if (!sel.options.length) {
+      Object.keys(PLATFORMS).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+      sel.value = 'Etsy';
+      $('commission').value = PLATFORMS['Etsy'];
+    }
+
+    let rows = '';
+    (p.variants || []).filter((v) => v.is_enabled).forEach((v) => {
+      rows += '<tr><td>' + esc(v.title) + '</td><td>' + money(v.cost) + '</td>' +
+        '<td><input type="number" step="0.01" min="0" value="' + (S.prices[v.id] || 0).toFixed(2) + '" onchange="setPrice(' + v.id + ', this.value)"></td>' +
+        '<td id="pf' + v.id + '"></td><td id="mg' + v.id + '"></td></tr>';
+    });
+    $('rBody').innerHTML = rows || '<tr><td colspan="5">Aktif varyant yok</td></tr>';
+    recalcAll();
+    renderShipping();
+
+    if (!noScroll) $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (poll && !uniqueImages(p.images).length) pollMockups(p.id, 0);
+  }
+
+  async function pollMockups(id, n) {
+    if (n >= 6 || !S.product || S.product.id !== id) return;
+    await new Promise((r) => setTimeout(r, 5000));
+    try {
+      const r = await callFn('printify-create-product', { action: 'get_product', productId: id });
+      if (S.product && S.product.id === id) {
+        S.product.images = r.product.images;
+        renderMockups();
+        if (!uniqueImages(r.product.images).length) pollMockups(id, n + 1);
+      }
+    } catch (e) { /* sessizce geç */ }
+  }
+
+  function renderShipping() {
+    const box = $('rShip');
+    if (!S.shipping || !S.shipping.profiles || !S.shipping.profiles.length || !S.blueprint || !S.provider || S.product.blueprint_id !== S.blueprint.id) { box.innerHTML = ''; return; }
+    let h = '<div class="opt-name" style="margin:14px 0 6px">Kargo ücretleri (Printify, ilk ürün / ek ürün)</div>';
+    if (S.shipping.handling_time) h += '<div class="hint" style="margin-top:0">Üretim süresi: yaklaşık ' + esc(S.shipping.handling_time.value) + ' ' + esc(S.shipping.handling_time.unit === 'day' ? 'gün' : S.shipping.handling_time.unit) + '</div>';
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ülkeler</th><th>İlk ürün</th><th>Her ek ürün</th></tr></thead><tbody>';
+    S.shipping.profiles.slice(0, 12).forEach((pr) => {
+      const c = (pr.countries || []);
+      const label = c.length > 8 ? c.slice(0, 8).join(', ') + ' +' + (c.length - 8) : c.join(', ');
+      h += '<tr><td style="white-space:normal">' + esc(label) + '</td><td>' + (pr.first_item ? money(pr.first_item.cost) : '-') + '</td><td>' + (pr.additional_items ? money(pr.additional_items.cost) : '-') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    box.innerHTML = h;
+  }
+
+  function onPlatformChange() {
+    $('commission').value = PLATFORMS[$('platformSel').value] || 0;
+    recalcAll();
+  }
+  function commissionPct() { return Math.max(0, Number($('commission').value) || 0); }
+
+  function updateRow(v) {
+    const price = S.prices[v.id] || 0;
+    const net = price * (1 - commissionPct() / 100) - (v.cost || 0) / 100;
+    const margin = price > 0 ? net / price * 100 : 0;
+    const cls = net >= 0 ? 'pos' : 'neg';
+    const pf = $('pf' + v.id), mg = $('mg' + v.id);
+    if (pf) pf.innerHTML = '<span class="' + cls + '">$' + net.toFixed(2) + '</span>';
+    if (mg) mg.innerHTML = '<span class="' + cls + '">%' + margin.toFixed(1) + '</span>';
+  }
+  function recalcAll() {
+    if (!S.product) return;
+    (S.product.variants || []).filter((v) => v.is_enabled).forEach(updateRow);
+  }
+  function setPrice(id, val) {
+    S.prices[id] = Math.max(0, Number(val) || 0);
+    const v = (S.product.variants || []).find((x) => x.id === id);
+    if (v) updateRow(v);
+  }
+
+  function applyMargin() {
+    if (!S.product) return;
+    const m = (Number($('targetMargin').value) || 0) / 100;
+    const c = commissionPct() / 100;
+    const denom = 1 - c - m;
+    if (m <= 0 || denom < 0.05) { toast('Hedef marj ile komisyon toplamı çok yüksek, daha düşük bir marj gir', 'err'); return; }
+    (S.product.variants || []).filter((v) => v.is_enabled).forEach((v) => {
+      const raw = (v.cost / 100) / denom;
+      S.prices[v.id] = Math.floor(raw) + 0.99;
+    });
+    renderResults(false, true);
+  }
+
+  async function savePrices() {
+    if (!S.product) return;
+    const prices = {};
+    Object.keys(S.prices).forEach((id) => { prices[id] = Math.round(S.prices[id] * 100); });
+    try {
+      const r = await callFn('printify-create-product', { action: 'update_product', productId: S.product.id, prices: prices });
+      S.product = r.product;
+      initPrices();
+      renderResults(false, true);
+      $('rMsg').innerHTML = '<div class="ok-box">Fiyatlar Printify\'a kaydedildi.</div>';
+      loadMyProducts();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function addToPanel() {
+    if (!S.product) return;
+    const enabled = (S.product.variants || []).filter((v) => v.is_enabled);
+    if (!enabled.length) { toast('Aktif varyant yok', 'err'); return; }
+    const cheapest = enabled.reduce((a, b) => (a.cost <= b.cost ? a : b));
+    const imgs = uniqueImages(S.product.images);
+    const row = {
+      user_id: session.user.id,
+      name: S.product.title,
+      supplier_price: (cheapest.cost || 0) / 100,
+      weight_kg: 0,
+      platform: $('platformSel').value,
+      commission_rate: commissionPct(),
+      generated_title: S.product.title,
+      generated_description: S.product.description || S.product.title,
+      sale_price: S.prices[cheapest.id] || 0,
+      supplier: 'printify',
+      supplier_item_id: String(S.product.id),
+      supplier_variant_id: String(cheapest.id),
+      image_url: imgs.length ? imgs[0] : null
+    };
+    const { error } = await supabaseClient.from('products').insert(row);
+    if (error) {
+      $('rMsg').innerHTML = '<div class="err">Panele eklenemedi: ' + esc(error.message) + '</div>';
+      toast('Panele eklenemedi', 'err');
+      return;
+    }
+    $('rMsg').innerHTML = '<div class="ok-box">Ürün panele eklendi (en ucuz varyantın maliyeti ve fiyatı baz alındı). <a href="dashboard.html" style="color:#6ee7b7">Panele git</a></div>';
+    toast('Panele eklendi', 'good');
+  }
+
+  async function deleteCurrent() {
+    if (!S.product) return;
+    await deleteProduct(S.product.id);
+  }
+
+  // ---------- Ürünlerim ----------
+  async function loadMyProducts() {
+    const grid = $('myGrid');
+    try {
+      const r = await callFn('printify-create-product', { action: 'list_products' });
+      if (!r.products.length) { grid.innerHTML = '<div class="hint">Henüz ürün yok.</div>'; return; }
+      let h = '';
+      r.products.forEach((p) => {
+        h += '<div class="my">' + (p.image ? '<img loading="lazy" src="' + esc(p.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
+          '<div class="my-t">' + esc(p.title) + '</div>' +
+          '<div class="my-a"><button class="btn small" onclick="openProduct(\'' + esc(p.id) + '\')">Aç</button>' +
+          '<button class="btn danger small" onclick="deleteProduct(\'' + esc(p.id) + '\')">Sil</button></div></div>';
+      });
+      grid.innerHTML = h;
+    } catch (e) {
+      grid.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+    }
+  }
+
+  async function openProduct(id) {
+    try {
+      const r = await callFn('printify-create-product', { action: 'get_product', productId: id });
+      S.product = r.product;
+      initPrices();
+      renderResults(false);
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function deleteProduct(id) {
+    if (!confirm('Bu ürün Printify\'dan silinsin mi?')) return;
+    try {
+      await callFn('printify-create-product', { action: 'delete_product', productId: id });
+      if (S.product && S.product.id === id) { S.product = null; $('resultCard').style.display = 'none'; }
+      toast('Silindi');
+      loadMyProducts();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  // ---------- Başlat ----------
+  async function init() {
+    const { data: { session: s } } = await supabaseClient.auth.getSession();
+    if (!s) { window.location.href = 'index.html'; return; }
+    session = s;
+    renderQuickChips();
+    loadConnection();
+  }
+  init();
+</script>
+
+</body>
+</html>
