@@ -287,6 +287,8 @@
             <div class="pub-grid" id="pubExtra"></div>
           </div>
           <div class="warn-box">Yabancı platformlarda ilan İngilizce olmalı, yoksa aramada görünmez. Aşağıdaki "İngilizceye çevir" butonu başlık, açıklama ve etiketleri çevirir; yayınlamadan önce kontrol edip düzenleyebilirsin. Etsy mağazanın dilini de Etsy panelinden İngilizce yapmalısın.</div>
+          <div style="margin-bottom:12px"><label>Başlık (TR)</label><input type="text" id="pubTitleTr" placeholder="Türkçe başlık"></div>
+          <div style="margin-bottom:12px"><label>Açıklama (TR)</label><textarea id="pubDescTr" placeholder="Türkçe açıklama (ürünü anlatan kendi cümlelerini yaz)"></textarea></div>
           <div class="row" style="margin-bottom:12px"><button class="btn secondary" id="pubTransBtn" onclick="translatePub()">İngilizceye çevir</button></div>
           <div style="margin-bottom:12px"><label>Başlık (EN)</label><input type="text" id="pubTitle" maxlength="140" placeholder="İngilizce başlık (en fazla 140 karakter)"></div>
           <div style="margin-bottom:12px"><label>Açıklama (EN)</label><textarea id="pubDesc" placeholder="İngilizce açıklama"></textarea></div>
@@ -902,6 +904,8 @@
     if (S.pubForId !== p.id) {
       S.pubForId = p.id;
       $('pubTitle').value = ''; $('pubDesc').value = ''; $('pubTags').value = '';
+      $('pubTitleTr').value = p.title || '';
+      $('pubDescTr').value = (p.description && p.description !== p.title) ? p.description : '';
       $('pubMsg').innerHTML = '';
     }
     if (S.pubShops === null) loadPubShops();
@@ -1053,8 +1057,9 @@
     const btn = $('pubTransBtn');
     btn.disabled = true; btn.textContent = 'Çevriliyor...';
     try {
-      const title = S.product.title || '';
-      const description = S.product.description || title;
+      const title = $('pubTitleTr').value.trim();
+      const description = $('pubDescTr').value.trim() || title;
+      if (!title) { toast('Önce Türkçe başlığı yaz', 'err'); return; }
       const res = await fetch(FN + 'translate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
