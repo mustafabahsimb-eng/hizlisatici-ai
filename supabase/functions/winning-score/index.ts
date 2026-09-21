@@ -1,0 +1,209 @@
+// Supabase Edge Function: winning-score
+// Bir ürünü 6 boyutta (rakip fiyat, müşteri yorumu potansiyeli, kargo/teslimat,
+// anahtar kelime/arama talebi, reklam potansiyeli, kâr marjı) analiz edip
+// tek bir 0-100 "Kazanan Ürün Skoru" üretir ve ürüne kaydeder.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function extractJson(fullText: string): any {
+  let text = fullText.replace(/```json/gi, "").replace(/```/g, "");
+
+  try {
+    return JSON.parse(text.trim());
+  } catch {
+    // devam et
+  }
+
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let end = -1;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+
+  if (end === -1) return null;
+
+  let candidate = text.slice(start, end + 1);
+  candidate = Array.from(candidate)
+    .map((ch) => (ch.charCodeAt(0) < 32 ? " " : ch))
+    .join("");
+
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const { productId, userAccessToken } = await req.json().catch(() => ({}));
+    if (!productId || !userAccessToken) {
+      return json({ error: "productId ve oturum bilgisi gerekli" }, 400);
+    }
+
+    // RLS ile kullanıcı sadece kendi ürününü görebilir
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: "Bearer " + userAccessToken } },
+    });
+
+    const { data: product, error: productErr } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
+
+    if (productErr || !product) return json({ error: "Ürün bulunamadı" }, 404);
+
+    // 1) Kâr marjı skoru - hazır sayısal verilerden hesaplanıyor, arama gerekmiyor
+    let marginScore = 50;
+    let marginNote = "Satış fiyatı girilmediği için kâr marjı hesaplanamadı.";
+    const supplierPrice = product.supplier_price || 0;
+    const salePrice = product.sale_price || 0;
+    const commissionRate = product.commission_rate || 0;
+
+    if (salePrice > 0) {
+      let shippingCost = 0;
+      if (product.weight_kg) {
+        const { data: rates } = await supabase.from("shipping_rates").select("*");
+        const matches = (rates || [])
+          .filter((r: any) => r.min_weight_kg <= product.weight_kg && r.max_weight_kg >= product.weight_kg)
+          .sort((a: any, b: any) => a.price - b.price);
+        shippingCost = matches.length > 0 ? matches[0].price : 0;
+      }
+      const commissionCost = salePrice * (commissionRate / 100);
+      const netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
+      const marginPct = (netProfit / salePrice) * 100;
+      // Marj yüzdesini 0-100 skora çevir: %0 ve altı = 0, %50 ve üstü = 100
+      marginScore = Math.max(0, Math.min(100, Math.round((marginPct / 50) * 100)));
+      marginNote = `Net kâr marjı: %${marginPct.toFixed(1)} (${netProfit.toFixed(2)} kâr).`;
+    }
+
+    // 2-6) Diğer 5 boyut - tek bir AI + web arama çağrısında birlikte değerlendiriliyor
+    const systemPrompt = `Sen bir e-ticaret/dropshipping ürün analistisin. "${product.name}" ürününü (platform: ${product.platform || "belirtilmemiş"}, kategori: ${product.category || "belirtilmemiş"}) 5 ayrı boyutta 0-100 arası puanla:
+
+1. priceScore: Rakip/piyasa fiyatlarına göre bu ürünün fiyat rekabetçiliği ve kârlılık potansiyeli (fiyat çok dalgalıysa veya çok ucuz/doymuşsa düşük puan).
+2. reviewScore: Bu tür ürünler için tipik müşteri memnuniyeti/yorum potansiyeli (sık iade/şikayet konusu olan bir ürünse düşük puan).
+3. shippingScore: Kargo/teslimat süresi ve lojistik kolaylığı açısından uygunluk (hacimli/kırılgan/uzun teslimat süresi olan ürünlere düşük puan).
+4. keywordScore: Bu ürün için arama hacmi/talep potansiyeli (niş, aranmayan bir ürünse düşük puan).
+5. adScore: Sosyal medya reklamı (TikTok/Instagram/Facebook) ile pazarlanabilirlik/"wow" etkisi potansiyeli.
+
+ÖNEMLİ - HIZ KURALI: En fazla 2 web araması yap, sonra aramayı bırak ve doğrudan yanıtı yaz. Zaman sınırın var, uzun/tekrarlı araştırmaya girme.
+
+Kurallar:
+- Her skor 0-100 arası bir tam sayı olsun.
+- Her boyut için "note" alanında 1 cümlelik kısa, somut bir gerekçe yaz (Türkçe).
+- Yanıtın SADECE tek satırlık, geçerli bir JSON nesnesi olsun. JSON dışında hiçbir metin, açıklama veya markdown ekleme. Metin alanlarında satır sonu (yeni satır) kullanma.
+- Format: {"priceScore": 0, "priceNote": "...", "reviewScore": 0, "reviewNote": "...", "shippingScore": 0, "shippingNote": "...", "keywordScore": 0, "keywordNote": "...", "adScore": 0, "adNote": "..."}`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: `Ürün: ${product.name}` }],
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
+      }),
+    });
+
+    const aiData = await response.json();
+    if (!response.ok) {
+      return json({ error: "AI hatası: " + JSON.stringify(aiData).slice(0, 300) }, 500);
+    }
+
+    const textBlocks = (aiData.content || [])
+      .filter((c: any) => c.type === "text")
+      .map((c: any) => c.text);
+    const fullText = textBlocks.join("\n");
+    const parsed = extractJson(fullText);
+
+    if (!parsed) {
+      return json({ error: "AI yanıtı JSON olarak ayrıştırılamadı", raw: fullText.slice(0, 800) }, 500);
+    }
+
+    const priceScore = Number(parsed.priceScore) || 0;
+    const reviewScore = Number(parsed.reviewScore) || 0;
+    const shippingScore = Number(parsed.shippingScore) || 0;
+    const keywordScore = Number(parsed.keywordScore) || 0;
+    const adScore = Number(parsed.adScore) || 0;
+
+    const overallScore = Math.round(
+      (priceScore + reviewScore + shippingScore + keywordScore + adScore + marginScore) / 6
+    );
+
+    const scoreData = {
+      overall: overallScore,
+      modules: {
+        price: { score: priceScore, note: parsed.priceNote || "" },
+        review: { score: reviewScore, note: parsed.reviewNote || "" },
+        shipping: { score: shippingScore, note: parsed.shippingNote || "" },
+        keyword: { score: keywordScore, note: parsed.keywordNote || "" },
+        ad: { score: adScore, note: parsed.adNote || "" },
+        margin: { score: marginScore, note: marginNote },
+      },
+    };
+
+    await supabase
+      .from("products")
+      .update({
+        winning_score: overallScore,
+        winning_score_data: scoreData,
+        winning_score_updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    return json(scoreData);
+  } catch (err) {
+    return json({ error: String(err) }, 500);
+  }
+});

@@ -1,0 +1,155 @@
+// Supabase Edge Function: trend-discovery
+// Claude'a gerçek zamanlı web araması yaptırıp Türkiye e-ticaretinde
+// (ve istenirse uluslararası) şu an trend olan ürün fikirlerini döndürür.
+// Her ürün fikri için Pexels'ten gerçek bir stok fotoğraf çeker.
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+const PEXELS_API_KEY = Deno.env.get("PEXELS_API_KEY");
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { scope } = await req.json().catch(() => ({ scope: "turkiye" }));
+    const isGlobal = scope === "global";
+
+    const systemPrompt = `Sen bir e-ticaret trend analistisin. Web araması kullanarak ${
+      isGlobal ? "hem Türkiye hem de uluslararası (AliExpress, Amazon, TikTok Shop, Etsy vb.)" : "Türkiye (Trendyol, Hepsiburada, N11 vb.)"
+    } pazaryerlerinde ŞU AN trend olan / talebi hızla artan somut ürün fikirlerini buluyorsun.
+
+Web aramalarını kullanarak güncel haberler, sosyal medya/viral ürün haberleri, mevsimsel talep sinyalleri ve e-ticaret sektör analizlerini tara. Kesin, tek bir haber kaynağıyla %100 doğrulanmış olmasa bile, aramalarında gördüğün sinyallere (mevsim, sosyal medya trendleri, sektör haberleri, genel talep kalıpları) dayanarak profesyonel bir tahmin yap. Tamamen alakasız veya rastgele ürün uydurma ama arama sonuçlarını yorumlayarak makul ürün fikirleri üretmekten çekinme.
+
+Her ürün için ayrıca kısa, İngilizce bir görsel arama terimi üret (imageSearchQuery) - bu terim bir stok fotoğraf sitesinde bu ürüne benzer gerçek bir fotoğraf bulmak için kullanılacak. Örnek: "wireless earbuds", "robot vacuum cleaner", "cellulite cream bottle", "oversized t-shirt".
+
+ÇOK ÖNEMLİ KURAL: Cevabında TAM OLARAK 25 (yirmi beş) ürün fikri olmalı. "En az" değil, TAM 25 - daha az verme, "yeterince bulamadım" diye erken durma. Farklı kategori ve alt-niş kombinasyonlarıyla (örn. aynı elektronik kategorisinde birden fazla farklı ürün tipi) listeyi 25'e tamamla. Emin olmadığın fikirler için demandLevel'i "Yükselişte" olarak işaretle ve reason alanında bunun bir tahmin olduğunu belirt. Aynı ürünü tekrar etme.
+
+Cevabını SADECE aşağıdaki JSON formatında ver, başka hiçbir metin ekleme:
+
+{
+  "trends": [
+    {
+      "productIdea": "kısa ürün adı (Türkçe)",
+      "category": "Elektronik | Giyim | Ev & Yaşam | Kozmetik & Kişisel Bakım | Anne & Bebek | Spor & Outdoor | Aksesuar | Diğer kategorilerden biri",
+      "reason": "neden trend olduğuna dair 1-2 cümlelik somut gerekçe, kaynağa dayalı",
+      "suggestedPlatforms": ["Trendyol", "Hepsiburada"],
+      "demandLevel": "Yüksek | Orta | Yükselişte",
+      "imageSearchQuery": "kısa İngilizce görsel arama terimi"
+    }
+  ]
+}
+
+TAM OLARAK 25 ürün fikri ver.`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 10000,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Bugünün tarihine göre ${
+              isGlobal ? "Türkiye ve uluslararası" : "Türkiye"
+            } e-ticaret pazarında trend olan ürünleri araştır ve JSON formatında listele. TAM OLARAK 25 ürün fikri ver, daha az verme.`,
+          },
+        ],
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 10,
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      return new Response(JSON.stringify({ error: data.error.message || "Anthropic API hatası" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // content dizisinde birden fazla "text" bloğu olabilir (arama adımları arasında);
+    // hepsini birleştirip içinden JSON'u ayıklıyoruz.
+    const textParts = (data.content || [])
+      .filter((block: any) => block.type === "text")
+      .map((block: any) => block.text)
+      .join("\n");
+
+    const jsonMatch = textParts.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return new Response(JSON.stringify({ error: "Model beklenen formatta yanıt vermedi", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "JSON ayrıştırma hatası", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!parsed.trends || parsed.trends.length === 0) {
+      return new Response(JSON.stringify({ error: "AI bu taramada ürün fikri üretemedi, lütfen tekrar dene", raw: textParts }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Her ürün fikri için Pexels'ten gerçek bir fotoğraf ara ve imageUrl olarak ekle.
+    // Bir ürün için görsel bulunamazsa veya Pexels anahtarı yoksa, sessizce geç -
+    // arayüz tarafında ikon fallback devreye girer.
+    if (PEXELS_API_KEY) {
+      await Promise.all(
+        parsed.trends.map(async (t: any) => {
+          try {
+            const query = t.imageSearchQuery || t.productIdea || "";
+            if (!query) return;
+            const pexelsRes = await fetch(
+              `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1`,
+              { headers: { Authorization: PEXELS_API_KEY } }
+            );
+            if (!pexelsRes.ok) return;
+            const pexelsData = await pexelsRes.json();
+            const photo = pexelsData?.photos?.[0];
+            if (photo?.src?.medium) {
+              t.imageUrl = photo.src.medium;
+            }
+          } catch (_e) {
+            // görsel bulunamazsa sessizce geç
+          }
+        })
+      );
+    }
+
+    return new Response(JSON.stringify(parsed), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
