@@ -220,6 +220,27 @@
     flex-shrink: 0;
   }
   .icon-btn-mini:hover { border-color: #3a4258; color: #fff; }
+  .stock-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .stock-ok { background: #123222; color: #6ee7b7; }
+  .stock-low { background: #2a2410; color: #e6c96a; }
+  .stock-out { background: #2a1414; color: #f28b8b; }
+  .auto-price-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #9aa3b2;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .auto-price-label input { width: 14px; height: 14px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -252,6 +273,7 @@
       <button class="btn-secondary" onclick="window.location.href='marka-ayarlari.html'">🏷️ Marka Ayarları</button>
       <button class="btn-secondary" onclick="window.location.href='gorsel-studyosu.html'">🎨 Görsel Stüdyosu</button>
       <button class="btn-secondary" onclick="window.location.href='pod.html'">Print on Demand</button>
+      <button class="btn-secondary" id="monitorBtn" onclick="runStockPriceMonitor(this)">📡 Stok ve Fiyat Takibi</button>
       <button class="btn-primary" onclick="window.location.href='add-product.html'">+ Yeni ürün ekle</button>
     </div>
   </div>
@@ -398,6 +420,12 @@
         ? `<span class="price-badge" onclick="showPriceSuggestion('${p.id}')" title="Detay için tıkla">💡 ${symbol}${Number(p.suggested_price).toFixed(2)}</span>
            <button class="icon-btn-mini" title="Fiyatı yenile" onclick="calculatePriceSuggestion('${p.id}', this)">🔄</button>`
         : `<button class="btn-secondary price-calc-btn" onclick="calculatePriceSuggestion('${p.id}', this)">💡 Fiyat Öner</button>`;
+      const stockHtml = (p.stock_status && p.stock_status !== 'bilinmiyor')
+        ? `<span class="stock-badge ${stockClass(p.stock_status)}" onclick="showMonitorNote('${p.id}')" title="Detay için tıkla">${stockLabel(p)}</span>`
+        : '';
+      const autoPriceHtml = p.supplier === 'cj'
+        ? `<label class="auto-price-label" title="Tedarikçi maliyeti değişince satış fiyatı aynı oranda otomatik güncellenir"><input type="checkbox" ${p.auto_price ? 'checked' : ''} onchange="toggleAutoPrice('${p.id}', this)"> Otomatik fiyat</label>`
+        : '';
       return `
       <div class="product-row" data-id="${p.id}">
         <div style="display:flex; align-items:flex-start; gap:12px;">
@@ -408,6 +436,8 @@
           </div>
         </div>
         <div class="product-right">
+          ${stockHtml}
+          ${autoPriceHtml}
           ${scoreHtml}
           ${priceHtml}
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">
@@ -580,6 +610,89 @@
       return;
     }
     loadProducts(session.user.id);
+  }
+  function stockClass(status) {
+    if (status === 'tukendi') return 'stock-out';
+    if (status === 'az') return 'stock-low';
+    return 'stock-ok';
+  }
+  function stockLabel(p) {
+    const qty = p.stock_qty != null ? ' (' + p.stock_qty + ')' : '';
+    if (p.stock_status === 'tukendi') return '📦 Stok bitti';
+    if (p.stock_status === 'az') return '📦 Stok az' + qty;
+    return '📦 Stokta' + qty;
+  }
+  function showMonitorNote(productId) {
+    const p = currentProducts.find(x => String(x.id) === String(productId));
+    if (!p) return;
+    const lines = [
+      'Stok durumu: ' + (p.stock_status || 'bilinmiyor') + (p.stock_qty != null ? ' (' + p.stock_qty + ' adet)' : ''),
+      p.supplier_cost != null ? 'Tedarikçi maliyeti (güncel): $' + Number(p.supplier_cost).toFixed(2) : '',
+      p.last_checked_at ? 'Son kontrol: ' + new Date(p.last_checked_at).toLocaleString('tr-TR') : '',
+      p.monitor_note ? 'Not: ' + p.monitor_note : '',
+    ].filter(line => line !== '');
+    alert(lines.join('\n'));
+  }
+  async function toggleAutoPrice(productId, checkbox) {
+    const { error } = await supabaseClient
+      .from('products')
+      .update({ auto_price: checkbox.checked })
+      .eq('id', productId);
+    if (error) {
+      alert('Ayar kaydedilemedi: ' + error.message);
+      checkbox.checked = !checkbox.checked;
+      return;
+    }
+    const p = currentProducts.find(x => String(x.id) === String(productId));
+    if (p) p.auto_price = checkbox.checked;
+  }
+  async function runStockPriceMonitor(btn) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Kontrol ediliyor...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/stock-price-monitor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ userAccessToken: session.access_token }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      if (!data.checked) {
+        alert(data.message || 'Kontrol edilecek CJ ürünü yok.');
+      } else {
+        const changed = (data.results || []).filter(r => r.note && r.note !== 'Değişiklik yok');
+        const errors = (data.results || []).filter(r => r.error);
+        const lines = [data.checked + ' ürün kontrol edildi.'];
+        if (changed.length > 0) {
+          lines.push('', 'Değişenler:');
+          changed.forEach(r => lines.push('• ' + (r.name || 'Ürün') + ': ' + r.note));
+        } else {
+          lines.push('Değişiklik yok.');
+        }
+        if (errors.length > 0) {
+          lines.push('', 'Hatalar:');
+          errors.forEach(r => lines.push('• ' + (r.name || 'Ürün') + ': ' + r.error));
+        }
+        const raw = (data.results || []).filter(r => r.stockRaw);
+        if (raw.length > 0) {
+          lines.push('', 'Stok okunamadı (CJ cevabı):', raw[0].stockRaw);
+        }
+        alert(lines.join('\n'));
+      }
+      loadProducts(session.user.id);
+    } catch (err) {
+      alert('Kontrol yapılamadı: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
   }
   async function deleteProduct(productId) {
     if (!confirm('Bu ürünü silmek istediğine emin misin?')) return;
