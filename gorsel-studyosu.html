@@ -116,6 +116,8 @@
   .empty-msg{color:var(--text-dim); font-size:12px; text-align:center; padding:16px 0;}
   .props-box{border-top:1px solid var(--border); padding-top:12px; margin-top:12px;}
   #cropBar{display:none; gap:8px; margin-top:8px;}
+  #lassoBar{display:none; flex-direction:column; gap:6px; margin-top:8px;}
+  button.tool-active{border-color:var(--accent); background:#1c2942; color:var(--accent);}
   .toast{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
@@ -154,6 +156,21 @@
       <button class="full-btn primary" id="uploadBtn">📤 Görsel Yükle</button>
       <button class="full-btn" id="removeBgBtn">✂️ Arka Planı Temizle</button>
       <div class="hint" id="removeBgHint"></div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title">Kes ve Sil</p>
+      <button class="full-btn" id="eraseToolBtn">🧽 Fırçayla Sil</button>
+      <label class="small">Fırça Boyutu: <span id="brushSizeVal">30</span></label>
+      <input type="range" id="brushSize" min="5" max="150" value="30">
+      <button class="full-btn" id="lassoToolBtn" style="margin-top:8px;">⭕ Çizerek Kes</button>
+      <div id="lassoBar">
+        <button class="full-btn danger" id="lassoDeleteBtn">🗑 İçini Sil</button>
+        <button class="full-btn primary" id="lassoKeepBtn">📌 İçini Yeni Katman Yap</button>
+        <button class="full-btn" id="lassoRedrawBtn">↺ Yeniden Çiz</button>
+      </div>
+      <button class="full-btn primary" id="toolDoneBtn" style="display:none; margin-top:8px;">✔ Bitti</button>
+      <div class="hint" id="toolHint">Önce düzenlemek istediğin görsele tıklayıp seç, sonra bir araç seç.</div>
     </div>
 
     <div class="panel">
@@ -622,6 +639,290 @@ document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
     btn.disabled = false;
     btn.innerHTML = original;
   }
+});
+
+/* ============== Kes ve Sil (fırçayla sil + çizerek kes) ============== */
+let toolMode = null;      // null | 'erase' | 'lasso'
+let toolTarget = null;    // üzerinde çalışılan fabric.Image
+let toolPts = [];         // fareyle çizilen noktalar (tuval koordinatı)
+let toolDrawing = false;
+let brushSize = 30;
+const MAX_EDIT_PX = 2048; // düzenleme sırasında görselin en uzun kenarı bunu geçmesin (hız için)
+
+const eraseToolBtn = document.getElementById('eraseToolBtn');
+const lassoToolBtn = document.getElementById('lassoToolBtn');
+const toolDoneBtn = document.getElementById('toolDoneBtn');
+const lassoBar = document.getElementById('lassoBar');
+const toolHint = document.getElementById('toolHint');
+
+const HINT_IDLE = 'Önce düzenlemek istediğin görsele tıklayıp seç, sonra bir araç seç.';
+const HINT_ERASE = 'Silmek istediğin yerin üstünde fareyi basılı tutarak boya. Yanlış olursa ↶ Geri Al. İşin bitince "Bitti"ye bas.';
+const HINT_LASSO = 'Kesmek istediğin şeklin etrafını fareyle basılı tutarak çevir, bırakınca seçenekler çıkar.';
+
+function pickToolTarget(){
+  const a = canvas.getActiveObject();
+  if(a && a.type === 'image') return a;
+  const all = canvas.getObjects();
+  if(baseImage && all.indexOf(baseImage) !== -1) return baseImage;
+  const imgs = canvas.getObjects('image');
+  return imgs.length ? imgs[imgs.length - 1] : null;
+}
+
+function drawToolOverlay(){
+  if(!toolMode) return;
+  const ctx = canvas.contextTop;
+  if(!ctx) return;
+  canvas.clearContext(ctx);
+  ctx.save();
+  // Düzenlenen görselin çerçevesi
+  if(toolTarget){
+    const b = toolTarget.getBoundingRect(true, true);
+    ctx.strokeStyle = 'rgba(29,158,117,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(b.left, b.top, b.width, b.height);
+  }
+  if(toolPts.length){
+    ctx.beginPath();
+    toolPts.forEach((p, i)=>{ if(i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    if(toolPts.length === 1) ctx.lineTo(toolPts[0].x + 0.01, toolPts[0].y);
+    if(toolMode === 'erase'){
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,80,80,0.55)';
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    } else {
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(29,158,117,0.20)';
+      ctx.fill();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#1D9E75';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  canvas.contextTopDirty = true;
+}
+canvas.on('after:render', drawToolOverlay);
+
+function updateToolButtons(){
+  eraseToolBtn.classList.toggle('tool-active', toolMode === 'erase');
+  lassoToolBtn.classList.toggle('tool-active', toolMode === 'lasso');
+  toolDoneBtn.style.display = toolMode ? 'block' : 'none';
+  if(!toolMode){ lassoBar.style.display = 'none'; toolHint.textContent = HINT_IDLE; }
+  else if(toolMode === 'erase'){ toolHint.textContent = HINT_ERASE; }
+  else { toolHint.textContent = HINT_LASSO; }
+}
+
+function startTool(mode){
+  const target = pickToolTarget();
+  if(!target){ showToast('Önce bir görsel yükle'); return; }
+  if(typeof cancelCrop === 'function') cancelCrop();
+  toolMode = mode;
+  toolTarget = target;
+  toolPts = [];
+  toolDrawing = false;
+  canvas.discardActiveObject();
+  canvas.selection = false;
+  canvas.skipTargetFind = true;
+  canvas.defaultCursor = 'crosshair';
+  canvas.hoverCursor = 'crosshair';
+  updateToolButtons();
+  canvas.renderAll();
+}
+
+function exitTool(){
+  toolMode = null;
+  toolTarget = null;
+  toolPts = [];
+  toolDrawing = false;
+  canvas.selection = true;
+  canvas.skipTargetFind = false;
+  canvas.defaultCursor = 'default';
+  canvas.hoverCursor = 'move';
+  if(canvas.contextTop) canvas.clearContext(canvas.contextTop);
+  updateToolButtons();
+  canvas.renderAll();
+}
+
+eraseToolBtn.addEventListener('click', ()=>{ if(toolMode === 'erase'){ exitTool(); } else { startTool('erase'); } });
+lassoToolBtn.addEventListener('click', ()=>{ if(toolMode === 'lasso'){ exitTool(); } else { startTool('lasso'); } });
+toolDoneBtn.addEventListener('click', exitTool);
+
+document.getElementById('brushSize').addEventListener('input', (e)=>{
+  brushSize = parseInt(e.target.value, 10) || 30;
+  document.getElementById('brushSizeVal').textContent = brushSize;
+});
+
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && toolMode) exitTool();
+});
+
+// Araç açıkken katman listesinden başka bir görsel seçilirse hedef o olsun
+function onToolSelection(e){
+  if(!toolMode) return;
+  const sel = e && e.selected && e.selected[0];
+  if(sel && sel.type === 'image'){ toolTarget = sel; canvas.requestRenderAll(); }
+}
+canvas.on('selection:created', onToolSelection);
+canvas.on('selection:updated', onToolSelection);
+
+canvas.on('mouse:down', (opt)=>{
+  if(!toolMode || !toolTarget) return;
+  lassoBar.style.display = 'none';
+  toolDrawing = true;
+  const p = canvas.getPointer(opt.e);
+  toolPts = [{ x: p.x, y: p.y }];
+  drawToolOverlay();
+});
+canvas.on('mouse:move', (opt)=>{
+  if(!toolMode || !toolDrawing) return;
+  const p = canvas.getPointer(opt.e);
+  const last = toolPts[toolPts.length - 1];
+  if(Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
+  toolPts.push({ x: p.x, y: p.y });
+  drawToolOverlay();
+});
+canvas.on('mouse:up', ()=>{
+  if(!toolMode || !toolDrawing) return;
+  toolDrawing = false;
+  if(toolMode === 'erase'){
+    const pts = toolPts;
+    toolPts = [];
+    applyErase(pts);
+    drawToolOverlay();
+  } else {
+    if(toolPts.length < 3){ toolPts = []; drawToolOverlay(); return; }
+    lassoBar.style.display = 'flex';
+    drawToolOverlay();
+  }
+});
+
+/* --- Görselin gerçek piksellerine ulaşma yardımcıları --- */
+// Görseli (gerekirse küçülterek) bir çizim tuvaline aktarır ve tuval koordinatını görsel pikseline çeviren fonksiyon verir.
+function makeEditContext(img){
+  const w = img.width, h = img.height;
+  const s = Math.min(1, MAX_EDIT_PX / Math.max(w, h));
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, Math.round(w * s));
+  off.height = Math.max(1, Math.round(h * s));
+  const ctx = off.getContext('2d');
+  ctx.drawImage(img.getElement(), 0, 0, off.width, off.height);
+  const inv = fabric.util.invertTransform(img.calcTransformMatrix());
+  const sx = off.width / w, sy = off.height / h;
+  const toPx = (p)=>{
+    const l = fabric.util.transformPoint(new fabric.Point(p.x, p.y), inv);
+    return { x: (l.x + w / 2) * sx, y: (l.y + h / 2) * sy };
+  };
+  return { off, ctx, w, h, sx, sy, toPx };
+}
+
+// Düzenlenmiş pikselleri aynı görsel nesnesine geri yazar (konum, boyut, açı aynen kalır)
+function commitEdit(img, e){
+  img.filters = [];               // parlaklık vb. ayarlar piksellere işlenmiş oldu
+  img.setElement(e.off);
+  img.scaleX = img.scaleX / e.sx;  // küçültme olduysa ekrandaki boyut değişmesin
+  img.scaleY = img.scaleY / e.sy;
+  img.dirty = true;
+  img.setCoords();
+  if(img === baseImage){
+    ['brightnessSlider','contrastSlider','saturationSlider'].forEach(id=>{ document.getElementById(id).value = 0; });
+  }
+  canvas.renderAll();
+  snapshotState();
+}
+
+function tracePolygon(ctx, pts){
+  ctx.beginPath();
+  pts.forEach((p, i)=>{ if(i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  ctx.closePath();
+}
+
+/* --- Fırçayla Sil --- */
+function applyErase(pts){
+  const img = toolTarget;
+  if(!img || !pts.length) return;
+  const e = makeEditContext(img);
+  const px = pts.map(e.toPx);
+  const scaleAvg = (Math.abs(img.scaleX) + Math.abs(img.scaleY)) / 2 || 1;
+  const ctx = e.ctx;
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = Math.max(1, (brushSize / scaleAvg) * e.sx);
+  ctx.beginPath();
+  px.forEach((p, i)=>{ if(i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  if(px.length === 1) ctx.lineTo(px[0].x + 0.01, px[0].y);
+  ctx.stroke();
+  ctx.restore();
+  commitEdit(img, e);
+}
+
+/* --- Çizerek Kes: İçini Sil --- */
+document.getElementById('lassoDeleteBtn').addEventListener('click', ()=>{
+  const img = toolTarget;
+  if(!img || toolPts.length < 3) return;
+  const e = makeEditContext(img);
+  const px = toolPts.map(e.toPx);
+  e.ctx.save();
+  e.ctx.globalCompositeOperation = 'destination-out';
+  e.ctx.fillStyle = '#000';
+  tracePolygon(e.ctx, px);
+  e.ctx.fill();
+  e.ctx.restore();
+  commitEdit(img, e);
+  exitTool();
+  showToast('Seçilen alan silindi');
+});
+
+/* --- Çizerek Kes: İçini Yeni Katman Yap --- */
+document.getElementById('lassoKeepBtn').addEventListener('click', ()=>{
+  const img = toolTarget;
+  if(!img || toolPts.length < 3) return;
+  const e = makeEditContext(img);
+  const px = toolPts.map(e.toPx);
+  // Şeklin görsel içinde kalan kutusu
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  px.forEach(p=>{ minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
+  const bx = Math.max(0, Math.floor(minX)), by = Math.max(0, Math.floor(minY));
+  const bw = Math.min(e.off.width, Math.ceil(maxX)) - bx;
+  const bh = Math.min(e.off.height, Math.ceil(maxY)) - by;
+  if(bw < 2 || bh < 2){ showToast('Çizdiğin alan görselin dışında kaldı'); return; }
+
+  const cut = document.createElement('canvas');
+  cut.width = bw; cut.height = bh;
+  const c2 = cut.getContext('2d');
+  c2.save();
+  tracePolygon(c2, px.map(p=>({ x: p.x - bx, y: p.y - by })));
+  c2.clip();
+  c2.drawImage(e.off, -bx, -by);
+  c2.restore();
+
+  // Parçayı, kaynak görselin üstünde tam aynı yere yerleştir
+  const localCenter = new fabric.Point((bx + bw / 2) / e.sx - e.w / 2, (by + bh / 2) / e.sy - e.h / 2);
+  const P = fabric.util.transformPoint(localCenter, img.calcTransformMatrix());
+  const piece = new fabric.Image(cut, {
+    left: P.x, top: P.y, originX: 'center', originY: 'center',
+    scaleX: img.scaleX / e.sx, scaleY: img.scaleY / e.sy,
+    angle: img.angle, flipX: img.flipX, flipY: img.flipY,
+    cornerColor: '#1D9E75', cornerStyle: 'circle', transparentCorners: false
+  });
+  exitTool();
+  canvas.add(piece);
+  canvas.setActiveObject(piece);
+  canvas.renderAll();
+  showToast('Kesilen parça yeni katman oldu. İstersen alttaki eski görseli silebilirsin.', 4000);
+});
+
+document.getElementById('lassoRedrawBtn').addEventListener('click', ()=>{
+  toolPts = [];
+  lassoBar.style.display = 'none';
+  drawToolOverlay();
 });
 
 /* ============== Katman Paneli ============== */
