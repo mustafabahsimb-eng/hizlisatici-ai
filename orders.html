@@ -105,6 +105,14 @@
     background: #1c212c; border: 1px solid #2a3040; color: #e6e8ee; font-size: 12px;
     padding: 6px 8px; border-radius: 6px;
   }
+  .pf-head { display: flex; justify-content: space-between; align-items: center; margin: 40px 0 16px; flex-wrap: wrap; gap: 12px; }
+  .pf-head h2 { font-size: 18px; font-weight: 600; color: #fff; }
+  .pf-meta-line { font-size: 12px; color: #9aa3b2; margin-top: 4px; }
+  .pf-items { margin-top: 8px; font-size: 13px; color: #cfd5e2; line-height: 1.6; }
+  .pf-track { margin-top: 8px; font-size: 12px; color: #9aa3b2; }
+  .pf-track a { color: #6ea8f2; text-decoration: none; }
+  .pf-track a:hover { text-decoration: underline; }
+  .pf-pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 16px; font-size: 13px; color: #9aa3b2; }
   .icon-btn {
     background: transparent; border: 1px solid #2a3040; color: #9aa3b2; width: 32px; height: 32px;
     border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -239,6 +247,18 @@
       <p>Bir pazaryerinde satış olduğunda buraya kaydet, tedarikçi ve kargo durumunu buradan takip et.</p>
     </div>
   </div>
+
+  <div class="pf-head">
+    <div>
+      <h2>Printify Siparişleri</h2>
+      <div class="subtitle" id="pfCountText">Yükleniyor...</div>
+    </div>
+    <button class="btn-secondary" id="pfRefreshBtn" onclick="loadPrintifyOrders(pfPage)">🔄 Yenile</button>
+  </div>
+  <div class="order-list" id="pfList">
+    <div class="empty-state"><p>Yükleniyor...</p></div>
+  </div>
+  <div class="pf-pager" id="pfPager"></div>
 </main>
 
 <script>
@@ -268,6 +288,7 @@
     document.getElementById('userEmail').textContent = session.user.email;
     await loadProducts();
     await loadOrders();
+    loadPrintifyOrders(1);
   }
 
   async function loadProducts() {
@@ -504,6 +525,121 @@
     const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
     if (error) { alert('Silinemedi: ' + error.message); return; }
     loadOrders();
+  }
+
+  // ---------- Printify siparişleri (sadece okuma) ----------
+  let pfPage = 1;
+  const PF_STATUS = {
+    'pending': ['Beklemede', 'beklemede'],
+    'on-hold': ['Bekletiliyor', 'beklemede'],
+    'sending-to-production': ['Üretime gönderiliyor', 'tedarikciye_verildi'],
+    'in-production': ['Üretimde', 'tedarikciye_verildi'],
+    'partially-fulfilled': ['Kısmen kargolandı', 'kargoya_verildi'],
+    'fulfilled': ['Kargoya verildi', 'kargoya_verildi'],
+    'canceled': ['İptal', 'iptal'],
+    'payment-not-received': ['Ödeme alınamadı', 'hata'],
+    'action-required': ['İşlem gerekli', 'hata'],
+    'has-issues': ['Sorun var', 'hata'],
+  };
+
+  function safeUrl(u) {
+    return /^https?:\/\//i.test(u || '') ? u.replace(/"/g, '%22').replace(/'/g, '%27') : null;
+  }
+  function usd(cents) {
+    return '$' + (Number(cents || 0) / 100).toFixed(2);
+  }
+
+  async function loadPrintifyOrders(page) {
+    pfPage = page || 1;
+    const listEl = document.getElementById('pfList');
+    const countEl = document.getElementById('pfCountText');
+    const pagerEl = document.getElementById('pfPager');
+    const btn = document.getElementById('pfRefreshBtn');
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+    btn.disabled = true;
+    btn.textContent = 'Yükleniyor...';
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/printify-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({ action: 'list', page: pfPage, userAccessToken: session.access_token }),
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+
+      const orders = data.orders || [];
+      countEl.textContent = orders.length === 0
+        ? 'Printify mağazanda henüz sipariş yok' + (data.shop_title ? ' (' + data.shop_title + ')' : '')
+        : (data.total || orders.length) + ' sipariş' + (data.shop_title ? ' · ' + data.shop_title : '');
+
+      if (orders.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <h3>Henüz Printify siparişi yok</h3>
+            <p>Etsy'de bir satış olduğunda Printify siparişi kendiliğinden alır, burada görünür.</p>
+          </div>`;
+        pagerEl.innerHTML = '';
+        return;
+      }
+
+      listEl.innerHTML = orders.map(o => {
+        const delivered = o.shipments.length > 0 && o.shipments.every(s => s.delivered_at);
+        const st = delivered ? ['Teslim edildi', 'teslim_edildi'] : (PF_STATUS[o.status] || [o.status || '-', 'beklemede']);
+        const metaParts = [];
+        metaParts.push('Sipariş: ' + escapeHtml(o.label || o.id));
+        if (o.created_at) metaParts.push(new Date(o.created_at).toLocaleDateString('tr-TR'));
+        if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
+        if (o.country) metaParts.push(escapeHtml(o.country) + (o.city ? ' / ' + escapeHtml(o.city) : ''));
+        const cost = (o.total_price || 0) + (o.total_shipping || 0) + (o.total_tax || 0);
+        if (o.total_price != null) metaParts.push('Printify maliyeti: ' + usd(cost));
+
+        const itemsHtml = o.items.map(i =>
+          escapeHtml(i.title) + (i.variant ? ' (' + escapeHtml(i.variant) + ')' : '') + ' × ' + i.quantity
+        ).join('<br>');
+
+        const trackHtml = o.shipments.length
+          ? o.shipments.map(s => {
+              const link = safeUrl(s.url);
+              const label = (s.carrier ? escapeHtml(s.carrier) + ' · ' : '') + (s.number ? escapeHtml(s.number) : 'takip no yok');
+              return 'Kargo: ' + (link ? '<a href="' + escapeHtml(link) + '" target="_blank" rel="noopener">' + label + '</a>' : label);
+            }).join('<br>')
+          : 'Kargo takip bilgisi henüz yok';
+
+        return `
+          <div class="order-row">
+            <div class="order-top">
+              <div>
+                <div class="order-name">${escapeHtml(o.items.length ? o.items[0].title : 'Sipariş')}${o.items.length > 1 ? ' +' + (o.items.length - 1) + ' ürün' : ''}</div>
+                <div class="order-meta">${metaParts.join(' · ')}</div>
+              </div>
+              <div class="order-right">
+                <span class="status-badge status-${st[1]}">${st[0]}</span>
+              </div>
+            </div>
+            <div class="pf-items">${itemsHtml}</div>
+            <div class="pf-track">${trackHtml}</div>
+          </div>`;
+      }).join('');
+
+      const last = data.last_page || 1;
+      pagerEl.innerHTML = last > 1
+        ? `<button class="btn-secondary" ${pfPage <= 1 ? 'disabled' : ''} onclick="loadPrintifyOrders(${pfPage - 1})">← Önceki</button>
+           <span>Sayfa ${pfPage} / ${last}</span>
+           <button class="btn-secondary" ${pfPage >= last ? 'disabled' : ''} onclick="loadPrintifyOrders(${pfPage + 1})">Sonraki →</button>`
+        : '';
+    } catch (err) {
+      countEl.textContent = 'Printify siparişleri alınamadı';
+      listEl.innerHTML = '<div class="empty-state"><h3>Yüklenemedi</h3><p>' + escapeHtml(err.message) + '</p></div>';
+      pagerEl.innerHTML = '';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 Yenile';
+    }
   }
 
   function escapeHtml(str) {
