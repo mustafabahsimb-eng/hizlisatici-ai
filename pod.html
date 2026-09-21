@@ -192,6 +192,18 @@
   <h1>Print on Demand</h1>
   <div class="subtitle">Tişört, kupa, hoodie gibi ürünlere kendi tasarımını bas. Sipariş gelince Printify üretir ve müşteriye gönderir, sen stok tutmazsın.</div>
 
+  <!-- Görsel Stüdyosu'ndan gelen tasarım -->
+  <div class="card" id="studioCard" style="display:none">
+    <h2>Görsel Stüdyosu'ndan gelen tasarım</h2>
+    <div class="row" style="align-items:center">
+      <img id="studioThumb" alt="" style="width:90px;height:90px;object-fit:contain;border-radius:8px;background:#e9ecf3">
+      <div style="flex:1;min-width:220px">
+        <div class="hint">Tasarımın hazır. Aşağıda ürün türünü seç, 4. adımda baskı alanının altındaki "Stüdyo tasarımını kullan" düğmesine bas.</div>
+        <button class="btn danger small" onclick="dropStudioDesign()">Bu tasarımı kullanma</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Printify bağlantısı -->
   <div class="card">
     <h2>Printify hesabın</h2>
@@ -358,6 +370,7 @@
     variants: [], optionKeys: [], optionValues: {}, selectedOpts: {},
     placeholders: [], shipping: null,
     designs: {},
+    studio: null,
     product: null, prices: {},
     pubShops: null, pubForId: null
   };
@@ -690,6 +703,7 @@
       const ch = Math.max(120, Math.min(420, Math.round(cw * pos.height / pos.width)));
       h += '<div class="design"><div class="design-title">' + esc(posLabel(pos.position)) + ' <span style="color:#9aa3b2;font-weight:400;font-size:11px">(' + pos.width + '×' + pos.height + ' px)</span></div>' +
         '<input type="file" accept="image/png,image/jpeg,image/webp" onchange="onDesignFile(' + idx + ', this)">' +
+        (S.studio ? '<button class="btn secondary small studio-use" style="margin-top:6px" onclick="useStudioDesign(' + idx + ')">Stüdyo tasarımını kullan</button>' : '') +
         '<canvas id="cv' + idx + '" width="' + cw + '" height="' + ch + '"></canvas>' +
         '<div id="ctl' + idx + '" class="ctl" style="display:none">' +
         sliderRow(idx, 'scale', 'Boyut', 5, 200, 100) +
@@ -745,6 +759,14 @@
     const file = input.files && input.files[0];
     if (!file) return;
     try {
+      await applyDesign(idx, file);
+    } catch (e) {
+      toast(e.message, 'err');
+      input.value = '';
+    }
+  }
+  async function applyDesign(idx, file) {
+    {
       const d = await prepareDesign(file);
       const pos = S.placeholders[idx];
       const fitScale = Math.min(1, (pos.height * d.w) / (pos.width * d.h));
@@ -754,10 +776,47 @@
       setSlider(idx, 'scale', Math.round(d.scale * 100));
       setSlider(idx, 'x', 50); setSlider(idx, 'y', 50); setSlider(idx, 'angle', 0);
       drawPreview(idx);
-    } catch (e) {
-      toast(e.message, 'err');
-      input.value = '';
     }
+  }
+
+  // ---------- Görsel Stüdyosu'ndan gelen tasarım ----------
+  function readStudioDesign() {
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('hizlisatici-studio', 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
+        req.onerror = () => resolve(null);
+        req.onsuccess = () => {
+          try {
+            const g = req.result.transaction('kv', 'readonly').objectStore('kv').get('pod-design');
+            g.onsuccess = () => { req.result.close(); resolve(g.result || null); };
+            g.onerror = () => { req.result.close(); resolve(null); };
+          } catch (e) { resolve(null); }
+        };
+      } catch (e) { resolve(null); }
+    });
+  }
+  async function loadStudioDesign() {
+    if (new URLSearchParams(location.search).get('studio') !== '1') return;
+    const rec = await readStudioDesign();
+    if (!rec || !rec.dataUrl) { toast('Stüdyodan gelen tasarım bulunamadı', 'err'); return; }
+    S.studio = rec;
+    $('studioThumb').src = rec.dataUrl;
+    $('studioCard').style.display = 'block';
+  }
+  function dropStudioDesign() {
+    S.studio = null;
+    $('studioCard').style.display = 'none';
+    document.querySelectorAll('.studio-use').forEach((el) => el.remove());
+  }
+  async function useStudioDesign(idx) {
+    if (!S.studio) return;
+    try {
+      const blob = await (await fetch(S.studio.dataUrl)).blob();
+      const file = new File([blob], 'studyo-tasarim.png', { type: 'image/png' });
+      await applyDesign(idx, file);
+      toast('Stüdyo tasarımı eklendi', 'good');
+    } catch (e) { toast(e.message, 'err'); }
   }
   function setSlider(idx, key, val) {
     $('sl_' + key + idx).value = val;
@@ -1202,6 +1261,7 @@
     if (!s) { window.location.href = 'index.html'; return; }
     session = s;
     renderQuickChips();
+    loadStudioDesign();
     loadConnection();
   }
   init();
