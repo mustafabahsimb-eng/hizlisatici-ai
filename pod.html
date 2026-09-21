@@ -1263,6 +1263,25 @@
     renderQuickChips();
     loadStudioDesign();
     loadConnection();
+    applyPreselect();
+  }
+
+  // Baskı Sağlayıcıları sayfasından gelindiyse (?bp=ürün türü&pp=atölye) ürün türü ve atölye hazır seçili gelir
+  async function applyPreselect() {
+    const params = new URLSearchParams(window.location.search);
+    const bp = Number(params.get('bp'));
+    const pp = Number(params.get('pp'));
+    if (!bp) return;
+    const title = (params.get('t') || '').slice(0, 140);
+    S.blueprints = [{ id: bp, title: title, brand: '', image: null }];
+    $('bpGrid').innerHTML = '<div class="bp" id="bp0"><div style="aspect-ratio:1;background:#1a1f2c"></div>' +
+      '<div class="bp-t">' + esc(title || 'Seçilen ürün türü') + '</div><div class="bp-b"></div></div>';
+    await pickBlueprint(0);
+    if (!pp) return;
+    const j = S.providers.findIndex((p) => Number(p.id) === pp);
+    if (j < 0) { toast('Seçtiğin atölye bu ürün türünde bulunamadı, listeden başka bir tane seç', 'err'); return; }
+    await pickProvider(j);
+    toast('Ürün türü ve atölye seçildi: ' + S.provider.title);
   }
   init();
 </script>
