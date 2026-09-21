@@ -271,6 +271,16 @@
     </div>
     <div class="acc-row">
       <div class="acc-info">
+        <div class="acc-name">Printify (Print on Demand)</div>
+        <div class="acc-desc">Tişört, kupa gibi ürünlere kendi tasarımını bas, sipariş gelince Printify üretip gönderir. Bağlantı ve ürün oluşturma Print on Demand sayfasından yapılır.</div>
+      </div>
+      <div class="acc-right">
+        <span class="acc-status none" id="status-printify">yükleniyor...</span>
+        <span id="action-printify"></span>
+      </div>
+    </div>
+    <div class="acc-row">
+      <div class="acc-info">
         <div class="acc-name">Temu</div>
         <div class="acc-desc">Resmi bir açık API'si var ama ortaklık onayı gerekiyor, şimdilik entegrasyon planlanmıyor</div>
       </div>
@@ -667,12 +677,47 @@
     await renderEtsyStatus();
   }
 
+  async function renderPrintifyStatus() {
+    const statusEl = document.getElementById('status-printify');
+    const actionEl = document.getElementById('action-printify');
+    if (!statusEl || !actionEl) return;
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return;
+      const res = await fetch(SUPABASE_URL + '/functions/v1/printify-connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY
+        },
+        body: JSON.stringify({ action: 'status', userAccessToken: session.access_token })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+      if (data.connected) {
+        statusEl.textContent = 'bağlı';
+        statusEl.className = 'acc-status connected';
+        actionEl.innerHTML = '<a class="acc-btn secondary" href="pod.html">Yönet</a>';
+      } else {
+        statusEl.textContent = 'hesap yok';
+        statusEl.className = 'acc-status none';
+        actionEl.innerHTML = '<a class="acc-btn" href="pod.html">Bağla</a>';
+      }
+    } catch (e) {
+      statusEl.textContent = 'kontrol edilemedi';
+      statusEl.className = 'acc-status none';
+      actionEl.innerHTML = '<a class="acc-btn secondary" href="pod.html">Aç</a>';
+    }
+  }
+
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
     await renderCJStatus();
     await renderAllStoreStatuses();
     await renderEtsyStatus();
+    await renderPrintifyStatus();
   }
   init();
 </script>
