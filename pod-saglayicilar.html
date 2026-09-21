@@ -70,7 +70,7 @@
   .filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 13px; color: #cfd5e2; }
   .filter-row input { width: auto; }
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 820px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
   th { text-align: left; font-weight: 500; color: #9aa3b2; padding: 10px 12px; border-bottom: 1px solid #232838; white-space: nowrap; }
   td { padding: 12px; border-bottom: 1px solid #232838; vertical-align: top; }
   tr:last-child td { border-bottom: none; }
@@ -83,6 +83,11 @@
   .price { white-space: nowrap; }
   .price.best { color: #6ee7b7; font-weight: 600; }
   .price.na { color: #5a6376; }
+  .go-btn {
+    display: inline-block; background: #1D9E75; color: #fff; text-decoration: none; font-size: 12px; font-weight: 600;
+    padding: 8px 12px; border-radius: 8px; white-space: nowrap;
+  }
+  .go-btn:hover { background: #178a65; }
   .legend { font-size: 12px; color: #9aa3b2; margin-top: 14px; line-height: 1.6; }
 </style>
 </head>
@@ -251,7 +256,7 @@
     }
 
     html += '<div class="table-wrap"><table><thead><tr><th>Sağlayıcı</th><th>Bölge</th><th>Üretim süresi</th>' +
-      targets.map(t => '<th>' + escapeHtml(COUNTRY_NAMES[t] || t) + '</th>').join('') + '</tr></thead><tbody>';
+      targets.map(t => '<th>' + escapeHtml(COUNTRY_NAMES[t] || t) + '</th>').join('') + '<th></th></tr></thead><tbody>';
     rows.forEach(p => {
       const loc = [p.city, p.country].filter(Boolean).map(escapeHtml).join(', ');
       html += '<tr><td><div class="prov-name">' + escapeHtml(p.title) + '</div><div class="prov-loc">' + (loc || 'Konum bilgisi yok') + '</div></td>' +
@@ -266,6 +271,9 @@
           html += '<td><span class="price' + (isBest ? ' best' : '') + '">' + fmtMoney(s) + (s.rest ? '*' : '') + '</span></td>';
         }
       });
+      const goUrl = 'pod.html?bp=' + encodeURIComponent(selectedBp.id) + '&pp=' + encodeURIComponent(p.id) +
+        '&t=' + encodeURIComponent(selectedBp.title || '');
+      html += '<td><a class="go-btn" href="' + goUrl + '">Bu atölyeyle devam et →</a></td>';
       html += '</tr>';
     });
     html += '</tbody></table></div>' +
