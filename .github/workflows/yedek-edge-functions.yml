@@ -1,0 +1,53 @@
+name: Edge Function Yedegi
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  yedekle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Supabase CLI kur
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Edge Function'lari indir
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ ! -f supabase/config.toml ]; then supabase init; fi
+          supabase functions download --use-api --project-ref ytucdrrgxsjhrqmaxckt
+          echo "Indirilen fonksiyonlar:"
+          ls supabase/functions
+
+      - name: Gizli anahtar taramasi
+        run: |
+          FOUND=$(grep -rEn -i "sb_secret_|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|(api_?key|secret|token|password)[\"']?[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9_.-]{20,}[\"']" supabase/functions | grep -v "sb_publishable_" | cut -d: -f1,2 || true)
+          if [ -n "$FOUND" ]; then
+            echo "HATA: Su satirlarda gizli anahtar olabilecek yazi var (icerik bilerek gosterilmiyor):"
+            echo "$FOUND"
+            echo "Yedek GitHub'a YAZILMADI."
+            exit 1
+          fi
+          echo "Tarama temiz."
+
+      - name: Yedegi depoya yaz
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions
+          if git diff --cached --quiet; then
+            echo "Degisiklik yok, yeni yedek gerekmedi."
+          else
+            git commit -m "Yedek: Edge Function'lar"
+            git push
+          fi
