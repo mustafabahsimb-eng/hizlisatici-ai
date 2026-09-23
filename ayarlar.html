@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ayarlar - HızlıSatıcı AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #e6e8ee;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #232838;
+    background: #141821;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #1D9E75; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .back-link {
+    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
+  }
+  .back-link:hover { color: #fff; }
+
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 24px 120px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
+
+  .section-title {
+    font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
+    letter-spacing: 0.03em; margin: 28px 0 12px;
+  }
+  .card {
+    background: #141821;
+    border-radius: 14px;
+    border: 1px solid #232838;
+    padding: 20px;
+  }
+  .card-desc { font-size: 13px; color: #9aa3b2; margin-bottom: 16px; line-height: 1.5; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .full { grid-column: 1 / -1; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  .field label {
+    display: block; font-size: 13px; font-weight: 600; color: #cfd4de; margin-bottom: 6px;
+  }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="tel"],
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: #0d0f16;
+    border: 1px solid #2a3040;
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: #1D9E75;
+  }
+  .field input.invalid { border-color: #e5484d; }
+  .hint { font-size: 12px; color: #7d8596; margin-top: 5px; line-height: 1.45; }
+  .error-text { font-size: 12px; color: #ff8a8d; margin-top: 5px; display: none; }
+
+  .check-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 4px 0;
+  }
+  .check-row input[type="checkbox"] {
+    width: 18px; height: 18px; margin-top: 1px; accent-color: #1D9E75; flex-shrink: 0; cursor: pointer;
+  }
+  .check-row label { font-size: 14px; color: #e6e8ee; cursor: pointer; }
+  .check-row .hint { margin-top: 3px; }
+
+  .epr-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  @media (max-width: 600px) { .epr-list { grid-template-columns: 1fr; } }
+
+  .save-bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: #141821; border-top: 1px solid #232838;
+    padding: 14px 24px;
+  }
+  .save-inner {
+    max-width: 760px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  .status { font-size: 13px; color: #9aa3b2; }
+  .status.ok { color: #6ee7b7; }
+  .status.err { color: #ff8a8d; }
+  .btn {
+    background: #1D9E75; color: #fff; border: none; padding: 11px 22px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: #178a65; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+
+  .loading { text-align: center; color: #9aa3b2; padding: 60px 0; font-size: 14px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <a href="dashboard.html" class="back-link">← Panele dön</a>
+</header>
+
+<main>
+  <h1>⚙️ Ayarlar</h1>
+  <p class="subtitle">Dil, bölge, işletme ve vergi bilgilerin. Fiyat, kâr ve vergi hesapları bu bilgilere göre yapılır.</p>
+
+  <div id="loading" class="loading">Yükleniyor...</div>
+
+  <form id="settingsForm" class="hidden" novalidate>
+
+    <!-- ========== DİL VE BÖLGE ========== -->
+    <div class="section-title">🌍 Dil ve Bölge</div>
+    <div class="card">
+      <div class="grid">
+        <div class="field">
+          <label for="ui_language">Arayüz dili</label>
+          <select id="ui_language">
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
+          <div class="hint">Paneli hangi dilde görmek istediğin. İlan dili bundan bağımsızdır, pazaryerine göre otomatik seçilir.</div>
+        </div>
+        <div class="field">
+          <label for="home_country">Ülken</label>
+          <select id="home_country"></select>
+          <div class="hint">İşletmenin kayıtlı olduğu ülke.</div>
+        </div>
+        <div class="field">
+          <label for="home_currency">Para birimin</label>
+          <select id="home_currency"></select>
+          <div class="hint">Toplam kâr ve raporlar bu para biriminde gösterilir.</div>
+        </div>
+        <div class="field">
+          <label for="timezone">Saat dilimi</label>
+          <select id="timezone"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== İŞLETME BİLGİLERİ ========== -->
+    <div class="section-title">🏢 İşletme Bilgileri</div>
+    <div class="card">
+      <div class="grid">
+        <div class="field full">
+          <label for="business_type">İş türü</label>
+          <select id="business_type">
+            <option value="">Seçiniz</option>
+            <option value="individual">Bireysel (şirketim yok)</option>
+            <option value="sole_proprietor">Şahıs şirketi</option>
+            <option value="company">Limited / Anonim şirket</option>
+          </select>
+          <div class="hint">Çoğu pazaryeri (Allegro, Amazon, Otto) satış için şahıs şirketi veya şirket istiyor.</div>
+        </div>
+        <div class="field full">
+          <label for="company_name">Şirket / işletme adı</label>
+          <input type="text" id="company_name" maxlength="200">
+        </div>
+        <div class="field">
+          <label for="tax_office">Vergi dairesi</label>
+          <input type="text" id="tax_office" maxlength="100">
+        </div>
+        <div class="field">
+          <label for="tax_number">Vergi numarası</label>
+          <input type="text" id="tax_number" maxlength="30">
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== VERGİ ========== -->
+    <div class="section-title">🧾 Vergi</div>
+    <div class="card">
+      <div class="card-desc">Kâr hesabında KDV'nin kimden düşüleceği bu bilgilere göre belirlenir. Emin olmadığın alanları boş bırakabilirsin, sonra mali müşavirinle birlikte doldurursun.</div>
+
+      <div class="check-row">
+        <input type="checkbox" id="vat_registered">
+        <div>
+          <label for="vat_registered">KDV mükellefiyim</label>
+          <div class="hint">Faturalarında KDV gösteriyorsan işaretle.</div>
+        </div>
+      </div>
+      <div class="field hidden" id="vatNumberWrap" style="margin: 10px 0 6px 28px;">
+        <label for="vat_number">KDV numarası</label>
+        <input type="text" id="vat_number" maxlength="30">
+      </div>
+
+      <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="oss_registered">
+        <div>
+          <label for="oss_registered">AB OSS (Tek Durak) kaydım var</label>
+          <div class="hint">AB içindeki depodan başka AB ülkelerine satış yapıyorsan, KDV'yi tek bir ülkeden beyan etmeni sağlayan sistem.</div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top: 18px;">
+        <div class="field">
+          <label for="ioss_number">IOSS numarası</label>
+          <input type="text" id="ioss_number" maxlength="12" placeholder="IM1234567890">
+          <div class="hint">AB dışından AB'ye 150 € altı gönderim için. "IM" + 10 rakam.</div>
+          <div class="error-text" id="iossError">Format hatalı: "IM" ile başlayıp 10 rakamla devam etmeli.</div>
+        </div>
+        <div class="field">
+          <label for="eori_number">EORI numarası</label>
+          <input type="text" id="eori_number" maxlength="17" placeholder="TR1234567890">
+          <div class="hint">AB ile gümrüklü ticaret yapan her işletmenin gümrük kimlik numarası.</div>
+          <div class="error-text" id="eoriError">Format hatalı: 2 harfli ülke kodu + en fazla 15 harf/rakam.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== AB YASAL BİLGİLERİ ========== -->
+    <div class="section-title">🇪🇺 AB Yasal Bilgileri</div>
+    <div class="card">
+      <div class="card-desc">
+        <strong>GPSR sorumlu kişi:</strong> AB'de satılan her ürün için AB içinde bir sorumlu kişi/firma bulunmak zorunda. Pazaryerleri bu bilgi olmadan ilanı kapatabiliyor. AB dışındaysan bu hizmeti veren bir firmayla anlaşman ya da tedarikçinin bilgisini kullanman gerekir.
+      </div>
+      <div class="grid">
+        <div class="field full">
+          <label for="gpsr_name">Sorumlu kişi / firma adı</label>
+          <input type="text" id="gpsr_name" maxlength="200">
+        </div>
+        <div class="field full">
+          <label for="gpsr_address">Adres (AB içinde)</label>
+          <textarea id="gpsr_address" maxlength="500"></textarea>
+        </div>
+        <div class="field">
+          <label for="gpsr_email">E-posta</label>
+          <input type="email" id="gpsr_email" maxlength="200">
+          <div class="error-text" id="gpsrEmailError">Geçerli bir e-posta adresi gir.</div>
+        </div>
+        <div class="field">
+          <label for="gpsr_phone">Telefon</label>
+          <input type="tel" id="gpsr_phone" maxlength="40">
+        </div>
+      </div>
+
+      <div class="card-desc" style="margin-top: 22px;">
+        <strong>Ambalaj (EPR) kayıt numaraları:</strong> Bazı ülkelerde satış yapmak için ambalaj kayıt numarası gerekiyor (Almanya'da LUCID, Fransa'da UIN). Sadece satış yaptığın ülkeleri doldur.
+      </div>
+      <div class="epr-list" id="eprList"></div>
+    </div>
+
+    <!-- ========== İADE ADRESİ ========== -->
+    <div class="section-title">📦 İade Adresi</div>
+    <div class="card">
+      <div class="card-desc">Müşteri iadelerinin gönderileceği adres. AB'de 14 gün cayma hakkı olduğu için pazaryerleri bu bilgiyi istiyor.</div>
+      <div class="grid">
+        <div class="field full">
+          <label for="ret_name">Alıcı adı</label>
+          <input type="text" id="ret_name" maxlength="200">
+        </div>
+        <div class="field full">
+          <label for="ret_address">Adres</label>
+          <textarea id="ret_address" maxlength="500"></textarea>
+        </div>
+        <div class="field">
+          <label for="ret_city">Şehir</label>
+          <input type="text" id="ret_city" maxlength="100">
+        </div>
+        <div class="field">
+          <label for="ret_postal">Posta kodu</label>
+          <input type="text" id="ret_postal" maxlength="20">
+        </div>
+        <div class="field">
+          <label for="ret_country">Ülke</label>
+          <select id="ret_country"></select>
+        </div>
+        <div class="field">
+          <label for="ret_phone">Telefon</label>
+          <input type="tel" id="ret_phone" maxlength="40">
+        </div>
+      </div>
+    </div>
+
+  </form>
+</main>
+
+<div class="save-bar hidden" id="saveBar">
+  <div class="save-inner">
+    <div class="status" id="status"></div>
+    <button class="btn" id="saveBtn" type="button">Kaydet</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Ülkeye göre varsayılan saat dilimi
+const DEFAULT_TIMEZONE = {
+  TR: 'Europe/Istanbul', PL: 'Europe/Warsaw', DE: 'Europe/Berlin', GB: 'Europe/London',
+  US: 'America/New_York', IT: 'Europe/Rome', IE: 'Europe/Dublin', CA: 'America/Toronto',
+  DK: 'Europe/Copenhagen', NL: 'Europe/Amsterdam', FR: 'Europe/Paris'
+};
+
+const TIMEZONES = [
+  ['Europe/Istanbul', 'İstanbul (UTC+3)'],
+  ['Europe/London', 'Londra'],
+  ['Europe/Dublin', 'Dublin'],
+  ['Europe/Berlin', 'Berlin'],
+  ['Europe/Paris', 'Paris'],
+  ['Europe/Amsterdam', 'Amsterdam'],
+  ['Europe/Rome', 'Roma'],
+  ['Europe/Warsaw', 'Varşova'],
+  ['Europe/Copenhagen', 'Kopenhag'],
+  ['America/New_York', 'New York (ABD Doğu)'],
+  ['America/Chicago', 'Chicago (ABD Orta)'],
+  ['America/Denver', 'Denver (ABD Dağ)'],
+  ['America/Los_Angeles', 'Los Angeles (ABD Batı)'],
+  ['America/Toronto', 'Toronto (Kanada Doğu)'],
+  ['America/Vancouver', 'Vancouver (Kanada Batı)']
+];
+
+const CURRENCY_NAMES = {
+  TRY: 'Türk Lirası (₺)', EUR: 'Euro (€)', USD: 'ABD Doları ($)', GBP: 'İngiliz Sterlini (£)',
+  PLN: 'Polonya Zlotisi (zł)', CAD: 'Kanada Doları (C$)', DKK: 'Danimarka Kronu (kr)'
+};
+
+// EPR (ambalaj kaydı) istenen ülkeler ve sistem adları
+const EPR_LABELS = {
+  DE: 'Almanya – LUCID numarası',
+  FR: 'Fransa – UIN numarası',
+  PL: 'Polonya – BDO numarası',
+  IT: 'İtalya – kayıt numarası',
+  NL: 'Hollanda – kayıt numarası',
+  IE: 'İrlanda – kayıt numarası',
+  DK: 'Danimarka – kayıt numarası'
+};
+
+let currentUserId = null;
+let countries = [];
+
+const $ = (id) => document.getElementById(id);
+
+function setStatus(text, type) {
+  const el = $('status');
+  el.textContent = text || '';
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function valOrNull(id) {
+  const v = $(id).value.trim();
+  return v === '' ? null : v;
+}
+
+async function init() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  currentUserId = session.user.id;
+
+  try {
+    await loadCountries();
+    buildTimezoneSelect();
+    buildEprList();
+    await loadProfile();
+    $('loading').classList.add('hidden');
+    $('settingsForm').classList.remove('hidden');
+    $('saveBar').classList.remove('hidden');
+  } catch (err) {
+    console.error(err);
+    $('loading').textContent = 'Ayarlar yüklenemedi: ' + (err.message || err);
+  }
+}
+
+async function loadCountries() {
+  const { data, error } = await supabaseClient
+    .from('countries')
+    .select('code, name_tr, currency, eu_member')
+    .eq('is_active', true)
+    .order('name_tr');
+  if (error) throw error;
+  countries = data || [];
+
+  const countryOptions = countries
+    .map(c => `<option value="${c.code}">${c.name_tr}</option>`)
+    .join('');
+  $('home_country').innerHTML = countryOptions;
+  $('ret_country').innerHTML = '<option value="">Seçiniz</option>' + countryOptions;
+
+  const currencies = [...new Set(countries.map(c => c.currency.trim()))].sort();
+  $('home_currency').innerHTML = currencies
+    .map(cur => `<option value="${cur}">${CURRENCY_NAMES[cur] || cur}</option>`)
+    .join('');
+}
+
+function buildTimezoneSelect() {
+  $('timezone').innerHTML = TIMEZONES
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+}
+
+function buildEprList() {
+  $('eprList').innerHTML = Object.entries(EPR_LABELS).map(([code, label]) => `
+    <div class="field">
+      <label for="epr_${code}">${label}</label>
+      <input type="text" id="epr_${code}" data-epr="${code}" maxlength="60">
+    </div>
+  `).join('');
+}
+
+async function loadProfile() {
+  let { data: profile, error } = await supabaseClient
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', currentUserId)
+    .maybeSingle();
+  if (error) throw error;
+
+  // Profil yoksa (eski kayıtlar için güvenlik ağı) oluştur
+  if (!profile) {
+    const { data: created, error: insertError } = await supabaseClient
+      .from('user_profiles')
+      .insert({ user_id: currentUserId })
+      .select('*')
+      .single();
+    if (insertError) throw insertError;
+    profile = created;
+  }
+
+  fillForm(profile);
+}
+
+function ensureOption(selectId, value) {
+  const sel = $(selectId);
+  if (value && ![...sel.options].some(o => o.value === value)) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    sel.appendChild(opt);
+  }
+}
+
+function fillForm(p) {
+  ensureOption('ui_language', p.ui_language);
+  $('ui_language').value = p.ui_language || 'tr';
+  $('home_country').value = p.home_country || 'TR';
+  ensureOption('home_currency', (p.home_currency || '').trim());
+  $('home_currency').value = (p.home_currency || 'TRY').trim();
+  ensureOption('timezone', p.timezone);
+  $('timezone').value = p.timezone || 'Europe/Istanbul';
+
+  $('business_type').value = p.business_type || '';
+  $('company_name').value = p.company_name || '';
+  $('tax_office').value = p.tax_office || '';
+  $('tax_number').value = p.tax_number || '';
+
+  $('vat_registered').checked = !!p.vat_registered;
+  $('vat_number').value = p.vat_number || '';
+  toggleVatNumber();
+  $('oss_registered').checked = !!p.oss_registered;
+  $('ioss_number').value = p.ioss_number || '';
+  $('eori_number').value = p.eori_number || '';
+
+  const g = p.gpsr_responsible_person || {};
+  $('gpsr_name').value = g.name || '';
+  $('gpsr_address').value = g.address || '';
+  $('gpsr_email').value = g.email || '';
+  $('gpsr_phone').value = g.phone || '';
+
+  const epr = p.epr_registrations || {};
+  document.querySelectorAll('[data-epr]').forEach(input => {
+    input.value = epr[input.dataset.epr] || '';
+  });
+
+  const r = p.return_address || {};
+  $('ret_name').value = r.name || '';
+  $('ret_address').value = r.address || '';
+  $('ret_city').value = r.city || '';
+  $('ret_postal').value = r.postal_code || '';
+  $('ret_country').value = r.country || '';
+  $('ret_phone').value = r.phone || '';
+}
+
+function toggleVatNumber() {
+  $('vatNumberWrap').classList.toggle('hidden', !$('vat_registered').checked);
+}
+
+// Ülke değişince para birimi ve saat dilimini öner
+function onCountryChange() {
+  const code = $('home_country').value;
+  const country = countries.find(c => c.code === code);
+  if (country) {
+    $('home_currency').value = country.currency.trim();
+  }
+  if (DEFAULT_TIMEZONE[code]) {
+    $('timezone').value = DEFAULT_TIMEZONE[code];
+  }
+}
+
+function showFieldError(inputId, errorId, show) {
+  $(inputId).classList.toggle('invalid', show);
+  $(errorId).style.display = show ? 'block' : 'none';
+}
+
+function validate() {
+  let ok = true;
+
+  const ioss = $('ioss_number').value.trim().toUpperCase();
+  $('ioss_number').value = ioss;
+  const iossBad = ioss !== '' && !/^IM[0-9]{10}$/.test(ioss);
+  showFieldError('ioss_number', 'iossError', iossBad);
+  if (iossBad) ok = false;
+
+  const eori = $('eori_number').value.trim().toUpperCase().replace(/\s+/g, '');
+  $('eori_number').value = eori;
+  const eoriBad = eori !== '' && !/^[A-Z]{2}[A-Z0-9]{1,15}$/.test(eori);
+  showFieldError('eori_number', 'eoriError', eoriBad);
+  if (eoriBad) ok = false;
+
+  const email = $('gpsr_email').value.trim();
+  const emailBad = email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  showFieldError('gpsr_email', 'gpsrEmailError', emailBad);
+  if (emailBad) ok = false;
+
+  return ok;
+}
+
+function buildJson(obj) {
+  const cleaned = {};
+  Object.entries(obj).forEach(([k, v]) => { if (v) cleaned[k] = v; });
+  return Object.keys(cleaned).length ? cleaned : null;
+}
+
+async function saveProfile() {
+  setStatus('');
+  if (!validate()) {
+    setStatus('Kırmızı işaretli alanları düzelt.', 'err');
+    return;
+  }
+
+  const epr = {};
+  document.querySelectorAll('[data-epr]').forEach(input => {
+    const v = input.value.trim();
+    if (v) epr[input.dataset.epr] = v;
+  });
+
+  const vatRegistered = $('vat_registered').checked;
+  const businessType = valOrNull('business_type');
+
+  const payload = {
+    user_id: currentUserId,
+    ui_language: $('ui_language').value,
+    home_country: $('home_country').value,
+    home_currency: $('home_currency').value,
+    timezone: $('timezone').value,
+
+    business_type: businessType,
+    company_name: valOrNull('company_name'),
+    tax_office: valOrNull('tax_office'),
+    tax_number: valOrNull('tax_number'),
+
+    vat_registered: vatRegistered,
+    vat_number: vatRegistered ? valOrNull('vat_number') : null,
+    oss_registered: $('oss_registered').checked,
+    ioss_number: valOrNull('ioss_number'),
+    eori_number: valOrNull('eori_number'),
+
+    gpsr_responsible_person: buildJson({
+      name: $('gpsr_name').value.trim(),
+      address: $('gpsr_address').value.trim(),
+      email: $('gpsr_email').value.trim(),
+      phone: $('gpsr_phone').value.trim()
+    }),
+    epr_registrations: epr,
+
+    return_address: buildJson({
+      name: $('ret_name').value.trim(),
+      address: $('ret_address').value.trim(),
+      city: $('ret_city').value.trim(),
+      postal_code: $('ret_postal').value.trim(),
+      country: $('ret_country').value,
+      phone: $('ret_phone').value.trim()
+    }),
+
+    onboarding_completed: !!businessType
+  };
+
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Kaydediliyor...';
+
+  try {
+    const { error } = await supabaseClient
+      .from('user_profiles')
+      .upsert(payload, { onConflict: 'user_id' });
+    if (error) throw error;
+    setStatus('✓ Kaydedildi', 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('Kaydedilemedi: ' + (err.message || err), 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Kaydet';
+  }
+}
+
+$('home_country').addEventListener('change', onCountryChange);
+$('vat_registered').addEventListener('change', toggleVatNumber);
+$('saveBtn').addEventListener('click', saveProfile);
+$('settingsForm').addEventListener('input', () => setStatus(''));
+
+init();
+</script>
+</body>
+</html>
