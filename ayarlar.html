@@ -44,6 +44,7 @@
   .section-title {
     font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
     letter-spacing: 0.03em; margin: 28px 0 12px;
+    scroll-margin-top: 20px;
   }
   .card {
     background: #141821;
@@ -52,6 +53,11 @@
     padding: 20px;
   }
   .card-desc { font-size: 13px; color: #9aa3b2; margin-bottom: 16px; line-height: 1.5; }
+  .notice {
+    font-size: 13px; line-height: 1.5; color: #f2d16b;
+    background: #2e2712; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;
+  }
+  .notice a { color: #f2d16b; }
 
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
   .full { grid-column: 1 / -1; }
@@ -63,6 +69,7 @@
   .field input[type="text"],
   .field input[type="email"],
   .field input[type="tel"],
+  .field input[type="url"],
   .field select,
   .field textarea {
     width: 100%;
@@ -78,9 +85,17 @@
   .field input:focus, .field select:focus, .field textarea:focus {
     outline: none; border-color: #1D9E75;
   }
+  .field input:disabled, .field textarea:disabled { opacity: 0.5; cursor: not-allowed; }
   .field input.invalid { border-color: #e5484d; }
   .hint { font-size: 12px; color: #7d8596; margin-top: 5px; line-height: 1.45; }
   .error-text { font-size: 12px; color: #ff8a8d; margin-top: 5px; display: none; }
+
+  .logo-preview {
+    margin-top: 10px; display: none;
+    width: 96px; height: 96px; border-radius: 10px;
+    border: 1px solid #2a3040; background: #0d0f16;
+    object-fit: contain; padding: 6px;
+  }
 
   .check-row {
     display: flex; align-items: flex-start; gap: 10px; padding: 4px 0;
@@ -129,14 +144,14 @@
 
 <main>
   <h1>⚙️ Ayarlar</h1>
-  <p class="subtitle">Dil, bölge, işletme ve vergi bilgilerin. Fiyat, kâr ve vergi hesapları bu bilgilere göre yapılır.</p>
+  <p class="subtitle">Dil, bölge, işletme, marka ve vergi bilgilerin. Fiyat, kâr, fatura ve vergi hesapları bu bilgilere göre yapılır.</p>
 
   <div id="loading" class="loading">Yükleniyor...</div>
 
   <form id="settingsForm" class="hidden" novalidate>
 
     <!-- ========== DİL VE BÖLGE ========== -->
-    <div class="section-title">🌍 Dil ve Bölge</div>
+    <div class="section-title" id="bolge">🌍 Dil ve Bölge</div>
     <div class="card">
       <div class="grid">
         <div class="field">
@@ -165,7 +180,7 @@
     </div>
 
     <!-- ========== İŞLETME BİLGİLERİ ========== -->
-    <div class="section-title">🏢 İşletme Bilgileri</div>
+    <div class="section-title" id="isletme">🏢 İşletme Bilgileri</div>
     <div class="card">
       <div class="grid">
         <div class="field full">
@@ -179,8 +194,9 @@
           <div class="hint">Çoğu pazaryeri (Allegro, Amazon, Otto) satış için şahıs şirketi veya şirket istiyor.</div>
         </div>
         <div class="field full">
-          <label for="company_name">Şirket / işletme adı</label>
+          <label for="company_name">Şirket / işletme adı (resmi)</label>
           <input type="text" id="company_name" maxlength="200">
+          <div class="hint">Vergi levhasındaki resmi ad.</div>
         </div>
         <div class="field">
           <label for="tax_office">Vergi dairesi</label>
@@ -189,12 +205,39 @@
         <div class="field">
           <label for="tax_number">Vergi numarası</label>
           <input type="text" id="tax_number" maxlength="30">
+          <div class="hint">Faturalarında da bu numara kullanılır.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== MARKA ========== -->
+    <div class="section-title" id="marka">🎨 Marka</div>
+    <div class="card">
+      <div class="card-desc">Faturalarında ve mağazanda görünecek marka bilgileri.</div>
+      <div class="notice hidden" id="brandNoStore">
+        Marka bilgileri mağazana bağlı. Önce <a href="magazani-kur.html">Mağazanı Kur</a> ile mağazanı oluştur, sonra buradan marka bilgilerini girebilirsin.
+      </div>
+      <div class="grid">
+        <div class="field full">
+          <label for="brand_name">Marka adı</label>
+          <input type="text" id="brand_name" maxlength="120" placeholder="Örn: Yokyok">
+          <div class="hint">Müşterinin gördüğü ad. Resmi şirket adından farklı olabilir.</div>
+        </div>
+        <div class="field full">
+          <label for="brand_logo_url">Logo görsel adresi (URL)</label>
+          <input type="url" id="brand_logo_url" maxlength="500" placeholder="https://...">
+          <img id="logoPreview" class="logo-preview" alt="Logo önizleme">
+          <div class="error-text" id="logoError">Adres "https://" ile başlamalı.</div>
+        </div>
+        <div class="field full">
+          <label for="brand_address">Fatura adresi</label>
+          <textarea id="brand_address" maxlength="500" placeholder="Faturalarda görünecek adres"></textarea>
         </div>
       </div>
     </div>
 
     <!-- ========== VERGİ ========== -->
-    <div class="section-title">🧾 Vergi</div>
+    <div class="section-title" id="vergi">🧾 Vergi</div>
     <div class="card">
       <div class="card-desc">Kâr hesabında KDV'nin kimden düşüleceği bu bilgilere göre belirlenir. Emin olmadığın alanları boş bırakabilirsin, sonra mali müşavirinle birlikte doldurursun.</div>
 
@@ -235,7 +278,7 @@
     </div>
 
     <!-- ========== AB YASAL BİLGİLERİ ========== -->
-    <div class="section-title">🇪🇺 AB Yasal Bilgileri</div>
+    <div class="section-title" id="ab">🇪🇺 AB Yasal Bilgileri</div>
     <div class="card">
       <div class="card-desc">
         <strong>GPSR sorumlu kişi:</strong> AB'de satılan her ürün için AB içinde bir sorumlu kişi/firma bulunmak zorunda. Pazaryerleri bu bilgi olmadan ilanı kapatabiliyor. AB dışındaysan bu hizmeti veren bir firmayla anlaşman ya da tedarikçinin bilgisini kullanman gerekir.
@@ -267,7 +310,7 @@
     </div>
 
     <!-- ========== İADE ADRESİ ========== -->
-    <div class="section-title">📦 İade Adresi</div>
+    <div class="section-title" id="iade">📦 İade Adresi</div>
     <div class="card">
       <div class="card-desc">Müşteri iadelerinin gönderileceği adres. AB'de 14 gün cayma hakkı olduğu için pazaryerleri bu bilgiyi istiyor.</div>
       <div class="grid">
@@ -343,7 +386,7 @@ const CURRENCY_NAMES = {
   PLN: 'Polonya Zlotisi (zł)', CAD: 'Kanada Doları (C$)', DKK: 'Danimarka Kronu (kr)'
 };
 
-// EPR (ambalaj kaydı) istenen ülkeler ve sistem adları
+// EPR (ambalaj kaydı) istenen ülkeler
 const EPR_LABELS = {
   DE: 'Almanya – LUCID numarası',
   FR: 'Fransa – UIN numarası',
@@ -354,8 +397,11 @@ const EPR_LABELS = {
   DK: 'Danimarka – kayıt numarası'
 };
 
+const BRAND_FIELDS = ['brand_name', 'brand_logo_url', 'brand_address'];
+
 let currentUserId = null;
 let countries = [];
+let hasStore = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -380,9 +426,16 @@ async function init() {
     buildTimezoneSelect();
     buildEprList();
     await loadProfile();
+    await loadBrand();
     $('loading').classList.add('hidden');
     $('settingsForm').classList.remove('hidden');
     $('saveBar').classList.remove('hidden');
+
+    // Adreste #marka gibi bölüm varsa oraya kaydır
+    if (location.hash) {
+      const target = document.querySelector(location.hash);
+      if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
   } catch (err) {
     console.error(err);
     $('loading').textContent = 'Ayarlar yüklenemedi: ' + (err.message || err);
@@ -433,7 +486,6 @@ async function loadProfile() {
     .maybeSingle();
   if (error) throw error;
 
-  // Profil yoksa (eski kayıtlar için güvenlik ağı) oluştur
   if (!profile) {
     const { data: created, error: insertError } = await supabaseClient
       .from('user_profiles')
@@ -445,6 +497,48 @@ async function loadProfile() {
   }
 
   fillForm(profile);
+}
+
+// Marka bilgileri store_settings tablosunda (faturalar buradan okuyor)
+async function loadBrand() {
+  const { data, error } = await supabaseClient
+    .from('store_settings')
+    .select('business_name, business_logo_url, business_address, business_tax_number')
+    .eq('user_id', currentUserId)
+    .limit(1);
+  if (error) throw error;
+
+  hasStore = !!(data && data.length);
+
+  if (!hasStore) {
+    $('brandNoStore').classList.remove('hidden');
+    BRAND_FIELDS.forEach(id => { $(id).disabled = true; });
+    return;
+  }
+
+  const s = data[0];
+  $('brand_name').value = s.business_name || '';
+  $('brand_logo_url').value = s.business_logo_url || '';
+  $('brand_address').value = s.business_address || '';
+  updateLogoPreview();
+
+  // Eski Marka Ayarları'nda girilmiş vergi no varsa ve profilde yoksa buraya al
+  if (!$('tax_number').value.trim() && s.business_tax_number) {
+    $('tax_number').value = s.business_tax_number;
+  }
+}
+
+function updateLogoPreview() {
+  const url = $('brand_logo_url').value.trim();
+  const img = $('logoPreview');
+  if (/^https:\/\/.+/i.test(url)) {
+    img.src = url;
+    img.style.display = 'block';
+    img.onerror = () => { img.style.display = 'none'; };
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+  }
 }
 
 function ensureOption(selectId, value) {
@@ -502,16 +596,11 @@ function toggleVatNumber() {
   $('vatNumberWrap').classList.toggle('hidden', !$('vat_registered').checked);
 }
 
-// Ülke değişince para birimi ve saat dilimini öner
 function onCountryChange() {
   const code = $('home_country').value;
   const country = countries.find(c => c.code === code);
-  if (country) {
-    $('home_currency').value = country.currency.trim();
-  }
-  if (DEFAULT_TIMEZONE[code]) {
-    $('timezone').value = DEFAULT_TIMEZONE[code];
-  }
+  if (country) $('home_currency').value = country.currency.trim();
+  if (DEFAULT_TIMEZONE[code]) $('timezone').value = DEFAULT_TIMEZONE[code];
 }
 
 function showFieldError(inputId, errorId, show) {
@@ -538,6 +627,11 @@ function validate() {
   const emailBad = email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   showFieldError('gpsr_email', 'gpsrEmailError', emailBad);
   if (emailBad) ok = false;
+
+  const logo = $('brand_logo_url').value.trim();
+  const logoBad = hasStore && logo !== '' && !/^https:\/\/.+/i.test(logo);
+  showFieldError('brand_logo_url', 'logoError', logoBad);
+  if (logoBad) ok = false;
 
   return ok;
 }
@@ -611,6 +705,21 @@ async function saveProfile() {
       .from('user_profiles')
       .upsert(payload, { onConflict: 'user_id' });
     if (error) throw error;
+
+    // Marka bilgileri + vergi no faturaların okuduğu yere de yazılır
+    if (hasStore) {
+      const { error: brandError } = await supabaseClient
+        .from('store_settings')
+        .update({
+          business_name: $('brand_name').value.trim(),
+          business_logo_url: $('brand_logo_url').value.trim(),
+          business_address: $('brand_address').value.trim(),
+          business_tax_number: $('tax_number').value.trim()
+        })
+        .eq('user_id', currentUserId);
+      if (brandError) throw brandError;
+    }
+
     setStatus('✓ Kaydedildi', 'ok');
   } catch (err) {
     console.error(err);
@@ -623,6 +732,7 @@ async function saveProfile() {
 
 $('home_country').addEventListener('change', onCountryChange);
 $('vat_registered').addEventListener('change', toggleVatNumber);
+$('brand_logo_url').addEventListener('input', updateLogoPreview);
 $('saveBtn').addEventListener('click', saveProfile);
 $('settingsForm').addEventListener('input', () => setStatus(''));
 
