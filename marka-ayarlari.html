@@ -3,133 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marka Ayarları - HızlıSatıcı AI</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Ayarlar'a yönlendiriliyor - HızlıSatıcı AI</title>
+<meta http-equiv="refresh" content="0; url=ayarlar.html#marka">
+<script>window.location.replace('ayarlar.html#marka');</script>
 <style>
-  * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    background: linear-gradient(180deg, #0B1220 0%, #0A0E17 100%);
-    color: #E5E7EB;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16;
+    color: #9aa3b2;
     min-height: 100vh;
-    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
   }
-  .container { max-width: 480px; margin: 0 auto; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  p.sub { color: #9CA3AF; font-size: 14px; margin-top: 0; margin-bottom: 24px; }
-  label { display: block; font-size: 13px; color: #9CA3AF; margin: 16px 0 6px; }
-  input {
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 10px;
-    border: 1px solid #1F2937;
-    background: #111827;
-    color: #E5E7EB;
-    font-size: 15px;
-  }
-  input:focus { outline: none; border-color: #1D9E75; }
-  button {
-    width: 100%;
-    margin-top: 24px;
-    padding: 14px;
-    border: none;
-    border-radius: 10px;
-    background: #1D9E75;
-    color: #fff;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:disabled { opacity: 0.6; }
-  #msg { margin-top: 14px; font-size: 14px; min-height: 20px; }
-  #msg.ok { color: #1D9E75; }
-  #msg.err { color: #EF4444; }
-  a.back { color: #9CA3AF; font-size: 13px; text-decoration: none; }
+  a { color: #1D9E75; }
 </style>
 </head>
 <body>
-<div class="container">
-  <a class="back" href="dashboard.html">&larr; Panele dön</a>
-  <h1>Marka Ayarları</h1>
-  <p class="sub">Faturalarında ve mağazanda görünecek marka bilgilerini gir.</p>
-
-  <label>İşletme / Marka Adı</label>
-  <input id="businessName" type="text" placeholder="Örn: Yokyok">
-
-  <label>Logo Görsel Adresi (URL)</label>
-  <input id="logoUrl" type="text" placeholder="https://...">
-
-  <label>Adres</label>
-  <input id="address" type="text" placeholder="Fatura adresin">
-
-  <label>Vergi Numarası</label>
-  <input id="taxNumber" type="text" placeholder="Vergi no">
-
-  <button id="saveBtn" onclick="saveSettings()">Kaydet</button>
-  <div id="msg"></div>
-</div>
-
-<script>
-  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  let currentUser = null;
-
-  async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      window.location.href = 'index.html';
-      return;
-    }
-    currentUser = session.user;
-
-    const { data, error } = await supabaseClient
-      .from('store_settings')
-      .select('business_name, business_logo_url, business_address, business_tax_number')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-
-    if (data) {
-      document.getElementById('businessName').value = data.business_name || '';
-      document.getElementById('logoUrl').value = data.business_logo_url || '';
-      document.getElementById('address').value = data.business_address || '';
-      document.getElementById('taxNumber').value = data.business_tax_number || '';
-    }
-  }
-
-  async function saveSettings() {
-    const btn = document.getElementById('saveBtn');
-    const msg = document.getElementById('msg');
-    btn.disabled = true;
-    msg.textContent = '';
-    msg.className = '';
-
-    const payload = {
-      business_name: document.getElementById('businessName').value.trim(),
-      business_logo_url: document.getElementById('logoUrl').value.trim(),
-      business_address: document.getElementById('address').value.trim(),
-      business_tax_number: document.getElementById('taxNumber').value.trim()
-    };
-
-    const { error } = await supabaseClient
-      .from('store_settings')
-      .update(payload)
-      .eq('user_id', currentUser.id);
-
-    btn.disabled = false;
-
-    if (error) {
-      msg.textContent = 'Hata: ' + error.message;
-      msg.className = 'err';
-    } else {
-      msg.textContent = 'Kaydedildi ✓';
-      msg.className = 'ok';
-    }
-  }
-
-  init();
-</script>
+  <p>Marka Ayarları artık <a href="ayarlar.html#marka">⚙️ Ayarlar</a> sayfasının içinde. Yönlendiriliyorsun...</p>
 </body>
 </html>
