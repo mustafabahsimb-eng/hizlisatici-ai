@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Baskı Sağlayıcıları</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -12,7 +13,7 @@
     background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
     padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
@@ -21,7 +22,7 @@
     display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .header-right { display: flex; align-items: center; gap: 14px; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .user-email { font-size: 13px; color: #9aa3b2; }
   .logout-btn {
     background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
@@ -47,7 +48,7 @@
   .card-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 12px; }
   .search-row { display: flex; gap: 10px; }
   input[type=text] {
-    flex: 1; background: #1c212c; border: 1px solid #2a3040; border-radius: 8px;
+    flex: 1; min-width: 0; background: #1c212c; border: 1px solid #2a3040; border-radius: 8px;
     padding: 10px 12px; color: #fff; font-size: 14px; outline: none; font-family: inherit;
   }
   input[type=text]:focus { border-color: #1D9E75; }
@@ -89,6 +90,12 @@
   }
   .go-btn:hover { background: #178a65; }
   .legend { font-size: 12px; color: #9aa3b2; margin-top: 14px; line-height: 1.6; }
+  @media (max-width: 520px) {
+    header { padding: 14px 16px; }
+    .logo-text, .user-email { display: none; }
+    main { padding: 24px 16px 80px; }
+    .search-row { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
@@ -100,32 +107,33 @@
   </div>
   <div class="header-right">
     <span class="user-email" id="userEmail"></span>
-    <button class="logout-btn" onclick="logout()">Çıkış yap</button>
+    <span id="langSwitcherHost"></span>
+    <button class="logout-btn" onclick="logout()" data-t="logout"></button>
   </div>
 </header>
 
 <main>
   <div class="top-row">
     <div>
-      <h1>Baskı Sağlayıcıları</h1>
-      <div class="subtitle">Bir ürün türü seç, Printify'daki atölyeleri konumlarına, üretim sürelerine ve kargo ücretlerine göre karşılaştır.</div>
+      <h1 data-t="title"></h1>
+      <div class="subtitle" data-t="subtitle"></div>
     </div>
-    <a href="dashboard.html" class="back-link">← Panele dön</a>
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
   </div>
 
   <div class="card">
-    <div class="card-title">1. Ürün türünü ara</div>
+    <div class="card-title" data-t="step1"></div>
     <div class="search-row">
-      <input type="text" id="searchInput" placeholder="Örn: tişört, kupa, hoodie, poster" onkeydown="if(event.key==='Enter') searchBlueprints()">
-      <button class="btn-primary" id="searchBtn" onclick="searchBlueprints()">Ara</button>
+      <input type="text" id="searchInput" data-tp="searchPh" autocomplete="off" onkeydown="if(event.key==='Enter') searchBlueprints()">
+      <button class="btn-primary" id="searchBtn" onclick="searchBlueprints()" data-t="search"></button>
     </div>
-    <div class="hint">Türkçe ya da İngilizce yazabilirsin.</div>
+    <div class="hint" data-t="searchHint"></div>
     <div id="searchMsg"></div>
     <div class="bp-list" id="bpList"></div>
   </div>
 
   <div class="card" id="resultCard" style="display:none;">
-    <div class="card-title" id="resultTitle">2. Sağlayıcılar</div>
+    <div class="card-title" id="resultTitle"></div>
     <div id="resultMsg"></div>
     <div id="resultBody"></div>
   </div>
@@ -134,17 +142,121 @@
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
 
-  const COUNTRY_NAMES = { DE: 'Almanya', PL: 'Polonya', IT: 'İtalya', GB: 'İngiltere', US: 'ABD', CA: 'Kanada' };
-  const REGION_LABEL = { eu: 'Avrupa Birliği', europe: 'Avrupa (AB dışı)', other: 'Diğer' };
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Baskı Sağlayıcıları',
+      logout: 'Çıkış yap',
+      title: 'Baskı Sağlayıcıları',
+      subtitle: 'Bir ürün türü seç, Printify\'daki atölyeleri konumlarına, üretim sürelerine ve kargo ücretlerine göre karşılaştır.',
+      back: '← Panele dön',
+      step1: '1. Ürün türünü ara',
+      searchPh: 'Örn: tişört, kupa, hoodie, poster',
+      search: 'Ara',
+      searching: 'Aranıyor...',
+      searchHint: 'Türkçe ya da İngilizce yazabilirsin.',
+      needQuery: 'Bir ürün türü yaz.',
+      noResults: 'Sonuç bulunamadı, başka bir kelime dene.',
+      step2: '2. Sağlayıcılar',
+      loadingProviders: 'Sağlayıcılar ve kargo ücretleri getiriliyor, birkaç saniye sürebilir...',
+      onlyEurope: 'Sadece Avrupa\'daki atölyeleri göster',
+      noEurope: 'Bu ürün türü için Avrupa\'da atölye bulunamadı. Kutuyu kaldırıp tüm sağlayıcılara bakabilirsin.',
+      noProviders: 'Bu ürün türü için sağlayıcı bulunamadı.',
+      thProvider: 'Sağlayıcı', thRegion: 'Bölge', thHandling: 'Üretim süresi',
+      noLocation: 'Konum bilgisi yok',
+      notShipped: 'Gönderilmiyor',
+      goOn: 'Bu atölyeyle devam et →',
+      days: 'gün',
+      legend: 'Kargo ücretleri tek ürün içindir (ilk ürün). Yeşil, o ülke için listedeki en ucuz seçenektir. * işareti, ülkeye özel tarife olmadığı için "dünyanın geri kalanı" tarifesinin kullanıldığı anlamına gelir. Ürünün kendi baskı maliyeti sağlayıcıya göre değişir, onu taslak ürün oluştururken göreceksin.',
+      noSession: 'Oturum yok',
+      unknownError: 'Bilinmeyen hata',
+      badResponse: 'Sunucu yanıtı okunamadı ({s})',
+      region: { eu: 'Avrupa Birliği', europe: 'Avrupa (AB dışı)', other: 'Diğer' },
+      countries: { DE: 'Almanya', PL: 'Polonya', IT: 'İtalya', GB: 'İngiltere', US: 'ABD', CA: 'Kanada' },
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Print Providers',
+      logout: 'Sign out',
+      title: 'Print Providers',
+      subtitle: 'Pick a product type and compare Printify print shops by location, production time and shipping rates.',
+      back: '← Back to dashboard',
+      step1: '1. Search a product type',
+      searchPh: 'e.g. t-shirt, mug, hoodie, poster',
+      search: 'Search',
+      searching: 'Searching...',
+      searchHint: 'You can type in English or Turkish.',
+      needQuery: 'Type a product type.',
+      noResults: 'No results found, try another word.',
+      step2: '2. Providers',
+      loadingProviders: 'Fetching providers and shipping rates, this may take a few seconds...',
+      onlyEurope: 'Show only print shops in Europe',
+      noEurope: 'No print shop in Europe was found for this product type. Untick the box to see all providers.',
+      noProviders: 'No provider found for this product type.',
+      thProvider: 'Provider', thRegion: 'Region', thHandling: 'Production time',
+      noLocation: 'No location info',
+      notShipped: 'Not shipped',
+      goOn: 'Continue with this provider →',
+      days: 'days',
+      legend: 'Shipping rates are for a single item (first item). Green is the cheapest option in the list for that country. * means there is no country-specific rate, so the "rest of the world" rate is used. The product\'s own print cost varies by provider; you will see it when you create the draft product.',
+      noSession: 'No session',
+      unknownError: 'Unknown error',
+      badResponse: 'Could not read server response ({s})',
+      region: { eu: 'European Union', europe: 'Europe (non-EU)', other: 'Other' },
+      countries: { DE: 'Germany', PL: 'Poland', IT: 'Italy', GB: 'United Kingdom', US: 'USA', CA: 'Canada' },
+    }
+  };
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let v = T[lang()][key];
+    if (v === undefined) v = T.tr[key] !== undefined ? T.tr[key] : key;
+    if (vars && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+    return v;
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.getAttribute('data-tp')); });
+    if (searching) document.getElementById('searchBtn').textContent = t('searching');
+  }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function countryName(code) {
+    const map = t('countries');
+    if (map[code]) return map[code];
+    try {
+      const dn = new Intl.DisplayNames([lang() === 'en' ? 'en' : 'tr'], { type: 'region' });
+      return dn.of(code) || code;
+    } catch (e) { return code; }
+  }
 
+  // ================= DURUM =================
   let compareData = null;
   let selectedBp = null;
+  let blueprints = [];
+  let searching = false;
+  let searchMsgState = null;   // { type, key, extra }
+  let resultMsgState = null;   // { type, key, extra }
+  let onlyEurope = true;
+
+  function renderMsg(boxId, st) {
+    const box = document.getElementById(boxId);
+    if (!st) { box.innerHTML = ''; return; }
+    const text = (st.key ? t(st.key) : '') + (st.extra || '');
+    box.innerHTML = '<div class="msg ' + st.type + '">' + escapeHtml(text) + '</div>';
+  }
+  function setSearchMsg(st) { searchMsgState = st; renderMsg('searchMsg', st); }
+  function setResultMsg(st) { resultMsgState = st; renderMsg('resultMsg', st); }
 
   async function callFn(name, body) {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; throw new Error('Oturum yok'); }
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; throw new Error(t('noSession')); }
     const response = await fetch(SUPABASE_URL + '/functions/v1/' + name, {
       method: 'POST',
       headers: {
@@ -152,147 +264,174 @@
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'apikey': SUPABASE_KEY,
       },
-      body: JSON.stringify(Object.assign({ userAccessToken: session.access_token }, body)),
+      body: JSON.stringify(Object.assign({ userAccessToken: session.access_token, language: lang() }, body)),
     });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+    let data;
+    try { data = await response.json(); } catch (e) { throw new Error(t('badResponse', { s: response.status })); }
+    if (!data.ok) throw new Error(data.error || t('unknownError'));
     return data;
   }
 
   async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    applyStatic();
+    const { data: { session } } = await db.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
     document.getElementById('userEmail').textContent = session.user.email;
   }
 
   async function searchBlueprints() {
+    if (searching) return;
     const q = document.getElementById('searchInput').value.trim();
     const btn = document.getElementById('searchBtn');
-    const msg = document.getElementById('searchMsg');
-    const list = document.getElementById('bpList');
-    if (!q) { msg.innerHTML = '<div class="msg error">Bir ürün türü yaz.</div>'; return; }
-    btn.disabled = true; btn.textContent = 'Aranıyor...';
-    msg.innerHTML = ''; list.innerHTML = '';
+    if (!q) { setSearchMsg({ type: 'error', key: 'needQuery' }); return; }
+    searching = true;
+    btn.disabled = true; btn.textContent = t('searching');
+    setSearchMsg(null);
+    blueprints = [];
+    renderBlueprints();
     try {
       const r = await callFn('printify-catalog', { action: 'search', query: q });
-      if (!r.blueprints.length) {
-        msg.innerHTML = '<div class="msg info">Sonuç bulunamadı, başka bir kelime dene.</div>';
-      } else {
-        list.innerHTML = r.blueprints.map((b, i) =>
-          '<div class="bp" id="bp' + i + '" onclick="pickBlueprint(' + b.id + ', ' + i + ')">' +
-          (b.image ? '<img src="' + escapeHtml(b.image) + '" alt="">' : '') +
-          '<div>' + escapeHtml(b.title) + '</div><div class="bp-brand">' + escapeHtml(b.brand || '') + '</div></div>'
-        ).join('');
-        window._bps = r.blueprints;
-      }
+      blueprints = r.blueprints || [];
+      if (!blueprints.length) setSearchMsg({ type: 'info', key: 'noResults' });
+      renderBlueprints();
     } catch (err) {
-      msg.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>';
+      setSearchMsg({ type: 'error', extra: err.message });
     } finally {
-      btn.disabled = false; btn.textContent = 'Ara';
+      searching = false;
+      btn.disabled = false; btn.textContent = t('search');
     }
   }
 
-  async function pickBlueprint(id, idx) {
-    document.querySelectorAll('.bp').forEach(el => el.classList.remove('sel'));
-    const el = document.getElementById('bp' + idx);
-    if (el) el.classList.add('sel');
-    selectedBp = (window._bps || []).find(b => b.id === id) || { id: id, title: '' };
+  function renderBlueprints() {
+    document.getElementById('bpList').innerHTML = blueprints.map((b, i) =>
+      '<div class="bp' + (selectedBp && selectedBp.id === b.id ? ' sel' : '') + '" data-idx="' + i + '">' +
+      (b.image ? '<img src="' + escapeHtml(b.image) + '" alt="" loading="lazy">' : '') +
+      '<div>' + escapeHtml(b.title) + '</div><div class="bp-brand">' + escapeHtml(b.brand || '') + '</div></div>'
+    ).join('');
+  }
+  document.getElementById('bpList').addEventListener('click', e => {
+    const el = e.target.closest('.bp');
+    if (!el) return;
+    const b = blueprints[Number(el.getAttribute('data-idx'))];
+    if (b) pickBlueprint(b);
+  });
 
+  function renderResultTitle() {
+    document.getElementById('resultTitle').textContent = t('step2') + (selectedBp && selectedBp.title ? ': ' + selectedBp.title : '');
+  }
+
+  async function pickBlueprint(bp) {
+    selectedBp = bp;
+    renderBlueprints();
     const card = document.getElementById('resultCard');
-    const body = document.getElementById('resultBody');
-    const msg = document.getElementById('resultMsg');
     card.style.display = 'block';
-    document.getElementById('resultTitle').textContent = '2. Sağlayıcılar: ' + (selectedBp.title || '');
-    body.innerHTML = '';
-    msg.innerHTML = '<div class="msg info">Sağlayıcılar ve kargo ücretleri getiriliyor, birkaç saniye sürebilir...</div>';
+    renderResultTitle();
+    compareData = null;
+    document.getElementById('resultBody').innerHTML = '';
+    setResultMsg({ type: 'info', key: 'loadingProviders' });
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const requestedId = bp.id;
     try {
-      compareData = await callFn('printify-eu-providers', { action: 'compare', blueprintId: id });
-      msg.innerHTML = '';
+      const data = await callFn('printify-eu-providers', { action: 'compare', blueprintId: bp.id });
+      if (!selectedBp || selectedBp.id !== requestedId) return; // bu arada başka ürün seçildiyse eski sonucu gösterme
+      compareData = data;
+      setResultMsg(null);
       renderTable();
     } catch (err) {
+      if (!selectedBp || selectedBp.id !== requestedId) return;
       compareData = null;
-      msg.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>';
+      setResultMsg({ type: 'error', extra: err.message });
     }
   }
 
   function fmtMoney(c) {
-    return (c.currency === 'USD' || !c.currency ? '$' : escapeHtml(c.currency) + ' ') + (c.cost / 100).toFixed(2);
+    return (c.currency === 'USD' || !c.currency ? '$' : escapeHtml(c.currency) + ' ') + (Number(c.cost || 0) / 100).toFixed(2);
   }
   function fmtHandling(h) {
     if (!h || h.value == null) return '-';
-    const unit = h.unit === 'day' || h.unit === 'days' ? 'gün' : (h.unit || '');
+    const unit = h.unit === 'day' || h.unit === 'days' ? t('days') : (h.unit || '');
     return escapeHtml(String(h.value)) + ' ' + escapeHtml(unit);
+  }
+
+  function toggleOnlyEurope(el) {
+    onlyEurope = el.checked;
+    renderTable();
   }
 
   function renderTable() {
     const body = document.getElementById('resultBody');
     if (!compareData) return;
-    const onlyEurope = document.getElementById('onlyEurope') ? document.getElementById('onlyEurope').checked : true;
-    let rows = compareData.providers;
+    let rows = compareData.providers || [];
     if (onlyEurope) rows = rows.filter(p => p.region === 'eu' || p.region === 'europe');
-    const targets = compareData.targets;
+    const targets = compareData.targets || [];
+    const regions = t('region');
 
     // Her ülke için görünen satırlar arasında en ucuz kargo
     const best = {};
-    targets.forEach(t => {
+    targets.forEach(tg => {
       let min = null;
       rows.forEach(p => {
-        const s = p.ship && p.ship[t];
+        const s = p.ship && p.ship[tg];
         if (s && (min === null || s.cost < min)) min = s.cost;
       });
-      best[t] = min;
+      best[tg] = min;
     });
 
     let html = '<div class="filter-row"><input type="checkbox" id="onlyEurope" ' + (onlyEurope ? 'checked' : '') +
-      ' onchange="renderTable()"><label for="onlyEurope" style="margin:0;color:#cfd5e2;">Sadece Avrupa\'daki atölyeleri göster</label></div>';
+      ' onchange="toggleOnlyEurope(this)"><label for="onlyEurope" style="margin:0;color:#cfd5e2;">' + escapeHtml(t('onlyEurope')) + '</label></div>';
 
     if (!rows.length) {
-      html += '<div class="msg info">' + (onlyEurope
-        ? 'Bu ürün türü için Avrupa\'da atölye bulunamadı. Kutuyu kaldırıp tüm sağlayıcılara bakabilirsin.'
-        : 'Bu ürün türü için sağlayıcı bulunamadı.') + '</div>';
+      html += '<div class="msg info">' + escapeHtml(onlyEurope ? t('noEurope') : t('noProviders')) + '</div>';
       body.innerHTML = html;
       return;
     }
 
-    html += '<div class="table-wrap"><table><thead><tr><th>Sağlayıcı</th><th>Bölge</th><th>Üretim süresi</th>' +
-      targets.map(t => '<th>' + escapeHtml(COUNTRY_NAMES[t] || t) + '</th>').join('') + '<th></th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table><thead><tr><th>' + escapeHtml(t('thProvider')) + '</th><th>' + escapeHtml(t('thRegion')) + '</th><th>' + escapeHtml(t('thHandling')) + '</th>' +
+      targets.map(tg => '<th>' + escapeHtml(countryName(tg)) + '</th>').join('') + '<th></th></tr></thead><tbody>';
     rows.forEach(p => {
       const loc = [p.city, p.country].filter(Boolean).map(escapeHtml).join(', ');
-      html += '<tr><td><div class="prov-name">' + escapeHtml(p.title) + '</div><div class="prov-loc">' + (loc || 'Konum bilgisi yok') + '</div></td>' +
-        '<td><span class="badge badge-' + p.region + '">' + REGION_LABEL[p.region] + '</span></td>' +
+      const region = ['eu', 'europe', 'other'].indexOf(p.region) >= 0 ? p.region : 'other';
+      html += '<tr><td><div class="prov-name">' + escapeHtml(p.title) + '</div><div class="prov-loc">' + (loc || escapeHtml(t('noLocation'))) + '</div></td>' +
+        '<td><span class="badge badge-' + region + '">' + escapeHtml(regions[region]) + '</span></td>' +
         '<td>' + fmtHandling(p.handling_time) + '</td>';
-      targets.forEach(t => {
-        const s = p.ship && p.ship[t];
+      targets.forEach(tg => {
+        const s = p.ship && p.ship[tg];
         if (!s) {
-          html += '<td><span class="price na">' + (p.error ? '?' : 'Gönderilmiyor') + '</span></td>';
+          html += '<td><span class="price na">' + (p.error ? '?' : escapeHtml(t('notShipped'))) + '</span></td>';
         } else {
-          const isBest = best[t] !== null && s.cost === best[t];
+          const isBest = best[tg] !== null && s.cost === best[tg];
           html += '<td><span class="price' + (isBest ? ' best' : '') + '">' + fmtMoney(s) + (s.rest ? '*' : '') + '</span></td>';
         }
       });
       const goUrl = 'pod.html?bp=' + encodeURIComponent(selectedBp.id) + '&pp=' + encodeURIComponent(p.id) +
         '&t=' + encodeURIComponent(selectedBp.title || '');
-      html += '<td><a class="go-btn" href="' + goUrl + '">Bu atölyeyle devam et →</a></td>';
+      html += '<td><a class="go-btn" href="' + escapeHtml(goUrl) + '">' + escapeHtml(t('goOn')) + '</a></td>';
       html += '</tr>';
     });
-    html += '</tbody></table></div>' +
-      '<div class="legend">Kargo ücretleri tek ürün içindir (ilk ürün). Yeşil, o ülke için listedeki en ucuz seçenektir. ' +
-      '* işareti, ülkeye özel tarife olmadığı için "dünyanın geri kalanı" tarifesinin kullanıldığı anlamına gelir. ' +
-      'Ürünün kendi baskı maliyeti sağlayıcıya göre değişir, onu taslak ürün oluştururken göreceksin.</div>';
+    html += '</tbody></table></div><div class="legend">' + escapeHtml(t('legend')) + '</div>';
     body.innerHTML = html;
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str == null ? '' : str;
-    return div.innerHTML;
-  }
-
   async function logout() {
-    await supabaseClient.auth.signOut();
+    await db.auth.signOut();
     window.location.href = 'index.html';
   }
+
+  function onLangChange() {
+    applyStatic();
+    renderMsg('searchMsg', searchMsgState);
+    if (selectedBp) {
+      renderResultTitle();
+      renderMsg('resultMsg', resultMsgState);
+      renderTable();
+    }
+  }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
 
   init();
 </script>
