@@ -5,53 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ayarlar - HızlıSatıcı AI</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .back-link {
-    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
-  }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; white-space: nowrap; }
   .back-link:hover { color: #fff; }
 
-  main {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 32px 24px 120px;
-  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 24px 120px; }
   h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
   .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
 
   .section-title {
     font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
-    letter-spacing: 0.03em; margin: 28px 0 12px;
-    scroll-margin-top: 20px;
+    letter-spacing: 0.03em; margin: 28px 0 12px; scroll-margin-top: 20px;
   }
-  .card {
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-    padding: 20px;
-  }
+  .card { background: #141821; border-radius: 14px; border: 1px solid #232838; padding: 20px; }
   .card-desc { font-size: 13px; color: #9aa3b2; margin-bottom: 16px; line-height: 1.5; }
   .notice {
     font-size: 13px; line-height: 1.5; color: #f2d16b;
@@ -63,43 +46,25 @@
   .full { grid-column: 1 / -1; }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 
-  .field label {
-    display: block; font-size: 13px; font-weight: 600; color: #cfd4de; margin-bottom: 6px;
-  }
-  .field input[type="text"],
-  .field input[type="email"],
-  .field input[type="tel"],
-  .field input[type="url"],
-  .field select,
-  .field textarea {
-    width: 100%;
-    background: #0d0f16;
-    border: 1px solid #2a3040;
-    border-radius: 8px;
-    color: #fff;
-    padding: 10px 12px;
-    font-size: 14px;
-    font-family: inherit;
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #cfd4de; margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="email"], .field input[type="tel"], .field input[type="url"],
+  .field select, .field textarea {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px;
+    color: #fff; padding: 10px 12px; font-size: 14px; font-family: inherit;
   }
   .field textarea { resize: vertical; min-height: 70px; }
-  .field input:focus, .field select:focus, .field textarea:focus {
-    outline: none; border-color: #1D9E75;
-  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #1D9E75; }
   .field input:disabled, .field textarea:disabled { opacity: 0.5; cursor: not-allowed; }
   .field input.invalid { border-color: #e5484d; }
   .hint { font-size: 12px; color: #7d8596; margin-top: 5px; line-height: 1.45; }
   .error-text { font-size: 12px; color: #ff8a8d; margin-top: 5px; display: none; }
 
   .logo-preview {
-    margin-top: 10px; display: none;
-    width: 96px; height: 96px; border-radius: 10px;
-    border: 1px solid #2a3040; background: #0d0f16;
-    object-fit: contain; padding: 6px;
+    margin-top: 10px; display: none; width: 96px; height: 96px; border-radius: 10px;
+    border: 1px solid #2a3040; background: #0d0f16; object-fit: contain; padding: 6px;
   }
 
-  .check-row {
-    display: flex; align-items: flex-start; gap: 10px; padding: 4px 0;
-  }
+  .check-row { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; }
   .check-row input[type="checkbox"] {
     width: 18px; height: 18px; margin-top: 1px; accent-color: #1D9E75; flex-shrink: 0; cursor: pointer;
   }
@@ -109,15 +74,8 @@
   .epr-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
   @media (max-width: 600px) { .epr-list { grid-template-columns: 1fr; } }
 
-  .save-bar {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    background: #141821; border-top: 1px solid #232838;
-    padding: 14px 24px;
-  }
-  .save-inner {
-    max-width: 760px; margin: 0 auto;
-    display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  }
+  .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #141821; border-top: 1px solid #232838; padding: 14px 24px; }
+  .save-inner { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .status { font-size: 13px; color: #9aa3b2; }
   .status.ok { color: #6ee7b7; }
   .status.err { color: #ff8a8d; }
@@ -130,6 +88,7 @@
 
   .loading { text-align: center; color: #9aa3b2; padding: 60px 0; font-size: 14px; }
   .hidden { display: none !important; }
+  @media (max-width: 600px) { header { padding: 14px 16px; } main { padding: 24px 16px 120px; } }
 </style>
 </head>
 <body>
@@ -139,203 +98,200 @@
     <div class="logo-dot">H</div>
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
+  </div>
 </header>
 
 <main>
-  <h1>⚙️ Ayarlar</h1>
-  <p class="subtitle">Dil, bölge, işletme, marka ve vergi bilgilerin. Fiyat, kâr, fatura ve vergi hesapları bu bilgilere göre yapılır.</p>
+  <h1 data-t="title"></h1>
+  <p class="subtitle" data-t="subtitle"></p>
 
-  <div id="loading" class="loading">Yükleniyor...</div>
+  <div id="loading" class="loading" data-t="loading"></div>
 
   <form id="settingsForm" class="hidden" novalidate>
 
     <!-- ========== DİL VE BÖLGE ========== -->
-    <div class="section-title" id="bolge">🌍 Dil ve Bölge</div>
+    <div class="section-title" id="bolge" data-t="secRegion"></div>
     <div class="card">
       <div class="grid">
         <div class="field">
-          <label for="ui_language">Arayüz dili</label>
+          <label for="ui_language" data-t="lUiLang"></label>
           <select id="ui_language">
             <option value="tr">Türkçe</option>
             <option value="en">English</option>
           </select>
-          <div class="hint">Paneli hangi dilde görmek istediğin. İlan dili bundan bağımsızdır, pazaryerine göre otomatik seçilir.</div>
+          <div class="hint" data-t="hUiLang"></div>
         </div>
         <div class="field">
-          <label for="home_country">Ülken</label>
+          <label for="home_country" data-t="lCountry"></label>
           <select id="home_country"></select>
-          <div class="hint">İşletmenin kayıtlı olduğu ülke.</div>
+          <div class="hint" data-t="hCountry"></div>
         </div>
         <div class="field">
-          <label for="home_currency">Para birimin</label>
+          <label for="home_currency" data-t="lCurrency"></label>
           <select id="home_currency"></select>
-          <div class="hint">Toplam kâr ve raporlar bu para biriminde gösterilir.</div>
+          <div class="hint" data-t="hCurrency"></div>
         </div>
         <div class="field">
-          <label for="timezone">Saat dilimi</label>
+          <label for="timezone" data-t="lTimezone"></label>
           <select id="timezone"></select>
         </div>
       </div>
     </div>
 
     <!-- ========== İŞLETME BİLGİLERİ ========== -->
-    <div class="section-title" id="isletme">🏢 İşletme Bilgileri</div>
+    <div class="section-title" id="isletme" data-t="secBusiness"></div>
     <div class="card">
       <div class="grid">
         <div class="field full">
-          <label for="business_type">İş türü</label>
+          <label for="business_type" data-t="lBizType"></label>
           <select id="business_type">
-            <option value="">Seçiniz</option>
-            <option value="individual">Bireysel (şirketim yok)</option>
-            <option value="sole_proprietor">Şahıs şirketi</option>
-            <option value="company">Limited / Anonim şirket</option>
+            <option value="" data-t="optSelect"></option>
+            <option value="individual" data-t="optIndividual"></option>
+            <option value="sole_proprietor" data-t="optSole"></option>
+            <option value="company" data-t="optCompany"></option>
           </select>
-          <div class="hint">Çoğu pazaryeri (Allegro, Amazon, Otto) satış için şahıs şirketi veya şirket istiyor.</div>
+          <div class="hint" data-t="hBizType"></div>
         </div>
         <div class="field full">
-          <label for="company_name">Şirket / işletme adı (resmi)</label>
+          <label for="company_name" data-t="lCompany"></label>
           <input type="text" id="company_name" maxlength="200">
-          <div class="hint">Vergi levhasındaki resmi ad.</div>
+          <div class="hint" data-t="hCompany"></div>
         </div>
         <div class="field">
-          <label for="tax_office">Vergi dairesi</label>
+          <label for="tax_office" data-t="lTaxOffice"></label>
           <input type="text" id="tax_office" maxlength="100">
         </div>
         <div class="field">
-          <label for="tax_number">Vergi numarası</label>
+          <label for="tax_number" data-t="lTaxNo"></label>
           <input type="text" id="tax_number" maxlength="30">
-          <div class="hint">Faturalarında da bu numara kullanılır.</div>
+          <div class="hint" data-t="hTaxNo"></div>
         </div>
       </div>
     </div>
 
     <!-- ========== MARKA ========== -->
-    <div class="section-title" id="marka">🎨 Marka</div>
+    <div class="section-title" id="marka" data-t="secBrand"></div>
     <div class="card">
-      <div class="card-desc">Faturalarında ve mağazanda görünecek marka bilgileri.</div>
-      <div class="notice hidden" id="brandNoStore">
-        Marka bilgileri mağazana bağlı. Önce <a href="magazani-kur.html">Mağazanı Kur</a> ile mağazanı oluştur, sonra buradan marka bilgilerini girebilirsin.
-      </div>
+      <div class="card-desc" data-t="dBrand"></div>
+      <div class="notice hidden" id="brandNoStore" data-th="noStore"></div>
       <div class="grid">
         <div class="field full">
-          <label for="brand_name">Marka adı</label>
-          <input type="text" id="brand_name" maxlength="120" placeholder="Örn: Yokyok">
-          <div class="hint">Müşterinin gördüğü ad. Resmi şirket adından farklı olabilir.</div>
+          <label for="brand_name" data-t="lBrandName"></label>
+          <input type="text" id="brand_name" maxlength="120" data-tp="phBrandName">
+          <div class="hint" data-t="hBrandName"></div>
         </div>
         <div class="field full">
-          <label for="brand_logo_url">Logo görsel adresi (URL)</label>
+          <label for="brand_logo_url" data-t="lLogo"></label>
           <input type="url" id="brand_logo_url" maxlength="500" placeholder="https://...">
-          <img id="logoPreview" class="logo-preview" alt="Logo önizleme">
-          <div class="error-text" id="logoError">Adres "https://" ile başlamalı.</div>
+          <img id="logoPreview" class="logo-preview" alt="">
+          <div class="error-text" id="logoError" data-t="eLogo"></div>
         </div>
         <div class="field full">
-          <label for="brand_address">Fatura adresi</label>
-          <textarea id="brand_address" maxlength="500" placeholder="Faturalarda görünecek adres"></textarea>
+          <label for="brand_address" data-t="lInvAddress"></label>
+          <textarea id="brand_address" maxlength="500" data-tp="phInvAddress"></textarea>
         </div>
       </div>
     </div>
 
     <!-- ========== VERGİ ========== -->
-    <div class="section-title" id="vergi">🧾 Vergi</div>
+    <div class="section-title" id="vergi" data-t="secTax"></div>
     <div class="card">
-      <div class="card-desc">Kâr hesabında KDV'nin kimden düşüleceği bu bilgilere göre belirlenir. Emin olmadığın alanları boş bırakabilirsin, sonra mali müşavirinle birlikte doldurursun.</div>
+      <div class="card-desc" data-t="dTax"></div>
 
       <div class="check-row">
         <input type="checkbox" id="vat_registered">
         <div>
-          <label for="vat_registered">KDV mükellefiyim</label>
-          <div class="hint">Faturalarında KDV gösteriyorsan işaretle.</div>
+          <label for="vat_registered" data-t="lVatReg"></label>
+          <div class="hint" data-t="hVatReg"></div>
         </div>
       </div>
       <div class="field hidden" id="vatNumberWrap" style="margin: 10px 0 6px 28px;">
-        <label for="vat_number">KDV numarası</label>
+        <label for="vat_number" data-t="lVatNo"></label>
         <input type="text" id="vat_number" maxlength="30">
       </div>
 
       <div class="check-row" style="margin-top: 12px;">
         <input type="checkbox" id="oss_registered">
         <div>
-          <label for="oss_registered">AB OSS (Tek Durak) kaydım var</label>
-          <div class="hint">AB içindeki depodan başka AB ülkelerine satış yapıyorsan, KDV'yi tek bir ülkeden beyan etmeni sağlayan sistem.</div>
+          <label for="oss_registered" data-t="lOss"></label>
+          <div class="hint" data-t="hOss"></div>
         </div>
       </div>
 
       <div class="grid" style="margin-top: 18px;">
         <div class="field">
-          <label for="ioss_number">IOSS numarası</label>
+          <label for="ioss_number" data-t="lIoss"></label>
           <input type="text" id="ioss_number" maxlength="12" placeholder="IM1234567890">
-          <div class="hint">AB dışından AB'ye 150 € altı gönderim için. "IM" + 10 rakam.</div>
-          <div class="error-text" id="iossError">Format hatalı: "IM" ile başlayıp 10 rakamla devam etmeli.</div>
+          <div class="hint" data-t="hIoss"></div>
+          <div class="error-text" id="iossError" data-t="eIoss"></div>
         </div>
         <div class="field">
-          <label for="eori_number">EORI numarası</label>
+          <label for="eori_number" data-t="lEori"></label>
           <input type="text" id="eori_number" maxlength="17" placeholder="TR1234567890">
-          <div class="hint">AB ile gümrüklü ticaret yapan her işletmenin gümrük kimlik numarası.</div>
-          <div class="error-text" id="eoriError">Format hatalı: 2 harfli ülke kodu + en fazla 15 harf/rakam.</div>
+          <div class="hint" data-t="hEori"></div>
+          <div class="error-text" id="eoriError" data-t="eEori"></div>
         </div>
       </div>
     </div>
 
     <!-- ========== AB YASAL BİLGİLERİ ========== -->
-    <div class="section-title" id="ab">🇪🇺 AB Yasal Bilgileri</div>
+    <div class="section-title" id="ab" data-t="secEu"></div>
     <div class="card">
-      <div class="card-desc">
-        <strong>GPSR sorumlu kişi:</strong> AB'de satılan her ürün için AB içinde bir sorumlu kişi/firma bulunmak zorunda. Pazaryerleri bu bilgi olmadan ilanı kapatabiliyor. AB dışındaysan bu hizmeti veren bir firmayla anlaşman ya da tedarikçinin bilgisini kullanman gerekir.
-      </div>
+      <div class="card-desc" data-th="dGpsr"></div>
       <div class="grid">
         <div class="field full">
-          <label for="gpsr_name">Sorumlu kişi / firma adı</label>
+          <label for="gpsr_name" data-t="lGpsrName"></label>
           <input type="text" id="gpsr_name" maxlength="200">
         </div>
         <div class="field full">
-          <label for="gpsr_address">Adres (AB içinde)</label>
+          <label for="gpsr_address" data-t="lGpsrAddress"></label>
           <textarea id="gpsr_address" maxlength="500"></textarea>
         </div>
         <div class="field">
-          <label for="gpsr_email">E-posta</label>
+          <label for="gpsr_email" data-t="lEmail"></label>
           <input type="email" id="gpsr_email" maxlength="200">
-          <div class="error-text" id="gpsrEmailError">Geçerli bir e-posta adresi gir.</div>
+          <div class="error-text" id="gpsrEmailError" data-t="eEmail"></div>
         </div>
         <div class="field">
-          <label for="gpsr_phone">Telefon</label>
+          <label for="gpsr_phone" data-t="lPhone"></label>
           <input type="tel" id="gpsr_phone" maxlength="40">
         </div>
       </div>
 
-      <div class="card-desc" style="margin-top: 22px;">
-        <strong>Ambalaj (EPR) kayıt numaraları:</strong> Bazı ülkelerde satış yapmak için ambalaj kayıt numarası gerekiyor (Almanya'da LUCID, Fransa'da UIN). Sadece satış yaptığın ülkeleri doldur.
-      </div>
+      <div class="card-desc" style="margin-top: 22px;" data-th="dEpr"></div>
       <div class="epr-list" id="eprList"></div>
     </div>
 
     <!-- ========== İADE ADRESİ ========== -->
-    <div class="section-title" id="iade">📦 İade Adresi</div>
+    <div class="section-title" id="iade" data-t="secReturn"></div>
     <div class="card">
-      <div class="card-desc">Müşteri iadelerinin gönderileceği adres. AB'de 14 gün cayma hakkı olduğu için pazaryerleri bu bilgiyi istiyor.</div>
+      <div class="card-desc" data-t="dReturn"></div>
       <div class="grid">
         <div class="field full">
-          <label for="ret_name">Alıcı adı</label>
+          <label for="ret_name" data-t="lRetName"></label>
           <input type="text" id="ret_name" maxlength="200">
         </div>
         <div class="field full">
-          <label for="ret_address">Adres</label>
+          <label for="ret_address" data-t="lAddress"></label>
           <textarea id="ret_address" maxlength="500"></textarea>
         </div>
         <div class="field">
-          <label for="ret_city">Şehir</label>
+          <label for="ret_city" data-t="lCity"></label>
           <input type="text" id="ret_city" maxlength="100">
         </div>
         <div class="field">
-          <label for="ret_postal">Posta kodu</label>
+          <label for="ret_postal" data-t="lPostal"></label>
           <input type="text" id="ret_postal" maxlength="20">
         </div>
         <div class="field">
-          <label for="ret_country">Ülke</label>
+          <label for="ret_country" data-t="lCountryShort"></label>
           <select id="ret_country"></select>
         </div>
         <div class="field">
-          <label for="ret_phone">Telefon</label>
+          <label for="ret_phone" data-t="lPhone"></label>
           <input type="tel" id="ret_phone" maxlength="40">
         </div>
       </div>
@@ -347,14 +303,189 @@
 <div class="save-bar hidden" id="saveBar">
   <div class="save-inner">
     <div class="status" id="status"></div>
-    <button class="btn" id="saveBtn" type="button">Kaydet</button>
+    <button class="btn" id="saveBtn" type="button" data-t="save"></button>
   </div>
 </div>
 
 <script>
 const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let db = null;
+
+// ================= DİL =================
+const T = {
+  tr: {
+    pageTitle: 'Ayarlar - HızlıSatıcı AI',
+    back: '← Panele dön',
+    title: '⚙️ Ayarlar',
+    subtitle: 'Dil, bölge, işletme, marka ve vergi bilgilerin. Fiyat, kâr, fatura ve vergi hesapları bu bilgilere göre yapılır.',
+    loading: 'Yükleniyor...',
+    loadFail: 'Ayarlar yüklenemedi: ',
+    secRegion: '🌍 Dil ve Bölge',
+    lUiLang: 'Arayüz dili',
+    hUiLang: 'Paneli hangi dilde görmek istediğin. Seçince hemen uygulanır. İlan dili bundan bağımsızdır, pazaryerine göre otomatik seçilir.',
+    lCountry: 'Ülken',
+    hCountry: 'İşletmenin kayıtlı olduğu ülke.',
+    lCurrency: 'Para birimin',
+    hCurrency: 'Toplam kâr ve raporlar bu para biriminde gösterilir.',
+    lTimezone: 'Saat dilimi',
+    secBusiness: '🏢 İşletme Bilgileri',
+    lBizType: 'İş türü',
+    optSelect: 'Seçiniz',
+    optIndividual: 'Bireysel (şirketim yok)',
+    optSole: 'Şahıs şirketi',
+    optCompany: 'Limited / Anonim şirket',
+    hBizType: 'Çoğu pazaryeri (Allegro, Amazon, Otto) satış için şahıs şirketi veya şirket istiyor.',
+    lCompany: 'Şirket / işletme adı (resmi)',
+    hCompany: 'Vergi levhasındaki resmi ad.',
+    lTaxOffice: 'Vergi dairesi',
+    lTaxNo: 'Vergi numarası',
+    hTaxNo: 'Faturalarında da bu numara kullanılır.',
+    secBrand: '🎨 Marka',
+    dBrand: 'Faturalarında ve mağazanda görünecek marka bilgileri.',
+    noStore: 'Marka bilgileri mağazana bağlı. Önce <a href="store-builder.html">Mağazanı Kur</a> ile mağazanı oluştur, sonra buradan marka bilgilerini girebilirsin.',
+    lBrandName: 'Marka adı',
+    phBrandName: 'Örn: Yokyok',
+    hBrandName: 'Müşterinin gördüğü ad. Resmi şirket adından farklı olabilir.',
+    lLogo: 'Logo görsel adresi (URL)',
+    eLogo: 'Adres "https://" ile başlamalı.',
+    lInvAddress: 'Fatura adresi',
+    phInvAddress: 'Faturalarda görünecek adres',
+    secTax: '🧾 Vergi',
+    dTax: "Kâr hesabında KDV'nin kimden düşüleceği bu bilgilere göre belirlenir. Emin olmadığın alanları boş bırakabilirsin, sonra mali müşavirinle birlikte doldurursun.",
+    lVatReg: 'KDV mükellefiyim',
+    hVatReg: 'Faturalarında KDV gösteriyorsan işaretle.',
+    lVatNo: 'KDV numarası',
+    lOss: 'AB OSS (Tek Durak) kaydım var',
+    hOss: "AB içindeki depodan başka AB ülkelerine satış yapıyorsan, KDV'yi tek bir ülkeden beyan etmeni sağlayan sistem.",
+    lIoss: 'IOSS numarası',
+    hIoss: 'AB dışından AB\'ye 150 € altı gönderim için. "IM" + 10 rakam.',
+    eIoss: 'Format hatalı: "IM" ile başlayıp 10 rakamla devam etmeli.',
+    lEori: 'EORI numarası',
+    hEori: 'AB ile gümrüklü ticaret yapan her işletmenin gümrük kimlik numarası.',
+    eEori: 'Format hatalı: 2 harfli ülke kodu + en fazla 15 harf/rakam.',
+    secEu: '🇪🇺 AB Yasal Bilgileri',
+    dGpsr: '<strong>GPSR sorumlu kişi:</strong> AB\'de satılan her ürün için AB içinde bir sorumlu kişi/firma bulunmak zorunda. Pazaryerleri bu bilgi olmadan ilanı kapatabiliyor. AB dışındaysan bu hizmeti veren bir firmayla anlaşman ya da tedarikçinin bilgisini kullanman gerekir.',
+    lGpsrName: 'Sorumlu kişi / firma adı',
+    lGpsrAddress: 'Adres (AB içinde)',
+    lEmail: 'E-posta',
+    eEmail: 'Geçerli bir e-posta adresi gir.',
+    lPhone: 'Telefon',
+    dEpr: '<strong>Ambalaj (EPR) kayıt numaraları:</strong> Bazı ülkelerde satış yapmak için ambalaj kayıt numarası gerekiyor (Almanya\'da LUCID, Fransa\'da UIN). Sadece satış yaptığın ülkeleri doldur.',
+    epr_DE: 'Almanya – LUCID numarası', epr_FR: 'Fransa – UIN numarası', epr_PL: 'Polonya – BDO numarası',
+    epr_IT: 'İtalya – kayıt numarası', epr_NL: 'Hollanda – kayıt numarası', epr_IE: 'İrlanda – kayıt numarası', epr_DK: 'Danimarka – kayıt numarası',
+    secReturn: '📦 İade Adresi',
+    dReturn: 'Müşteri iadelerinin gönderileceği adres. AB\'de 14 gün cayma hakkı olduğu için pazaryerleri bu bilgiyi istiyor.',
+    lRetName: 'Alıcı adı',
+    lAddress: 'Adres',
+    lCity: 'Şehir',
+    lPostal: 'Posta kodu',
+    lCountryShort: 'Ülke',
+    save: 'Kaydet',
+    saving: 'Kaydediliyor...',
+    saved: '✓ Kaydedildi',
+    saveFail: 'Kaydedilemedi: ',
+    fixRed: 'Kırmızı işaretli alanları düzelt.',
+    langApplied: '✓ Dil değiştirildi',
+    tz: { 'Europe/Istanbul': 'İstanbul (UTC+3)', 'Europe/London': 'Londra', 'Europe/Dublin': 'Dublin', 'Europe/Berlin': 'Berlin',
+      'Europe/Paris': 'Paris', 'Europe/Amsterdam': 'Amsterdam', 'Europe/Rome': 'Roma', 'Europe/Warsaw': 'Varşova',
+      'Europe/Copenhagen': 'Kopenhag', 'America/New_York': 'New York (ABD Doğu)', 'America/Chicago': 'Chicago (ABD Orta)',
+      'America/Denver': 'Denver (ABD Dağ)', 'America/Los_Angeles': 'Los Angeles (ABD Batı)',
+      'America/Toronto': 'Toronto (Kanada Doğu)', 'America/Vancouver': 'Vancouver (Kanada Batı)' },
+    cur: { TRY: 'Türk Lirası (₺)', EUR: 'Euro (€)', USD: 'ABD Doları ($)', GBP: 'İngiliz Sterlini (£)',
+      PLN: 'Polonya Zlotisi (zł)', CAD: 'Kanada Doları (C$)', DKK: 'Danimarka Kronu (kr)' },
+  },
+  en: {
+    pageTitle: 'Settings - HızlıSatıcı AI',
+    back: '← Back to dashboard',
+    title: '⚙️ Settings',
+    subtitle: 'Your language, region, business, brand and tax details. Prices, profit, invoices and taxes are calculated from these.',
+    loading: 'Loading...',
+    loadFail: 'Could not load settings: ',
+    secRegion: '🌍 Language & Region',
+    lUiLang: 'Interface language',
+    hUiLang: 'The language of your dashboard. Applied as soon as you select it. Listing language is separate and chosen automatically per marketplace.',
+    lCountry: 'Your country',
+    hCountry: 'The country where your business is registered.',
+    lCurrency: 'Your currency',
+    hCurrency: 'Total profit and reports are shown in this currency.',
+    lTimezone: 'Time zone',
+    secBusiness: '🏢 Business Details',
+    lBizType: 'Business type',
+    optSelect: 'Select',
+    optIndividual: 'Individual (no company)',
+    optSole: 'Sole proprietorship',
+    optCompany: 'Limited / joint-stock company',
+    hBizType: 'Most marketplaces (Allegro, Amazon, Otto) require a sole proprietorship or company to sell.',
+    lCompany: 'Company / business name (official)',
+    hCompany: 'The official name on your tax certificate.',
+    lTaxOffice: 'Tax office',
+    lTaxNo: 'Tax number',
+    hTaxNo: 'This number is also used on your invoices.',
+    secBrand: '🎨 Brand',
+    dBrand: 'Brand details shown on your invoices and your store.',
+    noStore: 'Brand details are linked to your store. First create your store with <a href="store-builder.html">Build Your Store</a>, then enter your brand details here.',
+    lBrandName: 'Brand name',
+    phBrandName: 'e.g. Yokyok',
+    hBrandName: 'The name customers see. Can differ from your official company name.',
+    lLogo: 'Logo image address (URL)',
+    eLogo: 'The address must start with "https://".',
+    lInvAddress: 'Invoice address',
+    phInvAddress: 'Address shown on invoices',
+    secTax: '🧾 Tax',
+    dTax: 'These details decide how VAT is deducted in profit calculations. You can leave fields empty if unsure and fill them in later with your accountant.',
+    lVatReg: 'I am VAT registered',
+    hVatReg: 'Tick if you show VAT on your invoices.',
+    lVatNo: 'VAT number',
+    lOss: 'I am registered for EU OSS (One-Stop Shop)',
+    hOss: 'If you sell from an EU warehouse to other EU countries, this lets you declare VAT in a single country.',
+    lIoss: 'IOSS number',
+    hIoss: 'For shipments under €150 from outside the EU into the EU. "IM" + 10 digits.',
+    eIoss: 'Invalid format: must start with "IM" followed by 10 digits.',
+    lEori: 'EORI number',
+    hEori: 'Customs ID for every business trading goods with the EU.',
+    eEori: 'Invalid format: 2-letter country code + up to 15 letters/digits.',
+    secEu: '🇪🇺 EU Legal Details',
+    dGpsr: '<strong>GPSR responsible person:</strong> Every product sold in the EU needs a responsible person/company inside the EU. Marketplaces may deactivate listings without it. If you are outside the EU, contract a provider offering this service or use your supplier\'s details.',
+    lGpsrName: 'Responsible person / company name',
+    lGpsrAddress: 'Address (inside the EU)',
+    lEmail: 'Email',
+    eEmail: 'Enter a valid email address.',
+    lPhone: 'Phone',
+    dEpr: '<strong>Packaging (EPR) registration numbers:</strong> Some countries require a packaging registration number to sell (LUCID in Germany, UIN in France). Only fill in the countries you sell to.',
+    epr_DE: 'Germany – LUCID number', epr_FR: 'France – UIN number', epr_PL: 'Poland – BDO number',
+    epr_IT: 'Italy – registration number', epr_NL: 'Netherlands – registration number', epr_IE: 'Ireland – registration number', epr_DK: 'Denmark – registration number',
+    secReturn: '📦 Return Address',
+    dReturn: 'Where customer returns are sent. Marketplaces require this because of the 14-day withdrawal right in the EU.',
+    lRetName: 'Recipient name',
+    lAddress: 'Address',
+    lCity: 'City',
+    lPostal: 'Postal code',
+    lCountryShort: 'Country',
+    save: 'Save',
+    saving: 'Saving...',
+    saved: '✓ Saved',
+    saveFail: 'Could not save: ',
+    fixRed: 'Please fix the fields marked in red.',
+    langApplied: '✓ Language changed',
+    tz: { 'Europe/Istanbul': 'Istanbul (UTC+3)', 'Europe/London': 'London', 'Europe/Dublin': 'Dublin', 'Europe/Berlin': 'Berlin',
+      'Europe/Paris': 'Paris', 'Europe/Amsterdam': 'Amsterdam', 'Europe/Rome': 'Rome', 'Europe/Warsaw': 'Warsaw',
+      'Europe/Copenhagen': 'Copenhagen', 'America/New_York': 'New York (US Eastern)', 'America/Chicago': 'Chicago (US Central)',
+      'America/Denver': 'Denver (US Mountain)', 'America/Los_Angeles': 'Los Angeles (US Pacific)',
+      'America/Toronto': 'Toronto (Canada Eastern)', 'America/Vancouver': 'Vancouver (Canada Pacific)' },
+    cur: { TRY: 'Turkish Lira (₺)', EUR: 'Euro (€)', USD: 'US Dollar ($)', GBP: 'British Pound (£)',
+      PLN: 'Polish Złoty (zł)', CAD: 'Canadian Dollar (C$)', DKK: 'Danish Krone (kr)' },
+  }
+};
+
+function lang() {
+  const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+  return T[l] ? l : 'tr';
+}
+function t(key) {
+  const v = T[lang()][key];
+  return v !== undefined ? v : (T.tr[key] !== undefined ? T.tr[key] : key);
+}
 
 // Ülkeye göre varsayılan saat dilimi
 const DEFAULT_TIMEZONE = {
@@ -362,52 +493,28 @@ const DEFAULT_TIMEZONE = {
   US: 'America/New_York', IT: 'Europe/Rome', IE: 'Europe/Dublin', CA: 'America/Toronto',
   DK: 'Europe/Copenhagen', NL: 'Europe/Amsterdam', FR: 'Europe/Paris'
 };
-
-const TIMEZONES = [
-  ['Europe/Istanbul', 'İstanbul (UTC+3)'],
-  ['Europe/London', 'Londra'],
-  ['Europe/Dublin', 'Dublin'],
-  ['Europe/Berlin', 'Berlin'],
-  ['Europe/Paris', 'Paris'],
-  ['Europe/Amsterdam', 'Amsterdam'],
-  ['Europe/Rome', 'Roma'],
-  ['Europe/Warsaw', 'Varşova'],
-  ['Europe/Copenhagen', 'Kopenhag'],
-  ['America/New_York', 'New York (ABD Doğu)'],
-  ['America/Chicago', 'Chicago (ABD Orta)'],
-  ['America/Denver', 'Denver (ABD Dağ)'],
-  ['America/Los_Angeles', 'Los Angeles (ABD Batı)'],
-  ['America/Toronto', 'Toronto (Kanada Doğu)'],
-  ['America/Vancouver', 'Vancouver (Kanada Batı)']
-];
-
-const CURRENCY_NAMES = {
-  TRY: 'Türk Lirası (₺)', EUR: 'Euro (€)', USD: 'ABD Doları ($)', GBP: 'İngiliz Sterlini (£)',
-  PLN: 'Polonya Zlotisi (zł)', CAD: 'Kanada Doları (C$)', DKK: 'Danimarka Kronu (kr)'
-};
-
-// EPR (ambalaj kaydı) istenen ülkeler
-const EPR_LABELS = {
-  DE: 'Almanya – LUCID numarası',
-  FR: 'Fransa – UIN numarası',
-  PL: 'Polonya – BDO numarası',
-  IT: 'İtalya – kayıt numarası',
-  NL: 'Hollanda – kayıt numarası',
-  IE: 'İrlanda – kayıt numarası',
-  DK: 'Danimarka – kayıt numarası'
-};
-
+const TIMEZONE_KEYS = ['Europe/Istanbul', 'Europe/London', 'Europe/Dublin', 'Europe/Berlin', 'Europe/Paris',
+  'Europe/Amsterdam', 'Europe/Rome', 'Europe/Warsaw', 'Europe/Copenhagen', 'America/New_York', 'America/Chicago',
+  'America/Denver', 'America/Los_Angeles', 'America/Toronto', 'America/Vancouver'];
+const EPR_CODES = ['DE', 'FR', 'PL', 'IT', 'NL', 'IE', 'DK'];
 const BRAND_FIELDS = ['brand_name', 'brand_logo_url', 'brand_address'];
 
 let currentUserId = null;
 let countries = [];
+let currencies = [];
 let hasStore = false;
+let lastStatusKey = null;
 
 const $ = (id) => document.getElementById(id);
 
-function setStatus(text, type) {
+function escapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function setStatus(key, type, extra) {
   const el = $('status');
-  el.textContent = text || '';
+  lastStatusKey = key ? { key, type, extra } : null;
+  el.textContent = key ? t(key) + (extra || '') : '';
   el.className = 'status' + (type ? ' ' + type : '');
 }
 
@@ -416,98 +523,86 @@ function valOrNull(id) {
   return v === '' ? null : v;
 }
 
-async function init() {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
-  currentUserId = session.user.id;
-
-  try {
-    await loadCountries();
-    buildTimezoneSelect();
-    buildEprList();
-    await loadProfile();
-    await loadBrand();
-    $('loading').classList.add('hidden');
-    $('settingsForm').classList.remove('hidden');
-    $('saveBar').classList.remove('hidden');
-
-    // Adreste #marka gibi bölüm varsa oraya kaydır
-    if (location.hash) {
-      const target = document.querySelector(location.hash);
-      if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth' }), 100);
-    }
-  } catch (err) {
-    console.error(err);
-    $('loading').textContent = 'Ayarlar yüklenemedi: ' + (err.message || err);
+function countryLabel(c) {
+  if (lang() === 'en') {
+    if (c.name_en) return c.name_en;
+    try { if (Intl.DisplayNames) return new Intl.DisplayNames(['en'], { type: 'region' }).of(c.code); } catch (e) {}
   }
+  return c.name_tr || c.code;
 }
 
-async function loadCountries() {
-  const { data, error } = await supabaseClient
-    .from('countries')
-    .select('code, name_tr, currency, eu_member')
-    .eq('is_active', true)
-    .order('name_tr');
-  if (error) throw error;
-  countries = data || [];
+// ================= METİNLERİ UYGULA =================
+function applyTexts() {
+  document.documentElement.lang = lang();
+  document.title = t('pageTitle');
+  document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-th]').forEach(el => { el.innerHTML = t(el.getAttribute('data-th')); });
+  document.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.getAttribute('data-tp')); });
+  $('logoPreview').alt = lang() === 'en' ? 'Logo preview' : 'Logo önizleme';
+  if (countries.length) buildCountrySelects();
+  buildTimezoneSelect();
+  relabelEpr();
+  if (lastStatusKey) setStatus(lastStatusKey.key, lastStatusKey.type, lastStatusKey.extra);
+}
 
-  const countryOptions = countries
-    .map(c => `<option value="${c.code}">${c.name_tr}</option>`)
-    .join('');
-  $('home_country').innerHTML = countryOptions;
-  $('ret_country').innerHTML = '<option value="">Seçiniz</option>' + countryOptions;
-
-  const currencies = [...new Set(countries.map(c => c.currency.trim()))].sort();
-  $('home_currency').innerHTML = currencies
-    .map(cur => `<option value="${cur}">${CURRENCY_NAMES[cur] || cur}</option>`)
-    .join('');
+function buildCountrySelects() {
+  const keepC = $('home_country').value;
+  const keepR = $('ret_country').value;
+  const keepCur = $('home_currency').value;
+  const sorted = [...countries].sort((a, b) => countryLabel(a).localeCompare(countryLabel(b), lang()));
+  const opts = sorted.map(c => '<option value="' + escapeHtml(c.code) + '">' + escapeHtml(countryLabel(c)) + '</option>').join('');
+  $('home_country').innerHTML = opts;
+  $('ret_country').innerHTML = '<option value="">' + escapeHtml(t('optSelect')) + '</option>' + opts;
+  const curNames = t('cur');
+  $('home_currency').innerHTML = currencies.map(cur => '<option value="' + cur + '">' + escapeHtml(curNames[cur] || cur) + '</option>').join('');
+  if (keepC) { ensureOption('home_country', keepC); $('home_country').value = keepC; }
+  if (keepR) { ensureOption('ret_country', keepR); $('ret_country').value = keepR; }
+  if (keepCur) { ensureOption('home_currency', keepCur); $('home_currency').value = keepCur; }
 }
 
 function buildTimezoneSelect() {
-  $('timezone').innerHTML = TIMEZONES
-    .map(([value, label]) => `<option value="${value}">${label}</option>`)
-    .join('');
+  const keep = $('timezone').value;
+  const names = t('tz');
+  $('timezone').innerHTML = TIMEZONE_KEYS.map(k => '<option value="' + k + '">' + escapeHtml(names[k] || k) + '</option>').join('');
+  if (keep) { ensureOption('timezone', keep); $('timezone').value = keep; }
 }
 
 function buildEprList() {
-  $('eprList').innerHTML = Object.entries(EPR_LABELS).map(([code, label]) => `
-    <div class="field">
-      <label for="epr_${code}">${label}</label>
-      <input type="text" id="epr_${code}" data-epr="${code}" maxlength="60">
-    </div>
-  `).join('');
+  $('eprList').innerHTML = EPR_CODES.map(code =>
+    '<div class="field"><label for="epr_' + code + '" id="eprLbl_' + code + '"></label>' +
+    '<input type="text" id="epr_' + code + '" data-epr="' + code + '" maxlength="60"></div>').join('');
+  relabelEpr();
+}
+function relabelEpr() {
+  EPR_CODES.forEach(code => { const l = $('eprLbl_' + code); if (l) l.textContent = t('epr_' + code); });
+}
+
+// ================= YÜKLEME =================
+async function loadCountries() {
+  const { data, error } = await db.from('countries').select('*').eq('is_active', true).order('name_tr');
+  if (error) throw error;
+  countries = data || [];
+  currencies = [...new Set(countries.map(c => String(c.currency || '').trim()).filter(Boolean))].sort();
+  buildCountrySelects();
 }
 
 async function loadProfile() {
-  let { data: profile, error } = await supabaseClient
-    .from('user_profiles')
-    .select('*')
-    .eq('user_id', currentUserId)
-    .maybeSingle();
+  let { data: profile, error } = await db.from('user_profiles').select('*').eq('user_id', currentUserId).maybeSingle();
   if (error) throw error;
-
   if (!profile) {
-    const { data: created, error: insertError } = await supabaseClient
-      .from('user_profiles')
-      .insert({ user_id: currentUserId })
-      .select('*')
-      .single();
+    const { data: created, error: insertError } = await db.from('user_profiles').insert({ user_id: currentUserId }).select('*').single();
     if (insertError) throw insertError;
     profile = created;
   }
-
   fillForm(profile);
 }
 
 // Marka bilgileri store_settings tablosunda (faturalar buradan okuyor)
 async function loadBrand() {
-  const { data, error } = await supabaseClient
-    .from('store_settings')
+  const { data, error } = await db.from('store_settings')
     .select('business_name, business_logo_url, business_address, business_tax_number')
-    .eq('user_id', currentUserId)
-    .limit(1);
+    .eq('user_id', currentUserId).limit(1);
   if (error) throw error;
-
   hasStore = !!(data && data.length);
 
   if (!hasStore) {
@@ -515,17 +610,12 @@ async function loadBrand() {
     BRAND_FIELDS.forEach(id => { $(id).disabled = true; });
     return;
   }
-
   const s = data[0];
   $('brand_name').value = s.business_name || '';
   $('brand_logo_url').value = s.business_logo_url || '';
   $('brand_address').value = s.business_address || '';
   updateLogoPreview();
-
-  // Eski Marka Ayarları'nda girilmiş vergi no varsa ve profilde yoksa buraya al
-  if (!$('tax_number').value.trim() && s.business_tax_number) {
-    $('tax_number').value = s.business_tax_number;
-  }
+  if (!$('tax_number').value.trim() && s.business_tax_number) $('tax_number').value = s.business_tax_number;
 }
 
 function updateLogoPreview() {
@@ -552,11 +642,12 @@ function ensureOption(selectId, value) {
 }
 
 function fillForm(p) {
-  ensureOption('ui_language', p.ui_language);
-  $('ui_language').value = p.ui_language || 'tr';
+  $('ui_language').value = (p.ui_language || lang()) === 'en' ? 'en' : 'tr';
+  ensureOption('home_country', p.home_country || 'TR');
   $('home_country').value = p.home_country || 'TR';
-  ensureOption('home_currency', (p.home_currency || '').trim());
-  $('home_currency').value = (p.home_currency || 'TRY').trim();
+  const cur = (p.home_currency || 'TRY').trim();
+  ensureOption('home_currency', cur);
+  $('home_currency').value = cur;
   ensureOption('timezone', p.timezone);
   $('timezone').value = p.timezone || 'Europe/Istanbul';
 
@@ -579,15 +670,14 @@ function fillForm(p) {
   $('gpsr_phone').value = g.phone || '';
 
   const epr = p.epr_registrations || {};
-  document.querySelectorAll('[data-epr]').forEach(input => {
-    input.value = epr[input.dataset.epr] || '';
-  });
+  document.querySelectorAll('[data-epr]').forEach(input => { input.value = epr[input.dataset.epr] || ''; });
 
   const r = p.return_address || {};
   $('ret_name').value = r.name || '';
   $('ret_address').value = r.address || '';
   $('ret_city').value = r.city || '';
   $('ret_postal').value = r.postal_code || '';
+  if (r.country) ensureOption('ret_country', r.country);
   $('ret_country').value = r.country || '';
   $('ret_phone').value = r.phone || '';
 }
@@ -599,8 +689,24 @@ function toggleVatNumber() {
 function onCountryChange() {
   const code = $('home_country').value;
   const country = countries.find(c => c.code === code);
-  if (country) $('home_currency').value = country.currency.trim();
+  if (country && country.currency) $('home_currency').value = String(country.currency).trim();
   if (DEFAULT_TIMEZONE[code]) $('timezone').value = DEFAULT_TIMEZONE[code];
+}
+
+// Dil seçilince sayfa hemen o dile geçer ve profile kaydedilir
+async function onLanguageChange() {
+  const newLang = $('ui_language').value;
+  try {
+    if (window.HS && typeof HS.setLang === 'function') {
+      await HS.setLang(newLang);        // profile kaydeder + tüm sayfaya haber verir
+    } else {
+      document.documentElement.lang = newLang;
+      if (window.HS) HS.lang = newLang;
+      await db.from('user_profiles').update({ ui_language: newLang }).eq('user_id', currentUserId);
+    }
+  } catch (e) { console.warn('setLang', e); }
+  applyTexts();
+  setStatus('langApplied', 'ok');
 }
 
 function showFieldError(inputId, errorId, show) {
@@ -610,7 +716,6 @@ function showFieldError(inputId, errorId, show) {
 
 function validate() {
   let ok = true;
-
   const ioss = $('ioss_number').value.trim().toUpperCase();
   $('ioss_number').value = ioss;
   const iossBad = ioss !== '' && !/^IM[0-9]{10}$/.test(ioss);
@@ -632,7 +737,6 @@ function validate() {
   const logoBad = hasStore && logo !== '' && !/^https:\/\/.+/i.test(logo);
   showFieldError('brand_logo_url', 'logoError', logoBad);
   if (logoBad) ok = false;
-
   return ok;
 }
 
@@ -643,18 +747,14 @@ function buildJson(obj) {
 }
 
 async function saveProfile() {
-  setStatus('');
-  if (!validate()) {
-    setStatus('Kırmızı işaretli alanları düzelt.', 'err');
-    return;
-  }
+  setStatus(null);
+  if (!validate()) { setStatus('fixRed', 'err'); return; }
 
   const epr = {};
   document.querySelectorAll('[data-epr]').forEach(input => {
     const v = input.value.trim();
     if (v) epr[input.dataset.epr] = v;
   });
-
   const vatRegistered = $('vat_registered').checked;
   const businessType = valOrNull('business_type');
 
@@ -664,77 +764,97 @@ async function saveProfile() {
     home_country: $('home_country').value,
     home_currency: $('home_currency').value,
     timezone: $('timezone').value,
-
     business_type: businessType,
     company_name: valOrNull('company_name'),
     tax_office: valOrNull('tax_office'),
     tax_number: valOrNull('tax_number'),
-
     vat_registered: vatRegistered,
     vat_number: vatRegistered ? valOrNull('vat_number') : null,
     oss_registered: $('oss_registered').checked,
     ioss_number: valOrNull('ioss_number'),
     eori_number: valOrNull('eori_number'),
-
     gpsr_responsible_person: buildJson({
-      name: $('gpsr_name').value.trim(),
-      address: $('gpsr_address').value.trim(),
-      email: $('gpsr_email').value.trim(),
-      phone: $('gpsr_phone').value.trim()
+      name: $('gpsr_name').value.trim(), address: $('gpsr_address').value.trim(),
+      email: $('gpsr_email').value.trim(), phone: $('gpsr_phone').value.trim()
     }),
     epr_registrations: epr,
-
     return_address: buildJson({
-      name: $('ret_name').value.trim(),
-      address: $('ret_address').value.trim(),
-      city: $('ret_city').value.trim(),
-      postal_code: $('ret_postal').value.trim(),
-      country: $('ret_country').value,
-      phone: $('ret_phone').value.trim()
+      name: $('ret_name').value.trim(), address: $('ret_address').value.trim(),
+      city: $('ret_city').value.trim(), postal_code: $('ret_postal').value.trim(),
+      country: $('ret_country').value, phone: $('ret_phone').value.trim()
     }),
-
     onboarding_completed: !!businessType
   };
 
   const btn = $('saveBtn');
   btn.disabled = true;
-  btn.textContent = 'Kaydediliyor...';
-
+  btn.textContent = t('saving');
   try {
-    const { error } = await supabaseClient
-      .from('user_profiles')
-      .upsert(payload, { onConflict: 'user_id' });
+    const { error } = await db.from('user_profiles').upsert(payload, { onConflict: 'user_id' });
     if (error) throw error;
-
-    // Marka bilgileri + vergi no faturaların okuduğu yere de yazılır
     if (hasStore) {
-      const { error: brandError } = await supabaseClient
-        .from('store_settings')
-        .update({
-          business_name: $('brand_name').value.trim(),
-          business_logo_url: $('brand_logo_url').value.trim(),
-          business_address: $('brand_address').value.trim(),
-          business_tax_number: $('tax_number').value.trim()
-        })
-        .eq('user_id', currentUserId);
+      const { error: brandError } = await db.from('store_settings').update({
+        business_name: $('brand_name').value.trim(),
+        business_logo_url: $('brand_logo_url').value.trim(),
+        business_address: $('brand_address').value.trim(),
+        business_tax_number: $('tax_number').value.trim()
+      }).eq('user_id', currentUserId);
       if (brandError) throw brandError;
     }
-
-    setStatus('✓ Kaydedildi', 'ok');
+    setStatus('saved', 'ok');
   } catch (err) {
     console.error(err);
-    setStatus('Kaydedilemedi: ' + (err.message || err), 'err');
+    setStatus('saveFail', 'err', err.message || String(err));
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Kaydet';
+    btn.textContent = t('save');
+  }
+}
+
+async function init() {
+  try {
+    if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+  } catch (e) { console.warn('HS.init', e); }
+  db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  applyTexts();
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  currentUserId = session.user.id;
+
+  try {
+    buildEprList();
+    await loadCountries();
+    await loadProfile();
+    await loadBrand();
+    applyTexts();
+    $('loading').classList.add('hidden');
+    $('settingsForm').classList.remove('hidden');
+    $('saveBar').classList.remove('hidden');
+    if (location.hash) {
+      const target = document.querySelector(location.hash);
+      if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  } catch (err) {
+    console.error(err);
+    $('loading').textContent = t('loadFail') + (err.message || err);
   }
 }
 
 $('home_country').addEventListener('change', onCountryChange);
+$('ui_language').addEventListener('change', onLanguageChange);
 $('vat_registered').addEventListener('change', toggleVatNumber);
 $('brand_logo_url').addEventListener('input', updateLogoPreview);
 $('saveBtn').addEventListener('click', saveProfile);
-$('settingsForm').addEventListener('input', () => setStatus(''));
+$('settingsForm').addEventListener('input', () => setStatus(null));
+
+// Üstteki bayrak düğmesiyle dil değişirse: sayfa + dil kutusu eşitlenir
+function onLangChange() {
+  if ($('ui_language').value !== lang() && (lang() === 'tr' || lang() === 'en')) $('ui_language').value = lang();
+  applyTexts();
+}
+window.addEventListener('hs:langchange', onLangChange);
+document.addEventListener('hs:langchange', onLangChange);
 
 init();
 </script>
