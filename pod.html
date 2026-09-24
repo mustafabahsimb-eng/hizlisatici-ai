@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Print on Demand</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -14,7 +15,7 @@
     min-height: 100vh;
   }
   header {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
     padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
@@ -24,6 +25,7 @@
     font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
   .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
   .back-link:hover { color: #fff; }
 
@@ -176,6 +178,14 @@
   .pub-item:hover { border-color: #3a4258; }
   .pub-item input { width: auto; margin: 0; }
   .pub-item small { color: #9aa3b2; }
+  @media (max-width: 520px) {
+    header { padding: 14px 16px; }
+    .logo-text { display: none; }
+    main { padding: 20px 16px 90px; }
+    .dd-btn { min-width: 0; width: 100%; }
+    .opt-row .opt-block { min-width: 0; width: 100%; }
+    .dd { display: block; }
+  }
 </style>
 </head>
 <body>
@@ -185,105 +195,108 @@
     <div class="logo-dot">H</div>
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
+  <div class="header-right">
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
+    <span id="langSwitcherHost"></span>
+  </div>
 </header>
 
 <main>
   <h1>Print on Demand</h1>
-  <div class="subtitle">Tişört, kupa, hoodie gibi ürünlere kendi tasarımını bas. Sipariş gelince Printify üretir ve müşteriye gönderir, sen stok tutmazsın.</div>
+  <div class="subtitle" data-t="subtitle"></div>
 
   <!-- Görsel Stüdyosu'ndan gelen tasarım -->
   <div class="card" id="studioCard" style="display:none">
-    <h2>Görsel Stüdyosu'ndan gelen tasarım</h2>
+    <h2 data-t="studioTitle"></h2>
     <div class="row" style="align-items:center">
       <img id="studioThumb" alt="" style="width:90px;height:90px;object-fit:contain;border-radius:8px;background:#e9ecf3">
       <div style="flex:1;min-width:220px">
-        <div class="hint">Tasarımın hazır. Aşağıda ürün türünü seç, 4. adımda baskı alanının altındaki "Stüdyo tasarımını kullan" düğmesine bas.</div>
-        <button class="btn danger small" onclick="dropStudioDesign()">Bu tasarımı kullanma</button>
+        <div class="hint" data-t="studioHint"></div>
+        <button class="btn danger small" onclick="dropStudioDesign()" data-t="studioDrop"></button>
       </div>
     </div>
   </div>
 
   <!-- Printify bağlantısı -->
   <div class="card">
-    <h2>Printify hesabın</h2>
-    <div id="connectBody"><div class="hint">Kontrol ediliyor...</div></div>
+    <h2 data-t="accountTitle"></h2>
+    <div id="connectBody"></div>
   </div>
 
   <div id="studio" style="display:none">
 
     <!-- 1. Ürün türü -->
     <div class="card">
-      <h2><span class="step">1</span> Ürün türünü seç</h2>
-      <div class="hint">Hızlı seçim yap ya da aşağıya yazarak ara (Türkçe veya İngilizce).</div>
+      <h2><span class="step">1</span> <span data-t="s1Title"></span></h2>
+      <div class="hint" data-t="s1Hint"></div>
       <div class="chips" id="quickChips"></div>
       <div class="row">
-        <div style="flex:1; min-width:200px"><input type="text" id="bpQuery" placeholder="Örn: tişört, kupa, poster, phone case..." onkeydown="if(event.key==='Enter')searchTyped()"></div>
-        <button class="btn" onclick="searchTyped()">Ara</button>
+        <div style="flex:1; min-width:200px"><input type="text" id="bpQuery" data-tp="s1Placeholder" onkeydown="if(event.key==='Enter')searchTyped()"></div>
+        <button class="btn" onclick="searchTyped()" data-t="search"></button>
       </div>
       <div class="bp-grid" id="bpGrid"></div>
     </div>
 
     <!-- 2. Sağlayıcı -->
     <div class="card" id="provCard" style="display:none">
-      <h2><span class="step">2</span> Baskı sağlayıcısını seç</h2>
-      <div class="hint">Aynı ürünü farklı baskı atölyeleri üretir. Fiyat, kalite ve üretim yeri sağlayıcıya göre değişir. Maliyeti taslak oluşturunca net göreceksin, istersen farklı sağlayıcıyla tekrar deneyebilirsin.</div>
+      <h2><span class="step">2</span> <span data-t="s2Title"></span></h2>
+      <div class="hint" data-t="s2Hint"></div>
       <div class="prov-list" id="provList"></div>
     </div>
 
     <!-- 3. Renk / beden -->
     <div class="card" id="optCard" style="display:none">
-      <h2><span class="step">3</span> Renk ve bedenleri seç</h2>
-      <div class="hint">Seçtiklerinin kombinasyonları satışa açılır. En fazla 100 varyant seçebilirsin.</div>
+      <h2><span class="step">3</span> <span data-t="s3Title"></span></h2>
+      <div class="hint" data-t="s3Hint"></div>
       <div id="optBody"></div>
       <div class="hint" id="variantCount"></div>
     </div>
 
     <!-- 4. Tasarım -->
     <div class="card" id="designCard" style="display:none">
-      <h2><span class="step">4</span> Tasarımını yükle</h2>
-      <div class="hint">Şeffaf arka planlı PNG en iyi sonucu verir. Baskı yapmak istediğin her alan için ayrı tasarım yükleyebilirsin (ör. ön ve arka). Boş bıraktığın alana baskı yapılmaz.</div>
+      <h2><span class="step">4</span> <span data-t="s4Title"></span></h2>
+      <div class="hint" data-t="s4Hint"></div>
       <div class="design-grid" id="designGrid"></div>
     </div>
 
     <!-- 5. Ürün bilgisi -->
     <div class="card" id="infoCard" style="display:none">
-      <h2><span class="step">5</span> Ürün bilgisi ve taslak</h2>
-      <div class="hint">Printify'da yayınlanmamış bir taslak oluşturulur. Gerçek maliyetler bu taslaktan okunur, sonra fiyatını kâra göre ayarlarsın.</div>
-      <div style="margin-bottom:12px"><label>Ürün başlığı</label><input type="text" id="pTitle" placeholder="Örn: Komik Kedi Baskılı Unisex Tişört"></div>
-      <div style="margin-bottom:12px"><label>Açıklama</label><textarea id="pDesc" placeholder="Ürün açıklaması (boş bırakırsan başlık kullanılır)"></textarea></div>
+      <h2><span class="step">5</span> <span data-t="s5Title"></span></h2>
+      <div class="hint" data-t="s5Hint"></div>
+      <div style="margin-bottom:12px"><label data-t="pTitleLabel"></label><input type="text" id="pTitle" data-tp="pTitlePh"></div>
+      <div style="margin-bottom:12px"><label data-t="pDescLabel"></label><textarea id="pDesc" data-tp="pDescPh"></textarea></div>
       <div class="fields">
-        <div><label>Başlangıç satış fiyatı ($)</label><input type="number" id="pPrice" value="29.99" step="0.01" min="1"></div>
+        <div><label data-t="pPriceLabel"></label><input type="number" id="pPrice" value="29.99" step="0.01" min="1"></div>
       </div>
       <div class="row">
-        <button class="btn" id="draftBtn" onclick="createDraft()">Taslak oluştur ve gerçek maliyeti göster</button>
+        <button class="btn" id="draftBtn" onclick="createDraft()" data-t="draftBtn"></button>
         <span class="status-line" id="draftStatus"></span>
       </div>
     </div>
 
     <!-- 6. Sonuç -->
     <div class="card" id="resultCard" style="display:none">
-      <h2><span class="step">6</span> Taslak ürün ve gerçek maliyet</h2>
+      <h2><span class="step">6</span> <span data-t="s6Title"></span></h2>
       <div class="hint" id="rInfo"></div>
       <div class="mock-grid" id="rMock"></div>
       <div class="fields">
-        <div><label>Satış platformu (komisyon için)</label><select id="platformSel" onchange="onPlatformChange()"></select></div>
-        <div><label>Komisyon % (tahmini, değiştirebilirsin)</label><input type="number" id="commission" step="0.1" min="0" oninput="recalcAll()"></div>
-        <div><label>Hedef net marj %</label><input type="number" id="targetMargin" value="35" step="1" min="1" max="80"></div>
-        <div><button class="btn secondary" onclick="applyMargin()">Tüm fiyatlara uygula</button></div>
+        <div><label data-t="platformLabel"></label><select id="platformSel" onchange="onPlatformChange()"></select></div>
+        <div><label data-t="commissionLabel"></label><input type="number" id="commission" step="0.1" min="0" oninput="recalcAll()"></div>
+        <div><label data-t="marginLabel"></label><input type="number" id="targetMargin" value="35" step="1" min="1" max="80"></div>
+        <div><button class="btn secondary" onclick="applyMargin()" data-t="applyAll"></button></div>
       </div>
       <div class="tbl-wrap">
         <table class="tbl">
-          <thead><tr><th>Varyant</th><th>Printify maliyeti</th><th>Satış fiyatı ($)</th><th>Net kâr</th><th>Net marj</th></tr></thead>
+          <thead><tr><th data-t="thVariant"></th><th data-t="thCost"></th><th data-t="thPrice"></th><th data-t="thNet"></th><th data-t="thMargin"></th></tr></thead>
           <tbody id="rBody"></tbody>
         </table>
       </div>
-      <div class="hint">Net kâr = satış fiyatı − platform komisyonu − Printify maliyeti. Kargo ücretini Printify siparişte ayrıca keser, müşteriden tahsil etmek istersen fiyata yansıt.</div>
+      <div class="hint" data-t="netHint"></div>
       <div id="rShip"></div>
       <div class="row" style="margin-top:14px">
-        <button class="btn" onclick="savePrices()">Fiyatları Printify'a kaydet</button>
-        <button class="btn" onclick="addToPanel()">Panele ürün olarak ekle</button>
-        <button class="btn danger" onclick="deleteCurrent()">Taslağı sil</button>
+        <button class="btn" onclick="savePrices()" data-t="savePrices"></button>
+        <button class="btn" onclick="addToPanel()" data-t="addToPanel"></button>
+        <button class="btn danger" onclick="deleteCurrent()" data-t="deleteDraft"></button>
       </div>
       <div id="rMsg"></div>
 
@@ -291,21 +304,21 @@
         <div id="pubShopsInfo"></div>
         <div id="pubForm" style="display:none">
           <div class="fields">
-            <div><label>Platform</label><select id="pubMain" onchange="renderPubExtra()"></select></div>
+            <div><label data-t="pubPlatform"></label><select id="pubMain" onchange="renderPubExtra()"></select></div>
           </div>
           <div id="pubExtraWrap" style="display:none">
-            <label>Ayrıca şu platformlarda da yayınla (opsiyonel)</label>
-            <div class="hint" style="margin-top:0">İşaretlediğin her platform için aynı ürün (aynı tasarım, varyantlar ve fiyatlar) o mağazada da oluşturulup yayınlanır.</div>
+            <label data-t="pubAlso"></label>
+            <div class="hint" style="margin-top:0" data-t="pubAlsoHint"></div>
             <div class="pub-grid" id="pubExtra"></div>
           </div>
-          <div class="warn-box">Yabancı platformlarda ilan İngilizce olmalı, yoksa aramada görünmez. Aşağıdaki "İngilizceye çevir" butonu başlık, açıklama ve etiketleri çevirir; yayınlamadan önce kontrol edip düzenleyebilirsin. Etsy mağazanın dilini de Etsy panelinden İngilizce yapmalısın.</div>
-          <div style="margin-bottom:12px"><label>Başlık (TR)</label><input type="text" id="pubTitleTr" placeholder="Türkçe başlık"></div>
-          <div style="margin-bottom:12px"><label>Açıklama (TR)</label><textarea id="pubDescTr" placeholder="Türkçe açıklama (ürünü anlatan kendi cümlelerini yaz)"></textarea></div>
-          <div class="row" style="margin-bottom:12px"><button class="btn secondary" id="pubTransBtn" onclick="translatePub()">İngilizceye çevir</button></div>
-          <div style="margin-bottom:12px"><label>Başlık (EN)</label><input type="text" id="pubTitle" maxlength="140" placeholder="İngilizce başlık (en fazla 140 karakter)"></div>
-          <div style="margin-bottom:12px"><label>Açıklama (EN)</label><textarea id="pubDesc" placeholder="İngilizce açıklama"></textarea></div>
-          <div style="margin-bottom:12px"><label>Etiketler (EN, virgülle ayır, en fazla 13 tane, her biri 20 karakteri geçmesin)</label><input type="text" id="pubTags" placeholder="etiket1, etiket2, etiket3"></div>
-          <div class="row"><button class="btn" id="pubBtn" onclick="publishProduct()">Yayınla</button></div>
+          <div class="warn-box" data-t="pubWarn"></div>
+          <div style="margin-bottom:12px"><label data-t="pubTitleSrc"></label><input type="text" id="pubTitleTr" data-tp="pubTitleSrcPh"></div>
+          <div style="margin-bottom:12px"><label data-t="pubDescSrc"></label><textarea id="pubDescTr" data-tp="pubDescSrcPh"></textarea></div>
+          <div class="row" style="margin-bottom:12px"><button class="btn secondary" id="pubTransBtn" onclick="translatePub()" data-t="translate"></button></div>
+          <div style="margin-bottom:12px"><label data-t="pubTitleEn"></label><input type="text" id="pubTitle" maxlength="140" data-tp="pubTitleEnPh"></div>
+          <div style="margin-bottom:12px"><label data-t="pubDescEn"></label><textarea id="pubDesc" data-tp="pubDescEnPh"></textarea></div>
+          <div style="margin-bottom:12px"><label data-t="pubTags"></label><input type="text" id="pubTags" data-tp="pubTagsPh"></div>
+          <div class="row"><button class="btn" id="pubBtn" onclick="publishProduct()" data-t="publish"></button></div>
         </div>
         <div id="pubMsg"></div>
       </div>
@@ -313,9 +326,9 @@
 
     <!-- Taslaklarım -->
     <div class="card">
-      <h2>Printify'daki ürünlerim</h2>
-      <div class="hint">Bu mağazada oluşturduğun ürünler. "Aç" ile fiyatlarını düzenleyebilirsin.</div>
-      <div class="my-grid" id="myGrid"><div class="hint">Yükleniyor...</div></div>
+      <h2 data-t="myTitle"></h2>
+      <div class="hint" data-t="myHint"></div>
+      <div class="my-grid" id="myGrid"></div>
     </div>
   </div>
 </main>
@@ -325,8 +338,346 @@
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
   const FN = SUPABASE_URL + '/functions/v1/';
+
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Print on Demand',
+      back: '← Panele dön',
+      subtitle: 'Tişört, kupa, hoodie gibi ürünlere kendi tasarımını bas. Sipariş gelince Printify üretir ve müşteriye gönderir, sen stok tutmazsın.',
+      studioTitle: 'Görsel Stüdyosu\'ndan gelen tasarım',
+      studioHint: 'Tasarımın hazır. Aşağıda ürün türünü seç, 4. adımda baskı alanının altındaki "Stüdyo tasarımını kullan" düğmesine bas.',
+      studioDrop: 'Bu tasarımı kullanma',
+      studioUse: 'Stüdyo tasarımını kullan',
+      studioNotFound: 'Stüdyodan gelen tasarım bulunamadı',
+      studioAdded: 'Stüdyo tasarımı eklendi',
+      accountTitle: 'Printify hesabın',
+      checking: 'Kontrol ediliyor...',
+      retry: 'Tekrar dene',
+      connectHelp: 'Printify hesabını bağlamak için bir API token gerekir:<br>1) printify.com adresinde ücretsiz hesap aç.<br>2) Hesap ayarlarında <b>Connections</b> bölümünde <b>Personal access token</b> oluştur (tüm izinleri seç).<br>3) Token\'ı aşağıya yapıştır. Token sadece sunucuda saklanır, tarayıcıya geri gönderilmez.',
+      tokenPh: 'Printify token',
+      connect: 'Bağla',
+      verifying: 'Doğrulanıyor...',
+      tokenEmpty: 'Token boş',
+      connected: 'Printify bağlandı',
+      noShops: 'Token geçerli ama Printify hesabında henüz mağaza yok. Printify panelinde <b>Manage my stores</b> bölümüne gidip <b>Add new store</b> ile bir mağaza ekle (manuel sipariş / API türü olan yeterli). Sonra aşağıdaki butona bas.',
+      refreshedCheck: 'Yeniledim, kontrol et',
+      disconnect: 'Bağlantıyı kaldır',
+      pickShop: 'Birden fazla mağazan var. Hangisini kullanalım?',
+      useShop: 'Bu mağazayı kullan',
+      badgeConnected: 'bağlı',
+      defaultShop: 'Printify mağazası',
+      confirmDisconnect: 'Printify bağlantısı kaldırılsın mı? (Printify\'daki ürünlerin silinmez)',
+      disconnected: 'Bağlantı kaldırıldı',
+      sessionEnded: 'Oturum bitti, tekrar giriş yap',
+      badResponse: 'Sunucu yanıtı okunamadı ({s})',
+      unknownError: 'Bilinmeyen hata',
+
+      s1Title: 'Ürün türünü seç',
+      s1Hint: 'Hızlı seçim yap ya da aşağıya yazarak ara (Türkçe veya İngilizce).',
+      s1Placeholder: 'Örn: tişört, kupa, poster, phone case...',
+      search: 'Ara',
+      searchEmpty: 'Aramak için bir şey yaz veya hızlı seçimlerden birine tıkla',
+      searching: 'Aranıyor...',
+      noResults: 'Sonuç bulunamadı. Başka bir kelime dene.',
+      pickedType: 'Seçilen ürün türü',
+
+      s2Title: 'Baskı sağlayıcısını seç',
+      s2Hint: 'Aynı ürünü farklı baskı atölyeleri üretir. Fiyat, kalite ve üretim yeri sağlayıcıya göre değişir. Maliyeti taslak oluşturunca net göreceksin, istersen farklı sağlayıcıyla tekrar deneyebilirsin.',
+      provLoading: 'Sağlayıcılar yükleniyor...',
+      provNone: 'Bu ürün için sağlayıcı bulunamadı.',
+
+      s3Title: 'Renk ve bedenleri seç',
+      s3Hint: 'Seçtiklerinin kombinasyonları satışa açılır. En fazla 100 varyant seçebilirsin.',
+      optLoading: 'Renk ve bedenler yükleniyor...',
+      noVariants: 'Bu sağlayıcıda stokta varyant yok. Başka bir sağlayıcı seç.',
+      noOptions: 'Bu üründe seçilecek renk/beden yok, tüm varyantlar kullanılacak.',
+      selectAll: 'Tümünü seç',
+      clear: 'Temizle',
+      optPick: '{o} seç ({n} seçili)',
+      optSelected: 'Seçili: ',
+      optNone: 'Hiç seçilmedi',
+      variantCount: '{n} varyant seçili',
+      variantTooMany: '(en fazla 100 olabilir, seçimini azalt)',
+
+      s4Title: 'Tasarımını yükle',
+      s4Hint: 'Şeffaf arka planlı PNG en iyi sonucu verir. Baskı yapmak istediğin her alan için ayrı tasarım yükleyebilirsin (ör. ön ve arka). Boş bıraktığın alana baskı yapılmaz.',
+      noPlaceholders: 'Bu sağlayıcı için baskı alanı bilgisi gelmedi. Başka bir sağlayıcı dene.',
+      slScale: 'Boyut', slX: 'Yatay', slY: 'Dikey', slAngle: 'Döndür',
+      removeDesign: 'Bu tasarımı kaldır',
+      printArea: 'Baskı alanı',
+      imgOpenFail: 'Görsel açılamadı',
+      imgTypeOnly: 'Sadece PNG, JPG veya WEBP yükleyebilirsin',
+      imgTooBig: 'Görsel çok büyük, küçültülemedi. Daha küçük bir dosya dene.',
+      quality: 'Baskı kalitesi: ',
+      qualityLow: ' (düşük çözünürlük, baskı bulanık çıkabilir. Daha büyük bir görsel yükle veya boyutu küçült)',
+
+      s5Title: 'Ürün bilgisi ve taslak',
+      s5Hint: 'Printify\'da yayınlanmamış bir taslak oluşturulur. Gerçek maliyetler bu taslaktan okunur, sonra fiyatını kâra göre ayarlarsın.',
+      pTitleLabel: 'Ürün başlığı',
+      pTitlePh: 'Örn: Komik Kedi Baskılı Unisex Tişört',
+      pDescLabel: 'Açıklama',
+      pDescPh: 'Ürün açıklaması (boş bırakırsan başlık kullanılır)',
+      pPriceLabel: 'Başlangıç satış fiyatı ($)',
+      draftBtn: 'Taslak oluştur ve gerçek maliyeti göster',
+      needTypeProvider: 'Önce ürün türü ve sağlayıcı seç',
+      titleEmpty: 'Ürün başlığı boş',
+      needVariant: 'En az bir renk/beden seç',
+      maxVariants: 'En fazla 100 varyant seçebilirsin',
+      needDesign: 'En az bir baskı alanına tasarım yükle',
+      uploading: 'Tasarım yükleniyor ({n}/{t})...',
+      creatingDraft: 'Printify\'da taslak ürün oluşturuluyor...',
+      draftCreated: 'Taslak oluşturuldu',
+
+      s6Title: 'Taslak ürün ve gerçek maliyet',
+      rInfo: ' - Printify taslağı (yayınlanmadı). Maliyetler Printify\'ın gerçek fiyatlarıdır.',
+      mockPending: 'Mockup görselleri hazırlanıyor...',
+      platformLabel: 'Satış platformu (komisyon için)',
+      commissionLabel: 'Komisyon % (tahmini, değiştirebilirsin)',
+      marginLabel: 'Hedef net marj %',
+      applyAll: 'Tüm fiyatlara uygula',
+      thVariant: 'Varyant', thCost: 'Printify maliyeti', thPrice: 'Satış fiyatı ($)', thNet: 'Net kâr', thMargin: 'Net marj',
+      noActive: 'Aktif varyant yok',
+      netHint: 'Net kâr = satış fiyatı − platform komisyonu − Printify maliyeti. Kargo ücretini Printify siparişte ayrıca keser, müşteriden tahsil etmek istersen fiyata yansıt.',
+      shipTitle: 'Kargo ücretleri (Printify, ilk ürün / ek ürün)',
+      handling: 'Üretim süresi: yaklaşık {v} {u}',
+      days: 'gün',
+      thCountries: 'Ülkeler', thFirst: 'İlk ürün', thAdditional: 'Her ek ürün',
+      marginTooHigh: 'Hedef marj ile komisyon toplamı çok yüksek, daha düşük bir marj gir',
+      savePrices: 'Fiyatları Printify\'a kaydet',
+      pricesSaved: 'Fiyatlar Printify\'a kaydedildi.',
+      addToPanel: 'Panele ürün olarak ekle',
+      deleteDraft: 'Taslağı sil',
+      panelFail: 'Panele eklenemedi',
+      panelAdded: 'Ürün panele eklendi (en ucuz varyantın maliyeti ve fiyatı baz alındı).',
+      goPanel: 'Panele git',
+      panelToast: 'Panele eklendi',
+
+      checkingShops: 'Bağlı mağazalar kontrol ediliyor...',
+      noChannelShops: 'Printify hesabında bir satış kanalına (Etsy, Shopify vb.) bağlı mağaza görünmüyor. Printify panelinde <b>My stores</b> bölümünden <b>Add new store</b> ile Etsy mağazanı bağla, sonra aşağıdaki butona bas.',
+      refreshedAgain: 'Yeniledim, tekrar kontrol et',
+      shopsFound: 'Printify\'a bağlı {n} mağaza bulundu.',
+      refresh: 'Yenile',
+      pubPlatform: 'Platform',
+      pubAlso: 'Ayrıca şu platformlarda da yayınla (opsiyonel)',
+      pubAlsoHint: 'İşaretlediğin her platform için aynı ürün (aynı tasarım, varyantlar ve fiyatlar) o mağazada da oluşturulup yayınlanır.',
+      pubWarn: 'Yabancı platformlarda ilan İngilizce olmalı, yoksa aramada görünmez. Aşağıdaki "İngilizceye çevir" butonu başlık, açıklama ve etiketleri çevirir; yayınlamadan önce kontrol edip düzenleyebilirsin. Etsy mağazanın dilini de Etsy panelinden İngilizce yapmalısın.',
+      pubTitleSrc: 'Başlık (TR)', pubTitleSrcPh: 'Türkçe başlık',
+      pubDescSrc: 'Açıklama (TR)', pubDescSrcPh: 'Türkçe açıklama (ürünü anlatan kendi cümlelerini yaz)',
+      translate: 'İngilizceye çevir',
+      translating: 'Çevriliyor...',
+      needSrcTitle: 'Önce Türkçe başlığı yaz',
+      translated: 'Çeviri hazır, kontrol edip düzenleyebilirsin',
+      translateFail: 'Çeviri yapılamadı: ',
+      pubTitleEn: 'Başlık (EN)', pubTitleEnPh: 'İngilizce başlık (en fazla 140 karakter)',
+      pubDescEn: 'Açıklama (EN)', pubDescEnPh: 'İngilizce açıklama',
+      pubTags: 'Etiketler (EN, virgülle ayır, en fazla 13 tane, her biri 20 karakteri geçmesin)',
+      pubTagsPh: 'etiket1, etiket2, etiket3',
+      publish: 'Yayınla',
+      publishing: 'Yayınlanıyor...',
+      pickPlatform: 'Platform seç',
+      needEn: 'Önce "İngilizceye çevir" butonuna bas ya da başlık ve açıklamayı doldur',
+      maxTags: 'En fazla 13 etiket olabilir',
+      trCharsConfirm: 'Başlık ya da açıklamada Türkçe karakter var. Yabancı platformda ilan İngilizce olmalı. Yine de yayınlansın mı?',
+      publishConfirm: 'Bu ürün şu mağazalarda GERÇEKTEN yayınlanacak:\n\n{names}\n\nMağazanda canlı ilan oluşur ve platform ilan ücreti alabilir (örneğin Etsy, ilan başına yaklaşık 0,20 $). Devam edilsin mi?',
+      sendingPrintify: 'Printify\'a gönderiliyor, biraz sürebilir...',
+      pubOk: 'yayın isteği Printify\'a gönderildi. İlanın mağazada görünmesi birkaç dakika sürebilir.',
+      pubFail: 'Yayınlanamadı',
+
+      myTitle: 'Printify\'daki ürünlerim',
+      myHint: 'Bu mağazada oluşturduğun ürünler. "Aç" ile fiyatlarını düzenleyebilirsin.',
+      loading: 'Yükleniyor...',
+      noProducts: 'Henüz ürün yok.',
+      open: 'Aç',
+      del: 'Sil',
+      confirmDelete: 'Bu ürün Printify\'dan silinsin mi?',
+      deleted: 'Silindi',
+      provNotFound: 'Seçtiğin atölye bu ürün türünde bulunamadı, listeden başka bir tane seç',
+      preselected: 'Ürün türü ve atölye seçildi: ',
+      quick: ['Tişört', 'Kupa', 'Hoodie', 'Sweatshirt', 'Poster', 'Tablo / Kanvas', 'Çanta', 'Telefon kılıfı', 'Şapka', 'Yastık', 'Sticker', 'Defter'],
+      pos: { front: 'Ön', back: 'Arka', left: 'Sol', right: 'Sağ', neck: 'Yaka', neck_label: 'Yaka etiketi', left_sleeve: 'Sol kol', right_sleeve: 'Sağ kol', front_left: 'Ön sol', front_right: 'Ön sağ', pocket: 'Cep', default: 'Ana baskı', top: 'Üst', bottom: 'Alt' },
+      opt: { color: 'Renk', colour: 'Renk', size: 'Beden', sizes: 'Beden' },
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Print on Demand',
+      back: '← Back to dashboard',
+      subtitle: 'Print your own designs on t-shirts, mugs, hoodies and more. When an order comes in, Printify produces and ships it to the customer, so you hold no stock.',
+      studioTitle: 'Design from Image Studio',
+      studioHint: 'Your design is ready. Pick a product type below, then press "Use studio design" under the print area in step 4.',
+      studioDrop: "Don't use this design",
+      studioUse: 'Use studio design',
+      studioNotFound: 'The design from the studio was not found',
+      studioAdded: 'Studio design added',
+      accountTitle: 'Your Printify account',
+      checking: 'Checking...',
+      retry: 'Try again',
+      connectHelp: 'You need an API token to connect your Printify account:<br>1) Create a free account at printify.com.<br>2) In account settings, open <b>Connections</b> and create a <b>Personal access token</b> (select all scopes).<br>3) Paste the token below. It is stored only on the server and never sent back to the browser.',
+      tokenPh: 'Printify token',
+      connect: 'Connect',
+      verifying: 'Verifying...',
+      tokenEmpty: 'Token is empty',
+      connected: 'Printify connected',
+      noShops: 'The token is valid but your Printify account has no store yet. In the Printify panel go to <b>Manage my stores</b> and use <b>Add new store</b> (a manual orders / API store is enough). Then press the button below.',
+      refreshedCheck: "I've added one, check again",
+      disconnect: 'Disconnect',
+      pickShop: 'You have more than one store. Which one should we use?',
+      useShop: 'Use this store',
+      badgeConnected: 'connected',
+      defaultShop: 'Printify store',
+      confirmDisconnect: 'Disconnect Printify? (Your products on Printify will not be deleted)',
+      disconnected: 'Disconnected',
+      sessionEnded: 'Session expired, please sign in again',
+      badResponse: 'Could not read server response ({s})',
+      unknownError: 'Unknown error',
+
+      s1Title: 'Choose a product type',
+      s1Hint: 'Pick a quick option or search below (English or Turkish).',
+      s1Placeholder: 'e.g. t-shirt, mug, poster, phone case...',
+      search: 'Search',
+      searchEmpty: 'Type something to search or click one of the quick options',
+      searching: 'Searching...',
+      noResults: 'No results found. Try another word.',
+      pickedType: 'Selected product type',
+
+      s2Title: 'Choose a print provider',
+      s2Hint: 'The same product is made by different print shops. Price, quality and production location vary by provider. You will see the exact cost after creating the draft, and you can try another provider if you like.',
+      provLoading: 'Loading providers...',
+      provNone: 'No provider found for this product.',
+
+      s3Title: 'Choose colors and sizes',
+      s3Hint: 'Every combination you select goes on sale. You can select up to 100 variants.',
+      optLoading: 'Loading colors and sizes...',
+      noVariants: 'This provider has no variants in stock. Choose another provider.',
+      noOptions: 'This product has no colors/sizes to pick, all variants will be used.',
+      selectAll: 'Select all',
+      clear: 'Clear',
+      optPick: 'Select {o} ({n} selected)',
+      optSelected: 'Selected: ',
+      optNone: 'None selected',
+      variantCount: '{n} variants selected',
+      variantTooMany: '(maximum is 100, reduce your selection)',
+
+      s4Title: 'Upload your design',
+      s4Hint: 'A PNG with a transparent background works best. You can upload a separate design for each print area (e.g. front and back). Areas left empty are not printed.',
+      noPlaceholders: 'No print area info came for this provider. Try another provider.',
+      slScale: 'Size', slX: 'Horizontal', slY: 'Vertical', slAngle: 'Rotate',
+      removeDesign: 'Remove this design',
+      printArea: 'Print area',
+      imgOpenFail: 'Could not open the image',
+      imgTypeOnly: 'Only PNG, JPG or WEBP can be uploaded',
+      imgTooBig: 'The image is too large and could not be reduced. Try a smaller file.',
+      quality: 'Print quality: ',
+      qualityLow: ' (low resolution, the print may look blurry. Upload a larger image or reduce the size)',
+
+      s5Title: 'Product info and draft',
+      s5Hint: 'An unpublished draft is created on Printify. Real costs are read from this draft, then you set your price for profit.',
+      pTitleLabel: 'Product title',
+      pTitlePh: 'e.g. Funny Cat Print Unisex T-Shirt',
+      pDescLabel: 'Description',
+      pDescPh: 'Product description (the title is used if left empty)',
+      pPriceLabel: 'Starting sale price ($)',
+      draftBtn: 'Create draft and show real cost',
+      needTypeProvider: 'Choose a product type and provider first',
+      titleEmpty: 'Product title is empty',
+      needVariant: 'Select at least one color/size',
+      maxVariants: 'You can select up to 100 variants',
+      needDesign: 'Upload a design to at least one print area',
+      uploading: 'Uploading design ({n}/{t})...',
+      creatingDraft: 'Creating draft product on Printify...',
+      draftCreated: 'Draft created',
+
+      s6Title: 'Draft product and real cost',
+      rInfo: ' - Printify draft (not published). Costs are Printify\'s real prices.',
+      mockPending: 'Mockup images are being prepared...',
+      platformLabel: 'Sales platform (for commission)',
+      commissionLabel: 'Commission % (estimate, editable)',
+      marginLabel: 'Target net margin %',
+      applyAll: 'Apply to all prices',
+      thVariant: 'Variant', thCost: 'Printify cost', thPrice: 'Sale price ($)', thNet: 'Net profit', thMargin: 'Net margin',
+      noActive: 'No active variants',
+      netHint: 'Net profit = sale price − platform commission − Printify cost. Printify charges shipping separately per order; add it to your price if you want the customer to pay for it.',
+      shipTitle: 'Shipping rates (Printify, first item / additional item)',
+      handling: 'Production time: about {v} {u}',
+      days: 'days',
+      thCountries: 'Countries', thFirst: 'First item', thAdditional: 'Each additional item',
+      marginTooHigh: 'Target margin plus commission is too high, enter a lower margin',
+      savePrices: 'Save prices to Printify',
+      pricesSaved: 'Prices saved to Printify.',
+      addToPanel: 'Add to dashboard as product',
+      deleteDraft: 'Delete draft',
+      panelFail: 'Could not add to dashboard',
+      panelAdded: 'Product added to dashboard (based on the cheapest variant\'s cost and price).',
+      goPanel: 'Go to dashboard',
+      panelToast: 'Added to dashboard',
+
+      checkingShops: 'Checking connected stores...',
+      noChannelShops: 'No store connected to a sales channel (Etsy, Shopify etc.) was found in your Printify account. In the Printify panel, use <b>Add new store</b> under <b>My stores</b> to connect your Etsy shop, then press the button below.',
+      refreshedAgain: "I've connected one, check again",
+      shopsFound: '{n} stores connected to Printify found.',
+      refresh: 'Refresh',
+      pubPlatform: 'Platform',
+      pubAlso: 'Also publish on these platforms (optional)',
+      pubAlsoHint: 'For each platform you tick, the same product (same design, variants and prices) is created and published in that store too.',
+      pubWarn: 'Listings on international platforms must be in English, otherwise they won\'t show up in search. The "Translate to English" button translates the title, description and tags; you can review and edit them before publishing. Also set your Etsy shop language to English in the Etsy panel.',
+      pubTitleSrc: 'Title (original)', pubTitleSrcPh: 'Original title (e.g. Turkish)',
+      pubDescSrc: 'Description (original)', pubDescSrcPh: 'Original description (describe the product in your own words)',
+      translate: 'Translate to English',
+      translating: 'Translating...',
+      needSrcTitle: 'Write the original title first',
+      translated: 'Translation ready, review and edit if needed',
+      translateFail: 'Translation failed: ',
+      pubTitleEn: 'Title (EN)', pubTitleEnPh: 'English title (max 140 characters)',
+      pubDescEn: 'Description (EN)', pubDescEnPh: 'English description',
+      pubTags: 'Tags (EN, comma separated, max 13, each up to 20 characters)',
+      pubTagsPh: 'tag1, tag2, tag3',
+      publish: 'Publish',
+      publishing: 'Publishing...',
+      pickPlatform: 'Choose a platform',
+      needEn: 'Press "Translate to English" first or fill in the title and description',
+      maxTags: 'You can have at most 13 tags',
+      trCharsConfirm: 'The title or description contains Turkish characters. Listings on international platforms should be in English. Publish anyway?',
+      publishConfirm: 'This product will be REALLY published in these stores:\n\n{names}\n\nA live listing will be created and the platform may charge a listing fee (e.g. Etsy, about $0.20 per listing). Continue?',
+      sendingPrintify: 'Sending to Printify, this may take a moment...',
+      pubOk: 'publish request sent to Printify. The listing may take a few minutes to appear in the store.',
+      pubFail: 'Could not publish',
+
+      myTitle: 'My products on Printify',
+      myHint: 'Products you created in this store. Use "Open" to edit their prices.',
+      loading: 'Loading...',
+      noProducts: 'No products yet.',
+      open: 'Open',
+      del: 'Delete',
+      confirmDelete: 'Delete this product from Printify?',
+      deleted: 'Deleted',
+      provNotFound: 'The provider you picked was not found for this product type, choose another one from the list',
+      preselected: 'Product type and provider selected: ',
+      quick: ['T-shirt', 'Mug', 'Hoodie', 'Sweatshirt', 'Poster', 'Canvas', 'Tote bag', 'Phone case', 'Hat', 'Pillow', 'Sticker', 'Notebook'],
+      pos: { front: 'Front', back: 'Back', left: 'Left', right: 'Right', neck: 'Neck', neck_label: 'Neck label', left_sleeve: 'Left sleeve', right_sleeve: 'Right sleeve', front_left: 'Front left', front_right: 'Front right', pocket: 'Pocket', default: 'Main print', top: 'Top', bottom: 'Bottom' },
+      opt: { color: 'Color', colour: 'Color', size: 'Size', sizes: 'Size' },
+    }
+  };
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let v = T[lang()][key];
+    if (v === undefined) v = T.tr[key] !== undefined ? T.tr[key] : key;
+    if (vars && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+    return v;
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.getAttribute('data-tp')); });
+  }
+  function pct(n, d) {
+    const s = Number(n || 0).toFixed(d == null ? 1 : d);
+    return lang() === 'tr' ? '%' + s.replace('.', ',') : s + '%';
+  }
 
   // Tahmini komisyonlar (yüzde). Kullanıcı değiştirebilir.
   const PLATFORMS = {
@@ -340,31 +691,16 @@
     'Wix': 3
   };
 
+  // Hızlı seçim: etiketler T.quick içinde (aynı sırayla)
   const QUICK = [
-    { label: 'Tişört', q: ['tee', 't-shirt'] },
-    { label: 'Kupa', q: ['mug'] },
-    { label: 'Hoodie', q: ['hoodie'] },
-    { label: 'Sweatshirt', q: ['sweatshirt'] },
-    { label: 'Poster', q: ['poster'] },
-    { label: 'Tablo / Kanvas', q: ['canvas'] },
-    { label: 'Çanta', q: ['tote', 'bag'] },
-    { label: 'Telefon kılıfı', q: ['phone case'] },
-    { label: 'Şapka', q: ['cap', 'hat'] },
-    { label: 'Yastık', q: ['pillow'] },
-    { label: 'Sticker', q: ['sticker'] },
-    { label: 'Defter', q: ['notebook', 'journal'] }
+    ['tee', 't-shirt'], ['mug'], ['hoodie'], ['sweatshirt'], ['poster'], ['canvas'],
+    ['tote', 'bag'], ['phone case'], ['cap', 'hat'], ['pillow'], ['sticker'], ['notebook', 'journal']
   ];
-
-  const POS_LABELS = {
-    front: 'Ön', back: 'Arka', left: 'Sol', right: 'Sağ', neck: 'Yaka', neck_label: 'Yaka etiketi',
-    left_sleeve: 'Sol kol', right_sleeve: 'Sağ kol', front_left: 'Ön sol', front_right: 'Ön sağ',
-    pocket: 'Cep', default: 'Ana baskı', top: 'Üst', bottom: 'Alt'
-  };
-  const OPT_LABELS = { color: 'Renk', colour: 'Renk', size: 'Beden', sizes: 'Beden' };
 
   let session = null;
   const S = {
     shopId: null, shopTitle: null,
+    conn: 'checking', connError: '', shopsForPicker: [],
     blueprints: [], blueprint: null,
     providers: [], provider: null,
     variants: [], optionKeys: [], optionValues: {}, selectedOpts: {},
@@ -372,26 +708,27 @@
     designs: {},
     studio: null,
     product: null, prices: {},
-    pubShops: null, pubForId: null
+    pubShops: null, pubShopsError: '', pubForId: null,
+    myProducts: null, myError: ''
   };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (cents) => '$' + (Number(cents || 0) / 100).toFixed(2);
-  const posLabel = (p) => POS_LABELS[p] || String(p).replace(/_/g, ' ');
+  const posLabel = (p) => t('pos')[p] || String(p).replace(/_/g, ' ');
 
   let toastTimer;
   function toast(msg, type) {
-    const t = $('toast');
-    t.textContent = msg;
-    t.className = 'toast show ' + (type || '');
+    const el = $('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + (type || '');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = 'toast'; }, type === 'err' ? 8000 : 3500);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, type === 'err' ? 8000 : 3500);
   }
 
   async function callFn(name, payload) {
-    const { data: { session: s } } = await supabaseClient.auth.getSession();
-    if (!s) { window.location.href = 'index.html'; throw new Error('Oturum bitti, tekrar giriş yap'); }
+    const { data: { session: s } } = await db.auth.getSession();
+    if (!s) { window.location.href = 'index.html'; throw new Error(t('sessionEnded')); }
     session = s;
     const res = await fetch(FN + name, {
       method: 'POST',
@@ -400,79 +737,94 @@
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'apikey': SUPABASE_KEY
       },
-      body: JSON.stringify(Object.assign({}, payload, { userAccessToken: s.access_token }))
+      body: JSON.stringify(Object.assign({}, payload, { userAccessToken: s.access_token, language: lang() }))
     });
     let data;
-    try { data = await res.json(); } catch (e) { throw new Error('Sunucu yanıtı okunamadı (' + res.status + ')'); }
-    if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+    try { data = await res.json(); } catch (e) { throw new Error(t('badResponse', { s: res.status })); }
+    if (!data.ok) throw new Error(data.error || t('unknownError'));
     return data;
   }
 
   // ---------- Printify bağlantısı ----------
   async function loadConnection() {
-    const box = $('connectBody');
-    box.innerHTML = '<div class="hint">Kontrol ediliyor...</div>';
+    S.conn = 'checking'; renderConnection();
     try {
       const st = await callFn('printify-connect', { action: 'status' });
-      if (!st.connected) { renderConnectForm(); $('studio').style.display = 'none'; return; }
+      if (!st.connected) { S.conn = 'form'; renderConnection(); $('studio').style.display = 'none'; return; }
       if (st.shop_id) {
         S.shopId = st.shop_id; S.shopTitle = st.shop_title;
-        renderConnected();
+        S.conn = 'connected'; renderConnection();
         $('studio').style.display = 'block';
         loadMyProducts();
         return;
       }
       $('studio').style.display = 'none';
-      await renderShopPicker();
+      const r = await callFn('printify-connect', { action: 'list_shops' });
+      S.shopsForPicker = r.shops || [];
+      S.conn = S.shopsForPicker.length ? 'picker' : 'noshops';
+      renderConnection();
     } catch (e) {
-      box.innerHTML = '<div class="err">' + esc(e.message) + '</div><button class="btn secondary small" onclick="loadConnection()">Tekrar dene</button>';
+      S.conn = 'error'; S.connError = e.message; renderConnection();
     }
   }
 
-  function renderConnectForm() {
-    $('connectBody').innerHTML =
-      '<div class="hint">Printify hesabını bağlamak için bir API token gerekir:<br>' +
-      '1) printify.com adresinde ücretsiz hesap aç.<br>' +
-      '2) Hesap ayarlarında <b>Connections</b> bölümünde <b>Personal access token</b> oluştur (tüm izinleri seç).<br>' +
-      '3) Token\'ı aşağıya yapıştır. Token sadece sunucuda saklanır, tarayıcıya geri gönderilmez.</div>' +
-      '<div class="row"><div style="flex:1; min-width:240px"><input type="password" id="pfToken" placeholder="Printify token"></div>' +
-      '<button class="btn" id="pfConnectBtn" onclick="connectPrintify()">Bağla</button></div>';
+  function renderConnection() {
+    const box = $('connectBody');
+    if (S.conn === 'checking') { box.innerHTML = '<div class="hint">' + esc(t('checking')) + '</div>'; return; }
+    if (S.conn === 'error') {
+      box.innerHTML = '<div class="err">' + esc(S.connError) + '</div><button class="btn secondary small" onclick="loadConnection()">' + esc(t('retry')) + '</button>';
+      return;
+    }
+    if (S.conn === 'form') {
+      const keep = $('pfToken') ? $('pfToken').value : '';
+      box.innerHTML =
+        '<div class="hint">' + t('connectHelp') + '</div>' +
+        '<div class="row"><div style="flex:1; min-width:240px"><input type="password" id="pfToken" autocomplete="new-password" placeholder="' + esc(t('tokenPh')) + '"></div>' +
+        '<button class="btn" id="pfConnectBtn" onclick="connectPrintify()">' + esc(t('connect')) + '</button></div>';
+      $('pfToken').value = keep;
+      return;
+    }
+    if (S.conn === 'noshops') {
+      box.innerHTML =
+        '<div class="warn-box">' + t('noShops') + '</div>' +
+        '<div class="row"><button class="btn" onclick="loadConnection()">' + esc(t('refreshedCheck')) + '</button>' +
+        '<button class="btn danger small" onclick="disconnectPrintify()">' + esc(t('disconnect')) + '</button></div>';
+      return;
+    }
+    if (S.conn === 'picker') {
+      const prev = $('shopSel') ? $('shopSel').value : '';
+      let opts = '';
+      S.shopsForPicker.forEach((s) => {
+        opts += '<option value="' + esc(s.id) + '">' + esc(s.title) + (s.sales_channel ? ' (' + esc(s.sales_channel) + ')' : '') + '</option>';
+      });
+      box.innerHTML =
+        '<div class="hint">' + esc(t('pickShop')) + '</div>' +
+        '<div class="row"><div style="flex:1; min-width:220px"><select id="shopSel">' + opts + '</select></div>' +
+        '<button class="btn" onclick="selectShop()">' + esc(t('useShop')) + '</button>' +
+        '<button class="btn danger small" onclick="disconnectPrintify()">' + esc(t('disconnect')) + '</button></div>';
+      if (prev) $('shopSel').value = prev;
+      return;
+    }
+    if (S.conn === 'connected') {
+      box.innerHTML =
+        '<div class="row"><span class="badge ok">' + esc(t('badgeConnected')) + '</span><b style="color:#fff">' + esc(S.shopTitle || t('defaultShop')) + '</b>' +
+        '<button class="btn danger small" onclick="disconnectPrintify()">' + esc(t('disconnect')) + '</button></div>';
+    }
   }
 
   async function connectPrintify() {
     const token = $('pfToken').value.trim();
-    if (!token) { toast('Token boş', 'err'); return; }
+    if (!token) { toast(t('tokenEmpty'), 'err'); return; }
     const btn = $('pfConnectBtn');
-    btn.disabled = true; btn.textContent = 'Doğrulanıyor...';
+    btn.disabled = true; btn.textContent = t('verifying');
     try {
       await callFn('printify-connect', { action: 'connect', apiToken: token });
-      toast('Printify bağlandı', 'good');
+      toast(t('connected'), 'good');
       await loadConnection();
     } catch (e) {
       toast(e.message, 'err');
-      btn.disabled = false; btn.textContent = 'Bağla';
+      btn.disabled = false; btn.textContent = t('connect');
     }
-  }
-
-  async function renderShopPicker() {
-    const box = $('connectBody');
-    const r = await callFn('printify-connect', { action: 'list_shops' });
-    if (!r.shops.length) {
-      box.innerHTML =
-        '<div class="warn-box">Token geçerli ama Printify hesabında henüz mağaza yok. Printify panelinde <b>Manage my stores</b> bölümüne gidip <b>Add new store</b> ile bir mağaza ekle (manuel sipariş / API türü olan yeterli). Sonra aşağıdaki butona bas.</div>' +
-        '<div class="row"><button class="btn" onclick="loadConnection()">Yeniledim, kontrol et</button>' +
-        '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
-      return;
-    }
-    let opts = '';
-    r.shops.forEach((s) => {
-      opts += '<option value="' + esc(s.id) + '">' + esc(s.title) + (s.sales_channel ? ' (' + esc(s.sales_channel) + ')' : '') + '</option>';
-    });
-    box.innerHTML =
-      '<div class="hint">Birden fazla mağazan var. Hangisini kullanalım?</div>' +
-      '<div class="row"><div style="flex:1; min-width:220px"><select id="shopSel">' + opts + '</select></div>' +
-      '<button class="btn" onclick="selectShop()">Bu mağazayı kullan</button>' +
-      '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
   }
 
   async function selectShop() {
@@ -482,83 +834,89 @@
     } catch (e) { toast(e.message, 'err'); }
   }
 
-  function renderConnected() {
-    $('connectBody').innerHTML =
-      '<div class="row"><span class="badge ok">bağlı</span><b style="color:#fff">' + esc(S.shopTitle || 'Printify mağazası') + '</b>' +
-      '<button class="btn danger small" onclick="disconnectPrintify()">Bağlantıyı kaldır</button></div>';
-  }
-
   async function disconnectPrintify() {
-    if (!confirm('Printify bağlantısı kaldırılsın mı? (Printify\'daki ürünlerin silinmez)')) return;
+    if (!confirm(t('confirmDisconnect'))) return;
     try {
       await callFn('printify-connect', { action: 'disconnect' });
       S.shopId = null;
-      toast('Bağlantı kaldırıldı');
+      toast(t('disconnected'));
       await loadConnection();
     } catch (e) { toast(e.message, 'err'); }
   }
 
   // ---------- 1. Ürün türü ----------
   function renderQuickChips() {
+    const labels = t('quick');
     let h = '';
-    QUICK.forEach((c, i) => { h += '<span class="chip" onclick="quickSearch(' + i + ')">' + esc(c.label) + '</span>'; });
+    QUICK.forEach((q, i) => { h += '<span class="chip" onclick="quickSearch(' + i + ')">' + esc(labels[i] || q[0]) + '</span>'; });
     $('quickChips').innerHTML = h;
   }
-  function quickSearch(i) { runSearch(QUICK[i].q); }
+  function quickSearch(i) { runSearch(QUICK[i]); }
   function searchTyped() {
     const q = $('bpQuery').value.trim();
-    if (!q) { toast('Aramak için bir şey yaz veya hızlı seçimlerden birine tıkla', 'err'); return; }
+    if (!q) { toast(t('searchEmpty'), 'err'); return; }
     runSearch([q]);
   }
 
   async function runSearch(queries) {
     const grid = $('bpGrid');
-    grid.innerHTML = '<div class="hint">Aranıyor...</div>';
+    grid.innerHTML = '<div class="hint">' + esc(t('searching')) + '</div>';
     try {
       const seen = new Set();
       const list = [];
       for (const q of queries) {
         const r = await callFn('printify-catalog', { action: 'search', query: q });
-        r.blueprints.forEach((b) => { if (!seen.has(b.id)) { seen.add(b.id); list.push(b); } });
+        (r.blueprints || []).forEach((b) => { if (!seen.has(b.id)) { seen.add(b.id); list.push(b); } });
       }
       S.blueprints = list.slice(0, 48);
-      if (!S.blueprints.length) { grid.innerHTML = '<div class="hint">Sonuç bulunamadı. Başka bir kelime dene.</div>'; return; }
-      let h = '';
-      S.blueprints.forEach((b, i) => {
-        h += '<div class="bp" id="bp' + i + '" onclick="pickBlueprint(' + i + ')">' +
-          (b.image ? '<img loading="lazy" src="' + esc(b.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
-          '<div class="bp-t">' + esc(b.title) + '</div><div class="bp-b">' + esc(b.brand || '') + '</div></div>';
-      });
-      grid.innerHTML = h;
+      renderBlueprints();
     } catch (e) {
       grid.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
     }
   }
 
+  function renderBlueprints() {
+    const grid = $('bpGrid');
+    if (!S.blueprints.length) { grid.innerHTML = '<div class="hint">' + esc(t('noResults')) + '</div>'; return; }
+    let h = '';
+    S.blueprints.forEach((b, i) => {
+      const sel = S.blueprint && S.blueprint.id === b.id ? ' sel' : '';
+      h += '<div class="bp' + sel + '" id="bp' + i + '" onclick="pickBlueprint(' + i + ')">' +
+        (b.image ? '<img loading="lazy" src="' + esc(b.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
+        '<div class="bp-t">' + esc(b.title || t('pickedType')) + '</div><div class="bp-b">' + esc(b.brand || '') + '</div></div>';
+    });
+    grid.innerHTML = h;
+  }
+
   // ---------- 2. Sağlayıcı ----------
   async function pickBlueprint(i) {
     S.blueprint = S.blueprints[i];
-    S.provider = null; S.variants = []; S.designs = {}; S.placeholders = [];
+    S.provider = null; S.variants = []; S.designs = {}; S.placeholders = []; S.providers = [];
     document.querySelectorAll('.bp').forEach((el) => el.classList.remove('sel'));
     const el = $('bp' + i); if (el) el.classList.add('sel');
     ['optCard', 'designCard', 'infoCard'].forEach((id) => { $(id).style.display = 'none'; });
     $('pTitle').value = '';
     $('provCard').style.display = 'block';
-    $('provList').innerHTML = '<div class="hint">Sağlayıcılar yükleniyor...</div>';
+    $('provList').innerHTML = '<div class="hint">' + esc(t('provLoading')) + '</div>';
     $('provCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const r = await callFn('printify-catalog', { action: 'providers', blueprintId: S.blueprint.id });
-      S.providers = r.providers;
-      if (!S.providers.length) { $('provList').innerHTML = '<div class="hint">Bu ürün için sağlayıcı bulunamadı.</div>'; return; }
-      let h = '';
-      S.providers.forEach((p, j) => {
-        h += '<div class="prov" id="prov' + j + '" onclick="pickProvider(' + j + ')"><div class="prov-t">' + esc(p.title) + '</div>' +
-          '<div class="prov-m">' + esc((p.decoration_methods || []).join(', ')) + '</div></div>';
-      });
-      $('provList').innerHTML = h;
+      S.providers = r.providers || [];
+      renderProviders();
     } catch (e) {
       $('provList').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
     }
+  }
+
+  function renderProviders() {
+    if (!S.providers.length) { $('provList').innerHTML = '<div class="hint">' + esc(t('provNone')) + '</div>'; return; }
+    let h = '';
+    S.providers.forEach((p, j) => {
+      const sel = S.provider && S.provider.id === p.id ? ' sel' : '';
+      h += '<div class="prov' + sel + '" id="prov' + j + '" onclick="pickProvider(' + j + ')"><div class="prov-t">' + esc(p.title) + '</div>' +
+        '<div class="prov-m">' + esc((p.decoration_methods || []).join(', ')) + '</div></div>';
+    });
+    $('provList').innerHTML = h;
   }
 
   // ---------- 3. Varyantlar ----------
@@ -568,13 +926,14 @@
     document.querySelectorAll('.prov').forEach((el) => el.classList.remove('sel'));
     const el = $('prov' + j); if (el) el.classList.add('sel');
     $('optCard').style.display = 'block';
-    $('optBody').innerHTML = '<div class="hint">Renk ve bedenler yükleniyor...</div>';
+    $('optBody').innerHTML = '<div class="hint">' + esc(t('optLoading')) + '</div>';
+    $('variantCount').innerHTML = '';
     $('designCard').style.display = 'none';
     $('infoCard').style.display = 'none';
     $('optCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const r = await callFn('printify-catalog', { action: 'variants', blueprintId: S.blueprint.id, providerId: S.provider.id });
-      S.variants = r.variants;
+      S.variants = r.variants || [];
       S.shipping = r.shipping;
       const seenPos = new Set();
       S.placeholders = [];
@@ -588,15 +947,13 @@
         });
       });
       // Hiçbir renk/beden kendiliğinden seçili gelmez, seçimi kullanıcı yapar
-      S.optionKeys.forEach((k) => {
-        S.selectedOpts[k] = new Set();
-      });
-      if (!S.variants.length) { $('optBody').innerHTML = '<div class="err">Bu sağlayıcıda stokta varyant yok. Başka bir sağlayıcı seç.</div>'; return; }
+      S.optionKeys.forEach((k) => { S.selectedOpts[k] = new Set(); });
+      if (!S.variants.length) { $('optBody').innerHTML = '<div class="err">' + esc(t('noVariants')) + '</div>'; return; }
       renderOptions();
       renderDesigns();
       $('designCard').style.display = 'block';
       $('infoCard').style.display = 'block';
-      if (!$('pTitle').value) $('pTitle').value = S.blueprint.title;
+      if (!$('pTitle').value) $('pTitle').value = S.blueprint.title || '';
     } catch (e) {
       $('optBody').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
     }
@@ -617,11 +974,11 @@
     for (const [re, hex] of COLOR_MAP) { if (re.test(name)) return hex; }
     return null;
   }
-  function optLabel(k) { return OPT_LABELS[k.toLowerCase()] || k; }
+  function optLabel(k) { return t('opt')[String(k).toLowerCase()] || k; }
 
   function renderOptions() {
     if (!S.optionKeys.length) {
-      $('optBody').innerHTML = '<div class="hint">Bu üründe seçilecek renk/beden yok, tüm varyantlar kullanılacak.</div>';
+      $('optBody').innerHTML = '<div class="hint">' + esc(t('noOptions')) + '</div>';
       updateVariantCount();
       return;
     }
@@ -632,8 +989,8 @@
         '<div class="dd" id="dd' + ki + '">' +
         '<button type="button" class="dd-btn" onclick="toggleDD(' + ki + ', event)"><span id="ddl' + ki + '"></span><span>▾</span></button>' +
         '<div class="dd-panel"><div class="dd-head">' +
-        '<button type="button" class="linkbtn" onclick="setAllOpt(' + ki + ',true)">Tümünü seç</button>' +
-        '<button type="button" class="linkbtn" onclick="setAllOpt(' + ki + ',false)">Temizle</button></div><div class="dd-list">';
+        '<button type="button" class="linkbtn" onclick="setAllOpt(' + ki + ',true)">' + esc(t('selectAll')) + '</button>' +
+        '<button type="button" class="linkbtn" onclick="setAllOpt(' + ki + ',false)">' + esc(t('clear')) + '</button></div><div class="dd-list">';
       S.optionValues[k].forEach((val, vi) => {
         const on = S.selectedOpts[k].has(val);
         const hex = isColor ? colorHex(val) : null;
@@ -653,8 +1010,8 @@
     const k = S.optionKeys[ki];
     const chosen = S.optionValues[k].filter((v) => S.selectedOpts[k].has(v));
     const btn = $('ddl' + ki), sum = $('dds' + ki);
-    if (btn) btn.textContent = optLabel(k) + ' seç (' + chosen.length + ' seçili)';
-    if (sum) sum.textContent = chosen.length ? 'Seçili: ' + chosen.join(', ') : 'Hiç seçilmedi';
+    if (btn) btn.textContent = t('optPick', { o: optLabel(k), n: chosen.length });
+    if (sum) sum.textContent = chosen.length ? t('optSelected') + chosen.join(', ') : t('optNone');
   }
   function toggleDD(ki, ev) {
     if (ev) ev.stopPropagation();
@@ -687,15 +1044,14 @@
   }
   function updateVariantCount() {
     const n = selectedVariantIds().length;
-    const el = $('variantCount');
-    el.innerHTML = n + ' varyant seçili' + (n > 100 ? ' <span class="neg">(en fazla 100 olabilir, seçimini azalt)</span>' : '');
+    $('variantCount').innerHTML = esc(t('variantCount', { n: n })) + (n > 100 ? ' <span class="neg">' + esc(t('variantTooMany')) + '</span>' : '');
   }
 
   // ---------- 4. Tasarım ----------
   function renderDesigns() {
     let h = '';
     if (!S.placeholders.length) {
-      $('designGrid').innerHTML = '<div class="err">Bu sağlayıcı için baskı alanı bilgisi gelmedi. Başka bir sağlayıcı dene.</div>';
+      $('designGrid').innerHTML = '<div class="err">' + esc(t('noPlaceholders')) + '</div>';
       return;
     }
     S.placeholders.forEach((pos, idx) => {
@@ -703,21 +1059,32 @@
       const ch = Math.max(120, Math.min(420, Math.round(cw * pos.height / pos.width)));
       h += '<div class="design"><div class="design-title">' + esc(posLabel(pos.position)) + ' <span style="color:#9aa3b2;font-weight:400;font-size:11px">(' + pos.width + '×' + pos.height + ' px)</span></div>' +
         '<input type="file" accept="image/png,image/jpeg,image/webp" onchange="onDesignFile(' + idx + ', this)">' +
-        (S.studio ? '<button class="btn secondary small studio-use" style="margin-top:6px" onclick="useStudioDesign(' + idx + ')">Stüdyo tasarımını kullan</button>' : '') +
+        (S.studio ? '<button class="btn secondary small studio-use" style="margin-top:6px" onclick="useStudioDesign(' + idx + ')">' + esc(t('studioUse')) + '</button>' : '') +
         '<canvas id="cv' + idx + '" width="' + cw + '" height="' + ch + '"></canvas>' +
         '<div id="ctl' + idx + '" class="ctl" style="display:none">' +
-        sliderRow(idx, 'scale', 'Boyut', 5, 200, 100) +
-        sliderRow(idx, 'x', 'Yatay', 0, 100, 50) +
-        sliderRow(idx, 'y', 'Dikey', 0, 100, 50) +
-        sliderRow(idx, 'angle', 'Döndür', -180, 180, 0) +
+        sliderRow(idx, 'scale', t('slScale'), 5, 200, 100) +
+        sliderRow(idx, 'x', t('slX'), 0, 100, 50) +
+        sliderRow(idx, 'y', t('slY'), 0, 100, 50) +
+        sliderRow(idx, 'angle', t('slAngle'), -180, 180, 0) +
         '<div class="hint" id="q' + idx + '" style="margin:6px 0"></div>' +
-        '<button class="btn danger small" onclick="removeDesign(' + idx + ')">Bu tasarımı kaldır</button></div></div>';
+        '<button class="btn danger small" onclick="removeDesign(' + idx + ')">' + esc(t('removeDesign')) + '</button></div></div>';
     });
     $('designGrid').innerHTML = h;
-    S.placeholders.forEach((_, idx) => drawPreview(idx));
+    // Dil değişiminde yeniden çizilirse yüklenmiş tasarımların ayarları korunur
+    S.placeholders.forEach((_, idx) => {
+      const d = S.designs[idx];
+      if (d) {
+        $('ctl' + idx).style.display = 'block';
+        setSlider(idx, 'scale', Math.round(d.scale * 100));
+        setSlider(idx, 'x', Math.round(d.x * 100));
+        setSlider(idx, 'y', Math.round(d.y * 100));
+        setSlider(idx, 'angle', Math.round(d.angle));
+      }
+      drawPreview(idx);
+    });
   }
   function sliderRow(idx, key, label, min, max, val) {
-    return '<div class="ctl-row"><span>' + label + '</span><input type="range" min="' + min + '" max="' + max + '" value="' + val + '" id="sl_' + key + idx + '" oninput="onSlider(' + idx + ',\'' + key + '\',this.value)"><span id="sv_' + key + idx + '">' + val + '</span></div>';
+    return '<div class="ctl-row"><span>' + esc(label) + '</span><input type="range" min="' + min + '" max="' + max + '" value="' + val + '" id="sl_' + key + idx + '" oninput="onSlider(' + idx + ',\'' + key + '\',this.value)"><span id="sv_' + key + idx + '">' + val + '</span></div>';
   }
 
   function loadImageFromFile(file) {
@@ -725,14 +1092,14 @@
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Görsel açılamadı')); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t('imgOpenFail'))); };
       img.src = url;
     });
   }
 
   // Görseli en fazla ~4 MB olacak şekilde küçültür (Printify'a base64 olarak gönderilecek)
   async function prepareDesign(file) {
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Sadece PNG, JPG veya WEBP yükleyebilirsin');
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error(t('imgTypeOnly'));
     const src = await loadImageFromFile(file);
     const isJpeg = file.type === 'image/jpeg';
     const LIMIT = 4 * 1024 * 1024;
@@ -747,12 +1114,12 @@
       const dataUrl = isJpeg ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const bytes = (dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75;
       if (bytes <= LIMIT) {
-        const base = (file.name.replace(/\.[^.]+$/, '') || 'tasarim').replace(/[^\w\-]+/g, '_');
+        const base = (file.name.replace(/\.[^.]+$/, '') || 'design').replace(/[^\w\-]+/g, '_');
         return { img: c, dataUrl: dataUrl, w: w, h: h, fileName: base + (isJpeg ? '.jpg' : '.png') };
       }
       maxDim = Math.round(Math.max(w, h) * 0.75);
     }
-    throw new Error('Görsel çok büyük, küçültülemedi. Daha küçük bir dosya dene.');
+    throw new Error(t('imgTooBig'));
   }
 
   async function onDesignFile(idx, input) {
@@ -766,17 +1133,15 @@
     }
   }
   async function applyDesign(idx, file) {
-    {
-      const d = await prepareDesign(file);
-      const pos = S.placeholders[idx];
-      const fitScale = Math.min(1, (pos.height * d.w) / (pos.width * d.h));
-      d.x = 0.5; d.y = 0.5; d.scale = fitScale; d.angle = 0;
-      S.designs[idx] = d;
-      $('ctl' + idx).style.display = 'block';
-      setSlider(idx, 'scale', Math.round(d.scale * 100));
-      setSlider(idx, 'x', 50); setSlider(idx, 'y', 50); setSlider(idx, 'angle', 0);
-      drawPreview(idx);
-    }
+    const d = await prepareDesign(file);
+    const pos = S.placeholders[idx];
+    const fitScale = Math.min(1, (pos.height * d.w) / (pos.width * d.h));
+    d.x = 0.5; d.y = 0.5; d.scale = fitScale; d.angle = 0;
+    S.designs[idx] = d;
+    $('ctl' + idx).style.display = 'block';
+    setSlider(idx, 'scale', Math.round(d.scale * 100));
+    setSlider(idx, 'x', 50); setSlider(idx, 'y', 50); setSlider(idx, 'angle', 0);
+    drawPreview(idx);
   }
 
   // ---------- Görsel Stüdyosu'ndan gelen tasarım ----------
@@ -799,7 +1164,7 @@
   async function loadStudioDesign() {
     if (new URLSearchParams(location.search).get('studio') !== '1') return;
     const rec = await readStudioDesign();
-    if (!rec || !rec.dataUrl) { toast('Stüdyodan gelen tasarım bulunamadı', 'err'); return; }
+    if (!rec || !rec.dataUrl) { toast(t('studioNotFound'), 'err'); return; }
     S.studio = rec;
     $('studioThumb').src = rec.dataUrl;
     $('studioCard').style.display = 'block';
@@ -813,9 +1178,9 @@
     if (!S.studio) return;
     try {
       const blob = await (await fetch(S.studio.dataUrl)).blob();
-      const file = new File([blob], 'studyo-tasarim.png', { type: 'image/png' });
+      const file = new File([blob], 'studio-design.png', { type: 'image/png' });
       await applyDesign(idx, file);
-      toast('Stüdyo tasarımı eklendi', 'good');
+      toast(t('studioAdded'), 'good');
     } catch (e) { toast(e.message, 'err'); }
   }
   function setSlider(idx, key, val) {
@@ -853,7 +1218,7 @@
     const q = $('q' + idx);
     if (!d) {
       ctx.fillStyle = '#8a92a6'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Baskı alanı', cv.width / 2, cv.height / 2);
+      ctx.fillText(t('printArea'), cv.width / 2, cv.height / 2);
       if (q) q.textContent = '';
       return;
     }
@@ -868,23 +1233,23 @@
       const pos = S.placeholders[idx];
       const printedPx = d.scale * pos.width;
       const quality = Math.min(100, Math.round(d.w / printedPx * 100));
-      q.innerHTML = 'Baskı kalitesi: <b class="' + (quality >= 60 ? 'pos' : 'neg') + '">%' + quality + '</b>' + (quality < 60 ? ' (düşük çözünürlük, baskı bulanık çıkabilir. Daha büyük bir görsel yükle veya boyutu küçült)' : '');
+      q.innerHTML = esc(t('quality')) + '<b class="' + (quality >= 60 ? 'pos' : 'neg') + '">' + esc(pct(quality, 0)) + '</b>' + (quality < 60 ? esc(t('qualityLow')) : '');
     }
   }
 
   // ---------- 5. Taslak ----------
-  function setDraftStatus(t) { $('draftStatus').textContent = t || ''; }
+  function setDraftStatus(s) { $('draftStatus').textContent = s || ''; }
 
   async function createDraft() {
     const title = $('pTitle').value.trim();
     const description = $('pDesc').value.trim();
     const ids = selectedVariantIds();
     const idxs = Object.keys(S.designs).map(Number);
-    if (!S.blueprint || !S.provider) { toast('Önce ürün türü ve sağlayıcı seç', 'err'); return; }
-    if (!title) { toast('Ürün başlığı boş', 'err'); return; }
-    if (!ids.length) { toast('En az bir renk/beden seç', 'err'); return; }
-    if (ids.length > 100) { toast('En fazla 100 varyant seçebilirsin', 'err'); return; }
-    if (!idxs.length) { toast('En az bir baskı alanına tasarım yükle', 'err'); return; }
+    if (!S.blueprint || !S.provider) { toast(t('needTypeProvider'), 'err'); return; }
+    if (!title) { toast(t('titleEmpty'), 'err'); return; }
+    if (!ids.length) { toast(t('needVariant'), 'err'); return; }
+    if (ids.length > 100) { toast(t('maxVariants'), 'err'); return; }
+    if (!idxs.length) { toast(t('needDesign'), 'err'); return; }
     const btn = $('draftBtn');
     btn.disabled = true;
     try {
@@ -892,12 +1257,12 @@
       let n = 0;
       for (const idx of idxs) {
         n++;
-        setDraftStatus('Tasarım yükleniyor (' + n + '/' + idxs.length + ')...');
+        setDraftStatus(t('uploading', { n: n, t: idxs.length }));
         const d = S.designs[idx];
         const up = await callFn('printify-create-product', { action: 'upload_image', fileName: d.fileName, imageBase64: d.dataUrl });
         placements.push({ position: S.placeholders[idx].position, imageId: up.image.id, x: d.x, y: d.y, scale: d.scale, angle: d.angle });
       }
-      setDraftStatus('Printify\'da taslak ürün oluşturuluyor...');
+      setDraftStatus(t('creatingDraft'));
       const price = Number($('pPrice').value) || 29.99;
       const r = await callFn('printify-create-product', {
         action: 'create_draft', title: title, description: description || title,
@@ -908,7 +1273,7 @@
       initPrices();
       renderResults(true);
       loadMyProducts();
-      toast('Taslak oluşturuldu', 'good');
+      toast(t('draftCreated'), 'good');
     } catch (e) {
       toast(e.message, 'err');
     } finally {
@@ -933,14 +1298,14 @@
     const imgs = uniqueImages(S.product.images);
     $('rMock').innerHTML = imgs.length
       ? imgs.map((s) => '<img loading="lazy" src="' + esc(s) + '" alt="">').join('')
-      : '<div class="hint">Mockup görselleri hazırlanıyor...</div>';
+      : '<div class="hint">' + esc(t('mockPending')) + '</div>';
   }
 
-  function renderResults(poll, noScroll) {
+  function renderResults(poll, noScroll, keepMsg) {
     const p = S.product;
     $('resultCard').style.display = 'block';
-    $('rInfo').innerHTML = '<b style="color:#fff">' + esc(p.title) + '</b> - Printify taslağı (yayınlanmadı). Maliyetler Printify\'ın gerçek fiyatlarıdır.';
-    $('rMsg').innerHTML = '';
+    $('rInfo').innerHTML = '<b style="color:#fff">' + esc(p.title) + '</b>' + esc(t('rInfo'));
+    if (!keepMsg) $('rMsg').innerHTML = '';
     renderMockups();
 
     const sel = $('platformSel');
@@ -956,7 +1321,7 @@
         '<td><input type="number" step="0.01" min="0" value="' + (S.prices[v.id] || 0).toFixed(2) + '" onchange="setPrice(' + v.id + ', this.value)"></td>' +
         '<td id="pf' + v.id + '"></td><td id="mg' + v.id + '"></td></tr>';
     });
-    $('rBody').innerHTML = rows || '<tr><td colspan="5">Aktif varyant yok</td></tr>';
+    $('rBody').innerHTML = rows || '<tr><td colspan="5">' + esc(t('noActive')) + '</td></tr>';
     recalcAll();
     renderShipping();
 
@@ -967,7 +1332,7 @@
       $('pubDescTr').value = (p.description && p.description !== p.title) ? p.description : '';
       $('pubMsg').innerHTML = '';
     }
-    if (S.pubShops === null) loadPubShops();
+    if (S.pubShops === null && !S.pubShopsError) loadPubShops();
 
     if (!noScroll) $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (poll && !uniqueImages(p.images).length) pollMockups(p.id, 0);
@@ -989,9 +1354,12 @@
   function renderShipping() {
     const box = $('rShip');
     if (!S.shipping || !S.shipping.profiles || !S.shipping.profiles.length || !S.blueprint || !S.provider || S.product.blueprint_id !== S.blueprint.id) { box.innerHTML = ''; return; }
-    let h = '<div class="opt-name" style="margin:14px 0 6px">Kargo ücretleri (Printify, ilk ürün / ek ürün)</div>';
-    if (S.shipping.handling_time) h += '<div class="hint" style="margin-top:0">Üretim süresi: yaklaşık ' + esc(S.shipping.handling_time.value) + ' ' + esc(S.shipping.handling_time.unit === 'day' ? 'gün' : S.shipping.handling_time.unit) + '</div>';
-    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ülkeler</th><th>İlk ürün</th><th>Her ek ürün</th></tr></thead><tbody>';
+    let h = '<div class="opt-name" style="margin:14px 0 6px">' + esc(t('shipTitle')) + '</div>';
+    if (S.shipping.handling_time) {
+      const u = S.shipping.handling_time.unit === 'day' ? t('days') : S.shipping.handling_time.unit;
+      h += '<div class="hint" style="margin-top:0">' + esc(t('handling', { v: S.shipping.handling_time.value, u: u })) + '</div>';
+    }
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>' + esc(t('thCountries')) + '</th><th>' + esc(t('thFirst')) + '</th><th>' + esc(t('thAdditional')) + '</th></tr></thead><tbody>';
     S.shipping.profiles.slice(0, 12).forEach((pr) => {
       const c = (pr.countries || []);
       const label = c.length > 8 ? c.slice(0, 8).join(', ') + ' +' + (c.length - 8) : c.join(', ');
@@ -1013,8 +1381,8 @@
     const margin = price > 0 ? net / price * 100 : 0;
     const cls = net >= 0 ? 'pos' : 'neg';
     const pf = $('pf' + v.id), mg = $('mg' + v.id);
-    if (pf) pf.innerHTML = '<span class="' + cls + '">$' + net.toFixed(2) + '</span>';
-    if (mg) mg.innerHTML = '<span class="' + cls + '">%' + margin.toFixed(1) + '</span>';
+    if (pf) pf.innerHTML = '<span class="' + cls + '">' + (net < 0 ? '-$' : '$') + Math.abs(net).toFixed(2) + '</span>';
+    if (mg) mg.innerHTML = '<span class="' + cls + '">' + esc(pct(margin, 1)) + '</span>';
   }
   function recalcAll() {
     if (!S.product) return;
@@ -1031,7 +1399,7 @@
     const m = (Number($('targetMargin').value) || 0) / 100;
     const c = commissionPct() / 100;
     const denom = 1 - c - m;
-    if (m <= 0 || denom < 0.05) { toast('Hedef marj ile komisyon toplamı çok yüksek, daha düşük bir marj gir', 'err'); return; }
+    if (m <= 0 || denom < 0.05) { toast(t('marginTooHigh'), 'err'); return; }
     (S.product.variants || []).filter((v) => v.is_enabled).forEach((v) => {
       const raw = (v.cost / 100) / denom;
       S.prices[v.id] = Math.floor(raw) + 0.99;
@@ -1048,7 +1416,7 @@
       S.product = r.product;
       initPrices();
       renderResults(false, true);
-      $('rMsg').innerHTML = '<div class="ok-box">Fiyatlar Printify\'a kaydedildi.</div>';
+      $('rMsg').innerHTML = '<div class="ok-box">' + esc(t('pricesSaved')) + '</div>';
       loadMyProducts();
     } catch (e) { toast(e.message, 'err'); }
   }
@@ -1066,31 +1434,36 @@
   }
 
   async function loadPubShops() {
-    const info = $('pubShopsInfo');
-    info.innerHTML = '<div class="hint">Bağlı mağazalar kontrol ediliyor...</div>';
+    S.pubShopsError = '';
+    $('pubShopsInfo').innerHTML = '<div class="hint">' + esc(t('checkingShops')) + '</div>';
     try {
       const r = await callFn('printify-connect', { action: 'list_shops' });
       S.pubShops = (r.shops || []).filter((s) => s.sales_channel && String(s.sales_channel).toLowerCase() !== 'disconnected');
-      renderPubShops();
     } catch (e) {
       S.pubShops = null;
-      info.innerHTML = '<div class="err">' + esc(e.message) + '</div><button class="btn secondary small" onclick="loadPubShops()">Tekrar dene</button>';
+      S.pubShopsError = e.message;
     }
+    renderPubShops();
   }
 
   function renderPubShops() {
     const info = $('pubShopsInfo');
-    const shops = S.pubShops || [];
+    if (S.pubShopsError) {
+      $('pubForm').style.display = 'none';
+      info.innerHTML = '<div class="err">' + esc(S.pubShopsError) + '</div><button class="btn secondary small" onclick="loadPubShops()">' + esc(t('retry')) + '</button>';
+      return;
+    }
+    if (S.pubShops === null) return;
+    const shops = S.pubShops;
     if (!shops.length) {
       $('pubForm').style.display = 'none';
       info.innerHTML =
-        '<div class="warn-box">Printify hesabında bir satış kanalına (Etsy, Shopify vb.) bağlı mağaza görünmüyor. ' +
-        'Printify panelinde <b>My stores</b> bölümünden <b>Add new store</b> ile Etsy mağazanı bağla, sonra aşağıdaki butona bas.</div>' +
-        '<button class="btn secondary small" onclick="loadPubShops()">Yeniledim, tekrar kontrol et</button>';
+        '<div class="warn-box">' + t('noChannelShops') + '</div>' +
+        '<button class="btn secondary small" onclick="loadPubShops()">' + esc(t('refreshedAgain')) + '</button>';
       return;
     }
-    info.innerHTML = '<div class="row" style="margin-bottom:12px"><span class="hint" style="margin:0">Printify\'a bağlı ' + shops.length + ' mağaza bulundu.</span>' +
-      '<button class="btn secondary small" onclick="loadPubShops()">Yenile</button></div>';
+    info.innerHTML = '<div class="row" style="margin-bottom:12px"><span class="hint" style="margin:0">' + esc(t('shopsFound', { n: shops.length })) + '</span>' +
+      '<button class="btn secondary small" onclick="loadPubShops()">' + esc(t('refresh')) + '</button></div>';
     const prev = $('pubMain').value;
     $('pubMain').innerHTML = shops.map((s) => '<option value="' + esc(s.id) + '">' + esc(shopLabel(s)) + '</option>').join('');
     if (prev && shops.some((s) => String(s.id) === String(prev))) $('pubMain').value = prev;
@@ -1114,11 +1487,11 @@
   async function translatePub() {
     if (!S.product) return;
     const btn = $('pubTransBtn');
-    btn.disabled = true; btn.textContent = 'Çevriliyor...';
+    const title = $('pubTitleTr').value.trim();
+    const description = $('pubDescTr').value.trim() || title;
+    if (!title) { toast(t('needSrcTitle'), 'err'); return; }
+    btn.disabled = true; btn.textContent = t('translating');
     try {
-      const title = $('pubTitleTr').value.trim();
-      const description = $('pubDescTr').value.trim() || title;
-      if (!title) { toast('Önce Türkçe başlığı yaz', 'err'); return; }
       const res = await fetch(FN + 'translate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
@@ -1129,11 +1502,11 @@
       $('pubTitle').value = data.titleEn || '';
       $('pubDesc').value = data.descriptionEn || '';
       $('pubTags').value = (data.tagsEn || []).join(', ');
-      toast('Çeviri hazır, kontrol edip düzenleyebilirsin', 'good');
+      toast(t('translated'), 'good');
     } catch (e) {
-      toast('Çeviri yapılamadı: ' + e.message, 'err');
+      toast(t('translateFail') + e.message, 'err');
     } finally {
-      btn.disabled = false; btn.textContent = 'İngilizceye çevir';
+      btn.disabled = false; btn.textContent = t('translate');
     }
   }
 
@@ -1141,24 +1514,23 @@
     if (!S.product) return;
     const title = $('pubTitle').value.trim();
     const description = $('pubDesc').value.trim();
-    const tags = $('pubTags').value.split(',').map((t) => t.trim()).filter(Boolean);
+    const tags = $('pubTags').value.split(',').map((x) => x.trim()).filter(Boolean);
     const main = $('pubMain').value;
-    if (!main) { toast('Platform seç', 'err'); return; }
-    if (!title || !description) { toast('Önce "İngilizceye çevir" butonuna bas ya da başlık ve açıklamayı doldur', 'err'); return; }
-    if (tags.length > 13) { toast('En fazla 13 etiket olabilir', 'err'); return; }
-    if (/[çğıöşüÇĞİÖŞÜ]/.test(title + ' ' + description) &&
-        !confirm('Başlık ya da açıklamada Türkçe karakter var. Yabancı platformda ilan İngilizce olmalı. Yine de yayınlansın mı?')) return;
+    if (!main) { toast(t('pickPlatform'), 'err'); return; }
+    if (!title || !description) { toast(t('needEn'), 'err'); return; }
+    if (tags.length > 13) { toast(t('maxTags'), 'err'); return; }
+    if (/[çğıöşüÇĞİÖŞÜ]/.test(title + ' ' + description) && !confirm(t('trCharsConfirm'))) return;
 
     const targets = [main].concat(Array.from(document.querySelectorAll('.pubExtraCheck:checked')).map((c) => c.value));
     const names = targets.map((id) => {
       const sh = (S.pubShops || []).find((x) => String(x.id) === String(id));
       return sh ? shopLabel(sh) : id;
     });
-    if (!confirm('Bu ürün şu mağazalarda GERÇEKTEN yayınlanacak:\n\n' + names.join('\n') + '\n\nMağazanda canlı ilan oluşur ve platform ilan ücreti alabilir (örneğin Etsy, ilan başına yaklaşık 0,20 $). Devam edilsin mi?')) return;
+    if (!confirm(t('publishConfirm', { names: names.join('\n') }))) return;
 
     const btn = $('pubBtn');
-    btn.disabled = true; btn.textContent = 'Yayınlanıyor...';
-    $('pubMsg').innerHTML = '<div class="hint">Printify\'a gönderiliyor, biraz sürebilir...</div>';
+    btn.disabled = true; btn.textContent = t('publishing');
+    $('pubMsg').innerHTML = '<div class="hint">' + esc(t('sendingPrintify')) + '</div>';
     try {
       const r = await callFn('printify-publish', {
         action: 'publish', productId: String(S.product.id), sourceShopId: String(S.shopId),
@@ -1169,22 +1541,22 @@
         const sh = (S.pubShops || []).find((y) => String(y.id) === String(x.shopId));
         const nm = sh ? shopLabel(sh) : x.shopId;
         h += x.ok
-          ? '<div class="ok-box"><b>' + esc(nm) + ':</b> yayın isteği Printify\'a gönderildi. İlanın mağazada görünmesi birkaç dakika sürebilir.</div>'
-          : '<div class="err"><b>' + esc(nm) + ':</b> ' + esc(x.error || 'Yayınlanamadı') + '</div>';
+          ? '<div class="ok-box"><b>' + esc(nm) + ':</b> ' + esc(t('pubOk')) + '</div>'
+          : '<div class="err"><b>' + esc(nm) + ':</b> ' + esc(x.error || t('pubFail')) + '</div>';
       });
       $('pubMsg').innerHTML = h;
       loadMyProducts();
     } catch (e) {
       $('pubMsg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
     } finally {
-      btn.disabled = false; btn.textContent = 'Yayınla';
+      btn.disabled = false; btn.textContent = t('publish');
     }
   }
 
   async function addToPanel() {
     if (!S.product) return;
     const enabled = (S.product.variants || []).filter((v) => v.is_enabled);
-    if (!enabled.length) { toast('Aktif varyant yok', 'err'); return; }
+    if (!enabled.length) { toast(t('noActive'), 'err'); return; }
     const cheapest = enabled.reduce((a, b) => (a.cost <= b.cost ? a : b));
     const imgs = uniqueImages(S.product.images);
     const row = {
@@ -1202,39 +1574,56 @@
       supplier_variant_id: String(cheapest.id),
       image_url: imgs.length ? imgs[0] : null
     };
-    const { error } = await supabaseClient.from('products').insert(row);
+    const { error } = await db.from('products').insert(row);
     if (error) {
-      $('rMsg').innerHTML = '<div class="err">Panele eklenemedi: ' + esc(error.message) + '</div>';
-      toast('Panele eklenemedi', 'err');
+      $('rMsg').innerHTML = '<div class="err">' + esc(t('panelFail')) + ': ' + esc(error.message) + '</div>';
+      toast(t('panelFail'), 'err');
       return;
     }
-    $('rMsg').innerHTML = '<div class="ok-box">Ürün panele eklendi (en ucuz varyantın maliyeti ve fiyatı baz alındı). <a href="dashboard.html" style="color:#6ee7b7">Panele git</a></div>';
-    toast('Panele eklendi', 'good');
+    $('rMsg').innerHTML = '<div class="ok-box">' + esc(t('panelAdded')) + ' <a href="dashboard.html" style="color:#6ee7b7">' + esc(t('goPanel')) + '</a></div>';
+    toast(t('panelToast'), 'good');
   }
 
   async function deleteCurrent() {
     if (!S.product) return;
-    await deleteProduct(S.product.id);
+    await deletePrintifyProduct(S.product.id);
   }
 
   // ---------- Ürünlerim ----------
   async function loadMyProducts() {
-    const grid = $('myGrid');
+    if (S.myProducts === null) $('myGrid').innerHTML = '<div class="hint">' + esc(t('loading')) + '</div>';
     try {
       const r = await callFn('printify-create-product', { action: 'list_products' });
-      if (!r.products.length) { grid.innerHTML = '<div class="hint">Henüz ürün yok.</div>'; return; }
-      let h = '';
-      r.products.forEach((p) => {
-        h += '<div class="my">' + (p.image ? '<img loading="lazy" src="' + esc(p.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
-          '<div class="my-t">' + esc(p.title) + '</div>' +
-          '<div class="my-a"><button class="btn small" onclick="openProduct(\'' + esc(p.id) + '\')">Aç</button>' +
-          '<button class="btn danger small" onclick="deleteProduct(\'' + esc(p.id) + '\')">Sil</button></div></div>';
-      });
-      grid.innerHTML = h;
+      S.myProducts = r.products || [];
+      S.myError = '';
     } catch (e) {
-      grid.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+      S.myError = e.message;
     }
+    renderMyProducts();
   }
+
+  function renderMyProducts() {
+    const grid = $('myGrid');
+    if (S.myError) { grid.innerHTML = '<div class="err">' + esc(S.myError) + '</div>'; return; }
+    if (S.myProducts === null) { grid.innerHTML = '<div class="hint">' + esc(t('loading')) + '</div>'; return; }
+    if (!S.myProducts.length) { grid.innerHTML = '<div class="hint">' + esc(t('noProducts')) + '</div>'; return; }
+    let h = '';
+    S.myProducts.forEach((p, i) => {
+      h += '<div class="my">' + (p.image ? '<img loading="lazy" src="' + esc(p.image) + '" alt="">' : '<div style="aspect-ratio:1;background:#1a1f2c"></div>') +
+        '<div class="my-t">' + esc(p.title) + '</div>' +
+        '<div class="my-a"><button class="btn small" data-act="open" data-idx="' + i + '">' + esc(t('open')) + '</button>' +
+        '<button class="btn danger small" data-act="del" data-idx="' + i + '">' + esc(t('del')) + '</button></div></div>';
+    });
+    grid.innerHTML = h;
+  }
+  $('myGrid').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b || !S.myProducts) return;
+    const p = S.myProducts[Number(b.getAttribute('data-idx'))];
+    if (!p) return;
+    if (b.getAttribute('data-act') === 'open') openProduct(p.id);
+    else deletePrintifyProduct(p.id);
+  });
 
   async function openProduct(id) {
     try {
@@ -1245,24 +1634,48 @@
     } catch (e) { toast(e.message, 'err'); }
   }
 
-  async function deleteProduct(id) {
-    if (!confirm('Bu ürün Printify\'dan silinsin mi?')) return;
+  async function deletePrintifyProduct(id) {
+    if (!confirm(t('confirmDelete'))) return;
     try {
       await callFn('printify-create-product', { action: 'delete_product', productId: id });
-      if (S.product && S.product.id === id) { S.product = null; $('resultCard').style.display = 'none'; }
-      toast('Silindi');
+      if (S.product && String(S.product.id) === String(id)) { S.product = null; $('resultCard').style.display = 'none'; }
+      toast(t('deleted'));
       loadMyProducts();
     } catch (e) { toast(e.message, 'err'); }
   }
 
+  // ---------- Dil değişimi ----------
+  function onLangChange() {
+    applyStatic();
+    renderConnection();
+    renderQuickChips();
+    if (S.blueprints.length) renderBlueprints();
+    if ($('provCard').style.display !== 'none' && S.providers.length) renderProviders();
+    if (S.variants.length) {
+      renderOptions();
+      if ($('designCard').style.display !== 'none') renderDesigns();
+    }
+    if (S.product && $('resultCard').style.display !== 'none') renderResults(false, true, true);
+    renderPubShops();
+    if (S.myProducts !== null || S.myError) renderMyProducts();
+  }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
+
   // ---------- Başlat ----------
   async function init() {
-    const { data: { session: s } } = await supabaseClient.auth.getSession();
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    applyStatic();
+    renderConnection();
+    const { data: { session: s } } = await db.auth.getSession();
     if (!s) { window.location.href = 'index.html'; return; }
     session = s;
     renderQuickChips();
     loadStudioDesign();
-    loadConnection();
+    await loadConnection();
     applyPreselect();
   }
 
@@ -1272,16 +1685,16 @@
     const bp = Number(params.get('bp'));
     const pp = Number(params.get('pp'));
     if (!bp) return;
+    if (S.conn !== 'connected') return;
     const title = (params.get('t') || '').slice(0, 140);
     S.blueprints = [{ id: bp, title: title, brand: '', image: null }];
-    $('bpGrid').innerHTML = '<div class="bp" id="bp0"><div style="aspect-ratio:1;background:#1a1f2c"></div>' +
-      '<div class="bp-t">' + esc(title || 'Seçilen ürün türü') + '</div><div class="bp-b"></div></div>';
+    renderBlueprints();
     await pickBlueprint(0);
     if (!pp) return;
     const j = S.providers.findIndex((p) => Number(p.id) === pp);
-    if (j < 0) { toast('Seçtiğin atölye bu ürün türünde bulunamadı, listeden başka bir tane seç', 'err'); return; }
+    if (j < 0) { toast(t('provNotFound'), 'err'); return; }
     await pickProvider(j);
-    toast('Ürün türü ve atölye seçildi: ' + S.provider.title);
+    toast(t('preselected') + S.provider.title);
   }
   init();
 </script>
