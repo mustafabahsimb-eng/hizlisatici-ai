@@ -182,7 +182,20 @@
   }
 
   async function logout() {
-    await db.auth.signOut();
+    // Sunucu hata verirse de tarayıcıdaki oturum MUTLAKA silinsin
+    try {
+      const res = await db.auth.signOut();
+      if (res && res.error) await db.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      try { await db.auth.signOut({ scope: 'local' }); } catch (e2) { /* yok say */ }
+    }
+    try {
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf('sb-') === 0 && k.indexOf('-auth-token') !== -1) localStorage.removeItem(k);
+      });
+    } catch (e) { /* yok say */ }
+    currentUser = null;
+    profile = null;
     window.location.href = 'index.html';
   }
 
