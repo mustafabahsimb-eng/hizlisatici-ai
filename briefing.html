@@ -5,117 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Haftalık Brifing</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
   }
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+  .logo { display: flex; align-items: center; gap: 10px; }
   .logo-dot {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    background: #1D9E75;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    color: #fff;
-    font-size: 15px;
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
   .header-right { display: flex; align-items: center; gap: 14px; }
   .user-email { font-size: 13px; color: #9aa3b2; }
   .logout-btn {
-    background: transparent;
-    border: 1px solid #2a3040;
-    color: #9aa3b2;
-    padding: 7px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    cursor: pointer;
+    background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
   }
   .logout-btn:hover { border-color: #3a4258; color: #fff; }
 
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 32px 24px;
-  }
-  .top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 14px;
-  }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px; }
   h1 { font-size: 22px; font-weight: 600; color: #fff; }
   .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; }
   .btn-primary {
-    background: #1D9E75;
-    color: #fff;
-    border: none;
-    padding: 11px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
+    background: #1D9E75; color: #fff; border: none; padding: 11px 18px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
   }
   .btn-primary:hover { background: #178a65; }
   .btn-primary:disabled { opacity: 0.6; cursor: default; }
   .btn-secondary {
-    background: transparent;
-    color: #9aa3b2;
-    border: 1px solid #2a3040;
-    padding: 11px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
-    white-space: nowrap;
+    background: transparent; color: #9aa3b2; border: 1px solid #2a3040; padding: 11px 18px;
+    border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
   }
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
 
+  .msg { margin-bottom: 20px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
+  .msg.error { background: #2a1414; color: #f28b8b; display: block; }
+
   .empty-briefing {
-    padding: 60px 20px;
-    text-align: center;
-    color: #9aa3b2;
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
+    padding: 60px 20px; text-align: center; color: #9aa3b2;
+    background: #141821; border-radius: 14px; border: 1px solid #232838;
   }
   .empty-briefing h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
   .empty-briefing p { font-size: 14px; }
 
   .briefing-section { margin-bottom: 28px; }
   .briefing-section h2 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 12px; }
-  .briefing-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
-  }
-  .briefing-card {
-    background: #1c212c;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #232838;
-  }
+  .briefing-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .briefing-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; }
   .briefing-card .name { font-size: 14px; font-weight: 500; color: #fff; margin-bottom: 4px; }
   .briefing-card .meta { font-size: 12px; color: #9aa3b2; margin-bottom: 8px; }
   .briefing-card .profit { font-size: 15px; font-weight: 600; }
@@ -124,16 +68,16 @@
   .no-data-note { color: #9aa3b2; font-size: 13px; }
 
   .trend-card {
-    background: #141821;
-    border: 1px solid #232838;
-    border-radius: 14px;
-    padding: 20px;
-    font-size: 14px;
-    line-height: 1.6;
-    color: #e6e8ee;
+    background: #141821; border: 1px solid #232838; border-radius: 14px;
+    padding: 20px; font-size: 14px; line-height: 1.6; color: #e6e8ee; white-space: pre-wrap;
   }
-
   .timestamp { font-size: 12px; color: #9aa3b2; margin-top: 20px; }
+
+  @media (max-width: 600px) {
+    header { padding: 14px 16px; }
+    .user-email { display: none; }
+    main { padding: 24px 16px; }
+  }
 </style>
 </head>
 <body>
@@ -144,126 +88,195 @@
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
   <div class="header-right">
+    <span id="langSwitcherHost"></span>
     <span class="user-email" id="userEmail"></span>
-    <button class="logout-btn" onclick="logout()">Çıkış yap</button>
+    <button class="logout-btn" onclick="logout()" data-t="logout"></button>
   </div>
 </header>
 
 <main>
   <div class="top-row">
     <div>
-      <h1>Haftalık AI Brifingi</h1>
-      <div class="subtitle">Ürünlerinin kâr/marj performansı ve trend özeti</div>
+      <h1 data-t="title"></h1>
+      <div class="subtitle" data-t="subtitle"></div>
     </div>
-    <div style="display:flex; gap:10px;">
-      <button class="btn-secondary" onclick="window.location.href='dashboard.html'">← Panele Dön</button>
-      <button class="btn-primary" id="generateBtn" onclick="generateBriefing()">🔄 Brifingi Oluştur</button>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn-secondary" onclick="window.location.href='dashboard.html'" data-t="back"></button>
+      <button class="btn-primary" id="generateBtn" onclick="generateBriefing()" data-t="generate"></button>
     </div>
   </div>
 
-  <div id="briefingContent">
-    <div class="empty-briefing">
-      <h3>Henüz brifing oluşturulmadı</h3>
-      <p>Yukarıdaki "Brifingi Oluştur" butonuna basarak en kârlı/en düşük marjlı ürünlerini ve trend özetini gör.</p>
-    </div>
-  </div>
+  <div class="msg" id="msgBox"></div>
+  <div id="briefingContent"></div>
 </main>
 
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+  let db = null;
   let currentSession = null;
+  let lastData = null;
+
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Haftalık Brifing',
+      logout: 'Çıkış yap',
+      title: 'Haftalık AI Brifingi',
+      subtitle: 'Ürünlerinin kâr/marj performansı ve trend özeti',
+      back: '← Panele Dön',
+      generate: '🔄 Brifingi Oluştur',
+      generating: 'Oluşturuluyor...',
+      emptyTitle: 'Henüz brifing oluşturulmadı',
+      emptyText: 'Yukarıdaki "Brifingi Oluştur" butonuna basarak en kârlı/en düşük marjlı ürünlerini ve trend özetini gör.',
+      fail: 'Brifing oluşturulamadı: ',
+      top: '🏆 En Kârlı Ürünlerin',
+      low: '⚠️ Marjı Düşük Ürünlerin',
+      trend: '🔥 Trend Kategori Özeti',
+      noPriced: 'Fiyatlandırılmış ürün bulunamadı.',
+      unnamed: 'İsimsiz ürün',
+      margin: '{m} marj',
+      created: 'Oluşturulma zamanı: ',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Weekly Briefing',
+      logout: 'Sign out',
+      title: 'Weekly AI Briefing',
+      subtitle: 'Profit/margin performance of your products and a trend summary',
+      back: '← Back to Dashboard',
+      generate: '🔄 Generate Briefing',
+      generating: 'Generating...',
+      emptyTitle: 'No briefing yet',
+      emptyText: 'Press "Generate Briefing" above to see your most profitable / lowest-margin products and a trend summary.',
+      fail: 'Could not generate briefing: ',
+      top: '🏆 Your Most Profitable Products',
+      low: '⚠️ Your Low-Margin Products',
+      trend: '🔥 Trending Category Summary',
+      noPriced: 'No priced products found.',
+      unnamed: 'Unnamed product',
+      margin: '{m} margin',
+      created: 'Generated at: ',
+    }
+  };
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let s = T[lang()][key] !== undefined ? T[lang()][key] : T.tr[key];
+    if (s === undefined) return key;
+    if (vars) Object.keys(vars).forEach(k => { s = s.split('{' + k + '}').join(vars[k]); });
+    return s;
+  }
+  function locale() { return lang() === 'en' ? 'en-GB' : 'tr-TR'; }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  }
+  function fmtPct(v) {
+    const n = Math.abs(Number(v || 0)).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const sign = Number(v) < 0 ? '-' : '';
+    return lang() === 'en' ? sign + n + '%' : sign + '%' + n;
+  }
+  function fmtMoney(v, sym) {
+    const n = Number(v || 0);
+    const s = Math.abs(n).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? '-' : '') + (sym || '₺') + s;
+  }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function showMsg(text) { const b = document.getElementById('msgBox'); b.textContent = text; b.className = 'msg error'; }
+  function hideMsg() { document.getElementById('msgBox').className = 'msg'; }
 
   async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      window.location.href = 'index.html';
-      return;
-    }
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
     currentSession = session;
     document.getElementById('userEmail').textContent = session.user.email;
+    applyStatic();
+    renderAll();
   }
 
   async function generateBriefing() {
     const btn = document.getElementById('generateBtn');
-    const originalHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = 'Oluşturuluyor...';
+    btn.textContent = t('generating');
+    hideMsg();
     try {
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) { window.location.href = 'index.html'; return; }
+      currentSession = session;
       const response = await fetch(SUPABASE_URL + '/functions/v1/weekly-briefing', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
-        body: JSON.stringify({ userAccessToken: currentSession.access_token }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ userAccessToken: session.access_token, language: lang() }),
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      renderBriefing(data);
+      lastData = data;
+      renderAll();
     } catch (err) {
-      alert('Brifing oluşturulamadı: ' + err.message);
+      showMsg(t('fail') + err.message);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = originalHtml;
+      btn.textContent = t('generate');
     }
   }
 
   function productCardHtml(p) {
-    const profitClass = p.netProfit >= 0 ? 'profit-positive' : 'profit-negative';
+    const profit = Number(p.netProfit || 0);
     const metaParts = [p.platform || '-'];
     if (p.category) metaParts.push(p.category);
-    metaParts.push('%' + p.marginPct.toFixed(1) + ' marj');
-    return `
-      <div class="briefing-card">
-        <div class="name">${escapeHtml(p.name || 'İsimsiz ürün')}</div>
-        <div class="meta">${escapeHtml(metaParts.join(' · '))}</div>
-        <div class="profit ${profitClass}">${p.symbol}${p.netProfit.toFixed(2)}</div>
-      </div>
-    `;
+    if (p.marginPct != null) metaParts.push(t('margin', { m: fmtPct(p.marginPct) }));
+    return '<div class="briefing-card">' +
+      '<div class="name">' + escapeHtml(p.name || t('unnamed')) + '</div>' +
+      '<div class="meta">' + escapeHtml(metaParts.join(' · ')) + '</div>' +
+      '<div class="profit ' + (profit >= 0 ? 'profit-positive' : 'profit-negative') + '">' + escapeHtml(fmtMoney(profit, p.symbol)) + '</div>' +
+    '</div>';
   }
 
-  function renderBriefing(data) {
-    const topHtml = data.topProducts && data.topProducts.length > 0
-      ? data.topProducts.map(productCardHtml).join('')
-      : '<div class="no-data-note">Fiyatlandırılmış ürün bulunamadı.</div>';
+  function renderAll() {
+    const el = document.getElementById('briefingContent');
+    if (!lastData) {
+      el.innerHTML = '<div class="empty-briefing"><h3>' + escapeHtml(t('emptyTitle')) + '</h3><p>' + escapeHtml(t('emptyText')) + '</p></div>';
+      return;
+    }
+    const data = lastData;
+    const none = '<div class="no-data-note">' + escapeHtml(t('noPriced')) + '</div>';
+    const topHtml = data.topProducts && data.topProducts.length ? data.topProducts.map(productCardHtml).join('') : none;
+    const lowHtml = data.lowProducts && data.lowProducts.length ? data.lowProducts.map(productCardHtml).join('') : none;
+    let generated = '';
+    try { generated = new Date(data.generatedAt || Date.now()).toLocaleString(locale()); } catch (e) {}
 
-    const lowHtml = data.lowProducts && data.lowProducts.length > 0
-      ? data.lowProducts.map(productCardHtml).join('')
-      : '<div class="no-data-note">Fiyatlandırılmış ürün bulunamadı.</div>';
-
-    const generatedDate = new Date(data.generatedAt).toLocaleString('tr-TR');
-
-    document.getElementById('briefingContent').innerHTML = `
-      <div class="briefing-section">
-        <h2>🏆 En Kârlı Ürünlerin</h2>
-        <div class="briefing-cards">${topHtml}</div>
-      </div>
-      <div class="briefing-section">
-        <h2>⚠️ Marjı Düşük Ürünlerin</h2>
-        <div class="briefing-cards">${lowHtml}</div>
-      </div>
-      <div class="briefing-section">
-        <h2>🔥 Trend Kategori Özeti</h2>
-        <div class="trend-card">${escapeHtml(data.trendSummary || '')}</div>
-      </div>
-      <div class="timestamp">Oluşturulma zamanı: ${generatedDate}</div>
-    `;
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    el.innerHTML =
+      '<div class="briefing-section"><h2>' + escapeHtml(t('top')) + '</h2><div class="briefing-cards">' + topHtml + '</div></div>' +
+      '<div class="briefing-section"><h2>' + escapeHtml(t('low')) + '</h2><div class="briefing-cards">' + lowHtml + '</div></div>' +
+      '<div class="briefing-section"><h2>' + escapeHtml(t('trend')) + '</h2><div class="trend-card">' + escapeHtml(data.trendSummary || '') + '</div></div>' +
+      '<div class="timestamp">' + escapeHtml(t('created')) + escapeHtml(generated) + '</div>';
   }
 
   async function logout() {
-    await supabaseClient.auth.signOut();
+    try {
+      if (window.HS && typeof HS.logout === 'function') { await HS.logout(); return; }
+    } catch (e) {}
+    await db.auth.signOut();
     window.location.href = 'index.html';
   }
+
+  function onLangChange() {
+    applyStatic();
+    const btn = document.getElementById('generateBtn');
+    if (btn.disabled) btn.textContent = t('generating');
+    renderAll();
+  }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
 
   init();
 </script>
