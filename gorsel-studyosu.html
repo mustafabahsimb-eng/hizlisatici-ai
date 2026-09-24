@@ -6,6 +6,7 @@
 <title>Görsel Stüdyosu - HızlıSatıcı AI</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   :root{
     --bg-dark:#0b1220;
@@ -35,7 +36,7 @@
     flex-wrap:wrap; gap:10px;
   }
   header h1{font-size:18px; margin:0; display:flex; align-items:center; gap:8px;}
-  .top-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .top-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
   button{
     cursor:pointer;
     border:1px solid var(--border);
@@ -123,25 +124,30 @@
     background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
     padding:10px 18px; border-radius:8px; font-size:13px; z-index:999;
     box-shadow:0 4px 20px rgba(0,0,0,.4);
-    display:none;
+    display:none; max-width:90vw;
   }
   .spinner{
     display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.3);
     border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
+  @media (max-width: 600px){
+    .sidebar-left, .sidebar-right{width:100%;}
+    .canvas-wrap{min-width:0; width:100%;}
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🎨 Görsel Stüdyosu</h1>
+  <h1 data-t="title"></h1>
   <div class="top-actions">
-    <button id="undoBtn" class="icon-btn" title="Geri al">↶ Geri Al</button>
-    <button id="redoBtn" class="icon-btn" title="Yinele">↷ Yinele</button>
-    <button id="downloadBtn" class="primary">⬇ PNG İndir</button>
-    <button id="podBtn" class="primary">👕 Print on Demand'a Gönder</button>
-    <a href="dashboard.html"><button>← Panele Dön</button></a>
+    <button id="undoBtn" class="icon-btn" data-t="undo" data-tt="undoTitle"></button>
+    <button id="redoBtn" class="icon-btn" data-t="redo" data-tt="redoTitle"></button>
+    <button id="downloadBtn" class="primary" data-t="download"></button>
+    <button id="podBtn" class="primary" data-t="sendPod"></button>
+    <a href="dashboard.html"><button data-t="back"></button></a>
+    <span id="langSwitcherHost"></span>
   </div>
 </header>
 
@@ -151,75 +157,75 @@
   <div class="sidebar-left">
 
     <div class="panel">
-      <p class="section-title">Görsel</p>
+      <p class="section-title" data-t="secImage"></p>
       <input type="file" id="fileInput" accept="image/*">
-      <button class="full-btn primary" id="uploadBtn">📤 Görsel Yükle</button>
-      <button class="full-btn" id="removeBgBtn">✂️ Arka Planı Temizle</button>
+      <button class="full-btn primary" id="uploadBtn" data-t="upload"></button>
+      <button class="full-btn" id="removeBgBtn" data-t="removeBg"></button>
       <div class="hint" id="removeBgHint"></div>
     </div>
 
     <div class="panel">
-      <p class="section-title">Kes ve Sil</p>
-      <button class="full-btn" id="eraseToolBtn">🧽 Fırçayla Sil</button>
-      <label class="small">Fırça Boyutu: <span id="brushSizeVal">30</span></label>
+      <p class="section-title" data-t="secCut"></p>
+      <button class="full-btn" id="eraseToolBtn" data-t="erase"></button>
+      <label class="small"><span data-t="brushSize"></span> <span id="brushSizeVal">30</span></label>
       <input type="range" id="brushSize" min="5" max="150" value="30">
-      <button class="full-btn" id="lassoToolBtn" style="margin-top:8px;">⭕ Çizerek Kes</button>
+      <button class="full-btn" id="lassoToolBtn" style="margin-top:8px;" data-t="lasso"></button>
       <div id="lassoBar">
-        <button class="full-btn danger" id="lassoDeleteBtn">🗑 İçini Sil</button>
-        <button class="full-btn primary" id="lassoKeepBtn">📌 İçini Yeni Katman Yap</button>
-        <button class="full-btn" id="lassoRedrawBtn">↺ Yeniden Çiz</button>
+        <button class="full-btn danger" id="lassoDeleteBtn" data-t="lassoDelete"></button>
+        <button class="full-btn primary" id="lassoKeepBtn" data-t="lassoKeep"></button>
+        <button class="full-btn" id="lassoRedrawBtn" data-t="lassoRedraw"></button>
       </div>
-      <button class="full-btn primary" id="toolDoneBtn" style="display:none; margin-top:8px;">✔ Bitti</button>
-      <div class="hint" id="toolHint">Önce düzenlemek istediğin görsele tıklayıp seç, sonra bir araç seç.</div>
+      <button class="full-btn primary" id="toolDoneBtn" style="display:none; margin-top:8px;" data-t="done"></button>
+      <div class="hint" id="toolHint"></div>
     </div>
 
     <div class="panel">
-      <p class="section-title">Ekle</p>
+      <p class="section-title" data-t="secAdd"></p>
       <div class="btn-grid">
-        <button id="addTextBtn">🔤 Metin</button>
-        <button id="addRectBtn">▭ Dikdörtgen</button>
-        <button id="addCircleBtn">◯ Daire</button>
-        <button id="addLineBtn">／ Çizgi</button>
+        <button id="addTextBtn" data-t="addText"></button>
+        <button id="addRectBtn" data-t="addRect"></button>
+        <button id="addCircleBtn" data-t="addCircle"></button>
+        <button id="addLineBtn" data-t="addLine"></button>
       </div>
     </div>
 
     <div class="panel">
-      <p class="section-title">Düzenle</p>
+      <p class="section-title" data-t="secEdit"></p>
       <div class="row">
-        <button id="rotateBtn">↻ 90° Döndür</button>
-        <button id="cropToggleBtn">✂ Kırp</button>
+        <button id="rotateBtn" data-t="rotate"></button>
+        <button id="cropToggleBtn" data-t="crop"></button>
       </div>
       <div id="cropBar">
-        <button id="cropApplyBtn" class="primary">Kırpmayı Uygula</button>
-        <button id="cropCancelBtn">İptal</button>
+        <button id="cropApplyBtn" class="primary" data-t="cropApply"></button>
+        <button id="cropCancelBtn" data-t="cancel"></button>
       </div>
 
       <div class="tool-group">
-        <label class="small">Parlaklık</label>
+        <label class="small" data-t="brightness"></label>
         <input type="range" id="brightnessSlider" min="-100" max="100" value="0">
-        <label class="small">Kontrast</label>
+        <label class="small" data-t="contrast"></label>
         <input type="range" id="contrastSlider" min="-100" max="100" value="0">
-        <label class="small">Doygunluk</label>
+        <label class="small" data-t="saturation"></label>
         <input type="range" id="saturationSlider" min="-100" max="100" value="0">
-        <button class="full-btn" id="resetFiltersBtn" style="margin-top:8px;">Ayarları Sıfırla</button>
+        <button class="full-btn" id="resetFiltersBtn" style="margin-top:8px;" data-t="resetFilters"></button>
       </div>
 
       <div class="tool-group">
-        <label class="small">Zemin Rengi</label>
+        <label class="small" data-t="bgColor"></label>
         <div class="row">
           <input type="color" id="bgColorPicker" value="#ffffff">
-          <button id="bgColorClearBtn" title="Zemin rengini kaldır">✕</button>
+          <button id="bgColorClearBtn" data-tt="bgColorClear">✕</button>
         </div>
-        <div class="hint">Sadece şeffaf alanlarda görünür (önce arka planı temizle).</div>
+        <div class="hint" data-t="bgColorHint"></div>
       </div>
     </div>
 
     <div class="panel">
-      <p class="section-title">Boyut Şablonu</p>
-      <button class="full-btn" data-w="1080" data-h="1080">Trendyol Kare (1080×1080)</button>
-      <button class="full-btn" data-w="1080" data-h="1080">Instagram Kare (1080×1080)</button>
-      <button class="full-btn" data-w="1080" data-h="1350">Instagram Dikey (1080×1350)</button>
-      <button class="full-btn" data-w="1200" data-h="630">Facebook Yatay (1200×630)</button>
+      <p class="section-title" data-t="secSize"></p>
+      <button class="full-btn" data-w="1080" data-h="1080" data-t="sizeTrendyol"></button>
+      <button class="full-btn" data-w="1080" data-h="1080" data-t="sizeIgSquare"></button>
+      <button class="full-btn" data-w="1080" data-h="1350" data-t="sizeIgPortrait"></button>
+      <button class="full-btn" data-w="1200" data-h="630" data-t="sizeFb"></button>
     </div>
 
   </div>
@@ -229,20 +235,20 @@
     <div class="canvas-stage">
       <canvas id="mainCanvas"></canvas>
     </div>
-    <div class="hint">Seçili öğeyi taşımak için sürükle, köşelerden boyutlandır, üstteki tutamaçtan döndür. Silmek için <b>Delete</b> tuşuna bas.</div>
+    <div class="hint" data-th="canvasHint"></div>
   </div>
 
   <!-- SAĞ PANEL: KATMANLAR + ÖZELLİKLER -->
   <div class="sidebar-right">
     <div class="panel">
-      <p class="section-title">Katmanlar</p>
-      <div id="layerList"><div class="empty-msg">Henüz öğe yok</div></div>
+      <p class="section-title" data-t="secLayers"></p>
+      <div id="layerList"></div>
     </div>
 
     <div class="panel" id="propsPanel" style="display:none; margin-top:14px;">
-      <p class="section-title">Seçili Öğe</p>
+      <p class="section-title" data-t="secSelected"></p>
       <div id="propsContent"></div>
-      <button class="full-btn danger" id="deleteSelectedBtn" style="margin-top:10px;">🗑 Sil</button>
+      <button class="full-btn danger" id="deleteSelectedBtn" style="margin-top:10px;" data-t="deleteBtn"></button>
     </div>
   </div>
 
@@ -251,15 +257,184 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ============== Dil ============== */
+const T = {
+  tr: {
+    pageTitle: 'Görsel Stüdyosu - HızlıSatıcı AI',
+    title: '🎨 Görsel Stüdyosu',
+    undo: '↶ Geri Al', undoTitle: 'Geri al (Ctrl+Z)',
+    redo: '↷ Yinele', redoTitle: 'Yinele (Ctrl+Y)',
+    download: '⬇ PNG İndir',
+    sendPod: '👕 Print on Demand\'a Gönder',
+    back: '← Panele Dön',
+    secImage: 'Görsel',
+    upload: '📤 Görsel Yükle',
+    removeBg: '✂️ Arka Planı Temizle',
+    processing: 'İşleniyor...',
+    secCut: 'Kes ve Sil',
+    erase: '🧽 Fırçayla Sil',
+    brushSize: 'Fırça Boyutu:',
+    lasso: '⭕ Çizerek Kes',
+    lassoDelete: '🗑 İçini Sil',
+    lassoKeep: '📌 İçini Yeni Katman Yap',
+    lassoRedraw: '↺ Yeniden Çiz',
+    done: '✔ Bitti',
+    hintIdle: 'Önce düzenlemek istediğin görsele tıklayıp seç, sonra bir araç seç.',
+    hintErase: 'Silmek istediğin yerin üstünde fareyi basılı tutarak boya. Yanlış olursa ↶ Geri Al. İşin bitince "Bitti"ye bas.',
+    hintLasso: 'Kesmek istediğin şeklin etrafını fareyle basılı tutarak çevir, bırakınca seçenekler çıkar.',
+    secAdd: 'Ekle',
+    addText: '🔤 Metin', addRect: '▭ Dikdörtgen', addCircle: '◯ Daire', addLine: '／ Çizgi',
+    defaultText: 'Metninizi yazın',
+    secEdit: 'Düzenle',
+    rotate: '↻ 90° Döndür',
+    crop: '✂ Kırp',
+    cropApply: 'Kırpmayı Uygula',
+    cancel: 'İptal',
+    brightness: 'Parlaklık', contrast: 'Kontrast', saturation: 'Doygunluk',
+    resetFilters: 'Ayarları Sıfırla',
+    bgColor: 'Zemin Rengi',
+    bgColorClear: 'Zemin rengini kaldır',
+    bgColorHint: 'Sadece şeffaf alanlarda görünür (önce arka planı temizle).',
+    secSize: 'Boyut Şablonu',
+    sizeTrendyol: 'Trendyol Kare (1080×1080)',
+    sizeIgSquare: 'Instagram Kare (1080×1080)',
+    sizeIgPortrait: 'Instagram Dikey (1080×1350)',
+    sizeFb: 'Facebook Yatay (1200×630)',
+    canvasHint: 'Seçili öğeyi taşımak için sürükle, köşelerden boyutlandır, üstteki tutamaçtan döndür. Silmek için <b>Delete</b> tuşuna bas.',
+    secLayers: 'Katmanlar',
+    noLayers: 'Henüz öğe yok',
+    secSelected: 'Seçili Öğe',
+    deleteBtn: '🗑 Sil',
+    layerImage: '🖼️ Görsel', layerRect: '▭ Dikdörtgen', layerCircle: '◯ Daire', layerLine: '／ Çizgi',
+    bringForward: 'Öne al', sendBackward: 'Arkaya gönder', del: 'Sil',
+    fontSize: 'Yazı Boyutu', color: 'Renk',
+    strokeColor: 'Kenarlık Rengi', strokeWidth: 'Kenarlık Kalınlığı', fillColor: 'Dolgu Rengi',
+    fillClear: 'Dolguyu kaldır (içi boş)',
+    lineColor: 'Çizgi Rengi',
+    noProps: 'Bu öğe için özel ayar yok.',
+    tImageLoaded: 'Görsel yüklendi',
+    tNeedImageOrObj: 'Önce bir görsel yükle veya öğe seç',
+    tNeedImage: 'Önce bir görsel yükle',
+    tCropHelp: 'Çerçevenin kenarlarını veya köşelerini içeri çekerek kırp',
+    tCropped: 'Kırpma uygulandı',
+    tSizeSet: 'Boyut {w}×{h} olarak ayarlandı',
+    tServerError: 'Sunucu hatası: {s}',
+    tBadResponse: 'Beklenmeyen yanıt formatı',
+    tBgRemoved: 'Arka plan temizlendi',
+    tError: 'Hata: ',
+    tAreaDeleted: 'Seçilen alan silindi',
+    tOutside: 'Çizdiğin alan görselin dışında kaldı',
+    tPieceLayer: 'Kesilen parça yeni katman oldu. İstersen alttaki eski görseli silebilirsin.',
+    tNeedContent: 'Önce tuvale bir görsel veya metin ekle.',
+    tSendFail: 'Gönderilemedi: ',
+  },
+  en: {
+    pageTitle: 'Image Studio - HızlıSatıcı AI',
+    title: '🎨 Image Studio',
+    undo: '↶ Undo', undoTitle: 'Undo (Ctrl+Z)',
+    redo: '↷ Redo', redoTitle: 'Redo (Ctrl+Y)',
+    download: '⬇ Download PNG',
+    sendPod: '👕 Send to Print on Demand',
+    back: '← Back to Dashboard',
+    secImage: 'Image',
+    upload: '📤 Upload Image',
+    removeBg: '✂️ Remove Background',
+    processing: 'Processing...',
+    secCut: 'Cut & Erase',
+    erase: '🧽 Brush Erase',
+    brushSize: 'Brush Size:',
+    lasso: '⭕ Lasso Cut',
+    lassoDelete: '🗑 Delete Inside',
+    lassoKeep: '📌 Make Inside a New Layer',
+    lassoRedraw: '↺ Redraw',
+    done: '✔ Done',
+    hintIdle: 'First click the image you want to edit to select it, then choose a tool.',
+    hintErase: 'Hold the mouse button and paint over the area to erase. Made a mistake? Use ↶ Undo. Press "Done" when finished.',
+    hintLasso: 'Hold the mouse button and draw around the shape you want to cut; options appear when you release.',
+    secAdd: 'Add',
+    addText: '🔤 Text', addRect: '▭ Rectangle', addCircle: '◯ Circle', addLine: '／ Line',
+    defaultText: 'Type your text',
+    secEdit: 'Edit',
+    rotate: '↻ Rotate 90°',
+    crop: '✂ Crop',
+    cropApply: 'Apply Crop',
+    cancel: 'Cancel',
+    brightness: 'Brightness', contrast: 'Contrast', saturation: 'Saturation',
+    resetFilters: 'Reset Adjustments',
+    bgColor: 'Background Color',
+    bgColorClear: 'Remove background color',
+    bgColorHint: 'Only visible in transparent areas (remove the background first).',
+    secSize: 'Size Template',
+    sizeTrendyol: 'Trendyol Square (1080×1080)',
+    sizeIgSquare: 'Instagram Square (1080×1080)',
+    sizeIgPortrait: 'Instagram Portrait (1080×1350)',
+    sizeFb: 'Facebook Landscape (1200×630)',
+    canvasHint: 'Drag to move the selected item, resize from the corners, rotate with the top handle. Press <b>Delete</b> to remove it.',
+    secLayers: 'Layers',
+    noLayers: 'No items yet',
+    secSelected: 'Selected Item',
+    deleteBtn: '🗑 Delete',
+    layerImage: '🖼️ Image', layerRect: '▭ Rectangle', layerCircle: '◯ Circle', layerLine: '／ Line',
+    bringForward: 'Bring forward', sendBackward: 'Send backward', del: 'Delete',
+    fontSize: 'Font Size', color: 'Color',
+    strokeColor: 'Border Color', strokeWidth: 'Border Width', fillColor: 'Fill Color',
+    fillClear: 'Remove fill (hollow)',
+    lineColor: 'Line Color',
+    noProps: 'No special settings for this item.',
+    tImageLoaded: 'Image uploaded',
+    tNeedImageOrObj: 'Upload an image or select an item first',
+    tNeedImage: 'Upload an image first',
+    tCropHelp: 'Drag the frame edges or corners inward to crop',
+    tCropped: 'Crop applied',
+    tSizeSet: 'Size set to {w}×{h}',
+    tServerError: 'Server error: {s}',
+    tBadResponse: 'Unexpected response format',
+    tBgRemoved: 'Background removed',
+    tError: 'Error: ',
+    tAreaDeleted: 'Selected area deleted',
+    tOutside: 'The area you drew is outside the image',
+    tPieceLayer: 'The cut piece is now a new layer. You can delete the old image underneath if you like.',
+    tNeedContent: 'Add an image or text to the canvas first.',
+    tSendFail: 'Could not send: ',
+  }
+};
+function lang(){
+  const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+  return T[l] ? l : 'tr';
+}
+function t(key, vars){
+  let v = T[lang()][key];
+  if(v === undefined) v = T.tr[key] !== undefined ? T.tr[key] : key;
+  if(vars && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k)=> vars[k] != null ? vars[k] : m);
+  return v;
+}
+function escapeHtml(str){
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+function applyStatic(){
+  document.documentElement.lang = lang();
+  document.title = t('pageTitle');
+  document.querySelectorAll('[data-t]').forEach(el=>{ el.textContent = t(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-th]').forEach(el=>{ el.innerHTML = t(el.getAttribute('data-th')); });
+  document.querySelectorAll('[data-tt]').forEach(el=>{ el.title = t(el.getAttribute('data-tt')); });
+}
+
 /* ============== Supabase ============== */
 const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let db = null;
 
 let currentUserAccessToken = null;
 
 async function initAuth(){
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  try{
+    if(window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+  }catch(e){ console.warn('HS.init', e); }
+  db = (window.HS && HS.db) ? HS.db : window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  applyStatic();
+  updateToolButtons();
+  refreshLayerList();
+  const { data: { session } } = await db.auth.getSession();
   if(!session){
     window.location.href = "index.html";
     return;
@@ -270,11 +445,11 @@ async function initAuth(){
 /* ============== Toast ============== */
 let toastTimer = null;
 function showToast(msg, ms=2500){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> t.style.display='none', ms);
+  toastTimer = setTimeout(()=> el.style.display='none', ms);
 }
 
 /* ============== Fabric Canvas ============== */
@@ -350,7 +525,7 @@ document.addEventListener('keydown', (e)=>{
   if((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); }
   if(e.key === 'Delete' || e.key === 'Backspace'){
     const active = canvas.getActiveObject();
-    if(active){ e.preventDefault(); canvas.remove(active); canvas.discardActiveObject(); canvas.renderAll(); }
+    if(active && !active.isEditing){ e.preventDefault(); canvas.remove(active); canvas.discardActiveObject(); canvas.renderAll(); }
   }
 });
 
@@ -379,7 +554,7 @@ function loadImageFile(file){
       canvas.setActiveObject(img);
       baseImage = img;
       canvas.renderAll();
-      showToast('Görsel yüklendi');
+      showToast(t('tImageLoaded'));
     }, { crossOrigin: 'anonymous' });
   };
   reader.readAsDataURL(file);
@@ -392,9 +567,7 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
 });
 
 /* ============== Sürükle-Bırak ile Görsel Yükleme ============== */
-// Tüm SAYFA (sadece küçük canvas kutusu değil) geçerli bırakma alanı - hedefi tutturmak kolay olsun diye.
-// Tarayıcının varsayılan davranışı (sayfayı terk edip görseli doğrudan açması) engelleniyor,
-// böylece sekme çubuğuna çok yakın olmadığın sürece dosya nereye bırakılırsa bırakılsın editör ekranı kaybolmuyor.
+// Tüm SAYFA geçerli bırakma alanı; tarayıcının görseli doğrudan açması engellenir.
 const canvasStageEl = document.querySelector('.canvas-stage');
 let dragDepth = 0;
 
@@ -422,7 +595,7 @@ document.documentElement.addEventListener('drop', (e)=>{
 
 /* ============== Metin / Şekil Ekleme ============== */
 document.getElementById('addTextBtn').addEventListener('click', ()=>{
-  const text = new fabric.IText('Metninizi yazın', {
+  const text = new fabric.IText(t('defaultText'), {
     left: canvas.width/2, top: canvas.height/2, originX:'center', originY:'center',
     fontSize: 42, fill: '#ffffff', fontFamily: 'Arial',
     cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
@@ -462,7 +635,7 @@ document.getElementById('addLineBtn').addEventListener('click', ()=>{
 /* ============== Döndür (90°) ============== */
 document.getElementById('rotateBtn').addEventListener('click', ()=>{
   const target = canvas.getActiveObject() || baseImage;
-  if(!target){ showToast('Önce bir görsel yükle veya öğe seç'); return; }
+  if(!target){ showToast(t('tNeedImageOrObj')); return; }
   target.rotate(((target.angle || 0) + 90) % 360);
   canvas.renderAll();
   snapshotState();
@@ -472,11 +645,9 @@ document.getElementById('rotateBtn').addEventListener('click', ()=>{
 let cropRect = null;
 
 document.getElementById('cropToggleBtn').addEventListener('click', ()=>{
-  if(!baseImage){ showToast('Önce bir görsel yükle'); return; }
+  if(!baseImage){ showToast(t('tNeedImage')); return; }
   if(cropRect){ cancelCrop(); return; }
-  // Çerçeve, görselin TAM sınırlarıyla başlar (telefondaki kırpma ekranı gibi).
-  // Kullanıcı çerçevenin sağ/sol/üst/alt kenarını veya köşelerini içeri çekerek
-  // istediği taraftan kırpabilir.
+  // Çerçeve, görselin TAM sınırlarıyla başlar; kenarlar/köşeler içeri çekilerek kırpılır.
   const b = baseImage.getBoundingRect();
   cropRect = new fabric.Rect({
     left: b.left,
@@ -496,7 +667,7 @@ document.getElementById('cropToggleBtn').addEventListener('click', ()=>{
   canvas.setActiveObject(cropRect);
   canvas.renderAll();
   document.getElementById('cropBar').style.display = 'flex';
-  showToast('Çerçevenin kenarlarını veya köşelerini içeri çekerek kırp');
+  showToast(t('tCropHelp'));
 });
 
 function cancelCrop(){
@@ -509,7 +680,6 @@ document.getElementById('cropCancelBtn').addEventListener('click', cancelCrop);
 document.getElementById('cropApplyBtn').addEventListener('click', ()=>{
   if(!cropRect || !baseImage) return;
   const rectBounds = cropRect.getBoundingRect();
-  // absolute positioned clipPath kullanarak, ekranda çizilen dikdörtgeni doğrudan kırpma alanı yapıyoruz
   const absClip = new fabric.Rect({
     left: rectBounds.left,
     top: rectBounds.top,
@@ -523,7 +693,7 @@ document.getElementById('cropApplyBtn').addEventListener('click', ()=>{
   canvas.renderAll();
   document.getElementById('cropBar').style.display = 'none';
   snapshotState();
-  showToast('Kırpma uygulandı');
+  showToast(t('tCropped'));
 });
 
 /* ============== Parlaklık / Kontrast / Doygunluk ============== */
@@ -577,17 +747,16 @@ document.querySelectorAll('.sidebar-left [data-w]').forEach(btn=>{
     }
     canvas.renderAll();
     snapshotState();
-    showToast(`Boyut ${w}×${h} olarak ayarlandı`);
+    showToast(t('tSizeSet', { w: w, h: h }));
   });
 });
 
 /* ============== Arka Planı Temizle (mevcut Edge Function) ============== */
 document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
-  if(!baseImage){ showToast('Önce bir görsel yükle'); return; }
+  if(!baseImage){ showToast(t('tNeedImage')); return; }
   const btn = document.getElementById('removeBgBtn');
-  const original = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> İşleniyor...';
+  btn.innerHTML = '<span class="spinner"></span> ' + escapeHtml(t('processing'));
   try{
     // görselin mevcut halini (filtreler dahil) base64 olarak al
     const dataUrl = baseImage.toDataURL({ format: 'png' });
@@ -598,18 +767,16 @@ document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'apikey': SUPABASE_KEY
       },
-      body: JSON.stringify({ imageBase64: dataUrl })
+      body: JSON.stringify({ imageBase64: dataUrl, userAccessToken: currentUserAccessToken, language: lang() })
     });
     const data = await res.json().catch(()=> ({}));
-    if(!res.ok){ throw new Error(data.error || `Sunucu hatası: ${res.status}`); }
+    if(!res.ok){ throw new Error(data.error || t('tServerError', { s: res.status })); }
     const resultUrl = data.imageBase64;
-    if(!resultUrl) throw new Error('Beklenmeyen yanıt formatı');
+    if(!resultUrl) throw new Error(t('tBadResponse'));
 
     fabric.Image.fromURL(resultUrl, (newImg)=>{
       const old = baseImage;
-      // Yeni görsel farklı bir piksel çözünürlüğünde dönebiliyor (remove.bg kendi boyutunu kullanabiliyor).
-      // Bu yüzden eski scaleX/scaleY'yi tekrar uygulamak yerine, EKRANDAKİ eski görünür boyutu hedef alıp
-      // yeni görselin gerçek piksel boyutuna göre orantıyı yeniden hesaplıyoruz.
+      // Yeni görsel farklı çözünürlükte dönebilir: ekrandaki eski görünür boyut hedeflenir.
       const targetDisplayWidth = old.getScaledWidth();
       const targetDisplayHeight = old.getScaledHeight();
       newImg.set({
@@ -629,15 +796,15 @@ document.getElementById('removeBgBtn').addEventListener('click', async ()=>{
       canvas.setActiveObject(newImg);
       baseImage = newImg;
       canvas.renderAll();
-      showToast('Arka plan temizlendi');
+      showToast(t('tBgRemoved'));
     }, { crossOrigin: 'anonymous' });
 
   }catch(err){
     console.error(err);
-    showToast('Hata: ' + err.message, 4000);
+    showToast(t('tError') + err.message, 4000);
   }finally{
     btn.disabled = false;
-    btn.innerHTML = original;
+    btn.textContent = t('removeBg');
   }
 });
 
@@ -654,10 +821,6 @@ const lassoToolBtn = document.getElementById('lassoToolBtn');
 const toolDoneBtn = document.getElementById('toolDoneBtn');
 const lassoBar = document.getElementById('lassoBar');
 const toolHint = document.getElementById('toolHint');
-
-const HINT_IDLE = 'Önce düzenlemek istediğin görsele tıklayıp seç, sonra bir araç seç.';
-const HINT_ERASE = 'Silmek istediğin yerin üstünde fareyi basılı tutarak boya. Yanlış olursa ↶ Geri Al. İşin bitince "Bitti"ye bas.';
-const HINT_LASSO = 'Kesmek istediğin şeklin etrafını fareyle basılı tutarak çevir, bırakınca seçenekler çıkar.';
 
 function pickToolTarget(){
   const a = canvas.getActiveObject();
@@ -712,14 +875,14 @@ function updateToolButtons(){
   eraseToolBtn.classList.toggle('tool-active', toolMode === 'erase');
   lassoToolBtn.classList.toggle('tool-active', toolMode === 'lasso');
   toolDoneBtn.style.display = toolMode ? 'block' : 'none';
-  if(!toolMode){ lassoBar.style.display = 'none'; toolHint.textContent = HINT_IDLE; }
-  else if(toolMode === 'erase'){ toolHint.textContent = HINT_ERASE; }
-  else { toolHint.textContent = HINT_LASSO; }
+  if(!toolMode){ lassoBar.style.display = 'none'; toolHint.textContent = t('hintIdle'); }
+  else if(toolMode === 'erase'){ toolHint.textContent = t('hintErase'); }
+  else { toolHint.textContent = t('hintLasso'); }
 }
 
 function startTool(mode){
   const target = pickToolTarget();
-  if(!target){ showToast('Önce bir görsel yükle'); return; }
+  if(!target){ showToast(t('tNeedImage')); return; }
   if(typeof cancelCrop === 'function') cancelCrop();
   toolMode = mode;
   toolTarget = target;
@@ -802,7 +965,6 @@ canvas.on('mouse:up', ()=>{
 });
 
 /* --- Görselin gerçek piksellerine ulaşma yardımcıları --- */
-// Görseli (gerekirse küçülterek) bir çizim tuvaline aktarır ve tuval koordinatını görsel pikseline çeviren fonksiyon verir.
 function makeEditContext(img){
   const w = img.width, h = img.height;
   const s = Math.min(1, MAX_EDIT_PX / Math.max(w, h));
@@ -822,9 +984,9 @@ function makeEditContext(img){
 
 // Düzenlenmiş pikselleri aynı görsel nesnesine geri yazar (konum, boyut, açı aynen kalır)
 function commitEdit(img, e){
-  img.filters = [];               // parlaklık vb. ayarlar piksellere işlenmiş oldu
+  img.filters = [];
   img.setElement(e.off);
-  img.scaleX = img.scaleX / e.sx;  // küçültme olduysa ekrandaki boyut değişmesin
+  img.scaleX = img.scaleX / e.sx;
   img.scaleY = img.scaleY / e.sy;
   img.dirty = true;
   img.setCoords();
@@ -877,7 +1039,7 @@ document.getElementById('lassoDeleteBtn').addEventListener('click', ()=>{
   e.ctx.restore();
   commitEdit(img, e);
   exitTool();
-  showToast('Seçilen alan silindi');
+  showToast(t('tAreaDeleted'));
 });
 
 /* --- Çizerek Kes: İçini Yeni Katman Yap --- */
@@ -886,13 +1048,12 @@ document.getElementById('lassoKeepBtn').addEventListener('click', ()=>{
   if(!img || toolPts.length < 3) return;
   const e = makeEditContext(img);
   const px = toolPts.map(e.toPx);
-  // Şeklin görsel içinde kalan kutusu
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   px.forEach(p=>{ minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
   const bx = Math.max(0, Math.floor(minX)), by = Math.max(0, Math.floor(minY));
   const bw = Math.min(e.off.width, Math.ceil(maxX)) - bx;
   const bh = Math.min(e.off.height, Math.ceil(maxY)) - by;
-  if(bw < 2 || bh < 2){ showToast('Çizdiğin alan görselin dışında kaldı'); return; }
+  if(bw < 2 || bh < 2){ showToast(t('tOutside')); return; }
 
   const cut = document.createElement('canvas');
   cut.width = bw; cut.height = bh;
@@ -916,7 +1077,7 @@ document.getElementById('lassoKeepBtn').addEventListener('click', ()=>{
   canvas.add(piece);
   canvas.setActiveObject(piece);
   canvas.renderAll();
-  showToast('Kesilen parça yeni katman oldu. İstersen alttaki eski görseli silebilirsin.', 4000);
+  showToast(t('tPieceLayer'), 4000);
 });
 
 document.getElementById('lassoRedrawBtn').addEventListener('click', ()=>{
@@ -930,7 +1091,7 @@ function refreshLayerList(){
   const list = document.getElementById('layerList');
   const objects = canvas.getObjects().slice().reverse();
   if(objects.length === 0){
-    list.innerHTML = '<div class="empty-msg">Henüz öğe yok</div>';
+    list.innerHTML = '<div class="empty-msg">' + escapeHtml(t('noLayers')) + '</div>';
     return;
   }
   const active = canvas.getActiveObject();
@@ -939,17 +1100,17 @@ function refreshLayerList(){
     const div = document.createElement('div');
     div.className = 'layer-item' + (obj === active ? ' active' : '');
     const label = obj.type === 'i-text' ? ('🔤 ' + (obj.text||'').slice(0,14))
-      : obj.type === 'image' ? '🖼️ Görsel'
-      : obj.type === 'rect' ? '▭ Dikdörtgen'
-      : obj.type === 'circle' ? '◯ Daire'
-      : obj.type === 'line' ? '／ Çizgi'
+      : obj.type === 'image' ? t('layerImage')
+      : obj.type === 'rect' ? t('layerRect')
+      : obj.type === 'circle' ? t('layerCircle')
+      : obj.type === 'line' ? t('layerLine')
       : obj.type;
-    div.innerHTML = `<span class="lname">${label}</span>
-      <div class="layer-actions">
-        <button data-act="up" title="Öne al">↑</button>
-        <button data-act="down" title="Arkaya gönder">↓</button>
-        <button data-act="del" title="Sil">🗑</button>
-      </div>`;
+    div.innerHTML = '<span class="lname">' + escapeHtml(label) + '</span>' +
+      '<div class="layer-actions">' +
+        '<button data-act="up" title="' + escapeHtml(t('bringForward')) + '">↑</button>' +
+        '<button data-act="down" title="' + escapeHtml(t('sendBackward')) + '">↓</button>' +
+        '<button data-act="del" title="' + escapeHtml(t('del')) + '">🗑</button>' +
+      '</div>';
     div.querySelector('.lname').addEventListener('click', ()=>{
       canvas.setActiveObject(obj); canvas.renderAll(); refreshLayerList();
     });
@@ -961,6 +1122,9 @@ function refreshLayerList(){
 }
 
 /* ============== Seçili Öğe Özellik Paneli ============== */
+function safeColor(c, fallback){
+  return /^#[0-9a-f]{6}$/i.test(String(c || '')) ? c : fallback;
+}
 function refreshPropsPanel(){
   const panel = document.getElementById('propsPanel');
   const content = document.getElementById('propsContent');
@@ -970,12 +1134,11 @@ function refreshPropsPanel(){
   content.innerHTML = '';
 
   if(obj.type === 'i-text'){
-    content.innerHTML = `
-      <label class="small">Yazı Boyutu</label>
-      <input type="number" id="propFontSize" value="${obj.fontSize}" min="8" max="300">
-      <label class="small">Renk</label>
-      <input type="color" id="propColor" value="${obj.fill || '#ffffff'}">
-    `;
+    content.innerHTML =
+      '<label class="small">' + escapeHtml(t('fontSize')) + '</label>' +
+      '<input type="number" id="propFontSize" value="' + (parseInt(obj.fontSize, 10) || 42) + '" min="8" max="300">' +
+      '<label class="small">' + escapeHtml(t('color')) + '</label>' +
+      '<input type="color" id="propColor" value="' + safeColor(obj.fill, '#ffffff') + '">';
     document.getElementById('propFontSize').addEventListener('input', (e)=>{
       obj.set('fontSize', parseInt(e.target.value,10)||42); canvas.renderAll();
     });
@@ -983,18 +1146,17 @@ function refreshPropsPanel(){
       obj.set('fill', e.target.value); canvas.renderAll();
     });
   } else if(obj.type === 'rect' || obj.type === 'circle'){
-    const currentFill = (obj.fill && obj.fill !== 'transparent') ? obj.fill : '#1D9E75';
-    content.innerHTML = `
-      <label class="small">Kenarlık Rengi</label>
-      <input type="color" id="propStroke" value="${obj.stroke || '#ffffff'}">
-      <label class="small">Kenarlık Kalınlığı</label>
-      <input type="range" id="propStrokeWidth" min="0" max="20" value="${obj.strokeWidth || 0}">
-      <label class="small">Dolgu Rengi</label>
-      <div class="row">
-        <input type="color" id="propFill" value="${currentFill}">
-        <button id="propFillClear" title="Dolguyu kaldır (içi boş)">✕</button>
-      </div>
-    `;
+    const currentFill = (obj.fill && obj.fill !== 'transparent') ? safeColor(obj.fill, '#1D9E75') : '#1D9E75';
+    content.innerHTML =
+      '<label class="small">' + escapeHtml(t('strokeColor')) + '</label>' +
+      '<input type="color" id="propStroke" value="' + safeColor(obj.stroke, '#ffffff') + '">' +
+      '<label class="small">' + escapeHtml(t('strokeWidth')) + '</label>' +
+      '<input type="range" id="propStrokeWidth" min="0" max="20" value="' + (parseInt(obj.strokeWidth, 10) || 0) + '">' +
+      '<label class="small">' + escapeHtml(t('fillColor')) + '</label>' +
+      '<div class="row">' +
+        '<input type="color" id="propFill" value="' + currentFill + '">' +
+        '<button id="propFillClear" title="' + escapeHtml(t('fillClear')) + '">✕</button>' +
+      '</div>';
     document.getElementById('propStroke').addEventListener('input', (e)=>{
       obj.set('stroke', e.target.value); canvas.renderAll();
     });
@@ -1008,15 +1170,14 @@ function refreshPropsPanel(){
       obj.set('fill', 'transparent'); canvas.renderAll();
     });
   } else if(obj.type === 'line'){
-    content.innerHTML = `
-      <label class="small">Çizgi Rengi</label>
-      <input type="color" id="propStroke" value="${obj.stroke}">
-    `;
+    content.innerHTML =
+      '<label class="small">' + escapeHtml(t('lineColor')) + '</label>' +
+      '<input type="color" id="propStroke" value="' + safeColor(obj.stroke, '#ffffff') + '">';
     document.getElementById('propStroke').addEventListener('input', (e)=>{
       obj.set('stroke', e.target.value); canvas.renderAll();
     });
   } else {
-    content.innerHTML = '<div class="hint">Bu öğe için özel ayar yok.</div>';
+    content.innerHTML = '<div class="hint">' + escapeHtml(t('noProps')) + '</div>';
   }
 }
 
@@ -1036,7 +1197,7 @@ document.getElementById('downloadBtn').addEventListener('click', ()=>{
   const dataUrl = canvas.toDataURL({ format: 'png', quality: 1 });
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = 'gorsel-studyosu-' + Date.now() + '.png';
+  a.download = (lang() === 'en' ? 'image-studio-' : 'gorsel-studyosu-') + Date.now() + '.png';
   a.click();
 });
 
@@ -1056,7 +1217,7 @@ function saveDesignForPod(dataUrl){
 }
 document.getElementById('podBtn').addEventListener('click', async ()=>{
   if(canvas.getObjects().length === 0){
-    showToast('Önce tuvale bir görsel veya metin ekle.');
+    showToast(t('tNeedContent'));
     return;
   }
   canvas.discardActiveObject();
@@ -1067,14 +1228,27 @@ document.getElementById('podBtn').addEventListener('click', async ()=>{
     await saveDesignForPod(dataUrl);
     window.location.href = 'pod.html?studio=1';
   }catch(err){
-    showToast('Gönderilemedi: ' + err.message);
+    showToast(t('tSendFail') + err.message);
   }
 });
 
+/* ============== Dil değişimi ============== */
+function onLangChange(){
+  applyStatic();
+  updateToolButtons();
+  refreshLayerList();
+  if(canvas.getActiveObject()) refreshPropsPanel();
+}
+window.addEventListener('hs:langchange', onLangChange);
+document.addEventListener('hs:langchange', onLangChange);
+
 /* ============== Başlat ============== */
-initAuth();
+applyStatic();
+updateToolButtons();
+refreshLayerList();
 updateUndoRedoButtons();
 snapshotState(); // boş canvas'ı ilk state olarak kaydet
+initAuth();
 </script>
 </body>
 </html>
