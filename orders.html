@@ -297,7 +297,7 @@
       back: '← Panele dön',
       tabSales: '🛒 Gelen Siparişler',
       tabSupplier: '📦 Tedarikçi (CJ)',
-      tabPrintify: '🖨️ Printify',
+      tabPrintify: 'Printify',
       loading: 'Yükleniyor...',
       refresh: '🔄 Yenile',
       // gelen siparişler
@@ -407,7 +407,7 @@
       back: '← Back to dashboard',
       tabSales: '🛒 Incoming Orders',
       tabSupplier: '📦 Supplier (CJ)',
-      tabPrintify: '🖨️ Printify',
+      tabPrintify: 'Printify',
       loading: 'Loading...',
       refresh: '🔄 Refresh',
       sOrders: 'Orders',
@@ -654,7 +654,7 @@
       if (rh != null) { revenue += Number(rh); revenueKnown++; }
       else {
         const cur = pick(o, ['currency', 'order_currency']);
-        const tot = pick(o, ['total_amount', 'gross_amount', 'order_total', 'total', 'amount']);
+        const tot = pick(o, ['total_amount', 'gross_amount', 'gross_total', 'total_gross', 'order_total', 'grand_total', 'total_price', 'order_amount', 'subtotal', 'total', 'amount']);
         if (tot != null && (!cur || cur === homeCurrency)) { revenue += Number(tot); revenueKnown++; }
       }
       const np = pick(o, ['net_profit_home']);
@@ -686,7 +686,7 @@
       const test = isTestOrder(o);
       const st = msStatus(o.status);
       const cur = pick(o, ['currency', 'order_currency']) || homeCurrency;
-      const total = pick(o, ['total_amount', 'gross_amount', 'order_total', 'total', 'amount']);
+      const total = pick(o, ['total_amount', 'gross_amount', 'gross_total', 'total_gross', 'order_total', 'grand_total', 'total_price', 'order_amount', 'subtotal', 'total', 'amount']);
       const np = pick(o, ['net_profit_home']);
       const date = pick(o, ['ordered_at', 'order_date', 'placed_at', 'created_at']);
       const buyer = pick(o, ['buyer_name', 'customer_name']);
@@ -695,9 +695,13 @@
       const qty = pick(o, ['quantity', 'item_count']);
       const title = pick(o, ['product_name', 'title', 'item_title']);
       const fx = pick(o, ['fx_rate', 'fx_rate_to_home', 'exchange_rate']);
+      const homeTotal = pick(o, ['revenue_home', 'gross_home', 'total_home', 'amount_home']);
+      const shownTotal = total != null ? fmtMoney(total, cur) : (homeTotal != null ? fmtMoney(homeTotal, homeCurrency) : '–');
+      const ext = o.external_order_id ? String(o.external_order_id) : '';
+      const extShort = ext.length > 16 ? ext.slice(0, 14) + '…' : ext;
 
       const meta = [];
-      if (o.external_order_id) meta.push(tt('orderNo') + ': ' + escapeHtml(o.external_order_id));
+      if (ext) meta.push('<span title="' + escapeHtml(ext) + '">' + tt('orderNo') + ': ' + escapeHtml(extShort) + '</span>');
       if (date) meta.push(fmtDate(date));
       if (qty) meta.push(tt('qty', { n: qty }));
       if (buyer) meta.push(escapeHtml(buyer));
@@ -720,7 +724,7 @@
           '<div class="order-meta">' + meta.join(' · ') + '</div>' +
         '</div>' +
         '<div class="order-right">' +
-          '<div class="money-box"><div class="money-main">' + fmtMoney(total, cur) + '</div>' +
+          '<div class="money-box"><div class="money-main">' + shownTotal + '</div>' +
             (moneySub ? '<div class="money-sub">' + moneySub + '</div>' : '') + profitHtml + '</div>' +
           '<span class="status-badge status-' + st.cls + '">' + escapeHtml(st.text) + '</span>' +
         '</div></div></div>';
