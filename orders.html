@@ -5,27 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Siparişler</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
   .header-right { display: flex; align-items: center; gap: 14px; }
@@ -37,11 +31,23 @@
   .logout-btn:hover { border-color: #3a4258; color: #fff; }
 
   main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
-  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
   h1 { font-size: 22px; font-weight: 600; color: #fff; }
   .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; }
-  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; align-self: center; }
   .back-link:hover { color: #fff; }
+
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid #232838; margin-bottom: 24px; overflow-x: auto; }
+  .tab {
+    background: none; border: none; color: #9aa3b2; font-size: 14px; font-weight: 600;
+    padding: 12px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #fff; border-bottom-color: #1D9E75; }
+  .tab-count { font-size: 11px; background: #232838; color: #c3c9d4; border-radius: 10px; padding: 2px 8px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
   .btn-primary {
     background: #1D9E75; color: #fff; border: none; padding: 11px 18px;
@@ -56,10 +62,19 @@
   .btn-secondary:hover { border-color: #3a4258; color: #fff; }
   .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
-  .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; min-width: 0; }
   .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
-  .stat-value { font-size: 22px; font-weight: 600; color: #fff; }
+  .stat-value { font-size: 22px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+  .stat-value.pos { color: #6ee7b7; }
+  .stat-value.neg { color: #f28b8b; }
+  .stat-note { font-size: 11px; color: #6b7385; margin-top: 4px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar select { width: auto; min-width: 170px; }
+  .toolbar .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9aa3b2; margin: 0; cursor: pointer; }
+  .toolbar .chk input { width: auto; accent-color: #1D9E75; }
+  .toolbar .spacer { flex: 1; }
 
   .section {
     background: #141821; border-radius: 14px; border: 1px solid #232838;
@@ -84,17 +99,25 @@
   .order-list { background: #141821; border-radius: 14px; border: 1px solid #232838; overflow: hidden; }
   .empty-state { padding: 60px 20px; text-align: center; color: #9aa3b2; }
   .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
-  .empty-state p { font-size: 14px; margin-bottom: 20px; }
+  .empty-state p { font-size: 14px; }
 
   .order-row { padding: 16px 20px; border-bottom: 1px solid #232838; }
   .order-row:last-child { border-bottom: none; }
+  .order-row.is-test { background: #121a2b; }
   .order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
-  .order-name { font-size: 14px; font-weight: 500; color: #fff; }
+  .order-name { font-size: 14px; font-weight: 500; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .order-meta { font-size: 12px; color: #9aa3b2; margin-top: 3px; line-height: 1.6; }
-  .order-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .status-badge {
-    font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap;
-  }
+  .order-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+  .money-box { text-align: right; }
+  .money-main { font-size: 14px; font-weight: 600; color: #fff; }
+  .money-sub { font-size: 11px; color: #9aa3b2; margin-top: 2px; }
+  .profit-pos { color: #6ee7b7; }
+  .profit-neg { color: #f28b8b; }
+
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #1c2130; color: #c3c9d4; border: 1px solid #2a3040; font-weight: 500; }
+  .chip.test { background: #1b2540; color: #93b4ff; border-color: #2b3b66; }
+
+  .status-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
   .status-beklemede { background: #2a2410; color: #e6c96a; }
   .status-tedarikciye_verildi { background: #142230; color: #7db8e6; }
   .status-kargoya_verildi { background: #1a2a40; color: #6ea8f2; }
@@ -103,11 +126,8 @@
   .status-hata { background: #2a1414; color: #f28b8b; }
   .status-select {
     background: #1c212c; border: 1px solid #2a3040; color: #e6e8ee; font-size: 12px;
-    padding: 6px 8px; border-radius: 6px;
+    padding: 6px 8px; border-radius: 6px; width: auto;
   }
-  .pf-head { display: flex; justify-content: space-between; align-items: center; margin: 40px 0 16px; flex-wrap: wrap; gap: 12px; }
-  .pf-head h2 { font-size: 18px; font-weight: 600; color: #fff; }
-  .pf-meta-line { font-size: 12px; color: #9aa3b2; margin-top: 4px; }
   .pf-items { margin-top: 8px; font-size: 13px; color: #cfd5e2; line-height: 1.6; }
   .pf-track { margin-top: 8px; font-size: 12px; color: #9aa3b2; }
   .pf-track a { color: #6ea8f2; text-decoration: none; }
@@ -124,6 +144,16 @@
   .cj-action-row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
   .cj-action-btn { font-size: 12px; padding: 7px 12px; }
   .error-line { color: #f28b8b; font-size: 12px; margin-top: 6px; }
+  .info-note { font-size: 12px; color: #9aa3b2; margin-bottom: 14px; line-height: 1.5; }
+
+  @media (max-width: 760px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    header { padding: 14px 16px; }
+    .user-email { display: none; }
+    main { padding: 24px 16px 80px; }
+    .money-box { text-align: left; }
+  }
 </style>
 </head>
 <body>
@@ -134,179 +164,614 @@
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
   <div class="header-right">
+    <span id="langSwitcherHost"></span>
     <span class="user-email" id="userEmail"></span>
-    <button class="logout-btn" onclick="logout()">Çıkış yap</button>
+    <button class="logout-btn" onclick="logout()" data-t="logout"></button>
   </div>
 </header>
 
 <main>
   <div class="top-row">
     <div>
-      <h1>Siparişler</h1>
-      <div class="subtitle" id="orderCountText">Yükleniyor...</div>
+      <h1 data-t="title"></h1>
+      <div class="subtitle" data-t="subtitle"></div>
     </div>
-    <div style="display:flex; gap:10px;">
-      <a href="dashboard.html" class="back-link" style="align-self:center;">← Panele dön</a>
-      <button class="btn-primary" onclick="toggleForm()">+ Yeni sipariş kaydet</button>
-    </div>
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
   </div>
 
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">Beklemede</div>
-      <div class="stat-value" id="statBeklemede">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Tedarikçiye verildi</div>
-      <div class="stat-value" id="statTedarikci">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Kargoda</div>
-      <div class="stat-value" id="statKargo">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Teslim edildi</div>
-      <div class="stat-value" id="statTeslim">0</div>
-    </div>
+  <div class="tabs">
+    <button class="tab" data-tab="sales" onclick="showTab('sales')"><span data-t="tabSales"></span> <span class="tab-count" id="countSales">0</span></button>
+    <button class="tab" data-tab="supplier" onclick="showTab('supplier')"><span data-t="tabSupplier"></span> <span class="tab-count" id="countSupplier">0</span></button>
+    <button class="tab" data-tab="printify" onclick="showTab('printify')"><span data-t="tabPrintify"></span> <span class="tab-count" id="countPrintify">–</span></button>
   </div>
 
-  <div class="section" id="formSection">
-    <div class="section-title">Yeni sipariş kaydet</div>
-    <div class="form-row">
-      <label for="productSelect">Hangi ürün satıldı?</label>
-      <select id="productSelect">
-        <option value="">Ürün seç...</option>
-      </select>
+  <!-- ============ 1) GELEN SİPARİŞLER (marketplace_orders) ============ -->
+  <div class="tab-panel" id="panel-sales">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label" data-t="sOrders"></div><div class="stat-value" id="msCount">0</div><div class="stat-note" data-t="sLiveOnly"></div></div>
+      <div class="stat-card"><div class="stat-label" data-t="sRevenue"></div><div class="stat-value" id="msRevenue">–</div><div class="stat-note" id="msRevenueNote"></div></div>
+      <div class="stat-card"><div class="stat-label" data-t="sProfit"></div><div class="stat-value" id="msProfit">–</div><div class="stat-note" id="msProfitNote"></div></div>
+      <div class="stat-card"><div class="stat-label" data-t="sTest"></div><div class="stat-value" id="msTest">0</div><div class="stat-note" data-t="sTestNote"></div></div>
     </div>
-    <div class="two-col">
-      <div class="form-row">
-        <label for="platformInput">Satış platformu</label>
-        <select id="platformInput">
-          <option value="">Seç...</option>
-          <option value="Trendyol">Trendyol</option>
-          <option value="Hepsiburada">Hepsiburada</option>
-          <option value="N11">N11</option>
-          <option value="Çiçeksepeti">Çiçeksepeti</option>
-          <option value="PTT AVM">PTT AVM</option>
-          <option value="Amazon TR">Amazon TR</option>
-          <option value="Pazarama">Pazarama</option>
-          <option value="Etsy">Etsy</option>
-          <option value="Amazon (Global)">Amazon (Global)</option>
-          <option value="eBay">eBay</option>
-          <option value="Facebook Marketplace">Facebook Marketplace</option>
-          <option value="TikTok Shop">TikTok Shop</option>
-          <option value="Shopify">Shopify</option>
-          <option value="WooCommerce">WooCommerce</option>
-          <option value="Wix">Wix</option>
-          <option value="Diğer">Diğer</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label for="marketplaceOrderNo">Pazaryeri sipariş no (opsiyonel)</label>
-        <input type="text" id="marketplaceOrderNo" placeholder="Örn: TY-2026-000123">
-      </div>
+    <div class="toolbar">
+      <select id="msChannel" onchange="renderSales()"></select>
+      <label class="chk"><input type="checkbox" id="msShowTest" checked onchange="renderSales()"> <span data-t="showTest"></span></label>
+      <div class="spacer"></div>
+      <button class="btn-secondary" id="msRefreshBtn" onclick="loadSales()" data-t="refresh"></button>
     </div>
-    <div class="two-col">
-      <div class="form-row">
-        <label for="customerName">Müşteri adı</label>
-        <input type="text" id="customerName" placeholder="Ad Soyad">
-      </div>
-      <div class="form-row">
-        <label for="customerPhone">Müşteri telefonu</label>
-        <input type="text" id="customerPhone" placeholder="05xx xxx xx xx">
-      </div>
-    </div>
-    <div class="form-row">
-      <label for="customerAddress">Teslimat adresi</label>
-      <textarea id="customerAddress" rows="2" placeholder="Açık adres"></textarea>
-    </div>
-    <div class="two-col">
-      <div class="form-row">
-        <label for="customerCity">Şehir</label>
-        <input type="text" id="customerCity" placeholder="İstanbul">
-      </div>
-      <div class="form-row">
-        <label for="quantityInput">Adet</label>
-        <input type="number" id="quantityInput" value="1" min="1">
-      </div>
-    </div>
-    <div class="form-row">
-      <label for="noteInput">Not (opsiyonel)</label>
-      <input type="text" id="noteInput" placeholder="Kendine hatırlatma notu">
-    </div>
-    <div class="actions">
-      <button class="btn-primary" id="saveOrderBtn" onclick="saveOrder()">Siparişi kaydet</button>
-      <button class="btn-secondary" onclick="toggleForm()">Vazgeç</button>
-    </div>
-    <div class="msg" id="formMsg"></div>
+    <div class="order-list" id="msList"><div class="empty-state"><p data-t="loading"></p></div></div>
   </div>
 
-  <div class="order-list" id="orderList">
-    <div class="empty-state">
-      <h3>Henüz sipariş kaydı yok</h3>
-      <p>Bir pazaryerinde satış olduğunda buraya kaydet, tedarikçi ve kargo durumunu buradan takip et.</p>
+  <!-- ============ 2) TEDARİKÇİ (orders - CJ / elle) ============ -->
+  <div class="tab-panel" id="panel-supplier">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label" data-t="st_beklemede"></div><div class="stat-value" id="statBeklemede">0</div></div>
+      <div class="stat-card"><div class="stat-label" data-t="st_tedarikciye_verildi"></div><div class="stat-value" id="statTedarikci">0</div></div>
+      <div class="stat-card"><div class="stat-label" data-t="stShipping"></div><div class="stat-value" id="statKargo">0</div></div>
+      <div class="stat-card"><div class="stat-label" data-t="st_teslim_edildi"></div><div class="stat-value" id="statTeslim">0</div></div>
     </div>
+    <div class="toolbar">
+      <div class="info-note" style="margin:0;" data-t="supplierInfo"></div>
+      <div class="spacer"></div>
+      <button class="btn-primary" onclick="toggleForm()" data-t="newOrder"></button>
+    </div>
+
+    <div class="section" id="formSection">
+      <div class="section-title" data-t="newOrderTitle"></div>
+      <div class="form-row">
+        <label for="productSelect" data-t="fProduct"></label>
+        <select id="productSelect"></select>
+      </div>
+      <div class="two-col">
+        <div class="form-row">
+          <label for="platformInput" data-t="fPlatform"></label>
+          <select id="platformInput"></select>
+        </div>
+        <div class="form-row">
+          <label for="marketplaceOrderNo" data-t="fOrderNo"></label>
+          <input type="text" id="marketplaceOrderNo" placeholder="TY-2026-000123">
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="form-row">
+          <label for="customerName" data-t="fCustName"></label>
+          <input type="text" id="customerName">
+        </div>
+        <div class="form-row">
+          <label for="customerPhone" data-t="fCustPhone"></label>
+          <input type="text" id="customerPhone" placeholder="05xx xxx xx xx">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="customerAddress" data-t="fAddress"></label>
+        <textarea id="customerAddress" rows="2"></textarea>
+      </div>
+      <div class="two-col">
+        <div class="form-row">
+          <label for="customerCity" data-t="fCity"></label>
+          <input type="text" id="customerCity">
+        </div>
+        <div class="form-row">
+          <label for="quantityInput" data-t="fQty"></label>
+          <input type="number" id="quantityInput" value="1" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="noteInput" data-t="fNote"></label>
+        <input type="text" id="noteInput">
+      </div>
+      <div class="actions">
+        <button class="btn-primary" id="saveOrderBtn" onclick="saveOrder()" data-t="saveOrder"></button>
+        <button class="btn-secondary" onclick="toggleForm()" data-t="cancel"></button>
+      </div>
+      <div class="msg" id="formMsg"></div>
+    </div>
+
+    <div class="order-list" id="orderList"><div class="empty-state"><p data-t="loading"></p></div></div>
   </div>
 
-  <div class="pf-head">
-    <div>
-      <h2>Printify Siparişleri</h2>
-      <div class="subtitle" id="pfCountText">Yükleniyor...</div>
+  <!-- ============ 3) PRINTIFY ============ -->
+  <div class="tab-panel" id="panel-printify">
+    <div class="toolbar">
+      <div class="subtitle" style="margin:0;" id="pfCountText"></div>
+      <div class="spacer"></div>
+      <button class="btn-secondary" id="pfRefreshBtn" onclick="loadPrintifyOrders(pfPage)" data-t="refresh"></button>
     </div>
-    <button class="btn-secondary" id="pfRefreshBtn" onclick="loadPrintifyOrders(pfPage)">🔄 Yenile</button>
+    <div class="order-list" id="pfList"><div class="empty-state"><p data-t="loading"></p></div></div>
+    <div class="pf-pager" id="pfPager"></div>
   </div>
-  <div class="order-list" id="pfList">
-    <div class="empty-state"><p>Yükleniyor...</p></div>
-  </div>
-  <div class="pf-pager" id="pfPager"></div>
 </main>
 
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
 
-  const STATUS_LABELS = {
-    beklemede: 'Beklemede',
-    tedarikciye_verildi: 'Tedarikçiye verildi',
-    kargoya_verildi: 'Kargoya verildi',
-    teslim_edildi: 'Teslim edildi',
-    iptal: 'İptal',
-    hata: 'Hata',
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Siparişler',
+      logout: 'Çıkış yap',
+      title: 'Siparişler',
+      subtitle: 'Müşteriden gelen satışlar, tedarikçiye verdiğin siparişler ve Printify tek ekranda.',
+      back: '← Panele dön',
+      tabSales: '🛒 Gelen Siparişler',
+      tabSupplier: '📦 Tedarikçi (CJ)',
+      tabPrintify: '🖨️ Printify',
+      loading: 'Yükleniyor...',
+      refresh: '🔄 Yenile',
+      // gelen siparişler
+      sOrders: 'Sipariş',
+      sLiveOnly: 'test siparişleri hariç',
+      sRevenue: 'Ciro',
+      sProfit: 'Net kâr',
+      sTest: 'Test siparişi',
+      sTestNote: 'rapora dahil edilmez',
+      fxNote: '{cur} cinsinden, sipariş günündeki kurla',
+      showTest: 'Test siparişlerini göster',
+      allChannels: 'Tüm kanallar',
+      testChip: 'TEST',
+      orderNo: 'Sipariş no',
+      qty: '{n} adet',
+      profitLbl: 'Net kâr',
+      costMissing: 'maliyet girilmemiş',
+      salesEmptyTitle: 'Henüz gelen sipariş yok',
+      salesEmptyText: 'Kendi Mağazam\'dan veya bağlı pazaryerlerinden gelen siparişler burada otomatik görünür.',
+      salesFilterEmpty: 'Bu filtreye uyan sipariş yok.',
+      loadFail: 'Yüklenemedi',
+      ms_pending: 'Yeni', ms_new: 'Yeni', ms_created: 'Yeni', ms_awaiting: 'Beklemede',
+      ms_paid: 'Ödendi', ms_confirmed: 'Onaylandı', ms_processing: 'Hazırlanıyor', ms_picking: 'Hazırlanıyor',
+      ms_shipped: 'Kargoda', ms_in_transit: 'Kargoda', ms_delivered: 'Teslim edildi', ms_completed: 'Tamamlandı',
+      ms_cancelled: 'İptal', ms_canceled: 'İptal', ms_returned: 'İade', ms_refunded: 'İade edildi', ms_failed: 'Hata',
+      ms_beklemede: 'Beklemede', ms_hazirlaniyor: 'Hazırlanıyor', ms_kargoda: 'Kargoda', ms_teslim_edildi: 'Teslim edildi', ms_iptal: 'İptal',
+      // tedarikçi
+      st_beklemede: 'Beklemede',
+      st_tedarikciye_verildi: 'Tedarikçiye verildi',
+      st_kargoya_verildi: 'Kargoya verildi',
+      st_teslim_edildi: 'Teslim edildi',
+      st_iptal: 'İptal',
+      st_hata: 'Hata',
+      stShipping: 'Kargoda',
+      supplierInfo: 'Bir satışı tedarikçiye iletmek için buraya kaydet; CJ ürünlerinde tek tıkla CJ\'ye sipariş verebilirsin.',
+      newOrder: '+ Yeni sipariş kaydet',
+      newOrderTitle: 'Yeni sipariş kaydet',
+      fProduct: 'Hangi ürün satıldı?',
+      fProductPh: 'Ürün seç...',
+      fPlatform: 'Satış platformu',
+      fPlatformPh: 'Seç...',
+      fOther: 'Diğer',
+      fOrderNo: 'Pazaryeri sipariş no (isteğe bağlı)',
+      fCustName: 'Müşteri adı',
+      fCustPhone: 'Müşteri telefonu',
+      fAddress: 'Teslimat adresi',
+      fCity: 'Şehir',
+      fQty: 'Adet',
+      fNote: 'Not (isteğe bağlı)',
+      saveOrder: 'Siparişi kaydet',
+      saving: 'Kaydediliyor...',
+      cancel: 'Vazgeç',
+      needProduct: 'Hangi ürünün satıldığını seçmelisin.',
+      saveFail: 'Kaydedilemedi: ',
+      saved: 'Sipariş kaydedildi.',
+      unnamed: 'İsimsiz ürün',
+      deletedProduct: 'Silinmiş ürün',
+      supplierLbl: 'Tedarikçi: ',
+      supEmptyTitle: 'Henüz tedarikçi siparişi yok',
+      supEmptyText: 'Bir pazaryerinde satış olduğunda buraya kaydet, tedarikçi ve kargo durumunu buradan takip et.',
+      supCount: '{n} sipariş',
+      deleteTitle: 'Siparişi sil',
+      error: 'Hata: ',
+      cjOrder: "📦 CJ'ye Sipariş Ver",
+      cjSync: '🔄 Kargo Durumunu Güncelle',
+      cjConfirm: "CJ Dropshipping'e gerçek sipariş oluşturulacak. Ödeme OTOMATİK yapılmayacak — CJ panelinden (cjdropshipping.com > Orders) sen onaylayıp ödeyeceksin. Devam edilsin mi?",
+      cjPlacing: 'Sipariş veriliyor...',
+      cjPlaced: "Sipariş CJ'de oluşturuldu (sipariş no: {no}).",
+      cjFail: 'Sipariş verilemedi: ',
+      checking: 'Kontrol ediliyor...',
+      trackFound: 'Kargo takip no bulundu: ',
+      trackNone: 'CJ henüz kargo takip numarası vermemiş, daha sonra tekrar dene.',
+      checkFail: 'Kontrol edilemedi: ',
+      updateFail: 'Güncellenemedi: ',
+      trackPrompt: 'Kargo takip numarası:',
+      trackNo: 'Kargo takip no: ',
+      change: 'değiştir',
+      addTrack: '+ Kargo takip no ekle',
+      deleteConfirm: 'Bu sipariş kaydını silmek istediğine emin misin?',
+      deleteFail: 'Silinemedi: ',
+      // printify
+      pfNone: 'Printify mağazanda henüz sipariş yok',
+      pfCount: '{n} sipariş',
+      pfEmptyTitle: 'Henüz Printify siparişi yok',
+      pfEmptyText: "Etsy'de bir satış olduğunda Printify siparişi kendiliğinden alır, burada görünür.",
+      pfFail: 'Printify siparişleri alınamadı',
+      pfOrder: 'Sipariş: ',
+      pfCost: 'Printify maliyeti: ',
+      pfNoTrack: 'takip no yok',
+      pfCargo: 'Kargo: ',
+      pfNoTrackYet: 'Kargo takip bilgisi henüz yok',
+      pfMore: ' +{n} ürün',
+      pfOrderWord: 'Sipariş',
+      prev: '← Önceki',
+      next: 'Sonraki →',
+      page: 'Sayfa {p} / {l}',
+      pf_pending: 'Beklemede', 'pf_on-hold': 'Bekletiliyor', 'pf_sending-to-production': 'Üretime gönderiliyor',
+      'pf_in-production': 'Üretimde', 'pf_partially-fulfilled': 'Kısmen kargolandı', pf_fulfilled: 'Kargoya verildi',
+      pf_canceled: 'İptal', 'pf_payment-not-received': 'Ödeme alınamadı', 'pf_action-required': 'İşlem gerekli',
+      'pf_has-issues': 'Sorun var', pf_delivered: 'Teslim edildi',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Orders',
+      logout: 'Sign out',
+      title: 'Orders',
+      subtitle: 'Customer sales, supplier orders and Printify in one place.',
+      back: '← Back to dashboard',
+      tabSales: '🛒 Incoming Orders',
+      tabSupplier: '📦 Supplier (CJ)',
+      tabPrintify: '🖨️ Printify',
+      loading: 'Loading...',
+      refresh: '🔄 Refresh',
+      sOrders: 'Orders',
+      sLiveOnly: 'excluding test orders',
+      sRevenue: 'Revenue',
+      sProfit: 'Net profit',
+      sTest: 'Test orders',
+      sTestNote: 'not included in reports',
+      fxNote: 'in {cur}, at the order-day rate',
+      showTest: 'Show test orders',
+      allChannels: 'All channels',
+      testChip: 'TEST',
+      orderNo: 'Order no',
+      qty: '{n} pcs',
+      profitLbl: 'Net profit',
+      costMissing: 'cost not entered',
+      salesEmptyTitle: 'No incoming orders yet',
+      salesEmptyText: 'Orders from My Store and connected marketplaces appear here automatically.',
+      salesFilterEmpty: 'No orders match this filter.',
+      loadFail: 'Could not load',
+      ms_pending: 'New', ms_new: 'New', ms_created: 'New', ms_awaiting: 'Pending',
+      ms_paid: 'Paid', ms_confirmed: 'Confirmed', ms_processing: 'Processing', ms_picking: 'Processing',
+      ms_shipped: 'Shipped', ms_in_transit: 'In transit', ms_delivered: 'Delivered', ms_completed: 'Completed',
+      ms_cancelled: 'Cancelled', ms_canceled: 'Cancelled', ms_returned: 'Returned', ms_refunded: 'Refunded', ms_failed: 'Error',
+      ms_beklemede: 'Pending', ms_hazirlaniyor: 'Processing', ms_kargoda: 'Shipped', ms_teslim_edildi: 'Delivered', ms_iptal: 'Cancelled',
+      st_beklemede: 'Pending',
+      st_tedarikciye_verildi: 'Sent to supplier',
+      st_kargoya_verildi: 'Shipped',
+      st_teslim_edildi: 'Delivered',
+      st_iptal: 'Cancelled',
+      st_hata: 'Error',
+      stShipping: 'Shipped',
+      supplierInfo: 'Record a sale here to forward it to a supplier; for CJ products you can place the CJ order in one click.',
+      newOrder: '+ Record new order',
+      newOrderTitle: 'Record new order',
+      fProduct: 'Which product was sold?',
+      fProductPh: 'Select product...',
+      fPlatform: 'Sales platform',
+      fPlatformPh: 'Select...',
+      fOther: 'Other',
+      fOrderNo: 'Marketplace order no (optional)',
+      fCustName: 'Customer name',
+      fCustPhone: 'Customer phone',
+      fAddress: 'Delivery address',
+      fCity: 'City',
+      fQty: 'Quantity',
+      fNote: 'Note (optional)',
+      saveOrder: 'Save order',
+      saving: 'Saving...',
+      cancel: 'Cancel',
+      needProduct: 'Please select which product was sold.',
+      saveFail: 'Could not save: ',
+      saved: 'Order saved.',
+      unnamed: 'Unnamed product',
+      deletedProduct: 'Deleted product',
+      supplierLbl: 'Supplier: ',
+      supEmptyTitle: 'No supplier orders yet',
+      supEmptyText: 'When you make a sale, record it here and track supplier and shipping status.',
+      supCount: '{n} orders',
+      deleteTitle: 'Delete order',
+      error: 'Error: ',
+      cjOrder: '📦 Order from CJ',
+      cjSync: '🔄 Update Shipping Status',
+      cjConfirm: 'A real order will be created at CJ Dropshipping. Payment is NOT automatic — you will approve and pay in the CJ panel (cjdropshipping.com > Orders). Continue?',
+      cjPlacing: 'Placing order...',
+      cjPlaced: 'Order created at CJ (order no: {no}).',
+      cjFail: 'Could not place order: ',
+      checking: 'Checking...',
+      trackFound: 'Tracking number found: ',
+      trackNone: 'CJ has not provided a tracking number yet, try again later.',
+      checkFail: 'Could not check: ',
+      updateFail: 'Could not update: ',
+      trackPrompt: 'Tracking number:',
+      trackNo: 'Tracking no: ',
+      change: 'change',
+      addTrack: '+ Add tracking number',
+      deleteConfirm: 'Delete this order record?',
+      deleteFail: 'Could not delete: ',
+      pfNone: 'No orders in your Printify shop yet',
+      pfCount: '{n} orders',
+      pfEmptyTitle: 'No Printify orders yet',
+      pfEmptyText: 'When you make a sale on Etsy, Printify picks up the order automatically and it shows here.',
+      pfFail: 'Could not load Printify orders',
+      pfOrder: 'Order: ',
+      pfCost: 'Printify cost: ',
+      pfNoTrack: 'no tracking no',
+      pfCargo: 'Shipping: ',
+      pfNoTrackYet: 'No tracking info yet',
+      pfMore: ' +{n} items',
+      pfOrderWord: 'Order',
+      prev: '← Previous',
+      next: 'Next →',
+      page: 'Page {p} / {l}',
+      pf_pending: 'Pending', 'pf_on-hold': 'On hold', 'pf_sending-to-production': 'Sending to production',
+      'pf_in-production': 'In production', 'pf_partially-fulfilled': 'Partially shipped', pf_fulfilled: 'Shipped',
+      pf_canceled: 'Cancelled', 'pf_payment-not-received': 'Payment not received', 'pf_action-required': 'Action required',
+      'pf_has-issues': 'Has issues', pf_delivered: 'Delivered',
+    }
   };
 
-  let currentUserId = null;
-  let myProducts = [];
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let s = T[lang()][key] !== undefined ? T[lang()][key] : T.tr[key];
+    if (s === undefined) return null;
+    if (vars) Object.keys(vars).forEach(k => { s = s.split('{' + k + '}').join(vars[k]); });
+    return s;
+  }
+  function tt(key, vars) { const s = t(key, vars); return s === null ? key : s; }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(str) { return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+  function locale() { return lang() === 'en' ? 'en-GB' : 'tr-TR'; }
+  function fmtDate(d) {
+    if (!d) return '';
+    try { return new Date(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; }
+  }
+  const CUR_SYMBOL = { TRY: '₺', EUR: '€', USD: '$', GBP: '£', PLN: 'zł', DKK: 'kr' };
+  function fmtMoney(v, cur) {
+    if (v == null || v === '' || isNaN(Number(v))) return '–';
+    cur = (cur || 'TRY').toUpperCase();
+    const n = Number(v).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const sym = CUR_SYMBOL[cur];
+    if (!sym) return n + ' ' + cur;
+    if (cur === 'PLN' || cur === 'DKK') return n + ' ' + sym;
+    return sym + n;
+  }
+  function pick(o, keys) {
+    for (const k of keys) { if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; }
+    return null;
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = tt('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { const s = t(el.getAttribute('data-t')); if (s !== null) el.textContent = s; });
+  }
 
-  async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      window.location.href = 'index.html';
+  // ================= SEKMELER =================
+  let currentTab = 'sales';
+  function showTab(name) {
+    currentTab = name;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+    try { localStorage.setItem('hs_orders_tab', name); } catch (e) {}
+    if (history.replaceState) history.replaceState(null, '', '#' + name);
+    if (name === 'printify' && !pfLoaded) loadPrintifyOrders(1);
+  }
+
+  // ================= ORTAK VERİ =================
+  let currentUserId = null;
+  let homeCurrency = 'TRY';
+  let marketplaceMap = {};   // code -> row
+  let connectionMap = {};    // id -> row
+
+  async function loadCommon() {
+    try {
+      const { data } = await db.from('user_profiles').select('home_currency').limit(1).maybeSingle();
+      if (data && data.home_currency) homeCurrency = data.home_currency;
+    } catch (e) {}
+    try {
+      const { data } = await db.from('marketplaces').select('*');
+      (data || []).forEach(m => { if (m.code) marketplaceMap[m.code] = m; });
+    } catch (e) {}
+    try {
+      const { data } = await db.from('store_connections').select('*');
+      (data || []).forEach(c => { connectionMap[c.id] = c; });
+    } catch (e) {}
+  }
+  function marketplaceName(code) {
+    if (!code) return '–';
+    if (code === 'own_store') return lang() === 'en' ? '🏪 My Store' : '🏪 Kendi Mağazam';
+    const m = marketplaceMap[code];
+    if (!m) return code;
+    return (lang() === 'en' ? pick(m, ['name_en', 'name']) : pick(m, ['name_tr', 'name'])) || code;
+  }
+
+  // ================= 1) GELEN SİPARİŞLER =================
+  let salesOrders = [];
+  let salesLoaded = false;
+
+  function isTestOrder(o) {
+    if (o.is_test === true) return true;
+    if (o.environment === 'sandbox') return true;
+    const c = o.store_connection_id ? connectionMap[o.store_connection_id] : null;
+    return !!(c && c.environment === 'sandbox');
+  }
+
+  async function loadSales() {
+    const btn = document.getElementById('msRefreshBtn');
+    btn.disabled = true;
+    try {
+      const { data, error } = await db.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(500);
+      if (error) throw error;
+      salesOrders = data || [];
+      salesLoaded = true;
+      fillChannelFilter();
+      renderSales();
+    } catch (e) {
+      document.getElementById('msList').innerHTML =
+        '<div class="empty-state"><h3>' + tt('loadFail') + '</h3><p>' + escapeHtml(e.message || e) + '</p></div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function fillChannelFilter() {
+    const sel = document.getElementById('msChannel');
+    const prev = sel.value;
+    const codes = Array.from(new Set(salesOrders.map(o => o.marketplace_code).filter(Boolean)));
+    sel.innerHTML = '<option value="">' + tt('allChannels') + '</option>' +
+      codes.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(marketplaceName(c)) + '</option>').join('');
+    if (prev && codes.indexOf(prev) !== -1) sel.value = prev;
+  }
+
+  function msStatus(s) {
+    if (!s) return { text: '–', cls: 'beklemede' };
+    const key = String(s).toLowerCase();
+    const text = t('ms_' + key) || s;
+    let cls = 'beklemede';
+    if (['shipped', 'in_transit', 'kargoda'].includes(key)) cls = 'kargoya_verildi';
+    else if (['delivered', 'completed', 'teslim_edildi'].includes(key)) cls = 'teslim_edildi';
+    else if (['cancelled', 'canceled', 'returned', 'refunded', 'iptal'].includes(key)) cls = 'iptal';
+    else if (['failed'].includes(key)) cls = 'hata';
+    else if (['paid', 'confirmed', 'processing', 'picking', 'hazirlaniyor'].includes(key)) cls = 'tedarikciye_verildi';
+    return { text, cls };
+  }
+  function isCancelled(o) {
+    return ['cancelled', 'canceled', 'returned', 'refunded', 'iptal'].includes(String(o.status || '').toLowerCase());
+  }
+
+  function renderSales() {
+    const channel = document.getElementById('msChannel').value;
+    const showTest = document.getElementById('msShowTest').checked;
+
+    // İstatistikler: sadece canlı + iptal olmayan
+    const live = salesOrders.filter(o => !isTestOrder(o));
+    const liveActive = live.filter(o => !isCancelled(o));
+    let revenue = 0, revenueKnown = 0, profit = 0, profitKnown = 0;
+    liveActive.forEach(o => {
+      const rh = pick(o, ['revenue_home', 'gross_home', 'total_home', 'amount_home']);
+      if (rh != null) { revenue += Number(rh); revenueKnown++; }
+      else {
+        const cur = pick(o, ['currency', 'order_currency']);
+        const tot = pick(o, ['total_amount', 'gross_amount', 'order_total', 'total', 'amount']);
+        if (tot != null && (!cur || cur === homeCurrency)) { revenue += Number(tot); revenueKnown++; }
+      }
+      const np = pick(o, ['net_profit_home']);
+      if (np != null) { profit += Number(np); profitKnown++; }
+    });
+    const testCount = salesOrders.length - live.length;
+    document.getElementById('msCount').textContent = live.length;
+    document.getElementById('msRevenue').textContent = revenueKnown ? fmtMoney(revenue, homeCurrency) : '–';
+    document.getElementById('msRevenueNote').textContent = tt('fxNote', { cur: homeCurrency });
+    const pEl = document.getElementById('msProfit');
+    pEl.textContent = profitKnown ? fmtMoney(profit, homeCurrency) : '–';
+    pEl.className = 'stat-value' + (profitKnown ? (profit >= 0 ? ' pos' : ' neg') : '');
+    document.getElementById('msProfitNote').textContent = tt('fxNote', { cur: homeCurrency });
+    document.getElementById('msTest').textContent = testCount;
+    document.getElementById('countSales').textContent = salesOrders.length;
+
+    const listEl = document.getElementById('msList');
+    if (salesOrders.length === 0) {
+      listEl.innerHTML = '<div class="empty-state"><h3>' + tt('salesEmptyTitle') + '</h3><p>' + tt('salesEmptyText') + '</p></div>';
       return;
     }
-    currentUserId = session.user.id;
-    document.getElementById('userEmail').textContent = session.user.email;
-    await loadProducts();
-    await loadOrders();
-    loadPrintifyOrders(1);
+    const rows = salesOrders.filter(o => (!channel || o.marketplace_code === channel) && (showTest || !isTestOrder(o)));
+    if (rows.length === 0) {
+      listEl.innerHTML = '<div class="empty-state"><p>' + tt('salesFilterEmpty') + '</p></div>';
+      return;
+    }
+
+    listEl.innerHTML = rows.map(o => {
+      const test = isTestOrder(o);
+      const st = msStatus(o.status);
+      const cur = pick(o, ['currency', 'order_currency']) || homeCurrency;
+      const total = pick(o, ['total_amount', 'gross_amount', 'order_total', 'total', 'amount']);
+      const np = pick(o, ['net_profit_home']);
+      const date = pick(o, ['ordered_at', 'order_date', 'placed_at', 'created_at']);
+      const buyer = pick(o, ['buyer_name', 'customer_name']);
+      const country = pick(o, ['buyer_country', 'ship_country', 'shipping_country', 'country_code', 'country']);
+      const city = pick(o, ['buyer_city', 'ship_city', 'shipping_city', 'city']);
+      const qty = pick(o, ['quantity', 'item_count']);
+      const title = pick(o, ['product_name', 'title', 'item_title']);
+      const fx = pick(o, ['fx_rate', 'fx_rate_to_home', 'exchange_rate']);
+
+      const meta = [];
+      if (o.external_order_id) meta.push(tt('orderNo') + ': ' + escapeHtml(o.external_order_id));
+      if (date) meta.push(fmtDate(date));
+      if (qty) meta.push(tt('qty', { n: qty }));
+      if (buyer) meta.push(escapeHtml(buyer));
+      if (country || city) meta.push(escapeHtml([city, country].filter(Boolean).join(' / ')));
+
+      let moneySub = '';
+      if (cur !== homeCurrency && fx) moneySub = '1 ' + escapeHtml(cur) + ' = ' + Number(fx).toLocaleString(locale(), { maximumFractionDigits: 4 }) + ' ' + escapeHtml(homeCurrency);
+      let profitHtml = '';
+      if (np != null) {
+        profitHtml = '<div class="money-sub">' + tt('profitLbl') + ': <span class="' + (Number(np) >= 0 ? 'profit-pos' : 'profit-neg') + '">' + fmtMoney(np, homeCurrency) + '</span></div>';
+      } else {
+        profitHtml = '<div class="money-sub">' + tt('costMissing') + '</div>';
+      }
+
+      return '<div class="order-row' + (test ? ' is-test' : '') + '">' +
+        '<div class="order-top"><div>' +
+          '<div class="order-name">' + escapeHtml(marketplaceName(o.marketplace_code)) +
+            (test ? ' <span class="chip test">' + tt('testChip') + '</span>' : '') +
+            (title ? ' <span class="chip">' + escapeHtml(title) + '</span>' : '') + '</div>' +
+          '<div class="order-meta">' + meta.join(' · ') + '</div>' +
+        '</div>' +
+        '<div class="order-right">' +
+          '<div class="money-box"><div class="money-main">' + fmtMoney(total, cur) + '</div>' +
+            (moneySub ? '<div class="money-sub">' + moneySub + '</div>' : '') + profitHtml + '</div>' +
+          '<span class="status-badge status-' + st.cls + '">' + escapeHtml(st.text) + '</span>' +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  // ================= 2) TEDARİKÇİ SİPARİŞLERİ (orders) =================
+  const STATUS_KEYS = ['beklemede', 'tedarikciye_verildi', 'kargoya_verildi', 'teslim_edildi', 'iptal', 'hata'];
+  const PLATFORMS = ['Trendyol', 'Hepsiburada', 'N11', 'Çiçeksepeti', 'PTT AVM', 'Amazon TR', 'Pazarama', 'Etsy',
+    'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+  let myProducts = [];
+  let supplierOrders = [];
+
+  function fillFormSelects() {
+    const ps = document.getElementById('productSelect');
+    const prevP = ps.value;
+    ps.innerHTML = '<option value="">' + tt('fProductPh') + '</option>' +
+      myProducts.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name || tt('unnamed')) + '</option>').join('');
+    ps.value = prevP;
+    const pl = document.getElementById('platformInput');
+    const prevPl = pl.value;
+    pl.innerHTML = '<option value="">' + tt('fPlatformPh') + '</option>' +
+      PLATFORMS.map(p => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>').join('') +
+      '<option value="Diğer">' + tt('fOther') + '</option>';
+    pl.value = prevPl;
+    const nameEl = document.getElementById('customerName');
+    nameEl.placeholder = lang() === 'en' ? 'Full name' : 'Ad Soyad';
+    document.getElementById('customerAddress').placeholder = lang() === 'en' ? 'Full address' : 'Açık adres';
+    document.getElementById('customerCity').placeholder = lang() === 'en' ? 'City' : 'İstanbul';
+    document.getElementById('noteInput').placeholder = lang() === 'en' ? 'A reminder for yourself' : 'Kendine hatırlatma notu';
   }
 
   async function loadProducts() {
-    const { data, error } = await supabaseClient
-      .from('products')
-      .select('id, name, platform, supplier')
-      .eq('user_id', currentUserId)
-      .order('created_at', { ascending: false });
-    if (error) { console.error(error); return; }
-    myProducts = data || [];
-    const sel = document.getElementById('productSelect');
-    sel.innerHTML = '<option value="">Ürün seç...</option>' +
-      myProducts.map(p => `<option value="${p.id}">${escapeHtml(p.name || 'İsimsiz ürün')}</option>`).join('');
+    const { data, error } = await db.from('products').select('id, name, platform, supplier')
+      .eq('user_id', currentUserId).is('deleted_at', null).order('created_at', { ascending: false });
+    if (error) {
+      // deleted_at sütunu yoksa eski sorguyla dene
+      const r = await db.from('products').select('id, name, platform, supplier').eq('user_id', currentUserId).order('created_at', { ascending: false });
+      myProducts = r.data || [];
+    } else {
+      myProducts = data || [];
+    }
+    fillFormSelects();
   }
 
-  function toggleForm() {
-    const section = document.getElementById('formSection');
-    section.classList.toggle('open');
+  function toggleForm() { document.getElementById('formSection').classList.toggle('open'); }
+
+  function showFormMsg(text, type) {
+    const box = document.getElementById('formMsg');
+    box.textContent = text;
+    box.className = 'msg ' + type;
   }
 
   async function saveOrder() {
@@ -320,17 +785,14 @@
     const quantity = parseInt(document.getElementById('quantityInput').value, 10) || 1;
     const note = document.getElementById('noteInput').value.trim() || null;
 
-    if (!productId) {
-      showFormMsg('Hangi ürünün satıldığını seçmelisin.', 'error');
-      return;
-    }
+    if (!productId) { showFormMsg(tt('needProduct'), 'error'); return; }
 
-    const product = myProducts.find(p => p.id === Number(productId));
+    const product = myProducts.find(p => String(p.id) === String(productId));
     const btn = document.getElementById('saveOrderBtn');
     btn.disabled = true;
-    btn.textContent = 'Kaydediliyor...';
+    btn.textContent = tt('saving');
 
-    const { error } = await supabaseClient.from('orders').insert({
+    const { error } = await db.from('orders').insert({
       user_id: currentUserId,
       product_id: productId,
       platform: platform || (product ? product.platform : null),
@@ -346,42 +808,33 @@
     });
 
     btn.disabled = false;
-    btn.textContent = 'Siparişi kaydet';
+    btn.textContent = tt('saveOrder');
 
-    if (error) {
-      showFormMsg('Kaydedilemedi: ' + error.message, 'error');
-      return;
-    }
+    if (error) { showFormMsg(tt('saveFail') + error.message, 'error'); return; }
 
-    showFormMsg('Sipariş kaydedildi.', 'success');
-    document.getElementById('marketplaceOrderNo').value = '';
-    document.getElementById('customerName').value = '';
-    document.getElementById('customerPhone').value = '';
-    document.getElementById('customerAddress').value = '';
-    document.getElementById('customerCity').value = '';
+    showFormMsg(tt('saved'), 'success');
+    ['marketplaceOrderNo', 'customerName', 'customerPhone', 'customerAddress', 'customerCity', 'noteInput']
+      .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('quantityInput').value = '1';
-    document.getElementById('noteInput').value = '';
     document.getElementById('formSection').classList.remove('open');
     loadOrders();
   }
 
-  function showFormMsg(text, type) {
-    const box = document.getElementById('formMsg');
-    box.textContent = text;
-    box.className = 'msg ' + type;
+  async function loadOrders() {
+    const { data, error } = await db.from('orders').select('*, products(name, platform)')
+      .eq('user_id', currentUserId).order('created_at', { ascending: false });
+    if (error) {
+      document.getElementById('orderList').innerHTML =
+        '<div class="empty-state"><h3>' + tt('loadFail') + '</h3><p>' + escapeHtml(error.message) + '</p></div>';
+      return;
+    }
+    supplierOrders = data || [];
+    renderOrders();
   }
 
-  async function loadOrders() {
-    const { data: orders, error } = await supabaseClient
-      .from('orders')
-      .select('*, products(name, platform)')
-      .eq('user_id', currentUserId)
-      .order('created_at', { ascending: false });
-
-    if (error) { console.error(error); return; }
-
-    document.getElementById('orderCountText').textContent =
-      orders.length === 0 ? 'Henüz sipariş yok' : orders.length + ' sipariş listeleniyor';
+  function renderOrders() {
+    const orders = supplierOrders;
+    document.getElementById('countSupplier').textContent = orders.length;
 
     const counts = { beklemede: 0, tedarikciye_verildi: 0, kargoya_verildi: 0, teslim_edildi: 0 };
     orders.forEach(o => { if (counts[o.status] !== undefined) counts[o.status]++; });
@@ -392,269 +845,278 @@
 
     const listEl = document.getElementById('orderList');
     if (orders.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <h3>Henüz sipariş kaydı yok</h3>
-          <p>Bir pazaryerinde satış olduğunda buraya kaydet, tedarikçi ve kargo durumunu buradan takip et.</p>
-        </div>`;
+      listEl.innerHTML = '<div class="empty-state"><h3>' + tt('supEmptyTitle') + '</h3><p>' + tt('supEmptyText') + '</p></div>';
       return;
     }
 
     listEl.innerHTML = orders.map(o => {
-      const productName = o.products ? o.products.name : 'Silinmiş ürün';
+      const productName = o.products ? o.products.name : tt('deletedProduct');
       const metaParts = [];
-      if (o.platform) metaParts.push(o.platform);
-      if (o.marketplace_order_no) metaParts.push('Sipariş no: ' + escapeHtml(o.marketplace_order_no));
-      metaParts.push(o.quantity + ' adet');
+      if (o.platform) metaParts.push(escapeHtml(o.platform));
+      if (o.marketplace_order_no) metaParts.push(tt('orderNo') + ': ' + escapeHtml(o.marketplace_order_no));
+      metaParts.push(tt('qty', { n: o.quantity }));
       if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
       if (o.customer_city) metaParts.push(escapeHtml(o.customer_city));
-      if (o.supplier) metaParts.push('Tedarikçi: ' + (o.supplier === 'cj' ? 'CJ Dropshipping' : o.supplier === 'aliexpress' ? 'AliExpress' : escapeHtml(o.supplier)));
+      if (o.created_at) metaParts.push(fmtDate(o.created_at));
+      if (o.supplier) metaParts.push(tt('supplierLbl') + (o.supplier === 'cj' ? 'CJ Dropshipping' : o.supplier === 'aliexpress' ? 'AliExpress' : escapeHtml(o.supplier)));
 
-      const statusOptions = Object.keys(STATUS_LABELS).map(s =>
-        `<option value="${s}" ${s === o.status ? 'selected' : ''}>${STATUS_LABELS[s]}</option>`
-      ).join('');
+      const statusOptions = STATUS_KEYS.map(s =>
+        '<option value="' + s + '"' + (s === o.status ? ' selected' : '') + '>' + tt('st_' + s) + '</option>').join('');
 
       const canPlaceCjOrder = o.supplier === 'cj' && (o.status === 'beklemede' || o.status === 'hata');
       const canSyncTracking = o.supplier === 'cj' && (o.status === 'tedarikciye_verildi' || o.status === 'kargoya_verildi');
+      const stText = t('st_' + o.status) || o.status;
 
-      return `
-        <div class="order-row" data-id="${o.id}">
-          <div class="order-top">
-            <div>
-              <div class="order-name">${escapeHtml(productName)}</div>
-              <div class="order-meta">${metaParts.join(' · ')}</div>
-            </div>
-            <div class="order-right">
-              <span class="status-badge status-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
-              <select class="status-select" onchange="updateStatus('${o.id}', this.value)">
-                ${statusOptions}
-              </select>
-              <button class="icon-btn" title="Siparişi sil" onclick="deleteOrder('${o.id}')">🗑</button>
-            </div>
-          </div>
-          ${o.status === 'hata' && o.error_message ? '<div class="error-line">Hata: ' + escapeHtml(o.error_message) + '</div>' : ''}
-          ${canPlaceCjOrder || canSyncTracking ? `
-            <div class="cj-action-row">
-              ${canPlaceCjOrder ? `<button class="btn-secondary cj-action-btn" onclick="placeCjOrder('${o.id}', this)">📦 CJ'ye Sipariş Ver</button>` : ''}
-              ${canSyncTracking ? `<button class="btn-secondary cj-action-btn" onclick="syncCjTracking('${o.id}', this)">🔄 Kargo Durumunu Güncelle</button>` : ''}
-            </div>` : ''}
-          <div class="tracking-line">
-            ${o.tracking_number
-              ? 'Kargo takip no: <span class="tracking-value">' + escapeHtml(o.tracking_number) + '</span> <a onclick="editTracking(\'' + o.id + '\', \'' + escapeAttr(o.tracking_number) + '\')">değiştir</a>'
-              : '<a onclick="editTracking(\'' + o.id + '\', \'\')">+ Kargo takip no ekle</a>'}
-            ${o.note ? ' · <span style="color:#9aa3b2;">' + escapeHtml(o.note) + '</span>' : ''}
-          </div>
-        </div>`;
+      return '<div class="order-row" data-id="' + escapeHtml(o.id) + '">' +
+        '<div class="order-top"><div>' +
+          '<div class="order-name">' + escapeHtml(productName) + '</div>' +
+          '<div class="order-meta">' + metaParts.join(' · ') + '</div>' +
+        '</div><div class="order-right">' +
+          '<span class="status-badge status-' + escapeHtml(o.status) + '">' + escapeHtml(stText) + '</span>' +
+          '<select class="status-select" onchange="updateStatus(\'' + escapeAttr(o.id) + '\', this.value)">' + statusOptions + '</select>' +
+          '<button class="icon-btn" title="' + tt('deleteTitle') + '" onclick="deleteOrder(\'' + escapeAttr(o.id) + '\')">🗑</button>' +
+        '</div></div>' +
+        (o.status === 'hata' && o.error_message ? '<div class="error-line">' + tt('error') + escapeHtml(o.error_message) + '</div>' : '') +
+        (canPlaceCjOrder || canSyncTracking
+          ? '<div class="cj-action-row">' +
+              (canPlaceCjOrder ? '<button class="btn-secondary cj-action-btn" onclick="placeCjOrder(\'' + escapeAttr(o.id) + '\', this)">' + tt('cjOrder') + '</button>' : '') +
+              (canSyncTracking ? '<button class="btn-secondary cj-action-btn" onclick="syncCjTracking(\'' + escapeAttr(o.id) + '\', this)">' + tt('cjSync') + '</button>' : '') +
+            '</div>'
+          : '') +
+        '<div class="tracking-line">' +
+          (o.tracking_number
+            ? tt('trackNo') + '<span class="tracking-value">' + escapeHtml(o.tracking_number) + '</span> <a onclick="editTracking(\'' + escapeAttr(o.id) + '\', \'' + escapeAttr(o.tracking_number) + '\')">' + tt('change') + '</a>'
+            : '<a onclick="editTracking(\'' + escapeAttr(o.id) + '\', \'\')">' + tt('addTrack') + '</a>') +
+          (o.note ? ' · <span style="color:#9aa3b2;">' + escapeHtml(o.note) + '</span>' : '') +
+        '</div></div>';
     }).join('');
   }
 
+  async function getSession() {
+    const { data: { session } } = await db.auth.getSession();
+    return session;
+  }
+
   async function placeCjOrder(orderId, btn) {
-    if (!confirm('CJ Dropshipping\'e gerçek sipariş oluşturulacak. Ödeme OTOMATİK yapılmayacak — CJ panelinden (cjdropshipping.com > Orders) sen onaylayıp ödeyeceksin. Devam edilsin mi?')) return;
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!confirm(tt('cjConfirm'))) return;
+    const session = await getSession();
     if (!session) return;
     btn.disabled = true;
-    btn.textContent = 'Sipariş veriliyor...';
+    btn.textContent = tt('cjPlacing');
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/cj-place-order', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
-        body: JSON.stringify({ orderId, userAccessToken: session.access_token }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ orderId, userAccessToken: session.access_token, language: lang() }),
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      alert('Sipariş CJ\'de oluşturuldu (sipariş no: ' + data.supplierOrderId + ').\n\n' + (data.note || ''));
+      alert(tt('cjPlaced', { no: data.supplierOrderId }) + '\n\n' + (data.note || ''));
       loadOrders();
     } catch (err) {
-      alert('Sipariş verilemedi: ' + err.message);
+      alert(tt('cjFail') + err.message);
       btn.disabled = false;
-      btn.textContent = "📦 CJ'ye Sipariş Ver";
+      btn.textContent = tt('cjOrder');
     }
   }
 
   async function syncCjTracking(orderId, btn) {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const session = await getSession();
     if (!session) return;
     btn.disabled = true;
-    btn.textContent = 'Kontrol ediliyor...';
+    btn.textContent = tt('checking');
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/cj-sync-tracking', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
         body: JSON.stringify({ orderId, userAccessToken: session.access_token }),
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      if (data.trackingNumber) {
-        alert('Kargo takip no bulundu: ' + data.trackingNumber);
-      } else {
-        alert('CJ henüz kargo takip numarası vermemiş, daha sonra tekrar dene.');
-      }
+      alert(data.trackingNumber ? tt('trackFound') + data.trackingNumber : tt('trackNone'));
       loadOrders();
     } catch (err) {
-      alert('Kontrol edilemedi: ' + err.message);
+      alert(tt('checkFail') + err.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '🔄 Kargo Durumunu Güncelle';
+      btn.textContent = tt('cjSync');
     }
   }
 
   async function updateStatus(orderId, status) {
-    const { error } = await supabaseClient.from('orders').update({ status }).eq('id', orderId);
-    if (error) { alert('Güncellenemedi: ' + error.message); return; }
+    const { error } = await db.from('orders').update({ status }).eq('id', orderId);
+    if (error) { alert(tt('updateFail') + error.message); return; }
     loadOrders();
   }
 
   async function editTracking(orderId, current) {
-    const value = prompt('Kargo takip numarası:', current || '');
+    const value = prompt(tt('trackPrompt'), current || '');
     if (value === null) return;
-    const { error } = await supabaseClient.from('orders').update({ tracking_number: value.trim() || null }).eq('id', orderId);
-    if (error) { alert('Güncellenemedi: ' + error.message); return; }
+    const { error } = await db.from('orders').update({ tracking_number: value.trim() || null }).eq('id', orderId);
+    if (error) { alert(tt('updateFail') + error.message); return; }
     loadOrders();
   }
 
   async function deleteOrder(orderId) {
-    if (!confirm('Bu sipariş kaydını silmek istediğine emin misin?')) return;
-    const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
-    if (error) { alert('Silinemedi: ' + error.message); return; }
+    if (!confirm(tt('deleteConfirm'))) return;
+    const { error } = await db.from('orders').delete().eq('id', orderId);
+    if (error) { alert(tt('deleteFail') + error.message); return; }
     loadOrders();
   }
 
-  // ---------- Printify siparişleri (sadece okuma) ----------
+  // ================= 3) PRINTIFY (sadece okuma) =================
   let pfPage = 1;
-  const PF_STATUS = {
-    'pending': ['Beklemede', 'beklemede'],
-    'on-hold': ['Bekletiliyor', 'beklemede'],
-    'sending-to-production': ['Üretime gönderiliyor', 'tedarikciye_verildi'],
-    'in-production': ['Üretimde', 'tedarikciye_verildi'],
-    'partially-fulfilled': ['Kısmen kargolandı', 'kargoya_verildi'],
-    'fulfilled': ['Kargoya verildi', 'kargoya_verildi'],
-    'canceled': ['İptal', 'iptal'],
-    'payment-not-received': ['Ödeme alınamadı', 'hata'],
-    'action-required': ['İşlem gerekli', 'hata'],
-    'has-issues': ['Sorun var', 'hata'],
+  let pfLoaded = false;
+  let pfData = null;
+  const PF_CLASS = {
+    'pending': 'beklemede', 'on-hold': 'beklemede', 'sending-to-production': 'tedarikciye_verildi',
+    'in-production': 'tedarikciye_verildi', 'partially-fulfilled': 'kargoya_verildi', 'fulfilled': 'kargoya_verildi',
+    'canceled': 'iptal', 'payment-not-received': 'hata', 'action-required': 'hata', 'has-issues': 'hata',
   };
-
   function safeUrl(u) {
     return /^https?:\/\//i.test(u || '') ? u.replace(/"/g, '%22').replace(/'/g, '%27') : null;
-  }
-  function usd(cents) {
-    return '$' + (Number(cents || 0) / 100).toFixed(2);
   }
 
   async function loadPrintifyOrders(page) {
     pfPage = page || 1;
-    const listEl = document.getElementById('pfList');
-    const countEl = document.getElementById('pfCountText');
-    const pagerEl = document.getElementById('pfPager');
     const btn = document.getElementById('pfRefreshBtn');
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const session = await getSession();
     if (!session) return;
     btn.disabled = true;
-    btn.textContent = 'Yükleniyor...';
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/printify-orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'apikey': SUPABASE_KEY,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
         body: JSON.stringify({ action: 'list', page: pfPage, userAccessToken: session.access_token }),
       });
       const data = await response.json();
-      if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
-
-      const orders = data.orders || [];
-      countEl.textContent = orders.length === 0
-        ? 'Printify mağazanda henüz sipariş yok' + (data.shop_title ? ' (' + data.shop_title + ')' : '')
-        : (data.total || orders.length) + ' sipariş' + (data.shop_title ? ' · ' + data.shop_title : '');
-
-      if (orders.length === 0) {
-        listEl.innerHTML = `
-          <div class="empty-state">
-            <h3>Henüz Printify siparişi yok</h3>
-            <p>Etsy'de bir satış olduğunda Printify siparişi kendiliğinden alır, burada görünür.</p>
-          </div>`;
-        pagerEl.innerHTML = '';
-        return;
-      }
-
-      listEl.innerHTML = orders.map(o => {
-        const delivered = o.shipments.length > 0 && o.shipments.every(s => s.delivered_at);
-        const st = delivered ? ['Teslim edildi', 'teslim_edildi'] : (PF_STATUS[o.status] || [o.status || '-', 'beklemede']);
-        const metaParts = [];
-        metaParts.push('Sipariş: ' + escapeHtml(o.label || o.id));
-        if (o.created_at) metaParts.push(new Date(o.created_at).toLocaleDateString('tr-TR'));
-        if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
-        if (o.country) metaParts.push(escapeHtml(o.country) + (o.city ? ' / ' + escapeHtml(o.city) : ''));
-        const cost = (o.total_price || 0) + (o.total_shipping || 0) + (o.total_tax || 0);
-        if (o.total_price != null) metaParts.push('Printify maliyeti: ' + usd(cost));
-
-        const itemsHtml = o.items.map(i =>
-          escapeHtml(i.title) + (i.variant ? ' (' + escapeHtml(i.variant) + ')' : '') + ' × ' + i.quantity
-        ).join('<br>');
-
-        const trackHtml = o.shipments.length
-          ? o.shipments.map(s => {
-              const link = safeUrl(s.url);
-              const label = (s.carrier ? escapeHtml(s.carrier) + ' · ' : '') + (s.number ? escapeHtml(s.number) : 'takip no yok');
-              return 'Kargo: ' + (link ? '<a href="' + escapeHtml(link) + '" target="_blank" rel="noopener">' + label + '</a>' : label);
-            }).join('<br>')
-          : 'Kargo takip bilgisi henüz yok';
-
-        return `
-          <div class="order-row">
-            <div class="order-top">
-              <div>
-                <div class="order-name">${escapeHtml(o.items.length ? o.items[0].title : 'Sipariş')}${o.items.length > 1 ? ' +' + (o.items.length - 1) + ' ürün' : ''}</div>
-                <div class="order-meta">${metaParts.join(' · ')}</div>
-              </div>
-              <div class="order-right">
-                <span class="status-badge status-${st[1]}">${st[0]}</span>
-              </div>
-            </div>
-            <div class="pf-items">${itemsHtml}</div>
-            <div class="pf-track">${trackHtml}</div>
-          </div>`;
-      }).join('');
-
-      const last = data.last_page || 1;
-      pagerEl.innerHTML = last > 1
-        ? `<button class="btn-secondary" ${pfPage <= 1 ? 'disabled' : ''} onclick="loadPrintifyOrders(${pfPage - 1})">← Önceki</button>
-           <span>Sayfa ${pfPage} / ${last}</span>
-           <button class="btn-secondary" ${pfPage >= last ? 'disabled' : ''} onclick="loadPrintifyOrders(${pfPage + 1})">Sonraki →</button>`
-        : '';
+      if (!data.ok) throw new Error(data.error || 'error');
+      pfData = data;
+      pfLoaded = true;
+      renderPrintify();
     } catch (err) {
-      countEl.textContent = 'Printify siparişleri alınamadı';
-      listEl.innerHTML = '<div class="empty-state"><h3>Yüklenemedi</h3><p>' + escapeHtml(err.message) + '</p></div>';
-      pagerEl.innerHTML = '';
+      pfData = { failed: true, message: err.message };
+      pfLoaded = true;
+      renderPrintify();
     } finally {
       btn.disabled = false;
-      btn.textContent = '🔄 Yenile';
     }
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str == null ? '' : str;
-    return div.innerHTML;
-  }
-  function escapeAttr(str) {
-    return (str || '').replace(/'/g, "\\'");
+  function renderPrintify() {
+    const listEl = document.getElementById('pfList');
+    const countEl = document.getElementById('pfCountText');
+    const pagerEl = document.getElementById('pfPager');
+    if (!pfData) return;
+    if (pfData.failed) {
+      countEl.textContent = tt('pfFail');
+      document.getElementById('countPrintify').textContent = '!';
+      listEl.innerHTML = '<div class="empty-state"><h3>' + tt('loadFail') + '</h3><p>' + escapeHtml(pfData.message) + '</p></div>';
+      pagerEl.innerHTML = '';
+      return;
+    }
+    const data = pfData;
+    const orders = data.orders || [];
+    const total = data.total || orders.length;
+    document.getElementById('countPrintify').textContent = total;
+    countEl.textContent = orders.length === 0
+      ? tt('pfNone') + (data.shop_title ? ' (' + data.shop_title + ')' : '')
+      : tt('pfCount', { n: total }) + (data.shop_title ? ' · ' + data.shop_title : '');
+
+    if (orders.length === 0) {
+      listEl.innerHTML = '<div class="empty-state"><h3>' + tt('pfEmptyTitle') + '</h3><p>' + tt('pfEmptyText') + '</p></div>';
+      pagerEl.innerHTML = '';
+      return;
+    }
+
+    listEl.innerHTML = orders.map(o => {
+      const shipments = o.shipments || [];
+      const items = o.items || [];
+      const delivered = shipments.length > 0 && shipments.every(s => s.delivered_at);
+      const stKey = delivered ? 'delivered' : o.status;
+      const stText = t('pf_' + stKey) || o.status || '-';
+      const stCls = delivered ? 'teslim_edildi' : (PF_CLASS[o.status] || 'beklemede');
+      const metaParts = [];
+      metaParts.push(tt('pfOrder') + escapeHtml(o.label || o.id));
+      if (o.created_at) metaParts.push(fmtDate(o.created_at));
+      if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
+      if (o.country) metaParts.push(escapeHtml(o.country) + (o.city ? ' / ' + escapeHtml(o.city) : ''));
+      const cost = (o.total_price || 0) + (o.total_shipping || 0) + (o.total_tax || 0);
+      if (o.total_price != null) metaParts.push(tt('pfCost') + fmtMoney(cost / 100, 'USD'));
+
+      const itemsHtml = items.map(i =>
+        escapeHtml(i.title) + (i.variant ? ' (' + escapeHtml(i.variant) + ')' : '') + ' × ' + i.quantity).join('<br>');
+      const trackHtml = shipments.length
+        ? shipments.map(s => {
+            const link = safeUrl(s.url);
+            const label = (s.carrier ? escapeHtml(s.carrier) + ' · ' : '') + (s.number ? escapeHtml(s.number) : tt('pfNoTrack'));
+            return tt('pfCargo') + (link ? '<a href="' + escapeHtml(link) + '" target="_blank" rel="noopener">' + label + '</a>' : label);
+          }).join('<br>')
+        : tt('pfNoTrackYet');
+
+      return '<div class="order-row"><div class="order-top"><div>' +
+          '<div class="order-name">' + escapeHtml(items.length ? items[0].title : tt('pfOrderWord')) +
+            (items.length > 1 ? tt('pfMore', { n: items.length - 1 }) : '') + '</div>' +
+          '<div class="order-meta">' + metaParts.join(' · ') + '</div>' +
+        '</div><div class="order-right"><span class="status-badge status-' + stCls + '">' + escapeHtml(stText) + '</span></div></div>' +
+        '<div class="pf-items">' + itemsHtml + '</div>' +
+        '<div class="pf-track">' + trackHtml + '</div></div>';
+    }).join('');
+
+    const last = data.last_page || 1;
+    pagerEl.innerHTML = last > 1
+      ? '<button class="btn-secondary" ' + (pfPage <= 1 ? 'disabled' : '') + ' onclick="loadPrintifyOrders(' + (pfPage - 1) + ')">' + tt('prev') + '</button>' +
+        '<span>' + tt('page', { p: pfPage, l: last }) + '</span>' +
+        '<button class="btn-secondary" ' + (pfPage >= last ? 'disabled' : '') + ' onclick="loadPrintifyOrders(' + (pfPage + 1) + ')">' + tt('next') + '</button>'
+      : '';
   }
 
+  // ================= GENEL =================
   async function logout() {
-    await supabaseClient.auth.signOut();
+    try {
+      if (window.HS && typeof HS.logout === 'function') { await HS.logout(); return; }
+    } catch (e) {}
+    await db.auth.signOut();
     window.location.href = 'index.html';
   }
+
+  function renderAllTexts() {
+    applyStatic();
+    fillFormSelects();
+    if (salesLoaded) { fillChannelFilter(); renderSales(); }
+    renderOrders();
+    renderPrintify();
+  }
+
+  async function init() {
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const session = await getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUserId = session.user.id;
+    document.getElementById('userEmail').textContent = session.user.email;
+
+    applyStatic();
+    document.getElementById('msChannel').innerHTML = '<option value="">' + tt('allChannels') + '</option>';
+
+    let startTab = (location.hash || '').replace('#', '');
+    if (['sales', 'supplier', 'printify'].indexOf(startTab) === -1) {
+      try { startTab = localStorage.getItem('hs_orders_tab') || 'sales'; } catch (e) { startTab = 'sales'; }
+      if (['sales', 'supplier', 'printify'].indexOf(startTab) === -1) startTab = 'sales';
+    }
+    showTab(startTab);
+
+    await loadCommon();
+    await Promise.all([loadSales(), loadProducts().then(loadOrders)]);
+    if (!pfLoaded) loadPrintifyOrders(1);
+  }
+
+  function onLangChange() { renderAllTexts(); }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
 
   init();
 </script>
