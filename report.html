@@ -5,128 +5,94 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Kâr-Zarar Raporu</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-dot {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: #1D9E75; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #fff; font-size: 15px;
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
-  .back-link {
-    color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
-  }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; white-space: nowrap; }
   .back-link:hover { color: #fff; }
 
-  main {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 32px 24px 80px;
-  }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 24px 80px; }
   h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 24px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 20px; }
+
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid #232838; margin-bottom: 20px; overflow-x: auto; }
+  .tab {
+    background: none; border: none; color: #9aa3b2; font-size: 14px; font-weight: 600;
+    padding: 12px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #fff; border-bottom-color: #1D9E75; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .period-btn {
+    background: #141821; border: 1px solid #2a3040; color: #9aa3b2; padding: 8px 14px;
+    border-radius: 20px; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .period-btn:hover { color: #fff; border-color: #3a4258; }
+  .period-btn.active { background: #123222; border-color: #1D9E75; color: #6ee7b7; }
 
   .empty-state {
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-    padding: 60px 20px;
-    text-align: center;
-    color: #9aa3b2;
+    background: #141821; border-radius: 14px; border: 1px solid #232838;
+    padding: 60px 20px; text-align: center; color: #9aa3b2;
   }
   .empty-state h3 { color: #fff; font-size: 16px; margin-bottom: 6px; font-weight: 500; }
+  .empty-state p { font-size: 14px; }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-  .stat-card {
-    background: #1c212c;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #232838;
-  }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; min-width: 0; }
   .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
-  .stat-value { font-size: 19px; font-weight: 600; color: #fff; }
-  .stat-value.green { color: #5DCAA5; }
-  .stat-value.red { color: #f28b8b; }
+  .stat-value { font-size: 19px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+  .stat-note { font-size: 11px; color: #6b7385; margin-top: 4px; }
+  .green { color: #5DCAA5; }
+  .red { color: #f28b8b; }
 
   .section-title {
     font-size: 14px; font-weight: 600; color: #9aa3b2; text-transform: uppercase;
     letter-spacing: 0.03em; margin: 28px 0 12px;
   }
-  .section-title:first-of-type { margin-top: 0; }
+  .panel { background: #141821; border-radius: 14px; border: 1px solid #232838; overflow: hidden; }
 
-  .panel {
-    background: #141821;
-    border-radius: 14px;
-    border: 1px solid #232838;
-    overflow: hidden;
+  .prod-row, .bar-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; border-bottom: 1px solid #232838; gap: 14px;
   }
-  .prod-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 20px;
-    border-bottom: 1px solid #232838;
-    gap: 14px;
-  }
-  .prod-row:last-child { border-bottom: none; }
-  .prod-rank {
-    width: 22px; flex-shrink: 0; font-size: 12px; color: #9aa3b2; font-weight: 600;
-  }
-  .prod-info { flex: 1; min-width: 0; }
-  .prod-name { font-size: 14px; font-weight: 500; color: #fff; }
-  .prod-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
-  .prod-value { font-size: 14px; font-weight: 600; flex-shrink: 0; }
-  .prod-value.green { color: #5DCAA5; }
-  .prod-value.red { color: #f28b8b; }
+  .prod-row:last-child, .bar-row:last-child { border-bottom: none; }
+  .prod-rank { width: 26px; flex-shrink: 0; font-size: 12px; color: #9aa3b2; font-weight: 600; }
+  .prod-info, .bar-info { flex: 1; min-width: 0; }
+  .prod-name, .bar-name { font-size: 14px; font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prod-meta, .bar-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .prod-value { font-size: 14px; font-weight: 600; flex-shrink: 0; text-align: right; }
+  .bar-wrap { flex: 1; height: 8px; background: #232838; border-radius: 4px; overflow: hidden; max-width: 200px; }
+  .bar { height: 100%; background: #1D9E75; border-radius: 4px; }
+  .bar.neg { background: #f28b8b; }
+  .bar-value { font-size: 13px; font-weight: 600; flex-shrink: 0; min-width: 110px; text-align: right; }
+  .bar-sub { font-size: 11px; color: #9aa3b2; font-weight: 400; }
 
-  .platform-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 20px;
-    border-bottom: 1px solid #232838;
-    gap: 14px;
-  }
-  .platform-row:last-child { border-bottom: none; }
-  .platform-name { font-size: 14px; font-weight: 500; color: #fff; }
-  .platform-count { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
-  .platform-bar-wrap {
-    flex: 1;
-    height: 8px;
-    background: #232838;
-    border-radius: 4px;
-    overflow: hidden;
-    max-width: 200px;
-  }
-  .platform-bar {
-    height: 100%;
-    background: #1D9E75;
-    border-radius: 4px;
-  }
-  .platform-value { font-size: 13px; font-weight: 600; color: #5DCAA5; flex-shrink: 0; min-width: 90px; text-align: right; }
+  .note { font-size: 12px; color: #9aa3b2; padding: 14px 4px; line-height: 1.5; }
 
-  .no-price-note {
-    font-size: 12px; color: #9aa3b2; padding: 14px 20px;
+  @media (max-width: 760px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    header { padding: 14px 16px; }
+    main { padding: 24px 16px 80px; }
+    .bar-wrap { display: none; }
+    .bar-value { min-width: 0; }
   }
 </style>
 </head>
@@ -137,201 +103,508 @@
     <div class="logo-dot">H</div>
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
+  </div>
 </header>
 
 <main>
-  <h1>📊 Kâr-Zarar Raporu</h1>
-  <div class="subtitle">Tüm ürünlerinin kâr durumu, en iyi/en zayıf performans gösterenler ve platform bazında dağılım.</div>
+  <h1 data-t="title"></h1>
+  <div class="subtitle" data-t="subtitle"></div>
 
-  <div id="reportContent">
-    <div class="empty-state">
-      <h3>Yükleniyor...</h3>
-    </div>
+  <div class="tabs">
+    <button class="tab" data-tab="sales" onclick="showTab('sales')" data-t="tabSales"></button>
+    <button class="tab" data-tab="products" onclick="showTab('products')" data-t="tabProducts"></button>
+  </div>
+
+  <!-- ============ 1) GERÇEKLEŞEN SATIŞLAR ============ -->
+  <div class="tab-panel" id="panel-sales">
+    <div class="toolbar" id="periodBar"></div>
+    <div id="salesContent"><div class="empty-state"><h3 data-t="loading"></h3></div></div>
+  </div>
+
+  <!-- ============ 2) ÜRÜN KÂRLILIĞI (tahmini) ============ -->
+  <div class="tab-panel" id="panel-products">
+    <div id="productContent"><div class="empty-state"><h3 data-t="loading"></h3></div></div>
   </div>
 </main>
 
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
 
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Kâr-Zarar Raporu',
+      back: '← Panele dön',
+      title: '📊 Kâr-Zarar Raporu',
+      subtitle: 'Gerçekleşen satışlarının kârı ve ürünlerinin tahmini kârlılığı.',
+      tabSales: '📈 Gerçekleşen Satışlar',
+      tabProducts: '🧮 Ürün Kârlılığı',
+      loading: 'Yükleniyor...',
+      loadFail: 'Rapor yüklenemedi',
+      p_month: 'Bu ay', p_30: 'Son 30 gün', p_90: 'Son 90 gün', p_year: 'Bu yıl', p_all: 'Tümü',
+      sRevenue: 'Ciro', sProfit: 'Net kâr', sOrders: 'Sipariş', sMargin: 'Kâr marjı',
+      sAvg: 'ortalama sepet: {v}',
+      fxNote: '{cur}, sipariş günündeki kurla',
+      costMissingNote: '{n} siparişte maliyet girilmemiş, kâra dahil edilmedi',
+      secChannel: 'Kanal bazında',
+      secCountry: 'Ülke bazında',
+      secProduct: 'En çok kazandıran ürünler',
+      ordersN: '{n} sipariş',
+      revenueLbl: 'ciro {v}',
+      unknownCountry: 'Belirtilmemiş',
+      unknownProduct: 'Ürün bilgisi yok',
+      salesEmptyTitle: 'Bu dönemde satış yok',
+      salesEmptyText: 'Siparişler geldikçe kâr, kanal ve ülke dağılımı burada görünür.',
+      excludedNote: 'Test (sandbox) siparişleri ve iptal/iade edilenler rapora dahil değildir.',
+      // ürün kârlılığı
+      prodInfo: 'Satış fiyatı, tedarikçi maliyeti, kargo ve komisyon üzerinden hesaplanan tahmini birim kâr. Gerçekleşen satış değildir.',
+      totalProducts: 'Toplam ürün',
+      totalUnitProfit: 'Toplam birim kâr',
+      avgMargin: 'Ortalama marj',
+      profitLoss: 'Kârlı / Zararda',
+      topProducts: 'En kârlı ürünler',
+      worstProducts: 'Dikkat edilmesi gerekenler (en düşük kârlı / zararda)',
+      byPlatform: 'Platform bazında dağılım',
+      productsN: '{n} ürün',
+      marginTxt: '{m} marj',
+      unnamed: 'İsimsiz ürün',
+      unspecified: 'Belirtilmemiş',
+      noProductsTitle: 'Henüz ürün eklemedin',
+      noProductsText: 'Rapor görebilmen için önce en az bir ürün eklemen gerekiyor.',
+      noPriceNote: 'ℹ️ {n} ürünün satış fiyatı girilmediği için rapora dahil edilmedi. Ürün düzenleme sayfasından satış fiyatını ekleyebilirsin.',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Profit & Loss Report',
+      back: '← Back to dashboard',
+      title: '📊 Profit & Loss Report',
+      subtitle: 'Profit from your actual sales and the estimated profitability of your products.',
+      tabSales: '📈 Actual Sales',
+      tabProducts: '🧮 Product Profitability',
+      loading: 'Loading...',
+      loadFail: 'Could not load report',
+      p_month: 'This month', p_30: 'Last 30 days', p_90: 'Last 90 days', p_year: 'This year', p_all: 'All time',
+      sRevenue: 'Revenue', sProfit: 'Net profit', sOrders: 'Orders', sMargin: 'Profit margin',
+      sAvg: 'average order: {v}',
+      fxNote: '{cur}, at the order-day rate',
+      costMissingNote: '{n} orders have no cost entered and are excluded from profit',
+      secChannel: 'By channel',
+      secCountry: 'By country',
+      secProduct: 'Top earning products',
+      ordersN: '{n} orders',
+      revenueLbl: 'revenue {v}',
+      unknownCountry: 'Unspecified',
+      unknownProduct: 'No product info',
+      salesEmptyTitle: 'No sales in this period',
+      salesEmptyText: 'As orders come in, profit, channel and country breakdowns appear here.',
+      excludedNote: 'Test (sandbox) orders and cancelled/returned orders are not included.',
+      prodInfo: 'Estimated unit profit from sale price, supplier cost, shipping and commission. Not actual sales.',
+      totalProducts: 'Total products',
+      totalUnitProfit: 'Total unit profit',
+      avgMargin: 'Average margin',
+      profitLoss: 'Profitable / Loss',
+      topProducts: 'Most profitable products',
+      worstProducts: 'Needs attention (lowest profit / loss)',
+      byPlatform: 'By platform',
+      productsN: '{n} products',
+      marginTxt: '{m} margin',
+      unnamed: 'Unnamed product',
+      unspecified: 'Unspecified',
+      noProductsTitle: 'No products yet',
+      noProductsText: 'Add at least one product to see the report.',
+      noPriceNote: 'ℹ️ {n} products have no sale price and are not included. You can add a sale price on the product edit page.',
+    }
+  };
+
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let s = T[lang()][key] !== undefined ? T[lang()][key] : T.tr[key];
+    if (s === undefined) return key;
+    if (vars) Object.keys(vars).forEach(k => { s = s.split('{' + k + '}').join(vars[k]); });
+    return s;
+  }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function locale() { return lang() === 'en' ? 'en-GB' : 'tr-TR'; }
+  const CUR_SYMBOL = { TRY: '₺', EUR: '€', USD: '$', GBP: '£', PLN: 'zł', DKK: 'kr' };
+  function fmtMoney(v, cur) {
+    if (v == null || isNaN(Number(v))) return '–';
+    cur = (cur || 'TRY').toUpperCase();
+    const n = Number(v).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const sym = CUR_SYMBOL[cur];
+    if (!sym) return n + ' ' + cur;
+    if (cur === 'PLN' || cur === 'DKK') return n + ' ' + sym;
+    return (Number(v) < 0 ? '-' + sym + n.replace('-', '') : sym + n);
+  }
+  function fmtPct(v) {
+    const n = Math.abs(Number(v)).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const sign = Number(v) < 0 ? '-' : '';
+    return lang() === 'en' ? sign + n + '%' : sign + '%' + n;
+  }
+  function pick(o, keys) {
+    for (const k of keys) { if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; }
+    return null;
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  }
+
+  // ================= SEKMELER =================
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+    try { localStorage.setItem('hs_report_tab', name); } catch (e) {}
+    if (history.replaceState) history.replaceState(null, '', '#' + name);
+  }
+
+  // ================= ORTAK VERİ =================
+  let currentUserId = null;
+  let homeCurrency = 'TRY';
+  let marketplaceMap = {};
+  let connectionMap = {};
+  let productMap = {};
+  let products = [];
+  let shippingRates = [];
+  let orders = [];
+  let loaded = { sales: false, products: false };
+  let loadError = { sales: null, products: null };
+
+  function marketplaceName(code) {
+    if (!code) return t('unspecified');
+    if (code === 'own_store') return lang() === 'en' ? '🏪 My Store' : '🏪 Kendi Mağazam';
+    const m = marketplaceMap[code];
+    if (!m) return code;
+    return (lang() === 'en' ? pick(m, ['name_en', 'name']) : pick(m, ['name_tr', 'name'])) || code;
+  }
+  function countryName(code) {
+    if (!code) return t('unknownCountry');
+    try {
+      if (String(code).length === 2 && Intl.DisplayNames) {
+        return new Intl.DisplayNames([locale()], { type: 'region' }).of(String(code).toUpperCase());
+      }
+    } catch (e) {}
+    return code;
+  }
+
+  // ================= 1) GERÇEKLEŞEN SATIŞLAR =================
+  const PERIODS = ['month', '30', '90', 'year', 'all'];
+  let period = 'month';
+
+  function isTestOrder(o) {
+    if (o.is_test === true) return true;
+    if (o.environment === 'sandbox') return true;
+    const c = o.store_connection_id ? connectionMap[o.store_connection_id] : null;
+    return !!(c && c.environment === 'sandbox');
+  }
+  function isCancelled(o) {
+    return ['cancelled', 'canceled', 'returned', 'refunded', 'iptal'].includes(String(o.status || '').toLowerCase());
+  }
+  function orderDate(o) {
+    const d = pick(o, ['ordered_at', 'order_date', 'placed_at', 'created_at']);
+    return d ? new Date(d) : null;
+  }
+  function periodStart(p) {
+    const now = new Date();
+    if (p === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+    if (p === '30') return new Date(now.getTime() - 30 * 86400000);
+    if (p === '90') return new Date(now.getTime() - 90 * 86400000);
+    if (p === 'year') return new Date(now.getFullYear(), 0, 1);
+    return null;
+  }
+  function revenueHome(o) {
+    const rh = pick(o, ['revenue_home', 'gross_home', 'total_home', 'amount_home']);
+    if (rh != null) return Number(rh);
+    const cur = pick(o, ['currency', 'order_currency']);
+    const tot = pick(o, ['total_amount', 'gross_amount', 'gross_total', 'total_gross', 'order_total', 'grand_total', 'total_price', 'order_amount', 'subtotal', 'total', 'amount']);
+    if (tot == null) return null;
+    if (!cur || cur === homeCurrency) return Number(tot);
+    const fx = pick(o, ['fx_rate', 'fx_rate_to_home', 'exchange_rate']);
+    return fx ? Number(tot) * Number(fx) : null;
+  }
+  function productLabel(o) {
+    const n = pick(o, ['product_name', 'title', 'item_title']);
+    if (n) return n;
+    const pid = pick(o, ['product_id']);
+    if (pid != null && productMap[pid]) return productMap[pid].name || t('unnamed');
+    return null;
+  }
+
+  function renderPeriodBar() {
+    document.getElementById('periodBar').innerHTML = PERIODS.map(p =>
+      '<button class="period-btn' + (p === period ? ' active' : '') + '" onclick="setPeriod(\'' + p + '\')">' + t('p_' + (p === '30' || p === '90' ? p : p)) + '</button>'
+    ).join('');
+  }
+  function setPeriod(p) {
+    period = p;
+    try { localStorage.setItem('hs_report_period', p); } catch (e) {}
+    renderPeriodBar();
+    renderSales();
+  }
+
+  function barRows(list, maxAbs) {
+    return list.map(r => {
+      const w = maxAbs > 0 ? Math.min(100, Math.abs(r.value) / maxAbs * 100) : 0;
+      return '<div class="bar-row"><div class="bar-info"><div class="bar-name">' + escapeHtml(r.name) + '</div>' +
+        '<div class="bar-meta">' + escapeHtml(r.meta) + '</div></div>' +
+        '<div class="bar-wrap"><div class="bar' + (r.value < 0 ? ' neg' : '') + '" style="width:' + w + '%"></div></div>' +
+        '<div class="bar-value ' + (r.value < 0 ? 'red' : 'green') + '">' + r.valueText +
+          (r.sub ? '<div class="bar-sub">' + escapeHtml(r.sub) + '</div>' : '') + '</div></div>';
+    }).join('');
+  }
+
+  function renderSales() {
+    const el = document.getElementById('salesContent');
+    if (loadError.sales) {
+      el.innerHTML = '<div class="empty-state"><h3>' + t('loadFail') + '</h3><p>' + escapeHtml(loadError.sales) + '</p></div>';
+      return;
+    }
+    if (!loaded.sales) return;
+
+    const start = periodStart(period);
+    const rows = orders.filter(o => {
+      if (isTestOrder(o) || isCancelled(o)) return false;
+      if (!start) return true;
+      const d = orderDate(o);
+      return d && d >= start;
+    });
+
+    if (rows.length === 0) {
+      el.innerHTML = '<div class="empty-state"><h3>' + t('salesEmptyTitle') + '</h3><p>' + t('salesEmptyText') + '</p></div>' +
+        '<div class="note">' + t('excludedNote') + '</div>';
+      return;
+    }
+
+    let revenue = 0, profit = 0, revenueForMargin = 0, costMissing = 0;
+    const byChannel = {}, byCountry = {}, byProduct = {};
+    rows.forEach(o => {
+      const rev = revenueHome(o);
+      const np = pick(o, ['net_profit_home']);
+      if (rev != null) revenue += rev;
+      if (np != null) { profit += Number(np); if (rev != null) revenueForMargin += rev; }
+      else costMissing++;
+
+      const ch = o.marketplace_code || '';
+      byChannel[ch] = byChannel[ch] || { count: 0, revenue: 0, profit: 0 };
+      byChannel[ch].count++; byChannel[ch].revenue += rev || 0; byChannel[ch].profit += np != null ? Number(np) : 0;
+
+      const cc = pick(o, ['buyer_country', 'ship_country', 'shipping_country', 'country_code', 'country']) || '';
+      byCountry[cc] = byCountry[cc] || { count: 0, revenue: 0, profit: 0 };
+      byCountry[cc].count++; byCountry[cc].revenue += rev || 0; byCountry[cc].profit += np != null ? Number(np) : 0;
+
+      const pl = productLabel(o);
+      if (pl) {
+        byProduct[pl] = byProduct[pl] || { count: 0, revenue: 0, profit: 0 };
+        byProduct[pl].count += Number(pick(o, ['quantity']) || 1); byProduct[pl].revenue += rev || 0; byProduct[pl].profit += np != null ? Number(np) : 0;
+      }
+    });
+    const margin = revenueForMargin > 0 ? (profit / revenueForMargin) * 100 : null;
+    const avg = rows.length ? revenue / rows.length : 0;
+
+    let html = '<div class="stats-grid">' +
+      '<div class="stat-card"><div class="stat-label">' + t('sRevenue') + '</div><div class="stat-value">' + fmtMoney(revenue, homeCurrency) + '</div><div class="stat-note">' + t('fxNote', { cur: homeCurrency }) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('sProfit') + '</div><div class="stat-value ' + (profit >= 0 ? 'green' : 'red') + '">' + fmtMoney(profit, homeCurrency) + '</div><div class="stat-note">' + (costMissing ? t('costMissingNote', { n: costMissing }) : t('fxNote', { cur: homeCurrency })) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('sOrders') + '</div><div class="stat-value">' + rows.length + '</div><div class="stat-note">' + t('sAvg', { v: fmtMoney(avg, homeCurrency) }) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('sMargin') + '</div><div class="stat-value ' + (margin == null ? '' : margin >= 0 ? 'green' : 'red') + '">' + (margin == null ? '–' : fmtPct(margin)) + '</div></div>' +
+      '</div>';
+
+    const toList = (obj, nameFn) => Object.entries(obj).map(([k, v]) => ({
+      name: nameFn(k), meta: t('ordersN', { n: v.count }), value: v.profit,
+      valueText: fmtMoney(v.profit, homeCurrency), sub: t('revenueLbl', { v: fmtMoney(v.revenue, homeCurrency) })
+    })).sort((a, b) => b.value - a.value);
+
+    const chList = toList(byChannel, marketplaceName);
+    const chMax = Math.max(...chList.map(r => Math.abs(r.value)), 0);
+    html += '<div class="section-title">' + t('secChannel') + '</div><div class="panel">' + barRows(chList, chMax) + '</div>';
+
+    const coList = toList(byCountry, countryName);
+    if (!(coList.length === 1 && coList[0].name === t('unknownCountry'))) {
+      const coMax = Math.max(...coList.map(r => Math.abs(r.value)), 0);
+      html += '<div class="section-title">' + t('secCountry') + '</div><div class="panel">' + barRows(coList, coMax) + '</div>';
+    }
+
+    const prList = Object.entries(byProduct).map(([k, v]) => ({
+      name: k, meta: (lang() === 'en' ? v.count + ' pcs' : v.count + ' adet'), value: v.profit,
+      valueText: fmtMoney(v.profit, homeCurrency), sub: t('revenueLbl', { v: fmtMoney(v.revenue, homeCurrency) })
+    })).sort((a, b) => b.value - a.value).slice(0, 10);
+    if (prList.length) {
+      const prMax = Math.max(...prList.map(r => Math.abs(r.value)), 0);
+      html += '<div class="section-title">' + t('secProduct') + '</div><div class="panel">' + barRows(prList, prMax) + '</div>';
+    }
+
+    html += '<div class="note">' + t('excludedNote') + '</div>';
+    el.innerHTML = html;
+  }
+
+  // ================= 2) ÜRÜN KÂRLILIĞI (tahmini, eski rapor) =================
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
-  function currencySymbolFor(platform) {
-    return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
+  function productCurrency(p) {
+    if (INTERNATIONAL_PLATFORMS.includes(p.platform)) return 'USD';
+    return p.cost_currency || 'TRY';
+  }
+  function getShippingCost(weightKg) {
+    if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
+    const matches = shippingRates
+      .filter(r => r.min_weight_kg <= weightKg && r.max_weight_kg >= weightKg)
+      .sort((a, b) => a.price - b.price);
+    return matches.length > 0 ? matches[0].price : 0;
+  }
+  function sumByCurrency(map) {
+    const parts = Object.entries(map).filter(([, v]) => v !== 0).map(([c, v]) => fmtMoney(v, c));
+    return parts.length ? parts.join(' + ') : fmtMoney(0, homeCurrency);
   }
 
-  async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
-    await loadReport(session.user.id);
-  }
-  init();
-
-  async function loadReport(userId) {
-    const { data: products, error } = await supabaseClient
-      .from('products')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      document.getElementById('reportContent').innerHTML =
-        '<div class="empty-state"><h3>Rapor yüklenemedi</h3><p>' + escapeHtml(error.message) + '</p></div>';
+  function renderProducts() {
+    const el = document.getElementById('productContent');
+    if (loadError.products) {
+      el.innerHTML = '<div class="empty-state"><h3>' + t('loadFail') + '</h3><p>' + escapeHtml(loadError.products) + '</p></div>';
       return;
     }
-
-    if (!products || products.length === 0) {
-      document.getElementById('reportContent').innerHTML = `
-        <div class="empty-state">
-          <h3>Henüz ürün eklemedin</h3>
-          <p>Rapor görebilmen için önce en az bir ürün eklemen gerekiyor.</p>
-        </div>`;
+    if (!loaded.products) return;
+    if (!products.length) {
+      el.innerHTML = '<div class="empty-state"><h3>' + t('noProductsTitle') + '</h3><p>' + t('noProductsText') + '</p></div>';
       return;
-    }
-
-    const { data: shippingRates } = await supabaseClient.from('shipping_rates').select('*');
-
-    function getShippingCost(weightKg) {
-      if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
-      const matches = shippingRates
-        .filter(r => r.min_weight_kg <= weightKg && r.max_weight_kg >= weightKg)
-        .sort((a, b) => a.price - b.price);
-      return matches.length > 0 ? matches[0].price : 0;
     }
 
     const computed = products.map(p => {
-      const supplierPrice = p.supplier_price || 0;
-      const salePrice = p.sale_price || 0;
-      const commissionRate = p.commission_rate || 0;
-      const symbol = currencySymbolFor(p.platform);
-      let netProfit = null;
-      let marginPct = null;
-
+      const salePrice = Number(p.sale_price || 0);
+      const cur = productCurrency(p);
+      let netProfit = null, marginPct = null;
       if (salePrice > 0) {
-        const shippingCost = getShippingCost(p.weight_kg);
-        const commissionCost = salePrice * (commissionRate / 100);
-        netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
+        const commissionCost = salePrice * (Number(p.commission_rate || 0) / 100);
+        netProfit = salePrice - Number(p.supplier_price || 0) - getShippingCost(p.weight_kg) - commissionCost;
         marginPct = (netProfit / salePrice) * 100;
       }
-
-      return { p, netProfit, marginPct, symbol };
+      return { p, netProfit, marginPct, cur };
     });
-
     const priced = computed.filter(c => c.netProfit !== null);
     const noPriceCount = computed.length - priced.length;
 
-    let tryProfit = 0, usdProfit = 0, marginSum = 0;
-    priced.forEach(c => {
-      if (c.symbol === '$') usdProfit += c.netProfit; else tryProfit += c.netProfit;
-      marginSum += c.marginPct;
-    });
-    const avgMargin = priced.length > 0 ? (marginSum / priced.length) : null;
+    const totals = {};
+    let marginSum = 0;
+    priced.forEach(c => { totals[c.cur] = (totals[c.cur] || 0) + c.netProfit; marginSum += c.marginPct; });
+    const avgMargin = priced.length ? marginSum / priced.length : null;
     const profitableCount = priced.filter(c => c.netProfit >= 0).length;
-    const lossCount = priced.filter(c => c.netProfit < 0).length;
+    const lossCount = priced.length - profitableCount;
 
-    const totalProfitText = usdProfit !== 0
-      ? '₺' + tryProfit.toFixed(2) + ' + $' + usdProfit.toFixed(2)
-      : '₺' + tryProfit.toFixed(2);
-
-    const topProfit = [...priced].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
-    const worstProfit = [...priced].sort((a, b) => a.netProfit - b.netProfit).slice(0, 5).filter(c => c.netProfit < (topProfit[0]?.netProfit ?? Infinity));
+    const top = [...priced].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
+    const worst = [...priced].sort((a, b) => a.netProfit - b.netProfit).slice(0, 5)
+      .filter(c => c.netProfit < (top[0] ? top[0].netProfit : Infinity));
 
     const platformMap = {};
     priced.forEach(c => {
-      const key = c.p.platform || 'Belirtilmemiş';
-      if (!platformMap[key]) platformMap[key] = { count: 0, profit: 0, symbol: c.symbol };
-      platformMap[key].count++;
-      platformMap[key].profit += c.netProfit;
+      const key = (c.p.platform || t('unspecified')) + '|' + c.cur;
+      platformMap[key] = platformMap[key] || { name: c.p.platform || t('unspecified'), cur: c.cur, count: 0, profit: 0 };
+      platformMap[key].count++; platformMap[key].profit += c.netProfit;
     });
-    const platformList = Object.entries(platformMap)
-      .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.profit - a.profit);
-    const maxPlatformProfit = Math.max(...platformList.map(p => Math.abs(p.profit)), 1);
+    const platformList = Object.values(platformMap).sort((a, b) => b.profit - a.profit);
+    const maxP = Math.max(...platformList.map(p => Math.abs(p.profit)), 1);
 
-    const statsHtml = `
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Toplam ürün</div>
-          <div class="stat-value">${products.length}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Toplam net kâr</div>
-          <div class="stat-value green">${totalProfitText}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Ortalama marj</div>
-          <div class="stat-value green">${avgMargin !== null ? avgMargin.toFixed(1) + '%' : '-'}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Kârlı / Zararda</div>
-          <div class="stat-value"><span class="green">${profitableCount}</span> / <span class="red">${lossCount}</span></div>
-        </div>
-      </div>
-    `;
+    const prodRow = (c, i) => '<div class="prod-row"><div class="prod-rank">#' + (i + 1) + '</div>' +
+      '<div class="prod-info"><div class="prod-name">' + escapeHtml(c.p.name || t('unnamed')) + '</div>' +
+      '<div class="prod-meta">' + escapeHtml(c.p.platform || '-') + ' · ' + t('marginTxt', { m: fmtPct(c.marginPct) }) + '</div></div>' +
+      '<div class="prod-value ' + (c.netProfit >= 0 ? 'green' : 'red') + '">' + fmtMoney(c.netProfit, c.cur) + '</div></div>';
 
-    const topHtml = topProfit.length > 0 ? `
-      <div class="section-title">En kârlı ürünler</div>
-      <div class="panel">
-        ${topProfit.map((c, i) => `
-          <div class="prod-row">
-            <div class="prod-rank">#${i + 1}</div>
-            <div class="prod-info">
-              <div class="prod-name">${escapeHtml(c.p.name || 'İsimsiz ürün')}</div>
-              <div class="prod-meta">${escapeHtml(c.p.platform || '-')} · %${c.marginPct.toFixed(1)} marj</div>
-            </div>
-            <div class="prod-value ${c.netProfit >= 0 ? 'green' : 'red'}">${c.symbol}${c.netProfit.toFixed(2)}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : '';
+    let html = '<div class="note" style="padding-top:0;">' + t('prodInfo') + '</div>' +
+      '<div class="stats-grid">' +
+      '<div class="stat-card"><div class="stat-label">' + t('totalProducts') + '</div><div class="stat-value">' + products.length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('totalUnitProfit') + '</div><div class="stat-value green">' + sumByCurrency(totals) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('avgMargin') + '</div><div class="stat-value green">' + (avgMargin !== null ? fmtPct(avgMargin) : '–') + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">' + t('profitLoss') + '</div><div class="stat-value"><span class="green">' + profitableCount + '</span> / <span class="red">' + lossCount + '</span></div></div>' +
+      '</div>';
 
-    const worstHtml = worstProfit.length > 0 ? `
-      <div class="section-title">Dikkat edilmesi gerekenler (en düşük kârlı / zararda)</div>
-      <div class="panel">
-        ${worstProfit.map((c, i) => `
-          <div class="prod-row">
-            <div class="prod-rank">#${i + 1}</div>
-            <div class="prod-info">
-              <div class="prod-name">${escapeHtml(c.p.name || 'İsimsiz ürün')}</div>
-              <div class="prod-meta">${escapeHtml(c.p.platform || '-')} · %${c.marginPct.toFixed(1)} marj</div>
-            </div>
-            <div class="prod-value ${c.netProfit >= 0 ? 'green' : 'red'}">${c.symbol}${c.netProfit.toFixed(2)}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : '';
-
-    const platformHtml = platformList.length > 0 ? `
-      <div class="section-title">Platform bazında dağılım</div>
-      <div class="panel">
-        ${platformList.map(p => `
-          <div class="platform-row">
-            <div style="flex:1; min-width:0;">
-              <div class="platform-name">${escapeHtml(p.name)}</div>
-              <div class="platform-count">${p.count} ürün</div>
-            </div>
-            <div class="platform-bar-wrap">
-              <div class="platform-bar" style="width:${Math.min(100, (Math.abs(p.profit) / maxPlatformProfit) * 100)}%; ${p.profit < 0 ? 'background:#f28b8b;' : ''}"></div>
-            </div>
-            <div class="platform-value" style="${p.profit < 0 ? 'color:#f28b8b;' : ''}">${p.symbol}${p.profit.toFixed(2)}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : '';
-
-    const noPriceHtml = noPriceCount > 0
-      ? `<div class="no-price-note">ℹ️ ${noPriceCount} ürünün satış fiyatı girilmediği için rapora dahil edilmedi. Ürün düzenleme sayfasından satış fiyatını ekleyebilirsin.</div>`
-      : '';
-
-    document.getElementById('reportContent').innerHTML = statsHtml + topHtml + worstHtml + platformHtml + noPriceHtml;
+    if (top.length) html += '<div class="section-title">' + t('topProducts') + '</div><div class="panel">' + top.map(prodRow).join('') + '</div>';
+    if (worst.length) html += '<div class="section-title">' + t('worstProducts') + '</div><div class="panel">' + worst.map(prodRow).join('') + '</div>';
+    if (platformList.length) {
+      html += '<div class="section-title">' + t('byPlatform') + '</div><div class="panel">' +
+        barRows(platformList.map(p => ({ name: p.name, meta: t('productsN', { n: p.count }), value: p.profit, valueText: fmtMoney(p.profit, p.cur) })), maxP) +
+        '</div>';
+    }
+    if (noPriceCount > 0) html += '<div class="note">' + t('noPriceNote', { n: noPriceCount }) + '</div>';
+    el.innerHTML = html;
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  // ================= YÜKLEME =================
+  async function loadAll() {
+    try {
+      const { data } = await db.from('user_profiles').select('home_currency').limit(1).maybeSingle();
+      if (data && data.home_currency) homeCurrency = data.home_currency;
+    } catch (e) {}
+    try {
+      const { data } = await db.from('marketplaces').select('*');
+      (data || []).forEach(m => { if (m.code) marketplaceMap[m.code] = m; });
+    } catch (e) {}
+    try {
+      const { data } = await db.from('store_connections').select('*');
+      (data || []).forEach(c => { connectionMap[c.id] = c; });
+    } catch (e) {}
+
+    // Ürünler (silinenler hariç; deleted_at yoksa eski sorgu)
+    try {
+      let r = await db.from('products').select('*').eq('user_id', currentUserId).is('deleted_at', null).order('created_at', { ascending: false });
+      if (r.error) r = await db.from('products').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false });
+      if (r.error) throw r.error;
+      products = r.data || [];
+      products.forEach(p => { productMap[p.id] = p; });
+      const sr = await db.from('shipping_rates').select('*');
+      shippingRates = sr.data || [];
+    } catch (e) { loadError.products = e.message || String(e); }
+    loaded.products = true;
+    renderProducts();
+
+    try {
+      const { data, error } = await db.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(5000);
+      if (error) throw error;
+      orders = data || [];
+    } catch (e) { loadError.sales = e.message || String(e); }
+    loaded.sales = true;
+    renderSales();
   }
+
+  function renderAllTexts() {
+    applyStatic();
+    renderPeriodBar();
+    renderSales();
+    renderProducts();
+  }
+
+  async function init() {
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUserId = session.user.id;
+
+    try { const sp = localStorage.getItem('hs_report_period'); if (PERIODS.indexOf(sp) !== -1) period = sp; } catch (e) {}
+    let startTab = (location.hash || '').replace('#', '');
+    if (['sales', 'products'].indexOf(startTab) === -1) {
+      try { startTab = localStorage.getItem('hs_report_tab') || 'sales'; } catch (e) { startTab = 'sales'; }
+      if (['sales', 'products'].indexOf(startTab) === -1) startTab = 'sales';
+    }
+
+    applyStatic();
+    renderPeriodBar();
+    showTab(startTab);
+    await loadAll();
+  }
+
+  function onLangChange() { renderAllTexts(); }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
+
+  init();
 </script>
 
 </body>
