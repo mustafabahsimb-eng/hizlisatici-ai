@@ -182,13 +182,14 @@
   }
 
   async function logout() {
-    // Sunucu hata verirse de tarayıcıdaki oturum MUTLAKA silinsin
+    // Supabase yanıt vermese bile en geç 1,5 sn içinde çıkış yapılır
     try {
-      const res = await db.auth.signOut();
-      if (res && res.error) await db.auth.signOut({ scope: 'local' });
-    } catch (e) {
-      try { await db.auth.signOut({ scope: 'local' }); } catch (e2) { /* yok say */ }
-    }
+      await Promise.race([
+        db.auth.signOut({ scope: 'local' }),
+        new Promise(function (r) { setTimeout(r, 1500); })
+      ]);
+    } catch (e) { /* yok say */ }
+    // Tarayıcıdaki oturum anahtarını elle de sil
     try {
       Object.keys(localStorage).forEach(function (k) {
         if (k.indexOf('sb-') === 0 && k.indexOf('-auth-token') !== -1) localStorage.removeItem(k);
@@ -196,7 +197,7 @@
     } catch (e) { /* yok say */ }
     currentUser = null;
     profile = null;
-    window.location.href = 'index.html';
+    window.location.replace('index.html');
   }
 
   // ---------- Biçimlendirme ----------
@@ -229,151 +230,4 @@
     if (n == null || isNaN(n)) return '-';
     const d = digits == null ? 1 : digits;
     return new Intl.NumberFormat(LOCALES[lang], {
-      style: 'percent', minimumFractionDigits: d, maximumFractionDigits: d
-    }).format(Number(n) / 100);
-  }
-
-  function date(value, withTime) {
-    if (!value) return '-';
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return '-';
-    const opts = withTime
-      ? { dateStyle: 'medium', timeStyle: 'short' }
-      : { dateStyle: 'medium' };
-    if (profile && profile.timezone) opts.timeZone = profile.timezone;
-    try {
-      return d.toLocaleString(LOCALES[lang], opts);
-    } catch (e) {
-      delete opts.timeZone;
-      return d.toLocaleString(LOCALES[lang], opts);
-    }
-  }
-
-  // ---------- Döviz ----------
-  const fxCache = {};
-
-  async function fxRate(from, to) {
-    const f = (from || '').trim().toUpperCase();
-    const tt = (to || '').trim().toUpperCase();
-    if (!f || !tt) return null;
-    if (f === tt) return 1;
-    const key = f + '>' + tt;
-    if (fxCache[key] !== undefined) return fxCache[key];
-    const res = await db.rpc('fx_rate', { p_from: f, p_to: tt, p_date: null });
-    const rate = (res.error || res.data == null) ? null : Number(res.data);
-    fxCache[key] = rate;
-    return rate;
-  }
-
-  async function convert(amount, from, to) {
-    if (amount == null || isNaN(amount)) return null;
-    const r = await fxRate(from, to || homeCurrency());
-    return r == null ? null : Number(amount) * r;
-  }
-
-  // ---------- Güvenlik ----------
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str == null ? '' : String(str);
-    return div.innerHTML;
-  }
-
-  // ---------- Bayrak düğmesi ----------
-  function injectStyles() {
-    if (document.getElementById('hsLangStyles')) return;
-    const css =
-      '.hs-lang{position:relative;display:inline-flex;align-items:center;margin-left:12px;}' +
-      '.hs-lang-btn{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid #2a3040;' +
-      'color:#cfd4de;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;line-height:1;}' +
-      '.hs-lang-btn:hover{border-color:#3a4258;color:#fff;}' +
-      '.hs-lang-btn svg,.hs-lang-item svg{border-radius:2px;flex-shrink:0;display:block;}' +
-      '.hs-lang-menu{position:absolute;right:0;top:calc(100% + 6px);background:#141821;border:1px solid #2a3040;' +
-      'border-radius:10px;padding:6px;min-width:150px;z-index:1000;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}' +
-      '.hs-lang.open .hs-lang-menu{display:block;}' +
-      '.hs-lang-item{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;' +
-      'color:#e6e8ee;padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer;text-align:left;}' +
-      '.hs-lang-item:hover{background:#1c212c;}' +
-      '.hs-lang-item.active{color:#6ee7b7;font-weight:600;}';
-    const style = document.createElement('style');
-    style.id = 'hsLangStyles';
-    style.textContent = css;
-    document.head.appendChild(style);
-  }
-
-  function renderSwitcher() {
-    const wrap = document.getElementById('hsLangSwitcher');
-    if (!wrap) return;
-    wrap.innerHTML =
-      '<button type="button" class="hs-lang-btn" aria-haspopup="true" aria-label="' + escapeHtml(t('common.language')) + '">' +
-        FLAGS[lang] + '<span>' + lang.toUpperCase() + '</span>' +
-      '</button>' +
-      '<div class="hs-lang-menu" role="menu">' +
-        SUPPORTED.map(function (l) {
-          return '<button type="button" role="menuitem" class="hs-lang-item' + (l === lang ? ' active' : '') +
-                 '" data-lang="' + l + '">' + FLAGS[l] + '<span>' + LANG_NAMES[l] + '</span></button>';
-        }).join('') +
-      '</div>';
-
-    wrap.querySelector('.hs-lang-btn').addEventListener('click', function (e) {
-      e.stopPropagation();
-      wrap.classList.toggle('open');
-    });
-    wrap.querySelectorAll('.hs-lang-item').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        wrap.classList.remove('open');
-        setLang(btn.getAttribute('data-lang'));
-      });
-    });
-  }
-
-  function mountSwitcher() {
-    injectStyles();
-    if (document.getElementById('hsLangSwitcher')) {
-      renderSwitcher();
-      return;
-    }
-    const host = document.getElementById('langSwitcherHost') ||
-                 document.querySelector('header .header-right') ||
-                 document.querySelector('header');
-    if (!host) return;
-    const wrap = document.createElement('div');
-    wrap.id = 'hsLangSwitcher';
-    wrap.className = 'hs-lang';
-    host.appendChild(wrap);
-    renderSwitcher();
-  }
-
-  document.addEventListener('click', function () {
-    const wrap = document.getElementById('hsLangSwitcher');
-    if (wrap) wrap.classList.remove('open');
-  });
-
-  // ---------- Dışa açılan ----------
-  const HS = {
-    SUPABASE_URL: SUPABASE_URL,
-    SUPABASE_KEY: SUPABASE_KEY,
-    db: db,
-    init: init,
-    requireAuth: requireAuth,
-    loadProfile: loadProfile,
-    logout: logout,
-    t: t,
-    i18n: { add: addDict, apply: applyI18n },
-    setLang: setLang,
-    money: money,
-    number: number,
-    percent: percent,
-    date: date,
-    fxRate: fxRate,
-    convert: convert,
-    escapeHtml: escapeHtml,
-    homeCurrency: homeCurrency,
-    supportedLangs: SUPPORTED.slice()
-  };
-  Object.defineProperty(HS, 'lang', { get: function () { return lang; } });
-  Object.defineProperty(HS, 'user', { get: function () { return currentUser; } });
-  Object.defineProperty(HS, 'profile', { get: function () { return profile; } });
-
-  window.HS = HS;
-})();
+      style: 'percent', minimumFractionDigits: d,
