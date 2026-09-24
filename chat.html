@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HızlıSatıcı AI - Sohbetle Yönet</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -18,6 +19,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 16px 24px;
     border-bottom: 1px solid #232838;
     background: #141821;
@@ -30,6 +32,7 @@
     font-weight: 700; color: #fff; font-size: 15px;
   }
   .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
   .back-link {
     color: #9aa3b2; font-size: 14px; text-decoration: none; display: flex; align-items: center; gap: 6px;
   }
@@ -67,6 +70,7 @@
     font-size: 14px;
     line-height: 1.45;
     white-space: pre-wrap;
+    word-wrap: break-word;
   }
   .msg-row.user .msg-bubble {
     background: #1D9E75;
@@ -84,6 +88,7 @@
     font-size: 12px;
     font-style: italic;
   }
+  .msg-row.ai .msg-bubble.typing { color: #9aa3b2; font-style: italic; }
 
   .suggestions {
     display: flex;
@@ -104,6 +109,7 @@
   }
   .chat-input-row input {
     flex: 1;
+    min-width: 0;
     background: #1c212c;
     border: 1px solid #2a3040;
     border-radius: 10px;
@@ -120,6 +126,12 @@
   }
   .send-btn:hover { background: #178a65; }
   .send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  @media (max-width: 520px) {
+    header { padding: 14px 16px; }
+    .logo-text { display: none; }
+    main { padding: 16px; }
+    .msg-bubble { max-width: 88%; }
+  }
 </style>
 </head>
 <body>
@@ -129,78 +141,175 @@
     <div class="logo-dot">H</div>
     <div class="logo-text">HızlıSatıcı AI</div>
   </div>
-  <a href="dashboard.html" class="back-link">← Panele dön</a>
+  <div class="header-right">
+    <a href="dashboard.html" class="back-link" data-t="back"></a>
+    <span id="langSwitcherHost"></span>
+  </div>
 </header>
 
 <main>
   <div class="intro">
-    <h1>💬 Sohbetle Yönet</h1>
-    <p>Ürün eklemek, silmek veya listeni görmek için doğal dille yaz — "kablosuz kulaklık ekle" veya "ürünlerimi listele" gibi.</p>
+    <h1 data-t="title"></h1>
+    <p data-t="intro"></p>
   </div>
 
-  <div class="suggestions" id="suggestions">
-    <div class="suggestion-chip" onclick="sendSuggestion('ürünlerimi listele')">ürünlerimi listele</div>
-    <div class="suggestion-chip" onclick="sendSuggestion('kablosuz kulaklık ekle')">kablosuz kulaklık ekle</div>
-  </div>
+  <div class="suggestions" id="suggestions"></div>
 
   <div class="chat-log" id="chatLog"></div>
 
   <div class="chat-input-row">
-    <input type="text" id="chatInput" placeholder="Örn: robot süpürge ekle" onkeydown="if(event.key==='Enter') sendMessage();">
-    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Gönder</button>
+    <input type="text" id="chatInput" data-tp="placeholder" autocomplete="off">
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()" data-t="send"></button>
   </div>
 </main>
 
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
 
   let currentUser = null;
   let cachedProducts = [];
+  let busy = false;
+  // Mesaj geçmişi: {role:'user'|'ai', text} ya da {role:'ai', key, vars} (sabit metinler dil değişince çevrilir)
+  const messages = [];
 
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Sohbetle Yönet',
+      back: '← Panele dön',
+      title: '💬 Sohbetle Yönet',
+      intro: 'Ürün eklemek, silmek veya listeni görmek için doğal dille yaz — "kablosuz kulaklık ekle" veya "ürünlerimi listele" gibi.',
+      placeholder: 'Örn: robot süpürge ekle',
+      send: 'Gönder',
+      suggestions: ['ürünlerimi listele', 'kablosuz kulaklık ekle'],
+      greeting: 'Merhaba! Ürünlerinle ilgili ne yapmak istersin? "ürünlerimi listele" ya da "[ürün adı] ekle" yazabilirsin.',
+      typing: 'Yazıyor...',
+      error: 'Bir hata oldu: ',
+      adding: '"{name}" ürününü ekliyorum, ürün ekleme sayfasına yönlendiriyorum...',
+      confirmDeleteNamed: '"{name}" ürününü silmek istediğine emin misin?',
+      confirmDelete: 'Bu ürünü silmek istediğine emin misin?',
+      deleteFailed: 'Silinemedi: ',
+      deleted: 'Ürün silindi.',
+      notDeleted: 'Tamam, silmedim.',
+      notFound: 'Bu ürünü listende bulamadım.',
+      listIntro: 'İşte ürünlerin:',
+      noProducts: 'Henüz hiç ürünün yok.',
+      unnamed: 'İsimsiz ürün',
+      notUnderstood: 'Anlayamadım, tekrar dener misin?',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Chat to Manage',
+      back: '← Back to dashboard',
+      title: '💬 Chat to Manage',
+      intro: 'Type in plain language to add, delete or list your products — like "add wireless earbuds" or "list my products".',
+      placeholder: 'e.g. add robot vacuum',
+      send: 'Send',
+      suggestions: ['list my products', 'add wireless earbuds'],
+      greeting: 'Hi! What would you like to do with your products? You can type "list my products" or "add [product name]".',
+      typing: 'Typing...',
+      error: 'Something went wrong: ',
+      adding: 'Adding "{name}", redirecting you to the add product page...',
+      confirmDeleteNamed: 'Are you sure you want to delete "{name}"?',
+      confirmDelete: 'Are you sure you want to delete this product?',
+      deleteFailed: 'Could not delete: ',
+      deleted: 'Product deleted.',
+      notDeleted: "OK, I didn't delete it.",
+      notFound: "I couldn't find this product in your list.",
+      listIntro: 'Here are your products:',
+      noProducts: "You don't have any products yet.",
+      unnamed: 'Unnamed product',
+      notUnderstood: "I didn't get that, could you try again?",
+    }
+  };
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key, vars) {
+    let v = T[lang()][key];
+    if (v === undefined) v = T.tr[key] !== undefined ? T.tr[key] : key;
+    if (vars && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+    return v;
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.getAttribute('data-tp')); });
+    renderSuggestions();
+  }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderSuggestions() {
+    const box = document.getElementById('suggestions');
+    box.innerHTML = t('suggestions').map((s, i) =>
+      '<div class="suggestion-chip" data-idx="' + i + '">' + escapeHtml(s) + '</div>').join('');
+  }
+  document.getElementById('suggestions').addEventListener('click', e => {
+    const chip = e.target.closest('.suggestion-chip');
+    if (!chip || busy) return;
+    const s = t('suggestions')[Number(chip.getAttribute('data-idx'))];
+    if (s) { document.getElementById('chatInput').value = s; sendMessage(); }
+  });
+
+  // ================= MESAJLAR =================
+  function messageText(m) {
+    if (m.key === 'productList') {
+      if (!m.items.length) return t('noProducts');
+      return m.items.map(p => '• ' + (p.name || t('unnamed')) + (p.platform ? ' (' + p.platform + ')' : '')).join('\n');
+    }
+    if (m.key) return (m.prefixKey ? t(m.prefixKey) : '') + t(m.key, m.vars) + (m.suffix || '');
+    return (m.prefixKey ? t(m.prefixKey) : '') + (m.text || '');
+  }
+  function renderLog() {
+    const log = document.getElementById('chatLog');
+    log.innerHTML = messages.map(m => {
+      const cls = 'msg-bubble' + (m.system ? ' system' : '') + (m.typing ? ' typing' : '');
+      const text = m.typing ? t('typing') : messageText(m);
+      return '<div class="msg-row ' + (m.role === 'user' ? 'user' : 'ai') + '"><div class="' + cls + '">' + escapeHtml(text) + '</div></div>';
+    }).join('');
+    log.scrollTop = log.scrollHeight;
+  }
+  function push(m) { messages.push(m); renderLog(); return m; }
+  function addUserMessage(text) { push({ role: 'user', text }); }
+  function addAiText(text, system) { push({ role: 'ai', text, system: !!system }); }
+  function addAiKey(key, vars, opts) { push(Object.assign({ role: 'ai', key, vars }, opts || {})); }
+  function removeMsg(m) { const i = messages.indexOf(m); if (i >= 0) messages.splice(i, 1); renderLog(); }
+
+  // ================= VERİ =================
   async function init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    applyStatic();
+
+    const { data: { session } } = await db.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
     currentUser = session.user;
     await refreshProducts();
-    addAiMessage('Merhaba! Ürünlerinle ilgili ne yapmak istersin? "ürünlerimi listele" ya da "[ürün adı] ekle" yazabilirsin.');
+    addAiKey('greeting');
+    document.getElementById('chatInput').focus();
   }
-  init();
 
   async function refreshProducts() {
-    const { data } = await supabaseClient
-      .from('products')
-      .select('id, name, platform')
-      .eq('user_id', currentUser.id)
+    let r = await db.from('products').select('id, name, platform')
+      .eq('user_id', currentUser.id).is('deleted_at', null)
       .order('created_at', { ascending: false });
-    cachedProducts = data || [];
-  }
-
-  function addUserMessage(text) {
-    const log = document.getElementById('chatLog');
-    const row = document.createElement('div');
-    row.className = 'msg-row user';
-    row.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
-    log.appendChild(row);
-    log.scrollTop = log.scrollHeight;
-  }
-
-  function addAiMessage(text, isSystem = false) {
-    const log = document.getElementById('chatLog');
-    const row = document.createElement('div');
-    row.className = 'msg-row ai';
-    row.innerHTML = `<div class="msg-bubble${isSystem ? ' system' : ''}">${escapeHtml(text)}</div>`;
-    log.appendChild(row);
-    log.scrollTop = log.scrollHeight;
-  }
-
-  function sendSuggestion(text) {
-    document.getElementById('chatInput').value = text;
-    sendMessage();
+    if (r.error) {
+      r = await db.from('products').select('id, name, platform')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+    }
+    cachedProducts = r.data || [];
   }
 
   async function sendMessage() {
+    if (busy) return;
     const input = document.getElementById('chatInput');
     const btn = document.getElementById('sendBtn');
     const text = input.value.trim();
@@ -208,9 +317,12 @@
 
     addUserMessage(text);
     input.value = '';
+    busy = true;
     btn.disabled = true;
+    const typingMsg = push({ role: 'ai', typing: true });
 
     try {
+      const { data: { session } } = await db.auth.getSession();
       const response = await fetch(SUPABASE_URL + '/functions/v1/chat-to-sell', {
         method: 'POST',
         headers: {
@@ -218,18 +330,34 @@
           'Authorization': 'Bearer ' + SUPABASE_KEY,
           'apikey': SUPABASE_KEY,
         },
-        body: JSON.stringify({ message: text, products: cachedProducts }),
+        body: JSON.stringify({
+          message: text,
+          products: cachedProducts,
+          userAccessToken: session ? session.access_token : null,
+          language: lang(),
+        }),
       });
       const data = await response.json();
+      removeMsg(typingMsg);
       if (data.error) throw new Error(data.error);
-
       await handleAction(data);
     } catch (err) {
-      addAiMessage('Bir hata oldu: ' + err.message);
+      removeMsg(typingMsg);
+      addAiText(t('error') + (err.message || err));
     } finally {
+      busy = false;
       btn.disabled = false;
       input.focus();
     }
+  }
+
+  async function deleteProduct(id) {
+    // Önce yumuşak silme (listing'ler ve siparişler bozulmasın), olmazsa kalıcı silme
+    const soft = await db.from('products').update({ deleted_at: new Date().toISOString() })
+      .eq('id', id).eq('user_id', currentUser.id);
+    if (!soft.error) return null;
+    const hard = await db.from('products').delete().eq('id', id).eq('user_id', currentUser.id);
+    return hard.error;
   }
 
   async function handleAction(data) {
@@ -237,7 +365,7 @@
     const params = data.params || {};
 
     if (action === 'add_product' && params.name) {
-      addAiMessage(data.reply || ('"' + params.name + '" ürününü ekliyorum, ürün ekleme sayfasına yönlendiriyorum...'));
+      if (data.reply) addAiText(data.reply); else addAiKey('adding', { name: params.name });
       setTimeout(() => {
         window.location.href = 'add-product.html?name=' + encodeURIComponent(params.name);
       }, 900);
@@ -245,43 +373,45 @@
     }
 
     if (action === 'delete_product' && params.id) {
-      const product = cachedProducts.find(p => p.id === params.id);
-      const confirmMsg = product
-        ? '"' + product.name + '" ürününü silmek istediğine emin misin?'
-        : 'Bu ürünü silmek istediğine emin misin?';
+      const product = cachedProducts.find(p => String(p.id) === String(params.id));
+      if (!product) { addAiKey('notFound'); return; }
+      const confirmMsg = product.name ? t('confirmDeleteNamed', { name: product.name }) : t('confirmDelete');
       if (confirm(confirmMsg)) {
-        const { error } = await supabaseClient.from('products').delete().eq('id', params.id);
+        const error = await deleteProduct(params.id);
         if (error) {
-          addAiMessage('Silinemedi: ' + error.message);
+          addAiKey('deleteFailed', null, { suffix: error.message });
         } else {
-          addAiMessage(data.reply || 'Ürün silindi.');
+          if (data.reply) addAiText(data.reply); else addAiKey('deleted');
           await refreshProducts();
         }
       } else {
-        addAiMessage('Tamam, silmedim.');
+        addAiKey('notDeleted');
       }
       return;
     }
 
     if (action === 'list_products') {
-      addAiMessage(data.reply || 'İşte ürünlerin:');
-      if (cachedProducts.length === 0) {
-        addAiMessage('Henüz hiç ürünün yok.', true);
-      } else {
-        const listText = cachedProducts.map(p => '• ' + p.name + (p.platform ? ' (' + p.platform + ')' : '')).join('\n');
-        addAiMessage(listText, true);
-      }
+      await refreshProducts();
+      if (data.reply) addAiText(data.reply); else addAiKey('listIntro');
+      push({ role: 'ai', key: 'productList', items: cachedProducts.slice(), system: true });
       return;
     }
 
-    addAiMessage(data.reply || 'Anlayamadım, tekrar dener misin?');
+    if (data.reply) addAiText(data.reply); else addAiKey('notUnderstood');
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  document.getElementById('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) sendMessage();
+  });
+
+  function onLangChange() {
+    applyStatic();
+    renderLog();
   }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
+
+  init();
 </script>
 
 </body>
