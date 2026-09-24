@@ -304,9 +304,6 @@
   (async function start() {
     await HS.init({ auth: false });
     renderMode();
-    // Zaten giriş yapmışsa doğrudan panele gönder
-    const { data } = await HS.db.auth.getSession();
-    if (data && data.session) window.location.href = 'dashboard.html';
   })();
 </script>
 
