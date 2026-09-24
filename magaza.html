@@ -67,7 +67,7 @@
   .modal-overlay.open{display:flex;}
   .modal{
     background:var(--bg-panel); border:1px solid var(--border); border-radius:14px;
-    padding:22px; width:100%; max-width:420px;
+    padding:22px; width:100%; max-width:420px; max-height:92vh; overflow-y:auto;
   }
   .modal h3{margin:0 0 4px 0;}
   .modal .modal-product{color:var(--text-dim); font-size:13px; margin-bottom:16px;}
@@ -79,42 +79,45 @@
   .modal textarea{resize:vertical; min-height:60px;}
   .modal-actions{display:flex; gap:8px; margin-top:18px;}
   .modal-actions button{flex:1;}
+  .privacy-note{font-size:11px; color:var(--text-dim); margin-top:12px; line-height:1.5;}
   .toast{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
     padding:10px 18px; border-radius:8px; font-size:13px; z-index:1000;
     box-shadow:0 4px 20px rgba(0,0,0,.4); display:none; max-width:90%; text-align:center;
   }
+  .toast.err{border-color:var(--danger);}
   .loading{text-align:center; padding:60px 20px; color:var(--text-dim);}
 </style>
 </head>
 <body>
 
 <header>
-  <h1 id="storeName">Mağaza yükleniyor...</h1>
+  <h1 id="storeName"></h1>
   <p id="storeSub"></p>
 </header>
 
 <div class="wrap">
-  <div id="content" class="loading">Yükleniyor...</div>
+  <div id="content" class="loading"></div>
 </div>
 
 <div class="modal-overlay" id="orderModalOverlay">
   <div class="modal">
-    <h3>Sipariş Ver</h3>
+    <h3 data-t="orderTitle"></h3>
     <div class="modal-product" id="modalProductName"></div>
     <form id="orderForm">
-      <label>Ad Soyad</label>
-      <input type="text" id="orderName" required>
-      <label>Telefon</label>
-      <input type="tel" id="orderPhone" required>
-      <label>Adres</label>
-      <textarea id="orderAddress" required></textarea>
-      <label>Adet</label>
-      <input type="number" id="orderQty" value="1" min="1">
+      <label for="orderName" data-t="fName"></label>
+      <input type="text" id="orderName" required maxlength="200" autocomplete="name">
+      <label for="orderPhone" data-t="fPhone"></label>
+      <input type="tel" id="orderPhone" required maxlength="40" autocomplete="tel">
+      <label for="orderAddress" data-t="fAddress"></label>
+      <textarea id="orderAddress" required maxlength="800" autocomplete="street-address"></textarea>
+      <label for="orderQty" data-t="fQty"></label>
+      <input type="number" id="orderQty" value="1" min="1" max="999">
+      <div class="privacy-note" data-t="privacy"></div>
       <div class="modal-actions">
-        <button type="button" id="orderCancelBtn">Vazgeç</button>
-        <button type="submit" class="primary" id="orderSubmitBtn">Siparişi Gönder</button>
+        <button type="button" id="orderCancelBtn" data-t="cancel"></button>
+        <button type="submit" class="primary" id="orderSubmitBtn" data-t="send"></button>
       </div>
     </form>
   </div>
@@ -122,14 +125,14 @@
 
 <div class="modal-overlay" id="askModalOverlay">
   <div class="modal">
-    <h3>❓ Soru Sor</h3>
+    <h3 data-t="askTitle"></h3>
     <div class="modal-product" id="askModalProductName"></div>
     <div id="askAnswerBox" style="display:none; background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:13px; line-height:1.5; margin-bottom:12px; white-space:pre-wrap;"></div>
-    <label>Sorunuz</label>
-    <textarea id="askQuestionInput" placeholder="Örn: Kargo ne zaman gelir?"></textarea>
+    <label for="askQuestionInput" data-t="askLabel"></label>
+    <textarea id="askQuestionInput" maxlength="1000"></textarea>
     <div class="modal-actions">
-      <button type="button" id="askCancelBtn">Kapat</button>
-      <button type="button" class="primary" id="askSubmitBtn">Gönder</button>
+      <button type="button" id="askCancelBtn" data-t="close"></button>
+      <button type="button" class="primary" id="askSubmitBtn" data-t="send2"></button>
     </div>
   </div>
 </div>
@@ -140,95 +143,201 @@
 const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
 
-let toastTimer = null;
-function showToast(msg, ms=3000){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> t.style.display='none', ms);
-}
+// ============== Dil (müşteri tarafı) ==============
+// Öncelik: ?lang= adresi > ilanların dili > tr
+const T = {
+  tr: {
+    loadingStore: 'Mağaza yükleniyor...',
+    loading: 'Yükleniyor...',
+    store: 'Mağaza',
+    notFound: 'Mağaza bulunamadı',
+    noSlug: 'Mağaza adresi eksik.',
+    loadFail: 'Mağaza yüklenemedi',
+    productsN: '{n} ürün',
+    empty: 'Bu mağazada henüz ürün yok.',
+    product: 'Ürün',
+    buy: 'Satın Al',
+    ask: '❓ Soru Sor',
+    orderTitle: 'Sipariş Ver',
+    fName: 'Ad Soyad',
+    fPhone: 'Telefon',
+    fAddress: 'Adres',
+    fQty: 'Adet',
+    privacy: 'Bilgilerin sadece bu siparişin teslimatı için satıcıyla paylaşılır.',
+    cancel: 'Vazgeç',
+    send: 'Siparişi Gönder',
+    sending: 'Gönderiliyor...',
+    orderOk: 'Siparişiniz alındı! En kısa sürede iletişime geçilecek.',
+    orderFail: 'Sipariş gönderilemedi',
+    error: 'Hata: ',
+    askTitle: '❓ Soru Sor',
+    askLabel: 'Sorunuz',
+    askPh: 'Örn: Kargo ne zaman gelir?',
+    close: 'Kapat',
+    send2: 'Gönder',
+    askEmpty: 'Önce bir soru yaz.',
+    answering: 'Yanıtlanıyor...',
+    thinking: '🤖 Düşünüyor...',
+    noAnswer: 'Cevap alınamadı.',
+    pageSuffix: ' - HızlıSatıcı AI',
+  },
+  en: {
+    loadingStore: 'Loading store...',
+    loading: 'Loading...',
+    store: 'Store',
+    notFound: 'Store not found',
+    noSlug: 'Store address is missing.',
+    loadFail: 'Could not load store',
+    productsN: '{n} products',
+    empty: 'This store has no products yet.',
+    product: 'Product',
+    buy: 'Buy Now',
+    ask: '❓ Ask a Question',
+    orderTitle: 'Place Order',
+    fName: 'Full name',
+    fPhone: 'Phone',
+    fAddress: 'Address',
+    fQty: 'Quantity',
+    privacy: 'Your details are shared with the seller only to deliver this order.',
+    cancel: 'Cancel',
+    send: 'Send Order',
+    sending: 'Sending...',
+    orderOk: 'Your order has been received! The seller will contact you shortly.',
+    orderFail: 'Could not send order',
+    error: 'Error: ',
+    askTitle: '❓ Ask a Question',
+    askLabel: 'Your question',
+    askPh: 'e.g. When will it be delivered?',
+    close: 'Close',
+    send2: 'Send',
+    askEmpty: 'Please type a question first.',
+    answering: 'Answering...',
+    thinking: '🤖 Thinking...',
+    noAnswer: 'No answer received.',
+    pageSuffix: ' - HızlıSatıcı AI',
+  }
+};
 
 const params = new URLSearchParams(window.location.search);
 const slug = params.get('slug') || params.get('magaza');
+const urlLang = (params.get('lang') || '').toLowerCase();
+let LANG = T[urlLang] ? urlLang : 'tr';
+
+function t(key, vars){
+  let s = (T[LANG] && T[LANG][key] !== undefined) ? T[LANG][key] : T.tr[key];
+  if (s === undefined) return key;
+  if (vars) Object.keys(vars).forEach(k => { s = s.split('{' + k + '}').join(vars[k]); });
+  return s;
+}
+function applyStatic(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  document.getElementById('askQuestionInput').placeholder = t('askPh');
+}
+function escapeHtml(str){
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function safeImg(u){
+  return /^https?:\/\//i.test(u || '') ? u : null;
+}
+
+let toastTimer = null;
+function showToast(msg, ms=3000, isErr=false){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.style.display='none', ms);
+}
 
 let currentStore = null;
 let currentProducts = [];
 
-function formatPrice(p){
+const CUR_SYMBOL = { TRY: '₺', EUR: '€', USD: '$', GBP: '£', PLN: 'zł', DKK: 'kr' };
+function formatPrice(p, cur){
   const n = parseFloat(p);
-  if(isNaN(n)) return '';
-  return '₺' + n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (isNaN(n)) return '';
+  cur = (cur || 'TRY').toUpperCase();
+  const locale = LANG === 'en' ? 'en-GB' : 'tr-TR';
+  const num = n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sym = CUR_SYMBOL[cur];
+  if (!sym) return num + ' ' + cur;
+  if (cur === 'PLN' || cur === 'DKK') return num + ' ' + sym;
+  return sym + num;
 }
 
 function getStoreName(store){
-  return store.store_name || store.name || store.magaza_adi || store.title || 'Mağaza';
+  return store.store_name || store.name || store.magaza_adi || store.title || t('store');
 }
+function productTitle(p){ return p.generated_title || p.name || t('product'); }
 
 function renderStore(){
-  const nameEl = document.getElementById('storeName');
-  const subEl = document.getElementById('storeSub');
-  nameEl.textContent = getStoreName(currentStore);
-  document.title = getStoreName(currentStore) + ' - HızlıSatıcı AI';
-  subEl.textContent = currentProducts.length + ' ürün';
+  const name = getStoreName(currentStore);
+  document.getElementById('storeName').textContent = name;
+  document.title = name + t('pageSuffix');
+  document.getElementById('storeSub').textContent = t('productsN', { n: currentProducts.length });
 }
 
 function renderProducts(){
   const content = document.getElementById('content');
-  if(currentProducts.length === 0){
-    content.innerHTML = '<div class="empty-msg">Bu mağazada henüz ürün yok.</div>';
+  content.className = '';
+  if (currentProducts.length === 0){
+    content.innerHTML = '<div class="empty-msg">' + escapeHtml(t('empty')) + '</div>';
     return;
   }
   content.innerHTML = '<div class="grid" id="productGrid"></div>';
   const grid = document.getElementById('productGrid');
   const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%2316213a'/%3E%3C/svg%3E";
-  currentProducts.forEach(p=>{
-    const title = p.generated_title || p.name || 'Ürün';
+  currentProducts.forEach(p => {
+    const title = productTitle(p);
     const desc = (p.generated_description || '').replace(/<[^>]*>/g, '').slice(0, 140);
-    const img = p.image_url || placeholderImg;
+    const img = safeImg(p.image_url) || placeholderImg;
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `
-      <img src="${img}" alt="${title}">
-      <div class="card-body">
-        <div class="card-title">${title}</div>
-        <div class="card-desc">${desc}</div>
-        <div class="card-price">${formatPrice(p.sale_price)}</div>
-        <div style="display:flex; gap:8px;">
-          <button class="primary buy-btn" data-id="${p.id}" style="flex:1;">Satın Al</button>
-          <button class="ask-btn" data-id="${p.id}">❓ Soru Sor</button>
-        </div>
-      </div>
-    `;
-    card.querySelector('.buy-btn').addEventListener('click', ()=> openOrderModal(p));
-    card.querySelector('.ask-btn').addEventListener('click', ()=> openAskModal(p));
+    card.innerHTML =
+      '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(title) + '" loading="lazy">' +
+      '<div class="card-body">' +
+        '<div class="card-title">' + escapeHtml(title) + '</div>' +
+        '<div class="card-desc">' + escapeHtml(desc) + '</div>' +
+        '<div class="card-price">' + escapeHtml(formatPrice(p.sale_price, p.currency)) + '</div>' +
+        '<div style="display:flex; gap:8px;">' +
+          '<button class="primary buy-btn" style="flex:1;">' + escapeHtml(t('buy')) + '</button>' +
+          '<button class="ask-btn">' + escapeHtml(t('ask')) + '</button>' +
+        '</div>' +
+      '</div>';
+    card.querySelector('.buy-btn').addEventListener('click', () => openOrderModal(p));
+    card.querySelector('.ask-btn').addEventListener('click', () => openAskModal(p));
     grid.appendChild(card);
   });
 }
 
 async function loadStore(){
-  if(!slug){
-    document.getElementById('content').innerHTML = '<div class="empty-msg">Mağaza adresi eksik.</div>';
-    document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
+  if (!slug){
+    document.getElementById('content').innerHTML = '<div class="empty-msg">' + escapeHtml(t('noSlug')) + '</div>';
+    document.getElementById('storeName').textContent = t('notFound');
     return;
   }
-  try{
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-store?slug=${encodeURIComponent(slug)}`, {
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY
-      }
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/get-store?slug=' + encodeURIComponent(slug), {
+      headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }
     });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok){ throw new Error(data.error || 'Mağaza yüklenemedi'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || t('loadFail'));
     currentStore = data.store;
     currentProducts = data.products || [];
+    // Adreste dil yoksa: ilanların diline göre
+    if (!T[urlLang] && currentProducts.length && T[currentProducts[0].language]) {
+      LANG = currentProducts[0].language;
+      applyStatic();
+    }
     renderStore();
     renderProducts();
-  }catch(err){
+  } catch (err) {
     console.error(err);
-    document.getElementById('storeName').textContent = 'Mağaza bulunamadı';
-    document.getElementById('content').innerHTML = `<div class="empty-msg">${err.message}</div>`;
+    document.getElementById('storeName').textContent = t('notFound');
+    document.getElementById('content').className = '';
+    document.getElementById('content').innerHTML = '<div class="empty-msg">' + escapeHtml(err.message) + '</div>';
   }
 }
 
@@ -237,56 +346,56 @@ let selectedProduct = null;
 
 function openOrderModal(product){
   selectedProduct = product;
-  document.getElementById('modalProductName').textContent = product.generated_title || product.name || 'Ürün';
+  document.getElementById('modalProductName').textContent =
+    productTitle(product) + ' · ' + formatPrice(product.sale_price, product.currency);
   document.getElementById('orderForm').reset();
   document.getElementById('orderQty').value = 1;
   document.getElementById('orderModalOverlay').classList.add('open');
 }
-
 function closeOrderModal(){
   document.getElementById('orderModalOverlay').classList.remove('open');
   selectedProduct = null;
 }
-
 document.getElementById('orderCancelBtn').addEventListener('click', closeOrderModal);
-document.getElementById('orderModalOverlay').addEventListener('click', (e)=>{
-  if(e.target.id === 'orderModalOverlay') closeOrderModal();
+document.getElementById('orderModalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'orderModalOverlay') closeOrderModal();
 });
 
-document.getElementById('orderForm').addEventListener('submit', async (e)=>{
+document.getElementById('orderForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if(!selectedProduct) return;
+  if (!selectedProduct) return;
   const submitBtn = document.getElementById('orderSubmitBtn');
-  const original = submitBtn.textContent;
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Gönderiliyor...';
-  try{
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-store-order`, {
+  submitBtn.textContent = t('sending');
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/create-store-order', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
         store_slug: slug,
         product_id: selectedProduct.id,
-        customer_name: document.getElementById('orderName').value,
-        customer_phone: document.getElementById('orderPhone').value,
-        customer_address: document.getElementById('orderAddress').value,
-        quantity: parseInt(document.getElementById('orderQty').value, 10) || 1
+        listing_id: selectedProduct.listing_id || null,
+        customer_name: document.getElementById('orderName').value.trim(),
+        customer_phone: document.getElementById('orderPhone').value.trim(),
+        customer_address: document.getElementById('orderAddress').value.trim(),
+        quantity: parseInt(document.getElementById('orderQty').value, 10) || 1,
+        language: LANG
       })
     });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok){ throw new Error(data.error || 'Sipariş gönderilemedi'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || t('orderFail'));
     closeOrderModal();
-    showToast('Siparişiniz alındı! En kısa sürede iletişime geçilecek.', 4000);
-  }catch(err){
+    showToast(t('orderOk'), 4000);
+  } catch (err) {
     console.error(err);
-    showToast('Hata: ' + err.message, 4000);
-  }finally{
+    showToast(t('error') + err.message, 4000, true);
+  } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = original;
+    submitBtn.textContent = t('send');
   }
 });
 
@@ -295,69 +404,68 @@ let askSelectedProduct = null;
 
 function openAskModal(product){
   askSelectedProduct = product;
-  document.getElementById('askModalProductName').textContent = product.generated_title || product.name || 'Ürün';
+  document.getElementById('askModalProductName').textContent = productTitle(product);
   document.getElementById('askQuestionInput').value = '';
   const answerBox = document.getElementById('askAnswerBox');
   answerBox.style.display = 'none';
   answerBox.textContent = '';
   document.getElementById('askModalOverlay').classList.add('open');
 }
-
 function closeAskModal(){
   document.getElementById('askModalOverlay').classList.remove('open');
   askSelectedProduct = null;
 }
-
 document.getElementById('askCancelBtn').addEventListener('click', closeAskModal);
-document.getElementById('askModalOverlay').addEventListener('click', (e)=>{
-  if(e.target.id === 'askModalOverlay') closeAskModal();
+document.getElementById('askModalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'askModalOverlay') closeAskModal();
 });
 
-document.getElementById('askSubmitBtn').addEventListener('click', async ()=>{
-  if(!askSelectedProduct) return;
+document.getElementById('askSubmitBtn').addEventListener('click', async () => {
+  if (!askSelectedProduct) return;
   const question = document.getElementById('askQuestionInput').value.trim();
-  if(!question){
-    showToast('Önce bir soru yaz.');
-    return;
-  }
+  if (!question){ showToast(t('askEmpty')); return; }
   const btn = document.getElementById('askSubmitBtn');
   const answerBox = document.getElementById('askAnswerBox');
-  const original = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Yanıtlanıyor...';
+  btn.textContent = t('answering');
   answerBox.style.display = 'block';
-  answerBox.textContent = '🤖 Düşünüyor...';
-  try{
+  answerBox.textContent = t('thinking');
+  try {
     const desc = (askSelectedProduct.generated_description || '').replace(/<[^>]*>/g, '');
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/customer-support-chat`, {
+    const cur = (askSelectedProduct.currency || 'TRY').toUpperCase();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/customer-support-chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
-        productName: askSelectedProduct.generated_title || askSelectedProduct.name,
+        productName: productTitle(askSelectedProduct),
         productDescription: desc,
         salePrice: askSelectedProduct.sale_price,
-        currency: '₺',
+        currency: CUR_SYMBOL[cur] || cur,
         storeName: getStoreName(currentStore),
-        question
+        question,
+        language: LANG
       })
     });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok || data.error){ throw new Error(data.error || 'Cevap alınamadı'); }
-    answerBox.textContent = data.answer || 'Cevap alınamadı.';
-  }catch(err){
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || t('noAnswer'));
+    answerBox.textContent = data.answer || t('noAnswer');
+  } catch (err) {
     console.error(err);
-    answerBox.textContent = 'Hata: ' + err.message;
-  }finally{
+    answerBox.textContent = t('error') + err.message;
+  } finally {
     btn.disabled = false;
-    btn.textContent = original;
+    btn.textContent = t('send2');
   }
 });
 
 /* ============== Başlat ============== */
+applyStatic();
+document.getElementById('storeName').textContent = t('loadingStore');
+document.getElementById('content').textContent = t('loading');
 loadStore();
 </script>
 </body>
