@@ -5,114 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mağaza X-Ray</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d0f16;
-    color: #e6e8ee;
-    min-height: 100vh;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
   }
   header {
-    padding: 20px;
-    border-bottom: 1px solid #232838;
-    background: #141821;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    padding: 20px; border-bottom: 1px solid #232838; background: #141821;
+    display: flex; align-items: center; gap: 12px;
   }
   header a { color: #9aa3b2; text-decoration: none; font-size: 14px; }
-  header h1 { font-size: 18px; font-weight: 700; color: #fff; }
-  main {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 24px 16px 60px;
-  }
+  header a:hover { color: #fff; }
+  header h1 { font-size: 18px; font-weight: 700; color: #fff; flex: 1; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 60px; }
   .intro { color: #9aa3b2; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
-  .search-box {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 24px;
-  }
+  .search-box { display: flex; gap: 10px; margin-bottom: 24px; }
   .search-box input {
-    flex: 1;
-    padding: 13px 14px;
-    border-radius: 10px;
-    border: 1px solid #232838;
-    background: #141821;
-    color: #e6e8ee;
-    font-size: 14px;
+    flex: 1; min-width: 0; padding: 13px 14px; border-radius: 10px; border: 1px solid #232838;
+    background: #141821; color: #e6e8ee; font-size: 14px;
   }
+  .search-box input:focus { outline: none; border-color: #1D9E75; }
   .search-box button {
-    background: #1D9E75;
-    color: #fff;
-    border: none;
-    padding: 0 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+    background: #1D9E75; color: #fff; border: none; padding: 0 20px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
   }
-  .search-box button:disabled { opacity: 0.6; }
+  .search-box button:hover { background: #178a65; }
+  .search-box button:disabled { opacity: 0.6; cursor: not-allowed; }
   .loading { text-align: center; color: #9aa3b2; padding: 30px; font-size: 14px; }
   .error-box {
-    background: #2a1620;
-    border: 1px solid #4a2030;
-    color: #f28b8b;
-    padding: 14px;
-    border-radius: 10px;
-    font-size: 13px;
-    margin-bottom: 16px;
+    background: #2a1620; border: 1px solid #4a2030; color: #f28b8b;
+    padding: 14px; border-radius: 10px; font-size: 13px; margin-bottom: 16px;
   }
-  .result-section {
-    background: #141821;
-    border: 1px solid #232838;
-    border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 16px;
-  }
-  .result-section h3 {
-    font-size: 13px;
-    color: #5DCAA5;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 10px;
-  }
-  .result-section p { font-size: 14px; line-height: 1.6; color: #e6e8ee; }
-  .product-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #1c212c;
-  }
+  .result-section { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .result-section h3 { font-size: 13px; color: #5DCAA5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .result-section p { font-size: 14px; line-height: 1.6; color: #e6e8ee; white-space: pre-wrap; }
+  .product-item { padding: 10px 0; border-bottom: 1px solid #1c212c; }
   .product-item:last-child { border-bottom: none; }
   .product-item .p-name { font-size: 14px; font-weight: 600; color: #fff; }
   .product-item .p-price { font-size: 13px; color: #5DCAA5; margin: 2px 0; }
   .product-item .p-reason { font-size: 12px; color: #9aa3b2; }
-  .list-item {
-    font-size: 14px;
-    color: #e6e8ee;
-    padding: 6px 0 6px 18px;
-    position: relative;
-    line-height: 1.5;
-  }
-  .list-item:before {
-    content: "•";
-    position: absolute;
-    left: 0;
-    color: #5DCAA5;
-  }
+  .list-item { font-size: 14px; color: #e6e8ee; padding: 6px 0 6px 18px; position: relative; line-height: 1.5; }
+  .list-item:before { content: "•"; position: absolute; left: 0; color: #5DCAA5; }
+  @media (max-width: 500px) { .search-box { flex-direction: column; } .search-box button { padding: 12px 20px; } }
 </style>
 </head>
 <body>
 <header>
-  <a href="dashboard.html">←</a>
-  <h1>🔍 Mağaza X-Ray</h1>
+  <a href="dashboard.html" data-tt="backTitle">←</a>
+  <h1 data-t="title"></h1>
+  <span id="langSwitcherHost"></span>
 </header>
 <main>
-  <div class="intro">Bir rakip mağazanın linkini yapıştır, AI senin için mağazayı analiz etsin: en çok satan ürünler, fiyatlandırma stratejisi ve fark yaratabileceğin fırsatlar.</div>
+  <div class="intro" data-t="intro"></div>
 
   <div class="search-box">
     <input id="storeUrlInput" type="text" placeholder="https://www.trendyol.com/magaza/...">
-    <button id="analyzeBtn" onclick="analyzeStore()">Analiz Et</button>
+    <button id="analyzeBtn" onclick="analyzeStore()" data-t="analyze"></button>
   </div>
 
   <div id="resultArea"></div>
@@ -121,101 +71,170 @@
 <script>
   const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
+  let lastData = null;
+  let lastErrorKey = null;
+  let lastErrorExtra = '';
+
+  // ================= DİL =================
+  const T = {
+    tr: {
+      pageTitle: 'Mağaza X-Ray',
+      backTitle: 'Panele dön',
+      title: '🔍 Mağaza X-Ray',
+      intro: 'Bir rakip mağazanın linkini yapıştır, AI senin için mağazayı analiz etsin: en çok satan ürünler, fiyatlandırma stratejisi ve fark yaratabileceğin fırsatlar.',
+      analyze: 'Analiz Et',
+      needUrl: 'Lütfen bir mağaza linki gir.',
+      badUrl: 'Link "http://" veya "https://" ile başlamalı.',
+      noSession: 'Oturum bulunamadı, lütfen tekrar giriş yap.',
+      loading: 'Mağaza inceleniyor, bu biraz sürebilir...',
+      error: 'Hata: ',
+      summary: 'Mağaza Özeti',
+      topProducts: 'Öne Çıkan Ürünler',
+      pricing: 'Fiyatlandırma Stratejisi',
+      strengths: 'Güçlü Yönleri',
+      opportunities: 'Senin Fırsatların',
+      noResult: 'Sonuç alınamadı.',
+    },
+    en: {
+      pageTitle: 'Store X-Ray',
+      backTitle: 'Back to dashboard',
+      title: '🔍 Store X-Ray',
+      intro: 'Paste a competitor store link and let AI analyze it for you: best-selling products, pricing strategy and opportunities where you can stand out.',
+      analyze: 'Analyze',
+      needUrl: 'Please enter a store link.',
+      badUrl: 'The link must start with "http://" or "https://".',
+      noSession: 'Session not found, please sign in again.',
+      loading: 'Analyzing the store, this may take a while...',
+      error: 'Error: ',
+      summary: 'Store Summary',
+      topProducts: 'Top Products',
+      pricing: 'Pricing Strategy',
+      strengths: 'Strengths',
+      opportunities: 'Your Opportunities',
+      noResult: 'No result received.',
+    }
+  };
+  function lang() {
+    const l = (window.HS && HS.lang) || document.documentElement.lang || 'tr';
+    return T[l] ? l : 'tr';
+  }
+  function t(key) {
+    const v = T[lang()][key];
+    return v !== undefined ? v : (T.tr[key] !== undefined ? T.tr[key] : key);
+  }
+  function applyStatic() {
+    document.documentElement.lang = lang();
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('[data-tt]').forEach(el => { el.title = t(el.getAttribute('data-tt')); });
+  }
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function showError(key, extra) {
+    lastErrorKey = key; lastErrorExtra = extra || '';
+    lastData = null;
+    document.getElementById('resultArea').innerHTML = '<div class="error-box">' + escapeHtml(t(key) + lastErrorExtra) + '</div>';
+  }
+
+  async function init() {
+    try {
+      if (window.HS && typeof HS.init === 'function') await HS.init({ auth: true });
+    } catch (e) { console.warn('HS.init', e); }
+    db = (window.HS && HS.db) ? HS.db : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    applyStatic();
+  }
 
   async function analyzeStore() {
-    const storeUrl = document.getElementById('storeUrlInput').value.trim();
-    const resultArea = document.getElementById('resultArea');
+    let storeUrl = document.getElementById('storeUrlInput').value.trim();
     const btn = document.getElementById('analyzeBtn');
 
-    if (!storeUrl) {
-      resultArea.innerHTML = '<div class="error-box">Lütfen bir mağaza linki gir.</div>';
-      return;
+    if (!storeUrl) { showError('needUrl'); return; }
+    if (!/^https?:\/\//i.test(storeUrl)) {
+      if (/^[\w.-]+\.[a-z]{2,}/i.test(storeUrl)) {
+        storeUrl = 'https://' + storeUrl;
+        document.getElementById('storeUrlInput').value = storeUrl;
+      } else { showError('badUrl'); return; }
     }
 
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-    const accessToken = sessionData?.session?.access_token;
-
-    if (!accessToken) {
-      resultArea.innerHTML = '<div class="error-box">Oturum bulunamadı, lütfen tekrar giriş yap.</div>';
-      return;
-    }
+    const { data: sessionData } = await db.auth.getSession();
+    const accessToken = sessionData && sessionData.session && sessionData.session.access_token;
+    if (!accessToken) { showError('noSession'); return; }
 
     btn.disabled = true;
     btn.textContent = '...';
-    resultArea.innerHTML = '<div class="loading">Mağaza inceleniyor, bu biraz sürebilir...</div>';
+    lastErrorKey = null;
+    document.getElementById('resultArea').innerHTML = '<div class="loading">' + escapeHtml(t('loading')) + '</div>';
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/store-spy`, {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/store-spy', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'apikey': SUPABASE_KEY
-        },
-        body: JSON.stringify({ storeUrl, userAccessToken: accessToken })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ storeUrl, userAccessToken: accessToken, language: lang() })
       });
-
       const data = await response.json();
-
-      if (data.error) {
-        resultArea.innerHTML = `<div class="error-box">Hata: ${escapeHtml(data.error)}</div>`;
-        return;
-      }
-
-      renderResult(data);
+      if (data.error) { showError('error', data.error); return; }
+      lastData = data;
+      renderResult();
     } catch (err) {
-      resultArea.innerHTML = `<div class="error-box">Hata: ${escapeHtml(String(err))}</div>`;
+      showError('error', String(err.message || err));
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Analiz Et';
+      btn.textContent = t('analyze');
     }
   }
 
-  function renderResult(data) {
+  function renderResult() {
     const resultArea = document.getElementById('resultArea');
+    if (lastErrorKey) { resultArea.innerHTML = '<div class="error-box">' + escapeHtml(t(lastErrorKey) + lastErrorExtra) + '</div>'; return; }
+    if (!lastData) return;
+    const data = lastData;
     let html = '';
-
     if (data.storeSummary) {
-      html += `<div class="result-section"><h3>Mağaza Özeti</h3><p>${escapeHtml(data.storeSummary)}</p></div>`;
+      html += '<div class="result-section"><h3>' + escapeHtml(t('summary')) + '</h3><p>' + escapeHtml(data.storeSummary) + '</p></div>';
     }
-
-    if (data.topProducts && data.topProducts.length > 0) {
-      html += `<div class="result-section"><h3>Öne Çıkan Ürünler</h3>`;
+    if (data.topProducts && data.topProducts.length) {
+      html += '<div class="result-section"><h3>' + escapeHtml(t('topProducts')) + '</h3>';
       data.topProducts.forEach(p => {
-        html += `<div class="product-item">
-          <div class="p-name">${escapeHtml(p.name || '')}</div>
-          <div class="p-price">${escapeHtml(p.estimatedPrice || '')}</div>
-          <div class="p-reason">${escapeHtml(p.reason || '')}</div>
-        </div>`;
+        html += '<div class="product-item"><div class="p-name">' + escapeHtml(p.name || '') + '</div>' +
+          '<div class="p-price">' + escapeHtml(p.estimatedPrice || '') + '</div>' +
+          '<div class="p-reason">' + escapeHtml(p.reason || '') + '</div></div>';
       });
-      html += `</div>`;
+      html += '</div>';
     }
-
     if (data.pricingStrategy) {
-      html += `<div class="result-section"><h3>Fiyatlandırma Stratejisi</h3><p>${escapeHtml(data.pricingStrategy)}</p></div>`;
+      html += '<div class="result-section"><h3>' + escapeHtml(t('pricing')) + '</h3><p>' + escapeHtml(data.pricingStrategy) + '</p></div>';
     }
-
-    if (data.strengths && data.strengths.length > 0) {
-      html += `<div class="result-section"><h3>Güçlü Yönleri</h3>`;
-      data.strengths.forEach(s => html += `<div class="list-item">${escapeHtml(s)}</div>`);
-      html += `</div>`;
+    if (data.strengths && data.strengths.length) {
+      html += '<div class="result-section"><h3>' + escapeHtml(t('strengths')) + '</h3>';
+      data.strengths.forEach(s => { html += '<div class="list-item">' + escapeHtml(s) + '</div>'; });
+      html += '</div>';
     }
-
-    if (data.opportunities && data.opportunities.length > 0) {
-      html += `<div class="result-section"><h3>Senin Fırsatların</h3>`;
-      data.opportunities.forEach(o => html += `<div class="list-item">${escapeHtml(o)}</div>`);
-      html += `</div>`;
+    if (data.opportunities && data.opportunities.length) {
+      html += '<div class="result-section"><h3>' + escapeHtml(t('opportunities')) + '</h3>';
+      data.opportunities.forEach(o => { html += '<div class="list-item">' + escapeHtml(o) + '</div>'; });
+      html += '</div>';
     }
-
-    resultArea.innerHTML = html || '<div class="error-box">Sonuç alınamadı.</div>';
+    resultArea.innerHTML = html || '<div class="error-box">' + escapeHtml(t('noResult')) + '</div>';
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  document.getElementById('storeUrlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !document.getElementById('analyzeBtn').disabled) analyzeStore();
+  });
+
+  function onLangChange() {
+    applyStatic();
+    const btn = document.getElementById('analyzeBtn');
+    if (btn.disabled) btn.textContent = '...';
+    renderResult();
   }
+  window.addEventListener('hs:langchange', onLangChange);
+  document.addEventListener('hs:langchange', onLangChange);
+
+  init();
 </script>
 </body>
 </html>
