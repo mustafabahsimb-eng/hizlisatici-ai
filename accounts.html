@@ -274,12 +274,12 @@
       // panel ipuçları
       h_trendyol: 'Trendyol panelinden (Hesabım > Entegrasyon Bilgileri) aldığın Satıcı ID, API Key ve API Secret bilgilerini gir.',
       h_hepsiburada: "Hepsiburada Merchant panelinden (Hesabım > Entegrasyon Bilgileri > API Anahtarı) aldığın Mağaza ID'yi Satıcı ID alanına, kullanıcı adını API Key alanına, şifreni de API Secret alanına gir.",
-      h_n11: "N11 mağaza panelinden (so.n11.com > Bilgilerim > API Hesapları) aldığın appKey'i API Key alanına, appSecret'i API Secret alanına gir. Satıcı ID alanına kendi takibin için mağaza adını yazabilirsin.",
+      h_n11: "N11 mağaza panelinden (so.n11.com > Bilgilerim > API Hesapları) aldığın appKey'i API Key alanına, appSecret'i API Secret alanına gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (N11'e gönderilmiyor, sadece kaydı ayırt etmek için).",
       h_ciceksepeti: "Çiçeksepeti satıcı panelinden (seller.ciceksepeti.com > Ürünlerim > Ürün Listesi > Api Erişim) aldığın Satıcı ID'yi ve API Key'i gir. Ayrı bir secret olmadığı için API Secret alanına da aynı API Key'i yazabilirsin.",
-      h_pttavm: 'PTT AVM satıcı panelinden (Ayarlar > Web Servis / Entegrasyon Ayarları) aldığın kullanıcı adını API Key alanına, şifreni API Secret alanına gir. Satıcı ID alanı doğrulamada kullanılmıyor.',
+      h_pttavm: 'PTT AVM satıcı panelinden (Ayarlar > Web Servis / Entegrasyon Ayarları) aldığın kullanıcı adını API Key alanına, şifreni API Secret alanına gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (doğrulamada kullanılmıyor, sadece kaydı ayırt etmek için).',
       h_amazontr: 'Amazon SP-API bilgilerin (Satıcı ID, LWA Client ID, Client Secret).',
-      h_pazarama: "Pazarama satıcı panelinden (isortagim.pazarama.com > mağaza adın > Hesap Bilgileri > Entegrasyon Bilgileri) aldığın API Key'i ve API Secret'i gir. Satıcı ID alanı doğrulamada kullanılmıyor.",
-      h_walmart: "Walmart Seller Center panelinden (Settings > API Keys) aldığın Client ID'yi API Key alanına, Client Secret'i API Secret alanına gir.",
+      h_pazarama: "Pazarama satıcı panelinden (isortagim.pazarama.com > mağaza adın > Hesap Bilgileri > Entegrasyon Bilgileri) aldığın API Key'i ve API Secret'i gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (doğrulamada kullanılmıyor, sadece kaydı ayırt etmek için).",
+      h_walmart: "Walmart Seller Center panelinden (Settings > API Keys) aldığın Client ID'yi API Key alanına, Client Secret'i API Secret alanına gir. Satıcı ID alanına Walmart satıcı numaranı yaz.",
       h_woocommerce: "Mağaza adresini (örn: benimmagazam.com) Satıcı ID alanına yaz. WordPress panelinden (WooCommerce > Ayarlar > Gelişmiş > REST API) ürettiğin Consumer Key'i API Key alanına, Consumer Secret'i API Secret alanına gir.",
       cjPrompt: 'CJ Dropshipping API anahtarını yapıştır:',
       cjConfirmRemove: 'CJ Dropshipping bağlantını kaldırmak istediğine emin misin? Aramalar tekrar paylaşımlı hesapla yapılacak.',
@@ -374,12 +374,12 @@
       d_temu: 'Has an official open API but requires partnership approval; no integration planned for now',
       h_trendyol: 'Enter the Seller ID, API Key and API Secret from the Trendyol panel (My Account > Integration Info).',
       h_hepsiburada: 'From the Hepsiburada Merchant panel (My Account > Integration Info > API Key): Merchant ID in Seller ID, username in API Key, password in API Secret.',
-      h_n11: 'From the N11 store panel (so.n11.com > My Info > API Accounts): appKey in API Key, appSecret in API Secret. Seller ID is only for your own reference.',
+      h_n11: 'From the N11 store panel (so.n11.com > My Info > API Accounts): appKey in API Key, appSecret in API Secret. Put your store name or number in Seller ID (only used to tell connections apart).',
       h_ciceksepeti: 'From the Çiçeksepeti seller panel (Products > Product List > API Access): enter Seller ID and API Key. There is no separate secret, so you can repeat the API Key in API Secret.',
-      h_pttavm: 'From the PTT AVM seller panel (Settings > Web Service / Integration): username in API Key, password in API Secret. Seller ID is not used for verification.',
+      h_pttavm: 'From the PTT AVM seller panel (Settings > Web Service / Integration): username in API Key, password in API Secret. Put your store name or number in Seller ID (not used for verification, only to tell connections apart).',
       h_amazontr: 'Your Amazon SP-API details (Seller ID, LWA Client ID, Client Secret).',
-      h_pazarama: 'From the Pazarama seller panel (isortagim.pazarama.com > your store > Account Info > Integration Info): enter API Key and API Secret. Seller ID is not used for verification.',
-      h_walmart: 'From Walmart Seller Center (Settings > API Keys): Client ID in API Key, Client Secret in API Secret.',
+      h_pazarama: 'From the Pazarama seller panel (isortagim.pazarama.com > your store > Account Info > Integration Info): enter API Key and API Secret. Put your store name or number in Seller ID (not used for verification, only to tell connections apart).',
+      h_walmart: 'From Walmart Seller Center (Settings > API Keys): Client ID in API Key, Client Secret in API Secret. Put your Walmart seller number in Seller ID.',
       h_woocommerce: 'Put your store URL (e.g. mystore.com) in Seller ID. From WordPress (WooCommerce > Settings > Advanced > REST API): Consumer Key in API Key, Consumer Secret in API Secret.',
       cjPrompt: 'Paste your CJ Dropshipping API key:',
       cjConfirmRemove: 'Remove your CJ Dropshipping connection? Searches will use the shared account again.',
@@ -428,17 +428,17 @@
   }
 
   // ---------- Pazaryerleri (store_connections + Vault) ----------
-  // key: sayfadaki anahtar; codes: marketplaces tablosunda olası kodlar (ilk eşleşen kullanılır)
+  // key: sayfadaki anahtar; codes: marketplaces tablosundaki kod (store-connect ile aynı)
   // fields: modal etiketleri; req: zorunlu alanlar
   const MP = {
-    trendyol:    { name: 'Trendyol', group: 'TR', codes: ['trendyol'], verify: true, signup: 'https://partner.trendyol.com/onboarding/satici-formu', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
-    hepsiburada: { name: 'Hepsiburada', group: 'TR', codes: ['hepsiburada'], verify: true, signup: 'https://merchant.hepsiburada.com/v2/sign-up', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
-    n11:         { name: 'N11', group: 'TR', codes: ['n11'], verify: true, signup: 'https://magazadestek.n11.com/satis-surecleri/magaza-uyelik-sureci-44', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['apiKey', 'apiSecret'] },
-    ciceksepeti: { name: 'Çiçeksepeti', group: 'TR', codes: ['ciceksepeti'], verify: true, signup: 'https://www.ciceksepeti.com/s/ciceksepetinde-satis-yap', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey'] },
-    pttavm:      { name: 'PTT AVM', group: 'TR', codes: ['pttavm', 'ptt_avm', 'ptt'], verify: true, signup: 'https://www.pttavm.com/satici-ol', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['apiKey', 'apiSecret'] },
-    amazontr:    { name: 'Amazon TR', group: 'TR', codes: ['amazon_tr', 'amazontr'], verify: false, signup: 'https://satis.amazon.com.tr/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
-    pazarama:    { name: 'Pazarama', group: 'TR', codes: ['pazarama'], verify: true, signup: 'https://isortagim.pazarama.com/auth/seller-application', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['apiKey', 'apiSecret'] },
-    walmart:     { name: 'Walmart Marketplace', group: 'INTL', codes: ['walmart', 'walmart_us'], verify: true, signup: 'https://marketplace.walmart.com/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['apiKey', 'apiSecret'] },
+    trendyol:    { name: 'Trendyol', group: 'TR', codes: ['trendyol_tr'], verify: true, signup: 'https://partner.trendyol.com/onboarding/satici-formu', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    hepsiburada: { name: 'Hepsiburada', group: 'TR', codes: ['hepsiburada_tr'], verify: true, signup: 'https://merchant.hepsiburada.com/v2/sign-up', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    n11:         { name: 'N11', group: 'TR', codes: ['n11_tr'], verify: true, signup: 'https://magazadestek.n11.com/satis-surecleri/magaza-uyelik-sureci-44', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    ciceksepeti: { name: 'Çiçeksepeti', group: 'TR', codes: ['ciceksepeti_tr'], verify: true, signup: 'https://www.ciceksepeti.com/s/ciceksepetinde-satis-yap', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey'] },
+    pttavm:      { name: 'PTT AVM', group: 'TR', codes: ['pttavm_tr'], verify: true, signup: 'https://www.pttavm.com/satici-ol', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    amazontr:    { name: 'Amazon TR', group: 'TR', codes: ['amazon_tr'], verify: false, signup: 'https://satis.amazon.com.tr/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    pazarama:    { name: 'Pazarama', group: 'TR', codes: ['pazarama_tr'], verify: true, signup: 'https://isortagim.pazarama.com/auth/seller-application', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    walmart:     { name: 'Walmart Marketplace', group: 'INTL', codes: ['walmart_us'], verify: true, signup: 'https://marketplace.walmart.com/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     woocommerce: { name: 'WooCommerce', group: 'INTL', codes: ['woocommerce'], verify: true, signup: null, labels: ['fSiteUrl', 'fConsumerKey', 'fConsumerSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
   };
 
@@ -458,10 +458,10 @@
   function connectionsFor(key) {
     const code = mpCodeFor(key);
     const row = mpRowFor(key);
-    return connections.filter(c =>
+    return connections.filter(c => !c.deleted_at && (
       (c.marketplace_code && c.marketplace_code === code) ||
       (row && c.marketplace_id != null && String(c.marketplace_id) === String(row.id))
-    );
+    ));
   }
   function statusInfo(c) {
     if (c.status === 'connected') return { cls: 'connected', text: t('stConnected') };
@@ -495,7 +495,7 @@
         return '<div class="conn-item">' +
           '<span class="acc-status ' + s.cls + '">' + s.text + '</span>' +
           '<span class="conn-env ' + (c.environment === 'live' ? 'live' : '') + '">' + envTxt + '</span>' +
-          (c.label ? '<span>' + esc(c.label) + '</span>' : '') +
+          (c.label && c.label !== def.name && c.label !== c.marketplace_code ? '<span>' + esc(c.label) + '</span>' : '') +
           (c.created_at ? '<span class="conn-date">' + t('since') + fmtDate(c.created_at) + '</span>' : '') +
           '<button class="conn-remove" onclick="disconnectStore(\'' + key + '\',\'' + esc(c.id) + '\')">' + t('btnRemove') + '</button>' +
           '</div>';
@@ -648,12 +648,12 @@
       const code = mpCodeFor(key);
       const result = await callStoreConnect({
         action: 'connect',
-        marketplace_code: code,
-        marketplace: code,
+        marketplaceCode: code,
         environment: env,
         label: label || null,
-        credentials: vals,
-        sellerId: vals.sellerId, apiKey: vals.apiKey, apiSecret: vals.apiSecret,
+        sellerId: vals.sellerId,
+        apiKey: vals.apiKey,
+        apiSecret: vals.apiSecret,
       });
       if (!result) return;
       if (!result.ok) {
@@ -661,7 +661,7 @@
         sb.disabled = false; sb.textContent = t('btnSave');
         return;
       }
-      const status = result.status || (result.connection && result.connection.status) || (env === 'sandbox' ? 'pending' : 'connected');
+      const status = result.status || (env === 'sandbox' ? 'pending' : 'connected');
       closeConnectModal();
       if (env === 'sandbox') toast(t('okSandbox', { name: def.name }));
       else if (status === 'connected') toast(t('okConnected', { name: def.name }));
@@ -680,7 +680,7 @@
     const envTxt = c && c.environment === 'sandbox' ? t('envSandbox') : t('envLive');
     if (!confirm(t('confirmRemove', { name: def.name, env: envTxt }))) return;
     try {
-      const result = await callStoreConnect({ action: 'disconnect', connection_id: connectionId, id: connectionId });
+      const result = await callStoreConnect({ action: 'disconnect', connectionId: connectionId });
       if (!result) return;
       if (!result.ok) { toast(t('failRemove') + errorText(result), true); return; }
       toast(t('okRemoved'));
