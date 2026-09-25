@@ -263,6 +263,20 @@
       'sync.pending': 'Gönderim bekliyor',
       'sync.error': 'Gönderim hatası: {e}',
       'sync.soon': 'Otomatik gönderim yakında',
+      'prova.ok': 'Prova geçti · Trendyol\'a gönderilmeye hazır',
+      'prova.failed': 'Prova: {n} eksik — {e}',
+      'prova.e.title_missing': 'başlık yok',
+      'prova.e.title_too_long': 'başlık 100 karakterden uzun',
+      'prova.e.description_missing': 'açıklama yok',
+      'prova.e.description_too_long': 'açıklama çok uzun',
+      'prova.e.category_missing': 'Trendyol kategorisi seçilmemiş',
+      'prova.e.brand_missing': 'Trendyol markası seçilmemiş',
+      'prova.e.attributes_missing': 'zorunlu özellik eksik',
+      'prova.e.price_missing': 'fiyat yok',
+      'prova.e.list_price_low': 'liste fiyatı satış fiyatından düşük',
+      'prova.e.currency_not_try': 'fiyat TL değil',
+      'prova.e.vat_invalid': 'KDV oranı geçersiz',
+      'prova.e.images_missing': 'görsel yok',
 
       'menu.chat': '💬 Sohbetle Yönet',
       'menu.orders': '📦 Siparişler',
@@ -364,6 +378,20 @@
       'sync.pending': 'Waiting to sync',
       'sync.error': 'Sync error: {e}',
       'sync.soon': 'Auto-sync coming soon',
+      'prova.ok': 'Dry run passed · ready to send to Trendyol',
+      'prova.failed': 'Dry run: {n} missing — {e}',
+      'prova.e.title_missing': 'no title',
+      'prova.e.title_too_long': 'title longer than 100 characters',
+      'prova.e.description_missing': 'no description',
+      'prova.e.description_too_long': 'description too long',
+      'prova.e.category_missing': 'Trendyol category not selected',
+      'prova.e.brand_missing': 'Trendyol brand not selected',
+      'prova.e.attributes_missing': 'required attributes missing',
+      'prova.e.price_missing': 'no price',
+      'prova.e.list_price_low': 'list price below sale price',
+      'prova.e.currency_not_try': 'price is not in TRY',
+      'prova.e.vat_invalid': 'invalid VAT rate',
+      'prova.e.images_missing': 'no image',
 
       'menu.chat': '💬 Manage by Chat',
       'menu.orders': '📦 Orders',
@@ -482,7 +510,7 @@
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       db.from('listings')
-        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at')
+        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at, prova_errors:validation->errors')
         .is('deleted_at', null),
       db.from('marketplaces').select('code, name'),
       db.from('shipping_rates').select('*')
@@ -627,11 +655,24 @@
     }
     const err = l.last_sync_error;
     if (err === 'adapter_not_ready') return { dot: 'soon', title: t('sync.soon') };
-    if (err) return { dot: 'error', title: t('sync.error', { e: err }) };
     const synced = l.last_synced_at ? new Date(l.last_synced_at).getTime() : 0;
     const changed = l.updated_at ? new Date(l.updated_at).getTime() : 0;
+    const isPending = !synced || changed - synced > 10000;
+    // Prova modu sonucu (ör. Trendyol): yeşil = geçti, sarı = eksik var
+    if (err === 'prova_ok' || err === 'prova_failed') {
+      if (isPending) return { dot: 'pending', title: t('sync.pending') };
+      if (err === 'prova_ok') return { dot: 'published', title: t('prova.ok') };
+      const list = Array.isArray(l.prova_errors) ? l.prova_errors : [];
+      const names = list.map(e => {
+        const key = 'prova.e.' + (e && e.code);
+        const txt = t(key);
+        return txt && txt !== key ? txt : ((e && e.msg) || '');
+      }).filter(Boolean);
+      return { dot: 'pending', title: t('prova.failed', { n: list.length || 1, e: names.join(', ') }) };
+    }
+    if (err) return { dot: 'error', title: t('sync.error', { e: err }) };
     // İşçi yazarken updated_at birkaç saniye sonra güncellenebilir: 10 sn tolerans
-    if (!synced || changed - synced > 10000) return { dot: 'pending', title: t('sync.pending') };
+    if (isPending) return { dot: 'pending', title: t('sync.pending') };
     return { dot: 'published', title: t('sync.ok', { d: HS.date(l.last_synced_at, true) }) };
   }
 
