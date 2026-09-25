@@ -263,7 +263,7 @@
       'sync.pending': 'Gönderim bekliyor',
       'sync.error': 'Gönderim hatası: {e}',
       'sync.soon': 'Otomatik gönderim yakında',
-      'prova.ok': 'Prova geçti · Trendyol\'a gönderilmeye hazır',
+      'prova.ok': 'Prova geçti · {m} için gönderime hazır',
       'prova.failed': 'Prova: {n} eksik — {e}',
       'prova.e.title_missing': 'başlık yok',
       'prova.e.title_too_long': 'başlık 100 karakterden uzun',
@@ -277,6 +277,7 @@
       'prova.e.currency_not_try': 'fiyat TL değil',
       'prova.e.vat_invalid': 'KDV oranı geçersiz',
       'prova.e.images_missing': 'görsel yok',
+      'prova.e.barcode_missing': 'barkod yok',
 
       'menu.chat': '💬 Sohbetle Yönet',
       'menu.orders': '📦 Siparişler',
@@ -378,7 +379,7 @@
       'sync.pending': 'Waiting to sync',
       'sync.error': 'Sync error: {e}',
       'sync.soon': 'Auto-sync coming soon',
-      'prova.ok': 'Dry run passed · ready to send to Trendyol',
+      'prova.ok': 'Dry run passed · ready to send to {m}',
       'prova.failed': 'Dry run: {n} missing — {e}',
       'prova.e.title_missing': 'no title',
       'prova.e.title_too_long': 'title longer than 100 characters',
@@ -392,6 +393,7 @@
       'prova.e.currency_not_try': 'price is not in TRY',
       'prova.e.vat_invalid': 'invalid VAT rate',
       'prova.e.images_missing': 'no image',
+      'prova.e.barcode_missing': 'no barcode',
 
       'menu.chat': '💬 Manage by Chat',
       'menu.orders': '📦 Orders',
@@ -648,7 +650,7 @@
 
   // İlanın pazaryerine gönderim durumu (senkron işçisi):
   // yeşil = gönderildi, sarı = bekliyor, kırmızı = hata, mavi = otomatik gönderim yakında, gri = taslak/diğer
-  function syncState(l) {
+  function syncState(l, name) {
     const stTitle = t('st.' + l.status);
     if (l.status !== 'published') {
       return { dot: l.status === 'error' ? 'error' : '', title: stTitle };
@@ -661,7 +663,7 @@
     // Prova modu sonucu (ör. Trendyol): yeşil = geçti, sarı = eksik var
     if (err === 'prova_ok' || err === 'prova_failed') {
       if (isPending) return { dot: 'pending', title: t('sync.pending') };
-      if (err === 'prova_ok') return { dot: 'published', title: t('prova.ok') };
+      if (err === 'prova_ok') return { dot: 'published', title: t('prova.ok', { m: name || l.marketplace_code }) };
       const list = Array.isArray(l.prova_errors) ? l.prova_errors : [];
       const names = list.map(e => {
         const key = 'prova.e.' + (e && e.code);
@@ -685,7 +687,7 @@
       const name = l.marketplace_code === 'own_store'
         ? t('ch.own')
         : (marketplaceNames[l.marketplace_code] || l.marketplace_code);
-      const s = syncState(l);
+      const s = syncState(l, name);
       return '<span class="channel-chip" title="' + esc(s.title) + '">' +
              '<span class="channel-dot ' + s.dot + '"></span>' + esc(name) + '</span>';
     }).join('');
