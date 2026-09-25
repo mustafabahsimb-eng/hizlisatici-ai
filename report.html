@@ -275,6 +275,7 @@
   let productMap = {};
   let products = [];
   let shippingRates = [];
+  let fxToHome = {};   // para birimi -> ana para birimi kuru (sıralamada farklı para birimlerini karşılaştırmak için)
   let orders = [];
   let loaded = { sales: false, products: false };
   let loadError = { sales: null, products: null };
@@ -449,7 +450,7 @@
   const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
   function productCurrency(p) {
     if (INTERNATIONAL_PLATFORMS.includes(p.platform)) return 'USD';
-    return p.cost_currency || 'TRY';
+    return String(p.cost_currency || 'TRY').trim().toUpperCase();
   }
   function getShippingCost(weightKg) {
     if (!weightKg || !shippingRates || shippingRates.length === 0) return 0;
@@ -496,7 +497,20 @@
     const profitableCount = priced.filter(c => c.netProfit >= 0).length;
     const lossCount = priced.length - profitableCount;
 
-    const top = [...priced].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
+    // Farklı para birimlerini (₺, $) karşılaştırabilmek için kârı ana para birimine çevir; kuru bulunamayanlar en sona
+    const toHome = (amount, cur) => {
+      if (cur === homeCurrency) return amount;
+      const r = fxToHome[cur];
+      return r == null ? null : amount * r;
+    };
+    const byHomeDesc = (x, y) => {
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return y - x;
+    };
+    priced.forEach(c => { c.profitHome = toHome(c.netProfit, c.cur); });
+    const top = [...priced].sort((a, b) => byHomeDesc(a.profitHome, b.profitHome)).slice(0, 5);
     // Dikkat listesi: para birimleri karışık olabileceği için tutara değil MARJA (%) göre sırala - en riskli en üstte
     const bestMargin = priced.reduce((m, c) => Math.max(m, c.marginPct), -Infinity);
     const worst = [...priced].sort((a, b) => a.marginPct - b.marginPct).slice(0, 5)
@@ -508,8 +522,9 @@
       platformMap[key] = platformMap[key] || { name: c.p.platform || t('unspecified'), cur: c.cur, count: 0, profit: 0 };
       platformMap[key].count++; platformMap[key].profit += c.netProfit;
     });
-    const platformList = Object.values(platformMap).sort((a, b) => b.profit - a.profit);
-    const maxP = Math.max(...platformList.map(p => Math.abs(p.profit)), 1);
+    Object.values(platformMap).forEach(p => { p.profitHome = toHome(p.profit, p.cur); });
+    const platformList = Object.values(platformMap).sort((a, b) => byHomeDesc(a.profitHome, b.profitHome));
+    const maxP = Math.max(...platformList.map(p => Math.abs(p.profitHome != null ? p.profitHome : 0)), 1);
 
     const prodRow = (c, i) => '<div class="prod-row"><div class="prod-rank">#' + (i + 1) + '</div>' +
       '<div class="prod-info"><div class="prod-name">' + escapeHtml(c.p.name || t('unnamed')) + '</div>' +
@@ -528,7 +543,7 @@
     if (worst.length) html += '<div class="section-title">' + t('worstProducts') + '</div><div class="panel">' + worst.map(prodRow).join('') + '</div>';
     if (platformList.length) {
       html += '<div class="section-title">' + t('byPlatform') + '</div><div class="panel">' +
-        barRows(platformList.map(p => ({ name: p.name, meta: t('productsN', { n: p.count }), value: p.profit, valueText: fmtMoney(p.profit, p.cur) })), maxP) +
+        barRows(platformList.map(p => ({ name: p.name, meta: t('productsN', { n: p.count }), value: p.profitHome != null ? p.profitHome : p.profit, valueText: fmtMoney(p.profit, p.cur) })), maxP) +
         '</div>';
     }
     if (noPriceCount > 0) html += '<div class="note">' + t('noPriceNote', { n: noPriceCount }) + '</div>';
@@ -539,7 +554,7 @@
   async function loadAll() {
     try {
       const { data } = await db.from('user_profiles').select('home_currency').limit(1).maybeSingle();
-      if (data && data.home_currency) homeCurrency = data.home_currency;
+      if (data && data.home_currency) homeCurrency = String(data.home_currency).trim().toUpperCase();
     } catch (e) {}
     try {
       const { data } = await db.from('marketplaces').select('*');
@@ -559,6 +574,11 @@
       products.forEach(p => { productMap[p.id] = p; });
       const sr = await db.from('shipping_rates').select('*');
       shippingRates = sr.data || [];
+      // Ürünlerde geçen para birimleri için günlük kuru çek (sıralama için)
+      const curs = [...new Set(products.map(productCurrency))].filter(c => c && c !== homeCurrency);
+      for (const c of curs) {
+        try { fxToHome[c] = (window.HS && HS.fxRate) ? await HS.fxRate(c, homeCurrency) : null; } catch (e) { fxToHome[c] = null; }
+      }
     } catch (e) { loadError.products = e.message || String(e); }
     loaded.products = true;
     renderProducts();
