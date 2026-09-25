@@ -92,6 +92,8 @@
   .channel-dot { width: 6px; height: 6px; border-radius: 50%; background: #5a6275; }
   .channel-dot.published { background: #5DCAA5; }
   .channel-dot.error { background: #f28b8b; }
+  .channel-dot.pending { background: #f2d16b; }
+  .channel-dot.soon { background: #93b4ff; }
   .channel-chip.none { color: #7d8596; border-style: dashed; }
   .product-profit { font-size: 15px; font-weight: 600; color: #5DCAA5; }
   .product-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -257,6 +259,10 @@
       'st.out_of_stock': 'Stokta yok',
       'st.error': 'Hata',
       'st.removed': 'Kaldırıldı',
+      'sync.ok': 'Gönderildi · {d}',
+      'sync.pending': 'Gönderim bekliyor',
+      'sync.error': 'Gönderim hatası: {e}',
+      'sync.soon': 'Otomatik gönderim yakında',
 
       'menu.chat': '💬 Sohbetle Yönet',
       'menu.orders': '📦 Siparişler',
@@ -354,6 +360,10 @@
       'st.out_of_stock': 'Out of stock',
       'st.error': 'Error',
       'st.removed': 'Removed',
+      'sync.ok': 'Synced · {d}',
+      'sync.pending': 'Waiting to sync',
+      'sync.error': 'Sync error: {e}',
+      'sync.soon': 'Auto-sync coming soon',
 
       'menu.chat': '💬 Manage by Chat',
       'menu.orders': '📦 Orders',
@@ -472,7 +482,7 @@
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       db.from('listings')
-        .select('product_id, marketplace_code, status')
+        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at')
         .is('deleted_at', null),
       db.from('marketplaces').select('code, name'),
       db.from('shipping_rates').select('*')
@@ -608,6 +618,23 @@
     }).join('');
   }
 
+  // İlanın pazaryerine gönderim durumu (senkron işçisi):
+  // yeşil = gönderildi, sarı = bekliyor, kırmızı = hata, mavi = otomatik gönderim yakında, gri = taslak/diğer
+  function syncState(l) {
+    const stTitle = t('st.' + l.status);
+    if (l.status !== 'published') {
+      return { dot: l.status === 'error' ? 'error' : '', title: stTitle };
+    }
+    const err = l.last_sync_error;
+    if (err === 'adapter_not_ready') return { dot: 'soon', title: t('sync.soon') };
+    if (err) return { dot: 'error', title: t('sync.error', { e: err }) };
+    const synced = l.last_synced_at ? new Date(l.last_synced_at).getTime() : 0;
+    const changed = l.updated_at ? new Date(l.updated_at).getTime() : 0;
+    // İşçi yazarken updated_at birkaç saniye sonra güncellenebilir: 10 sn tolerans
+    if (!synced || changed - synced > 10000) return { dot: 'pending', title: t('sync.pending') };
+    return { dot: 'published', title: t('sync.ok', { d: HS.date(l.last_synced_at, true) }) };
+  }
+
   function channelChips(p) {
     const list = listingsByProduct[String(p.id)] || [];
     if (list.length === 0) {
@@ -617,9 +644,9 @@
       const name = l.marketplace_code === 'own_store'
         ? t('ch.own')
         : (marketplaceNames[l.marketplace_code] || l.marketplace_code);
-      const dotClass = l.status === 'published' ? 'published' : (l.status === 'error' ? 'error' : '');
-      return '<span class="channel-chip" title="' + esc(t('st.' + l.status)) + '">' +
-             '<span class="channel-dot ' + dotClass + '"></span>' + esc(name) + '</span>';
+      const s = syncState(l);
+      return '<span class="channel-chip" title="' + esc(s.title) + '">' +
+             '<span class="channel-dot ' + s.dot + '"></span>' + esc(name) + '</span>';
     }).join('');
   }
 
