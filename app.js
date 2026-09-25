@@ -205,12 +205,17 @@
     return ((profile && profile.home_currency) || 'TRY').trim();
   }
 
+  // Bu para birimlerinde İngilizcede de kısa sembol gösterilir (TRY → ₺, PLN → zł, DKK → kr).
+  // CAD/AUD gibi "$" kullananlar karışmasın diye eklenmedi (CA$, A$ kalır).
+  const NARROW_SYMBOL_CURRENCIES = ['TRY', 'PLN', 'DKK', 'SEK', 'NOK', 'CZK', 'HUF', 'RON', 'BGN'];
+
   function money(amount, currency) {
     if (amount == null || isNaN(amount)) return '-';
     const cur = (currency || homeCurrency()).trim().toUpperCase();
     try {
       return new Intl.NumberFormat(LOCALES[lang], {
         style: 'currency', currency: cur,
+        currencyDisplay: NARROW_SYMBOL_CURRENCIES.indexOf(cur) !== -1 ? 'narrowSymbol' : 'symbol',
         minimumFractionDigits: 2, maximumFractionDigits: 2
       }).format(Number(amount));
     } catch (e) {
