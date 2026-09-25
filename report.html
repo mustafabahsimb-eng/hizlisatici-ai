@@ -497,8 +497,10 @@
     const lossCount = priced.length - profitableCount;
 
     const top = [...priced].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
-    const worst = [...priced].sort((a, b) => a.netProfit - b.netProfit).slice(0, 5)
-      .filter(c => c.netProfit < (top[0] ? top[0].netProfit : Infinity));
+    // Dikkat listesi: para birimleri karışık olabileceği için tutara değil MARJA (%) göre sırala - en riskli en üstte
+    const bestMargin = priced.reduce((m, c) => Math.max(m, c.marginPct), -Infinity);
+    const worst = [...priced].sort((a, b) => a.marginPct - b.marginPct).slice(0, 5)
+      .filter(c => c.marginPct < bestMargin);
 
     const platformMap = {};
     priced.forEach(c => {
