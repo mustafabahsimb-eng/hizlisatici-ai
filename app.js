@@ -17,6 +17,42 @@
   }
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // ---------- Güvenlik: Edge Function çağrılarına kullanıcı oturumunu ekle ----------
+  // Sayfalar fonksiyonları genel anahtarla (publishable) çağırıyor. Giriş yapılmışsa
+  // bu anahtar otomatik olarak kullanıcının oturum anahtarıyla değiştirilir; böylece
+  // fonksiyonlar "Verify JWT" açıkken sadece giriş yapmış kullanıcılara çalışır.
+  (function patchFunctionFetch() {
+    if (!window.fetch || window.fetch.__hsPatched) return;
+    const origFetch = window.fetch.bind(window);
+    const FN_PREFIX = SUPABASE_URL + '/functions/v1/';
+    const PUBLIC_BEARER = 'Bearer ' + SUPABASE_KEY;
+    const patched = async function (input, init) {
+      try {
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (url.indexOf(FN_PREFIX) === 0 && init && init.headers) {
+          const h = init.headers;
+          const isHeaders = (typeof Headers !== 'undefined') && (h instanceof Headers);
+          let key = null, current = null;
+          if (isHeaders) { current = h.get('Authorization'); key = 'Authorization'; }
+          else {
+            Object.keys(h).forEach(function (k) { if (k.toLowerCase() === 'authorization') { key = k; current = h[k]; } });
+          }
+          if (current === PUBLIC_BEARER) {
+            const res = await db.auth.getSession();
+            const token = res && res.data && res.data.session && res.data.session.access_token;
+            if (token) {
+              if (isHeaders) { const nh = new Headers(h); nh.set('Authorization', 'Bearer ' + token); init = Object.assign({}, init, { headers: nh }); }
+              else { const nh = Object.assign({}, h); nh[key] = 'Bearer ' + token; init = Object.assign({}, init, { headers: nh }); }
+            }
+          }
+        }
+      } catch (e) { /* sessizce devam: orijinal istek gönderilir */ }
+      return origFetch(input, init);
+    };
+    patched.__hsPatched = true;
+    window.fetch = patched;
+  })();
+
   // ---------- Diller ----------
   const SUPPORTED = ['tr', 'en'];
   const LOCALES = { tr: 'tr-TR', en: 'en-US' };
