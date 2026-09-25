@@ -119,7 +119,8 @@
             'Authorization': 'Bearer ' + SUPABASE_KEY,
             'apikey': SUPABASE_KEY,
           },
-          body: JSON.stringify({ code, codeVerifier, userId: session.user.id }),
+          // Oturum anahtarı da gönderilir: fonksiyon kullanıcıyı bununla doğrular
+          body: JSON.stringify({ code, codeVerifier, userId: session.user.id, userAccessToken: session.access_token }),
         });
         const result = await res.json();
 
