@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AliExpress Yetkilendirme</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   body {
     background: #0f1117;
@@ -25,6 +26,8 @@
     padding: 28px;
     text-align: center;
   }
+  #langSwitcherHost { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  #langSwitcherHost .hs-lang { margin-left: 0; }
   h1 { font-size: 20px; margin-bottom: 8px; }
   p { color: #9aa1b2; font-size: 14px; line-height: 1.5; }
   .code-box {
@@ -38,7 +41,7 @@
     font-size: 14px;
     color: #4ade80;
   }
-  button {
+  button.copy-btn {
     background: #22c55e;
     color: #06280f;
     border: none;
@@ -48,38 +51,63 @@
     font-size: 14px;
     cursor: pointer;
   }
-  button:hover { background: #16a34a; }
+  button.copy-btn:hover { background: #16a34a; }
   .warn { color: #f59e0b; margin-top: 16px; font-size: 13px; }
 </style>
 </head>
 <body>
   <div class="box">
-    <h1>AliExpress Yetkilendirme Kodu</h1>
-    <p>Bu sayfa hiçbir yere otomatik yönlendirme yapmaz. Aşağıdaki kodu kopyala.</p>
-    <div class="code-box" id="codeBox">Kod aranıyor...</div>
-    <button onclick="copyCode()">Kodu Kopyala</button>
-    <p class="warn" id="warnMsg" style="display:none;">URL'de "code" parametresi bulunamadı. AliExpress yetkilendirme adımını tekrar dene.</p>
+    <div id="langSwitcherHost"></div>
+    <h1 data-i18n="ae.title"></h1>
+    <p data-i18n="ae.sub"></p>
+    <div class="code-box" id="codeBox"></div>
+    <button class="copy-btn" id="copyBtn" data-i18n="ae.copy"></button>
+    <p class="warn" id="warnMsg" style="display:none;" data-i18n="ae.noCode"></p>
   </div>
 
+  <script src="app.js"></script>
   <script>
+    HS.i18n.add({
+      tr: {
+        'ae.pageTitle': 'AliExpress Yetkilendirme',
+        'ae.title': 'AliExpress Yetkilendirme Kodu',
+        'ae.sub': 'Bu sayfa hiçbir yere otomatik yönlendirme yapmaz. Aşağıdaki kodu kopyala.',
+        'ae.copy': 'Kodu Kopyala',
+        'ae.copied': 'Kopyalandı!',
+        'ae.none': '(kod yok)',
+        'ae.noCode': 'URL\'de "code" parametresi bulunamadı. AliExpress yetkilendirme adımını tekrar dene.'
+      },
+      en: {
+        'ae.pageTitle': 'AliExpress Authorization',
+        'ae.title': 'AliExpress Authorization Code',
+        'ae.sub': 'This page does not redirect anywhere. Copy the code below.',
+        'ae.copy': 'Copy Code',
+        'ae.copied': 'Copied!',
+        'ae.none': '(no code)',
+        'ae.noCode': 'No "code" parameter was found in the URL. Please repeat the AliExpress authorization step.'
+      }
+    });
+
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const codeBox = document.getElementById('codeBox');
     const warnMsg = document.getElementById('warnMsg');
 
-    if (code) {
-      codeBox.textContent = code;
-    } else {
-      codeBox.textContent = '(kod yok)';
-      warnMsg.style.display = 'block';
+    function render() {
+      document.title = HS.t('ae.pageTitle');
+      codeBox.textContent = code || HS.t('ae.none');
+      warnMsg.style.display = code ? 'none' : 'block';
     }
 
-    function copyCode() {
+    document.getElementById('copyBtn').addEventListener('click', function () {
       if (!code) return;
-      navigator.clipboard.writeText(code).then(() => {
-        alert('Kopyalandı!');
+      navigator.clipboard.writeText(code).then(function () {
+        alert(HS.t('ae.copied'));
       });
-    }
+    });
+
+    window.addEventListener('hs:langchange', render);
+    HS.init({ auth: false }).then(render);
   </script>
 </body>
 </html>
