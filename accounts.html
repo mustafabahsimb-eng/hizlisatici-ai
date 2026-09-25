@@ -93,6 +93,8 @@
     padding: 10px 12px; color: #e6e8ee; font-size: 13px; margin-bottom: 14px;
   }
   .modal-input:focus { outline: none; border-color: #1D9E75; }
+  /* Gizli alan: şifre kutusu gibi noktalı görünür ama Chrome "şifre kaydedilsin mi" diye sormaz */
+  .secret-input { -webkit-text-security: disc; text-security: disc; }
   .env-group { display: flex; gap: 8px; margin-bottom: 8px; }
   .env-opt {
     flex: 1; border: 1px solid #2a3040; border-radius: 8px; padding: 10px; cursor: pointer;
@@ -160,13 +162,13 @@
     <div class="env-help" id="envHelp"></div>
 
     <label class="modal-label" data-t="fLabel"></label>
-    <input type="text" id="connectLabel" class="modal-input">
+    <input type="text" id="connectLabel" class="modal-input" autocomplete="off" data-lpignore="true" data-1p-ignore>
     <label class="modal-label" id="lblSellerId"></label>
-    <input type="text" id="connectSellerId" class="modal-input" autocomplete="off">
+    <input type="text" id="connectSellerId" class="modal-input" autocomplete="off" data-lpignore="true" data-1p-ignore>
     <label class="modal-label" id="lblApiKey"></label>
-    <input type="text" id="connectApiKey" class="modal-input" autocomplete="off">
+    <input type="text" id="connectApiKey" class="modal-input" autocomplete="off" data-lpignore="true" data-1p-ignore>
     <label class="modal-label" id="lblApiSecret"></label>
-    <input type="password" id="connectApiSecret" class="modal-input" autocomplete="new-password">
+    <input type="text" id="connectApiSecret" class="modal-input secret-input" autocomplete="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
 
     <div class="modal-error" id="connectModalError"></div>
     <div class="modal-actions">
