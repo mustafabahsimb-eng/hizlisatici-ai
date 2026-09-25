@@ -139,6 +139,17 @@
   .msg.error { background: #2a1414; color: #f28b8b; display: block; }
   .msg.success { background: #123222; color: #6ee7b7; display: block; }
   .msg a { color: #6ee7b7; text-decoration: underline; }
+  .ty-status { font-size: 12px; margin-top: 10px; color: #9aa3b2; }
+  .ty-status.ok { color: #6ee7b7; }
+  .ty-status.warn { color: #f2d16b; }
+  .ty-status.error { color: #f28b8b; }
+  .ty-attr-row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #232838; }
+  .ty-attr-row:last-child { border-bottom: none; }
+  .ty-attr-name { font-size: 13px; color: #e6e8ee; }
+  .ty-attr-row.missing .ty-attr-name { color: #f28b8b; }
+  .ty-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; white-space: nowrap; }
+  .ty-badge.guess { background: #3a3214; color: #f2d16b; }
+  @media (max-width: 600px) { .ty-attr-row { grid-template-columns: 1fr; gap: 4px; } }
 </style>
 </head>
 <body>
@@ -282,6 +293,35 @@
     <div class="form-row">
       <label for="genTags" data-i18n="ap.genTags">Etiketler (virgülle ayır)</label>
       <input type="text" id="genTags" data-i18n-placeholder="ap.genTagsPh" placeholder="etiket1, etiket2, etiket3">
+    </div>
+  </div>
+
+  <!-- TRENDYOL -->
+  <div class="section" id="tySection" style="display:none;">
+    <div class="section-title" data-i18n="ty.title">Trendyol bilgileri</div>
+    <div class="ai-note" data-i18n="ty.note">Trendyol ürün açarken kendi kategorisini, kayıtlı bir markayı ve kategoriye özel zorunlu özellikleri (renk, beden, materyal gibi) ister. AI bunları senin için doldurur; sarı "tahmin" işaretlileri kontrol et.</div>
+    <button class="btn-primary" id="tyFillBtn" onclick="tyAutoFill()" data-i18n="ty.fill">✨ AI ile doldur</button>
+    <div id="tyStatus" class="ty-status" style="display:none;"></div>
+
+    <div class="form-row" style="margin-top:16px;">
+      <label for="tyCategory" data-i18n="ty.category">Trendyol kategorisi</label>
+      <select id="tyCategory" onchange="tyOnCategoryChange()">
+        <option value="" data-i18n="ty.categoryNone">Kategori seçilmedi</option>
+      </select>
+      <input type="text" id="tyCatSearch" style="margin-top:8px;" data-i18n-placeholder="ty.catSearchPh" placeholder="Kategori ara (örn: pijama, kulaklık)">
+    </div>
+    <div class="form-row">
+      <label for="tyBrand" data-i18n="ty.brand">Marka</label>
+      <input type="text" id="tyBrandSearch" data-i18n-placeholder="ty.brandPh" placeholder="Marka ara (en az 2 harf)">
+      <select id="tyBrand" style="margin-top:8px;">
+        <option value="" data-i18n="ty.brandNone">Marka seçilmedi</option>
+      </select>
+      <div class="hint" data-i18n="ty.brandHint">Trendyol'da ürün açmak için Trendyol'a kayıtlı bir marka gerekir.</div>
+    </div>
+    <div class="form-row">
+      <label data-i18n="ty.attrs">Zorunlu özellikler</label>
+      <div id="tyAttrs"><div class="hint" data-i18n="ty.attrsEmpty">Kategori seçilince burada görünür.</div></div>
+      <div id="tyMissing" class="ty-status" style="display:none;"></div>
     </div>
   </div>
 
@@ -568,7 +608,34 @@
       'ap.saveFail': 'Kaydedilemedi: {e}',
       'ap.savedOne': 'Ürün kaydedildi! Panele yönlendiriliyorsun...',
       'ap.savedMany': 'Ürün kaydedildi ve {n} kanalda ilan açıldı! Panele yönlendiriliyorsun...',
-      'ap.clickHere': 'Otomatik geçmezse buraya tıkla.'
+      'ap.clickHere': 'Otomatik geçmezse buraya tıkla.',
+      'ty.title': 'Trendyol bilgileri',
+      'ty.note': 'Trendyol ürün açarken kendi kategorisini, kayıtlı bir markayı ve kategoriye özel zorunlu özellikleri (renk, beden, materyal gibi) ister. AI bunları senin için doldurur; sarı "tahmin" işaretlileri kontrol et.',
+      'ty.fill': '✨ AI ile doldur',
+      'ty.filling': 'Dolduruluyor...',
+      'ty.fillingNote': 'AI kategori, marka ve özellikleri seçiyor (10-30 sn)...',
+      'ty.filled': 'Dolduruldu. Kategori güveni: %{c}. {g} özellik tahmin edildi, kontrol et.',
+      'ty.needName': 'Önce ürün adını gir.',
+      'ty.noCategory': 'Uygun Trendyol kategorisi bulunamadı. Kategoriyi aramayla seç.',
+      'ty.category': 'Trendyol kategorisi',
+      'ty.categoryNone': 'Kategori seçilmedi',
+      'ty.catSearchPh': 'Kategori ara (örn: pijama, kulaklık)',
+      'ty.catFound': '{n} kategori bulundu, yukarıdaki listeden seç.',
+      'ty.brand': 'Marka',
+      'ty.brandPh': 'Marka ara (en az 2 harf)',
+      'ty.brandNone': 'Marka seçilmedi',
+      'ty.brandHint': 'Trendyol\'da ürün açmak için Trendyol\'a kayıtlı bir marka gerekir.',
+      'ty.brandFound': '{n} marka bulundu, listeden seç.',
+      'ty.brandNotFound': 'Bu adla Trendyol\'da marka bulunamadı.',
+      'ty.attrs': 'Zorunlu özellikler',
+      'ty.attrsEmpty': 'Kategori seçilince burada görünür.',
+      'ty.attrsLoading': 'Özellikler yükleniyor...',
+      'ty.attrsNone': 'Bu kategoride zorunlu özellik yok.',
+      'ty.guess': 'tahmin',
+      'ty.customOr': 'Listede yoksa elle yaz',
+      'ty.customPh': 'Değeri yaz',
+      'ty.missing': '{n} zorunlu özellik boş.',
+      'ty.allFilled': 'Tüm zorunlu özellikler dolu ✓'
     },
     en: {
       'ap.title': 'Add new product',
@@ -706,7 +773,34 @@
       'ap.saveFail': 'Could not save: {e}',
       'ap.savedOne': 'Product saved! Redirecting to the dashboard...',
       'ap.savedMany': 'Product saved and listed on {n} channels! Redirecting to the dashboard...',
-      'ap.clickHere': 'Click here if you are not redirected.'
+      'ap.clickHere': 'Click here if you are not redirected.',
+      'ty.title': 'Trendyol details',
+      'ty.note': 'To create a product, Trendyol requires its own category, a registered brand and category-specific required attributes (colour, size, material, etc.). AI fills these in for you; check the ones marked yellow as "guess".',
+      'ty.fill': '✨ Fill with AI',
+      'ty.filling': 'Filling...',
+      'ty.fillingNote': 'AI is choosing the category, brand and attributes (10-30 s)...',
+      'ty.filled': 'Filled. Category confidence: {c}%. {g} attributes were guessed, please check.',
+      'ty.needName': 'Enter the product name first.',
+      'ty.noCategory': 'No suitable Trendyol category found. Pick one using search.',
+      'ty.category': 'Trendyol category',
+      'ty.categoryNone': 'No category selected',
+      'ty.catSearchPh': 'Search category (e.g. pijama, kulaklık)',
+      'ty.catFound': '{n} categories found, pick one from the list above.',
+      'ty.brand': 'Brand',
+      'ty.brandPh': 'Search brand (at least 2 letters)',
+      'ty.brandNone': 'No brand selected',
+      'ty.brandHint': 'To list a product on Trendyol you need a brand registered on Trendyol.',
+      'ty.brandFound': '{n} brands found, pick one from the list.',
+      'ty.brandNotFound': 'No Trendyol brand found with this name.',
+      'ty.attrs': 'Required attributes',
+      'ty.attrsEmpty': 'Shown here once a category is selected.',
+      'ty.attrsLoading': 'Loading attributes...',
+      'ty.attrsNone': 'This category has no required attributes.',
+      'ty.guess': 'guess',
+      'ty.customOr': 'Type it if not in the list',
+      'ty.customPh': 'Type the value',
+      'ty.missing': '{n} required attributes are empty.',
+      'ty.allFilled': 'All required attributes are filled ✓'
     }
   });
 
@@ -822,6 +916,7 @@
     fillCommissionRate();
     updateCurrencyDisplay();
     renderAdditionalPlatformCheckboxes();
+    tyUpdateVisibility();
   }
 
   function renderAdditionalPlatformCheckboxes() {
@@ -1525,6 +1620,258 @@
   }
 
   // ============================================================
+  // TRENDYOL BİLGİLERİ (kategori, marka, zorunlu özellikler)
+  // ============================================================
+  let tyAttrDefs = [];
+  let tyCatTimer = null;
+  let tyBrandTimer = null;
+
+  function tyIsSelected() {
+    if (document.getElementById('platform').value === 'Trendyol') return true;
+    return Array.from(document.querySelectorAll('.extraPlatformCheck:checked')).some(cb => cb.value === 'Trendyol');
+  }
+
+  function tyUpdateVisibility() {
+    document.getElementById('tySection').style.display = tyIsSelected() ? 'block' : 'none';
+  }
+  document.getElementById('multiPlatformList').addEventListener('change', tyUpdateVisibility);
+
+  function tyStatus(text, kind) {
+    const el = document.getElementById('tyStatus');
+    el.textContent = text || '';
+    el.className = 'ty-status ' + (kind || '');
+    el.style.display = text ? 'block' : 'none';
+  }
+
+  // Giriş yapmış kullanıcının oturumuyla fonksiyon çağır
+  async function tyFn(name, body) {
+    const { data: { session } } = await db.auth.getSession();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/' + name, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_KEY),
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  function tySetCategoryOptions(list, selectedId) {
+    const sel = document.getElementById('tyCategory');
+    const prev = sel.value;
+    const seen = new Set();
+    let html = '<option value="">' + escapeHtml(t('ty.categoryNone')) + '</option>';
+    list.forEach(c => {
+      const k = String(c.id);
+      if (!k || seen.has(k)) return;
+      seen.add(k);
+      html += '<option value="' + escapeHtml(k) + '">' + escapeHtml(c.path) + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = selectedId != null ? String(selectedId) : prev;
+  }
+
+  function tySetBrandOptions(list, pickId) {
+    const sel = document.getElementById('tyBrand');
+    const prev = sel.value;
+    const keep = sel.value ? [{ id: sel.value, name: sel.options[sel.selectedIndex].text }] : [];
+    const seen = new Set();
+    let html = '<option value="">' + escapeHtml(t('ty.brandNone')) + '</option>';
+    keep.concat(list).forEach(b => {
+      const k = String(b.id);
+      if (seen.has(k)) return;
+      seen.add(k);
+      html += '<option value="' + escapeHtml(k) + '">' + escapeHtml(b.name) + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = pickId != null ? String(pickId) : prev;
+  }
+
+  // Kategori arama (kendi tablomuzdan)
+  document.getElementById('tyCatSearch').addEventListener('input', (e) => {
+    clearTimeout(tyCatTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) return;
+    tyCatTimer = setTimeout(async () => {
+      const safe = q.replace(/[\\%_,()]/g, ' ');
+      const { data, error } = await db
+        .from('trendyol_categories')
+        .select('id, path')
+        .eq('is_leaf', true)
+        .ilike('path', '%' + safe + '%')
+        .order('path')
+        .limit(30);
+      if (error) { tyStatus(t('ap.errorPrefix', { e: error.message }), 'error'); return; }
+      const sel = document.getElementById('tyCategory');
+      const keep = sel.value ? [{ id: sel.value, path: sel.options[sel.selectedIndex].text }] : [];
+      tySetCategoryOptions(keep.concat(data || []), sel.value || null);
+      tyStatus(t('ty.catFound', { n: (data || []).length }), (data || []).length ? '' : 'warn');
+    }, 350);
+  });
+
+  // Marka arama
+  document.getElementById('tyBrandSearch').addEventListener('input', (e) => {
+    clearTimeout(tyBrandTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) return;
+    tyBrandTimer = setTimeout(async () => {
+      try {
+        const data = await tyFn('trendyol-catalog', { action: 'brands', q });
+        const list = data.brands || [];
+        tySetBrandOptions(list, null);
+        tyStatus(list.length ? t('ty.brandFound', { n: list.length }) : t('ty.brandNotFound'), list.length ? '' : 'warn');
+      } catch (err) {
+        tyStatus(t('ap.errorPrefix', { e: err.message }), 'error');
+      }
+    }, 450);
+  });
+
+  // Kategori değişince zorunlu özellikleri getir
+  async function tyOnCategoryChange(prefill) {
+    const id = Number(document.getElementById('tyCategory').value);
+    const box = document.getElementById('tyAttrs');
+    tyAttrDefs = [];
+    if (!id) {
+      box.innerHTML = '<div class="hint">' + escapeHtml(t('ty.attrsEmpty')) + '</div>';
+      tyUpdateMissing();
+      return;
+    }
+    box.innerHTML = '<div class="hint">' + escapeHtml(t('ty.attrsLoading')) + '</div>';
+    try {
+      const data = await tyFn('trendyol-catalog', { action: 'attributes', category_id: id });
+      tyAttrDefs = (data.attributes || []).filter(a => a.required);
+      tyRenderAttrs(Array.isArray(prefill) ? prefill : []);
+    } catch (err) {
+      box.innerHTML = '<div class="hint" style="color:#f28b8b;">' + escapeHtml(t('ap.errorPrefix', { e: err.message })) + '</div>';
+      tyUpdateMissing();
+    }
+  }
+
+  function tyRenderAttrs(prefill) {
+    const box = document.getElementById('tyAttrs');
+    if (!tyAttrDefs.length) {
+      box.innerHTML = '<div class="hint">' + escapeHtml(t('ty.attrsNone')) + '</div>';
+      tyUpdateMissing();
+      return;
+    }
+    const pre = new Map((prefill || []).map(p => [String(p.attribute_id), p]));
+    box.innerHTML = tyAttrDefs.map(a => {
+      const p = pre.get(String(a.attribute_id)) || {};
+      const vals = a.attribute_values || [];
+      const badge = (p.guessed && !p.missing) ? '<span class="ty-badge guess">' + escapeHtml(t('ty.guess')) + '</span>' : '';
+      let field = '';
+      if (vals.length) {
+        field += '<select class="ty-attr-select" data-attr="' + escapeHtml(a.attribute_id) + '">' +
+          '<option value="">' + escapeHtml(t('ap.choose')) + '</option>' +
+          vals.map(v => '<option value="' + escapeHtml(v.id) + '"' + (String(v.id) === String(p.value_id) ? ' selected' : '') + '>' + escapeHtml(v.name) + '</option>').join('') +
+          '</select>';
+      }
+      if (a.allow_custom || !vals.length) {
+        field += '<input type="text" class="ty-attr-custom" data-attr="' + escapeHtml(a.attribute_id) + '" value="' + escapeHtml(p.custom_value || '') + '"' +
+          ' placeholder="' + escapeHtml(t(vals.length ? 'ty.customOr' : 'ty.customPh')) + '"' + (vals.length ? ' style="margin-top:6px;"' : '') + '>';
+      }
+      return '<div class="ty-attr-row" data-row="' + escapeHtml(a.attribute_id) + '">' +
+        '<div class="ty-attr-name">' + escapeHtml(a.name) + badge + '</div>' +
+        '<div class="ty-attr-field">' + field + '</div></div>';
+    }).join('');
+    tyUpdateMissing();
+  }
+
+  // Kullanıcı bir değeri değiştirince "tahmin" işaretini kaldır
+  document.getElementById('tyAttrs').addEventListener('change', (e) => {
+    const row = e.target.closest('.ty-attr-row');
+    if (row) {
+      const b = row.querySelector('.ty-badge.guess');
+      if (b) b.remove();
+    }
+    tyUpdateMissing();
+  });
+  document.getElementById('tyAttrs').addEventListener('input', tyUpdateMissing);
+
+  function tyUpdateMissing() {
+    const el = document.getElementById('tyMissing');
+    if (!tyAttrDefs.length) { el.style.display = 'none'; return; }
+    let missing = 0;
+    tyAttrDefs.forEach(a => {
+      const row = document.querySelector('.ty-attr-row[data-row="' + a.attribute_id + '"]');
+      if (!row) return;
+      const sel = row.querySelector('.ty-attr-select');
+      const inp = row.querySelector('.ty-attr-custom');
+      const has = (sel && sel.value) || (inp && inp.value.trim());
+      row.classList.toggle('missing', !has);
+      if (!has) missing++;
+    });
+    el.textContent = missing ? t('ty.missing', { n: missing }) : t('ty.allFilled');
+    el.className = 'ty-status ' + (missing ? 'warn' : 'ok');
+    el.style.display = 'block';
+  }
+
+  // AI ile doldur
+  async function tyAutoFill() {
+    const title = document.getElementById('genTitle').value.trim() || document.getElementById('productName').value.trim();
+    if (!title) { tyStatus(t('ty.needName'), 'error'); return; }
+    const btn = document.getElementById('tyFillBtn');
+    btn.disabled = true;
+    btn.textContent = t('ty.filling');
+    tyStatus(t('ty.fillingNote'), '');
+    try {
+      const r = await tyFn('trendyol-match', {
+        title,
+        description: document.getElementById('genDesc').value.trim(),
+        category_key: document.getElementById('genCategory').value.trim()
+      });
+      tySetCategoryOptions([r.category].concat(r.alternatives || []), r.category.id);
+      if (r.brand && r.brand.guess) document.getElementById('tyBrandSearch').value = r.brand.guess;
+      if (r.brand && r.brand.options && r.brand.options.length) {
+        tySetBrandOptions(r.brand.options, r.brand.match ? r.brand.match.id : null);
+      }
+      await tyOnCategoryChange(r.attributes || []);
+      const guessed = (r.attributes || []).filter(a => a.guessed && !a.missing).length;
+      tyStatus(t('ty.filled', { c: Math.round((r.category.confidence || 0) * 100), g: guessed }), 'ok');
+    } catch (err) {
+      tyStatus(err.message === 'no_category_candidates' ? t('ty.noCategory') : t('ap.errorPrefix', { e: err.message }), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t('ty.fill');
+    }
+  }
+
+  // Kaydederken Trendyol ilanına yazılacak alanlar
+  function tyListingFields() {
+    const catSel = document.getElementById('tyCategory');
+    const brandSel = document.getElementById('tyBrand');
+    const attrs = [];
+    tyAttrDefs.forEach(a => {
+      const row = document.querySelector('.ty-attr-row[data-row="' + a.attribute_id + '"]');
+      if (!row) return;
+      const sel = row.querySelector('.ty-attr-select');
+      const inp = row.querySelector('.ty-attr-custom');
+      if (sel && sel.value) {
+        attrs.push({ attributeId: a.attribute_id, attributeValueId: Number(sel.value), name: a.name, value: sel.options[sel.selectedIndex].text });
+      } else if (inp && inp.value.trim()) {
+        attrs.push({ attributeId: a.attribute_id, customAttributeValue: inp.value.trim(), name: a.name, value: inp.value.trim() });
+      }
+    });
+    if (!catSel.value && !brandSel.value && !attrs.length) return {};
+    return {
+      marketplace_category_id: catSel.value || null,
+      marketplace_brand_id: brandSel.value || null,
+      marketplace_brand_name: brandSel.value ? brandSel.options[brandSel.selectedIndex].text : null,
+      attributes: {
+        trendyol: {
+          category_path: catSel.value ? catSel.options[catSel.selectedIndex].text : null,
+          attributes: attrs,
+          required_count: tyAttrDefs.length
+        }
+      }
+    };
+  }
+
+  // ============================================================
   // KAYDET: tek ürün + her kanal için ilan
   // ============================================================
   async function saveProduct() {
@@ -1608,7 +1955,7 @@
       const listingRows = channels.map(p => {
         const intl = INTERNATIONAL_PLATFORMS.includes(p);
         const useEn = intl && !!titleEn;
-        return {
+        const row = {
           user_id: userId,
           product_id: product.id,
           source_product_id: product.id,
@@ -1624,6 +1971,8 @@
           price_mode: 'manual',
           status: 'draft'
         };
+        if (p === 'Trendyol') Object.assign(row, tyListingFields());
+        return row;
       });
 
       if (ownStore) {
