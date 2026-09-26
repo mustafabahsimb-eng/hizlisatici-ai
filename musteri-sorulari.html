@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Müşteri Soruları</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn {
+    background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .logout-btn:hover { border-color: #3a4258; color: #fff; }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; max-width: 640px; line-height: 1.5; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; min-width: 0; }
+  .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 600; color: #fff; }
+  .stat-value.warn { color: #e6c96a; }
+
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid #232838; margin-bottom: 20px; overflow-x: auto; }
+  .tab {
+    background: none; border: none; color: #9aa3b2; font-size: 14px; font-weight: 600;
+    padding: 12px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #fff; border-bottom-color: #1D9E75; }
+  .tab-count { font-size: 11px; background: #232838; color: #c3c9d4; border-radius: 10px; padding: 2px 8px; }
+  .tab-count.warn { background: #3a3012; color: #e6c96a; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .btn-primary {
+    background: #1D9E75; color: #fff; border: none; padding: 10px 16px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-primary:hover { background: #178a65; }
+  .btn-primary:disabled, .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent; color: #9aa3b2; border: 1px solid #2a3040; padding: 10px 16px;
+    border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
+  }
+  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn-danger { background: transparent; color: #f28b8b; border: 1px solid #4a2626; padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+  .btn-danger:hover { background: #2a1414; }
+
+  .info-note { font-size: 13px; color: #9aa3b2; background: #141821; border: 1px solid #232838; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; line-height: 1.5; }
+
+  .q-card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .q-card.human { border-color: #5a4a1a; }
+  .q-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #9aa3b2; margin-bottom: 10px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+  .badge.human { background: #3a3012; color: #e6c96a; }
+  .badge.ai { background: #123222; color: #6ee7b7; }
+  .badge.answered { background: #142230; color: #7db8e6; }
+  .badge.closed { background: #232838; color: #9aa3b2; }
+  .q-text { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 8px; line-height: 1.4; }
+  .a-box { background: #1c212c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
+  .a-label { font-size: 11px; color: #6b7385; margin-bottom: 4px; }
+  .contact { font-size: 13px; margin: 8px 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .contact a { color: #6ee7b7; text-decoration: none; }
+  .contact a:hover { text-decoration: underline; }
+  .reply-area { margin-top: 10px; }
+  textarea, input[type=text] {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a3040;
+    background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9aa3b2; cursor: pointer; }
+  .chk input { accent-color: #1D9E75; }
+  .spacer { flex: 1; }
+  .empty-state { text-align: center; color: #9aa3b2; padding: 40px 20px; background: #141821; border: 1px dashed #232838; border-radius: 14px; font-size: 14px; line-height: 1.6; }
+  .faq-item { background: #141821; border: 1px solid #232838; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .faq-q { font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .faq-a { font-size: 13px; color: #c3c9d4; line-height: 1.5; white-space: pre-wrap; }
+  .section { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .section h3 { font-size: 15px; color: #fff; margin-bottom: 10px; }
+  .msg { font-size: 13px; margin-top: 8px; }
+  .msg.ok { color: #6ee7b7; }
+  .msg.err { color: #f28b8b; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1c212c; border: 1px solid #1D9E75; color: #fff; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; z-index: 1000; display: none; max-width: 90%; text-align: center;
+  }
+  .toast.err { border-color: #e0554f; }
+  @media (max-width: 700px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } main { padding: 20px 16px 60px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot">H</div><div class="logo-text">HızlıSatıcı AI</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+
+<main>
+  <div class="top-row">
+    <div>
+      <h1 data-t="title"></h1>
+      <div class="subtitle" data-t="subtitle"></div>
+    </div>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label" data-t="sTotal"></div><div class="stat-value" id="sTotal">–</div></div>
+    <div class="stat-card"><div class="stat-label" data-t="sAi"></div><div class="stat-value" id="sAi">–</div></div>
+    <div class="stat-card"><div class="stat-label" data-t="sWaiting"></div><div class="stat-value warn" id="sWaiting">–</div></div>
+    <div class="stat-card"><div class="stat-label" data-t="sFaq"></div><div class="stat-value" id="sFaq">–</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab" data-tab="waiting" onclick="showTab('waiting')"><span data-t="tabWaiting"></span> <span class="tab-count warn" id="cWaiting">0</span></button>
+    <button class="tab" data-tab="all" onclick="showTab('all')"><span data-t="tabAll"></span> <span class="tab-count" id="cAll">0</span></button>
+    <button class="tab" data-tab="faq" onclick="showTab('faq')"><span data-t="tabFaq"></span> <span class="tab-count" id="cFaq">0</span></button>
+    <button class="tab" data-tab="rules" onclick="showTab('rules')"><span data-t="tabRules"></span></button>
+  </div>
+
+  <!-- Sana iletilenler -->
+  <div class="tab-panel" id="panel-waiting">
+    <div class="info-note" data-t="waitingInfo"></div>
+    <div id="waitingList"></div>
+  </div>
+
+  <!-- Tüm sorular -->
+  <div class="tab-panel" id="panel-all">
+    <div id="allList"></div>
+  </div>
+
+  <!-- SSS -->
+  <div class="tab-panel" id="panel-faq">
+    <div class="info-note" data-t="faqInfo"></div>
+    <div class="section">
+      <h3 data-t="faqAddTitle"></h3>
+      <input type="text" id="faqNewQ" maxlength="300">
+      <div style="height:8px"></div>
+      <textarea id="faqNewA" maxlength="1500"></textarea>
+      <div class="row"><div class="spacer"></div><button class="btn-primary" id="faqAddBtn" onclick="addFaq()" data-t="faqAddBtn"></button></div>
+    </div>
+    <div id="faqList"></div>
+  </div>
+
+  <!-- Mağaza kuralları -->
+  <div class="tab-panel" id="panel-rules">
+    <div class="info-note" data-t="rulesInfo"></div>
+    <div class="section">
+      <textarea id="rulesInput" maxlength="3000" style="min-height:220px;"></textarea>
+      <div class="row">
+        <span class="msg" id="rulesMsg"></span>
+        <div class="spacer"></div>
+        <button class="btn-primary" id="rulesSaveBtn" onclick="saveRules()" data-t="save"></button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Müşteri Soruları',
+      logout: 'Çıkış yap',
+      back: '← Panele dön',
+      title: '💬 Müşteri Soruları',
+      subtitle: 'Mağazandaki "Soru Sor" ile gelen sorular. Yapay zekâ cevaplayabildiklerini kendisi cevaplar, emin olmadıklarını sana iletir. Senin cevapların SSS\'ye eklenir, AI bir dahaki sefere o soruyu kendisi cevaplar.',
+      sTotal: 'Toplam soru',
+      sAi: 'AI cevapladı',
+      sWaiting: 'Sana iletilen (bekleyen)',
+      sFaq: 'SSS kaydı',
+      tabWaiting: '🙋 Sana iletilenler',
+      tabAll: 'Tüm sorular',
+      tabFaq: '📚 SSS',
+      tabRules: '📜 Mağaza kuralları',
+      waitingInfo: 'Yapay zekânın emin olamadığı sorular. Müşteri iletişim bilgisi bıraktıysa ona buradan dönüş yapabilirsin. Cevabını kaydedersen SSS\'ye eklenir ve AI benzer soruları artık kendisi cevaplar.',
+      faqInfo: 'Yapay zekâ müşteri sorularını cevaplarken bu listeyi kullanır. Sık gelen soruları ve cevaplarını buraya ekleyebilirsin.',
+      faqAddTitle: '+ Yeni SSS ekle',
+      faqQPh: 'Soru (örn: Kargo ücreti var mı?)',
+      faqAPh: 'Cevap (örn: 500 TL ve üzeri siparişlerde kargo ücretsiz, altındaysa 49,90 TL.)',
+      faqAddBtn: 'SSS\'ye ekle',
+      faqEmpty: 'Henüz SSS kaydı yok. Sana iletilen soruları cevapladıkça burası otomatik dolacak.',
+      rulesInfo: 'Mağazanın kurallarını buraya yaz: kargo süresi ve ücreti, iade/değişim şartları, ödeme seçenekleri, iletişim saatleri vb. Yapay zekâ müşterilere cevap verirken bunları kullanır, burada yazmayan bir şeyi uydurmaz.',
+      rulesPh: 'Örnek:\n- Siparişler 1-3 iş günü içinde kargoya verilir, teslimat 2-5 iş günü sürer.\n- 500 TL ve üzeri siparişlerde kargo ücretsiz.\n- Ürünü teslim aldıktan sonra 14 gün içinde iade edebilirsin. Kullanılmamış ve etiketi sökülmemiş olmalı.\n- İade kargo ücreti ürün kusurluysa bize ait.\n- Hafta içi 09:00-18:00 arası mesajlara dönüş yapıyoruz.',
+      save: 'Kaydet',
+      saving: 'Kaydediliyor...',
+      saved: '✓ Kaydedildi',
+      noStore: 'Önce mağazanı kurmalısın. Panelden "🧭 Mağazanı Kur"a git.',
+      loading: 'Yükleniyor...',
+      loadFail: 'Yüklenemedi: ',
+      waitingEmpty: '🎉 Bekleyen soru yok. Yapay zekâ tüm soruları cevaplamış.',
+      allEmpty: 'Henüz soru gelmedi. Mağaza sayfandaki "❓ Soru Sor" ile gelen sorular burada görünür.',
+      bHuman: '🙋 Sana iletildi',
+      bAi: '🤖 AI cevapladı',
+      bAnswered: '✓ Cevapladın',
+      bClosed: 'Kapatıldı',
+      product: 'Ürün',
+      aiAnswer: '🤖 AI\'ın cevabı',
+      yourAnswer: '✍️ Senin cevabın',
+      contact: 'Müşteri iletişim:',
+      noContact: 'Müşteri iletişim bilgisi bırakmadı.',
+      replyPh: 'Cevabını yaz (SSS\'ye eklenirse AI bir dahaki sefere bunu kullanır)',
+      addToFaq: 'SSS\'ye ekle',
+      saveAnswer: 'Cevabı kaydet',
+      close: 'Kapat (cevap gerekmiyor)',
+      reopen: 'Tekrar aç',
+      needAnswer: 'Önce cevabını yaz.',
+      answerSaved: 'Cevap kaydedildi.',
+      answerSavedFaq: 'Cevap kaydedildi ve SSS\'ye eklendi.',
+      delete: 'Sil',
+      confirmDelete: 'Bu SSS kaydı silinsin mi?',
+      needBoth: 'Soru ve cevabı birlikte yaz.',
+      faqAdded: 'SSS\'ye eklendi.',
+      whatsapp: 'WhatsApp',
+      call: 'Ara',
+      mail: 'E-posta gönder',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Customer Questions',
+      logout: 'Sign out',
+      back: '← Back to dashboard',
+      title: '💬 Customer Questions',
+      subtitle: 'Questions from the "Ask a Question" button in your store. The AI answers what it can and forwards what it is unsure about to you. Your answers are added to the FAQ so the AI can answer them next time.',
+      sTotal: 'Total questions',
+      sAi: 'Answered by AI',
+      sWaiting: 'Forwarded to you (waiting)',
+      sFaq: 'FAQ entries',
+      tabWaiting: '🙋 Forwarded to you',
+      tabAll: 'All questions',
+      tabFaq: '📚 FAQ',
+      tabRules: '📜 Store policies',
+      waitingInfo: 'Questions the AI was not sure about. If the customer left contact details you can get back to them from here. If you save your answer it is added to the FAQ and the AI will answer similar questions itself.',
+      faqInfo: 'The AI uses this list when answering customer questions. You can add frequent questions and their answers here.',
+      faqAddTitle: '+ Add FAQ entry',
+      faqQPh: 'Question (e.g. Is there a shipping fee?)',
+      faqAPh: 'Answer (e.g. Free shipping on orders over 500 TRY, otherwise 49.90 TRY.)',
+      faqAddBtn: 'Add to FAQ',
+      faqEmpty: 'No FAQ entries yet. It fills up automatically as you answer forwarded questions.',
+      rulesInfo: 'Write your store policies here: shipping time and fee, returns/exchanges, payment options, contact hours, etc. The AI uses these when answering customers and never makes up anything that is not written here.',
+      rulesPh: 'Example:\n- Orders ship within 1-3 business days, delivery takes 2-5 business days.\n- Free shipping on orders over 500 TRY.\n- You can return items within 14 days of delivery, unused and with tags attached.\n- Return shipping is on us if the item is defective.\n- We reply to messages on weekdays 09:00-18:00.',
+      save: 'Save',
+      saving: 'Saving...',
+      saved: '✓ Saved',
+      noStore: 'Set up your store first. Go to "🧭 Build Your Store" on the dashboard.',
+      loading: 'Loading...',
+      loadFail: 'Could not load: ',
+      waitingEmpty: '🎉 No waiting questions. The AI answered everything.',
+      allEmpty: 'No questions yet. Questions from "❓ Ask a Question" on your store page appear here.',
+      bHuman: '🙋 Forwarded to you',
+      bAi: '🤖 Answered by AI',
+      bAnswered: '✓ You answered',
+      bClosed: 'Closed',
+      product: 'Product',
+      aiAnswer: '🤖 AI answer',
+      yourAnswer: '✍️ Your answer',
+      contact: 'Customer contact:',
+      noContact: 'The customer did not leave contact details.',
+      replyPh: 'Write your answer (if added to the FAQ, the AI will use it next time)',
+      addToFaq: 'Add to FAQ',
+      saveAnswer: 'Save answer',
+      close: 'Close (no answer needed)',
+      reopen: 'Reopen',
+      needAnswer: 'Write your answer first.',
+      answerSaved: 'Answer saved.',
+      answerSavedFaq: 'Answer saved and added to the FAQ.',
+      delete: 'Delete',
+      confirmDelete: 'Delete this FAQ entry?',
+      needBoth: 'Write both the question and the answer.',
+      faqAdded: 'Added to FAQ.',
+      whatsapp: 'WhatsApp',
+      call: 'Call',
+      mail: 'Send email',
+    }
+  });
+
+  const t = HS.t;
+  const esc = HS.escapeHtml;
+  const db = HS.db;
+  let userId = null;
+  let questions = [];
+  let faqs = [];
+  let storeRow = null;
+
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (isErr ? ' err' : '');
+    el.style.display = 'block';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+
+  function applyStatic() {
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.getElementById('faqNewQ').placeholder = t('faqQPh');
+    document.getElementById('faqNewA').placeholder = t('faqAPh');
+    document.getElementById('rulesInput').placeholder = t('rulesPh');
+  }
+
+  // ---------- Sekmeler ----------
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+    try { localStorage.setItem('hs_support_tab', name); } catch (e) {}
+  }
+
+  // ---------- Yükleme ----------
+  async function loadAll() {
+    const [q, f, s] = await Promise.all([
+      db.from('support_questions')
+        .select('id, product_title, question, ai_answer, needs_human, customer_contact, status, seller_answer, language, created_at, answered_at')
+        .eq('user_id', userId).order('created_at', { ascending: false }).limit(300),
+      db.from('store_faq').select('id, question, answer, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+      db.from('store_settings').select('store_slug, support_rules').eq('user_id', userId).maybeSingle(),
+    ]);
+    if (q.error) { toast(t('loadFail') + q.error.message, true); }
+    if (f.error) { toast(t('loadFail') + f.error.message, true); }
+    questions = q.data || [];
+    faqs = f.data || [];
+    storeRow = s.data || null;
+    render();
+  }
+
+  function waitingList() { return questions.filter(x => x.needs_human && x.status === 'open'); }
+
+  function render() {
+    const waiting = waitingList();
+    document.getElementById('sTotal').textContent = HS.number(questions.length);
+    document.getElementById('sAi').textContent = HS.number(questions.filter(x => !x.needs_human).length);
+    document.getElementById('sWaiting').textContent = HS.number(waiting.length);
+    document.getElementById('sFaq').textContent = HS.number(faqs.length);
+    document.getElementById('cWaiting').textContent = waiting.length;
+    document.getElementById('cAll').textContent = questions.length;
+    document.getElementById('cFaq').textContent = faqs.length;
+
+    document.getElementById('waitingList').innerHTML = waiting.length
+      ? waiting.map(cardHtml).join('')
+      : '<div class="empty-state">' + esc(t('waitingEmpty')) + '</div>';
+    document.getElementById('allList').innerHTML = questions.length
+      ? questions.map(cardHtml).join('')
+      : '<div class="empty-state">' + esc(t('allEmpty')) + '</div>';
+
+    document.getElementById('faqList').innerHTML = faqs.length
+      ? faqs.map(f =>
+          '<div class="faq-item"><div class="row" style="margin-top:0; align-items:flex-start;">' +
+            '<div style="flex:1; min-width:0;"><div class="faq-q">' + esc(f.question) + '</div><div class="faq-a">' + esc(f.answer) + '</div></div>' +
+            '<button class="btn-danger" onclick="deleteFaq(\'' + f.id + '\')">' + esc(t('delete')) + '</button>' +
+          '</div></div>').join('')
+      : '<div class="empty-state">' + esc(t('faqEmpty')) + '</div>';
+
+    const rules = document.getElementById('rulesInput');
+    if (!storeRow) {
+      rules.disabled = true;
+      document.getElementById('rulesSaveBtn').disabled = true;
+      setMsg('rulesMsg', t('noStore'), true);
+    } else if (document.activeElement !== rules) {
+      rules.value = storeRow.support_rules || '';
+    }
+  }
+
+  function contactHtml(c) {
+    if (!c) return '<div class="contact" style="color:#6b7385;">' + esc(t('noContact')) + '</div>';
+    const isMail = /@/.test(c);
+    let links = '';
+    if (isMail) {
+      links = '<a href="mailto:' + esc(c) + '">' + esc(t('mail')) + '</a>';
+    } else {
+      let digits = c.replace(/\D/g, '');
+      if (digits.startsWith('0')) digits = '90' + digits.slice(1);
+      else if (digits.length === 10 && digits.startsWith('5')) digits = '90' + digits;
+      links = '<a href="tel:' + esc(c.replace(/[^\d+]/g, '')) + '">' + esc(t('call')) + '</a>' +
+              '<a href="https://wa.me/' + esc(digits) + '" target="_blank" rel="noopener">' + esc(t('whatsapp')) + '</a>';
+    }
+    return '<div class="contact"><span style="color:#9aa3b2;">' + esc(t('contact')) + '</span> <b>' + esc(c) + '</b> ' + links + '</div>';
+  }
+
+  function badgeHtml(q) {
+    if (q.status === 'answered') return '<span class="badge answered">' + esc(t('bAnswered')) + '</span>';
+    if (q.status === 'closed') return '<span class="badge closed">' + esc(t('bClosed')) + '</span>';
+    if (q.needs_human) return '<span class="badge human">' + esc(t('bHuman')) + '</span>';
+    return '<span class="badge ai">' + esc(t('bAi')) + '</span>';
+  }
+
+  function cardHtml(q) {
+    const open = q.needs_human && q.status === 'open';
+    let html = '<div class="q-card' + (open ? ' human' : '') + '">' +
+      '<div class="q-head"><span>' + esc(HS.date(q.created_at, true)) +
+      (q.product_title ? ' · ' + esc(t('product')) + ': ' + esc(q.product_title) : '') +
+      (q.language === 'en' ? ' · EN' : '') + '</span>' + badgeHtml(q) + '</div>' +
+      '<div class="q-text">' + esc(q.question) + '</div>' +
+      '<div class="a-label">' + esc(t('aiAnswer')) + '</div>' +
+      '<div class="a-box">' + esc(q.ai_answer || '–') + '</div>';
+    if (q.seller_answer) {
+      html += '<div class="a-label">' + esc(t('yourAnswer')) + '</div><div class="a-box">' + esc(q.seller_answer) + '</div>';
+    }
+    if (q.needs_human) html += contactHtml(q.customer_contact);
+    if (open) {
+      html += '<div class="reply-area">' +
+        '<textarea id="reply-' + q.id + '" maxlength="1500" placeholder="' + esc(t('replyPh')) + '"></textarea>' +
+        '<div class="row">' +
+          '<label class="chk"><input type="checkbox" id="faq-' + q.id + '" checked> ' + esc(t('addToFaq')) + '</label>' +
+          '<div class="spacer"></div>' +
+          '<button class="btn-secondary" onclick="closeQuestion(\'' + q.id + '\', this)">' + esc(t('close')) + '</button>' +
+          '<button class="btn-primary" onclick="saveAnswer(\'' + q.id + '\', this)">' + esc(t('saveAnswer')) + '</button>' +
+        '</div></div>';
+    } else if (q.status === 'closed') {
+      html += '<div class="row"><div class="spacer"></div><button class="btn-secondary" onclick="reopenQuestion(\'' + q.id + '\', this)">' + esc(t('reopen')) + '</button></div>';
+    }
+    return html + '</div>';
+  }
+
+  function setMsg(id, text, isErr) {
+    const el = document.getElementById(id);
+    el.textContent = text || '';
+    el.className = 'msg' + (text ? (isErr ? ' err' : ' ok') : '');
+  }
+
+  // ---------- İşlemler ----------
+  async function saveAnswer(id, btn) {
+    const q = questions.find(x => x.id === id);
+    const answer = (document.getElementById('reply-' + id).value || '').trim();
+    if (!answer) { toast(t('needAnswer'), true); return; }
+    const toFaq = document.getElementById('faq-' + id).checked;
+    btn.disabled = true;
+    const up = await db.from('support_questions')
+      .update({ seller_answer: answer, status: 'answered', answered_at: new Date().toISOString() })
+      .eq('id', id);
+    if (up.error) { btn.disabled = false; toast(up.error.message, true); return; }
+    if (toFaq && q) {
+      const ins = await db.from('store_faq').insert({ user_id: userId, question: q.question, answer, source_question_id: id });
+      if (ins.error) { toast(ins.error.message, true); }
+    }
+    toast(toFaq ? t('answerSavedFaq') : t('answerSaved'));
+    await loadAll();
+  }
+
+  async function closeQuestion(id, btn) {
+    btn.disabled = true;
+    const up = await db.from('support_questions').update({ status: 'closed' }).eq('id', id);
+    if (up.error) { btn.disabled = false; toast(up.error.message, true); return; }
+    await loadAll();
+  }
+
+  async function reopenQuestion(id, btn) {
+    btn.disabled = true;
+    const up = await db.from('support_questions').update({ status: 'open', needs_human: true }).eq('id', id);
+    if (up.error) { btn.disabled = false; toast(up.error.message, true); return; }
+    await loadAll();
+  }
+
+  async function addFaq() {
+    const q = document.getElementById('faqNewQ').value.trim();
+    const a = document.getElementById('faqNewA').value.trim();
+    if (!q || !a) { toast(t('needBoth'), true); return; }
+    const btn = document.getElementById('faqAddBtn');
+    btn.disabled = true;
+    const ins = await db.from('store_faq').insert({ user_id: userId, question: q, answer: a });
+    btn.disabled = false;
+    if (ins.error) { toast(ins.error.message, true); return; }
+    document.getElementById('faqNewQ').value = '';
+    document.getElementById('faqNewA').value = '';
+    toast(t('faqAdded'));
+    await loadAll();
+  }
+
+  async function deleteFaq(id) {
+    if (!confirm(t('confirmDelete'))) return;
+    const del = await db.from('store_faq').delete().eq('id', id);
+    if (del.error) { toast(del.error.message, true); return; }
+    await loadAll();
+  }
+
+  async function saveRules() {
+    if (!storeRow) return;
+    const btn = document.getElementById('rulesSaveBtn');
+    const val = document.getElementById('rulesInput').value.trim();
+    btn.disabled = true;
+    btn.textContent = t('saving');
+    const up = await db.from('store_settings').update({ support_rules: val || null }).eq('user_id', userId);
+    btn.disabled = false;
+    btn.textContent = t('save');
+    if (up.error) { setMsg('rulesMsg', up.error.message, true); return; }
+    storeRow.support_rules = val;
+    setMsg('rulesMsg', t('saved'));
+    setTimeout(() => setMsg('rulesMsg', ''), 3000);
+  }
+
+  // ---------- Başlat ----------
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    applyStatic();
+    let tab = 'waiting';
+    try { tab = localStorage.getItem('hs_support_tab') || 'waiting'; } catch (e) {}
+    showTab(['waiting', 'all', 'faq', 'rules'].includes(tab) ? tab : 'waiting');
+    await loadAll();
+  })();
+
+  window.addEventListener('hs:langchange', () => { applyStatic(); render(); });
+</script>
+</body>
+</html>
