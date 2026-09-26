@@ -135,6 +135,10 @@
     .sidebar-left, .sidebar-right{width:100%;}
     .canvas-wrap{min-width:0; width:100%;}
   }
+  #detectedList { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .det-row { display: flex; gap: 6px; align-items: center; }
+  .det-row input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid #2a3040; background: #0d0f16; color: #e6e8ee; font-size: 12px; }
+  .det-row button { padding: 5px 8px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -187,6 +191,13 @@
         <button id="addCircleBtn" data-t="addCircle"></button>
         <button id="addLineBtn" data-t="addLine"></button>
       </div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title" data-t="secTextEdit"></p>
+      <button class="full-btn primary" id="detectTextBtn" data-t="detectText"></button>
+      <div class="hint" data-t="detectHint"></div>
+      <div id="detectedList"></div>
     </div>
 
     <div class="panel">
@@ -327,6 +338,14 @@ const T = {
     tPieceLayer: 'Kesilen parça yeni katman oldu. İstersen alttaki eski görseli silebilirsin.',
     tNeedContent: 'Önce tuvale bir görsel veya metin ekle.',
     tSendFail: 'Gönderilemedi: ',
+    secTextEdit: '✏️ Resimdeki Yazıyı Düzenle',
+    detectText: '🔍 Yazıları Bul',
+    detectHint: 'Yapay zekâ görseldeki yazıları bulur, üstünü zemin rengiyle kapatır ve yerine düzenlenebilir metin koyar. Metni aşağıdaki kutulardan ya da tuvalde çift tıklayarak değiştir. Konumlar yaklaşık olabilir; kutuları sürükleyerek düzeltebilirsin. En iyi sonuç düz renkli zeminlerde alınır.',
+    detecting: 'Yazılar aranıyor...',
+    tNoText: 'Görselde yazı bulunamadı',
+    tTextFound: '{n} yazı bulundu. Değiştirmek için aşağıdaki kutulara yaz.',
+    removeText: 'Yazıyı tamamen sil (sadece zemin kalsın)',
+    tStale: 'Liste eskidi, "Yazıları Bul"a tekrar bas',
   },
   en: {
     pageTitle: 'Image Studio - HızlıSatıcı AI',
@@ -396,6 +415,14 @@ const T = {
     tPieceLayer: 'The cut piece is now a new layer. You can delete the old image underneath if you like.',
     tNeedContent: 'Add an image or text to the canvas first.',
     tSendFail: 'Could not send: ',
+    secTextEdit: '✏️ Edit Text in Image',
+    detectText: '🔍 Find Text',
+    detectHint: 'The AI finds the text in the image, covers it with the background color and puts editable text in its place. Change the text in the boxes below or by double-clicking it on the canvas. Positions may be approximate; drag the boxes to fix them. Works best on flat, single-color backgrounds.',
+    detecting: 'Looking for text...',
+    tNoText: 'No text found in the image',
+    tTextFound: '{n} text blocks found. Type in the boxes below to change them.',
+    removeText: 'Delete the text completely (keep only the background)',
+    tStale: 'The list is outdated, press "Find Text" again',
   }
 };
 function lang(){
@@ -1229,6 +1256,146 @@ document.getElementById('podBtn').addEventListener('click', async ()=>{
     window.location.href = 'pod.html?studio=1';
   }catch(err){
     showToast(t('tSendFail') + err.message);
+  }
+});
+
+/* ============== Resimdeki Yazıyı Düzenle ============== */
+let detectedItems = []; // { text: fabric.IText, cover: fabric.Rect }
+
+function imageToCanvas(img, maxSide){
+  const el = img.getElement();
+  const W = el.naturalWidth || el.width, H = el.naturalHeight || el.height;
+  const k = maxSide ? Math.min(1, maxSide / Math.max(W, H)) : 1;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
+  const ctx = c.getContext('2d');
+  ctx.drawImage(el, 0, 0, c.width, c.height);
+  return { c, ctx, W, H };
+}
+
+// Kutunun çevresindeki piksellerden zemin rengini bul (ortanca renk)
+function sampleBgColor(ctx, W, H, x, y, w, h){
+  const pad = Math.max(3, Math.round(Math.min(w, h) * 0.15));
+  const x0 = Math.max(0, Math.round(x - pad)), y0 = Math.max(0, Math.round(y - pad));
+  const x1 = Math.min(W - 1, Math.round(x + w + pad)), y1 = Math.min(H - 1, Math.round(y + h + pad));
+  const rs = [], gs = [], bs = [];
+  const push = (px, py)=>{
+    const d = ctx.getImageData(px, py, 1, 1).data;
+    if(d[3] < 20) return; // şeffaf pikselleri sayma
+    rs.push(d[0]); gs.push(d[1]); bs.push(d[2]);
+  };
+  const stepX = Math.max(1, Math.round((x1 - x0) / 40)), stepY = Math.max(1, Math.round((y1 - y0) / 20));
+  for(let px = x0; px <= x1; px += stepX){ push(px, y0); push(px, y1); }
+  for(let py = y0; py <= y1; py += stepY){ push(x0, py); push(x1, py); }
+  if(!rs.length) return null;
+  const med = a => a.sort((m, n)=> m - n)[Math.floor(a.length / 2)];
+  const hex = v => ('0' + v.toString(16)).slice(-2);
+  return '#' + hex(med(rs)) + hex(med(gs)) + hex(med(bs));
+}
+
+function renderDetectedList(){
+  const box = document.getElementById('detectedList');
+  box.innerHTML = '';
+  detectedItems.forEach((item, i)=>{
+    const row = document.createElement('div');
+    row.className = 'det-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = item.text.text;
+    input.addEventListener('input', ()=>{
+      const objs = canvas.getObjects();
+      if(objs.indexOf(item.text) === -1){ showToast(t('tStale')); return; }
+      item.text.set('text', input.value);
+      canvas.requestRenderAll();
+    });
+    input.addEventListener('change', ()=>{ snapshotState(); refreshLayerList(); });
+    input.addEventListener('focus', ()=>{
+      if(canvas.getObjects().indexOf(item.text) !== -1){ canvas.setActiveObject(item.text); canvas.requestRenderAll(); }
+    });
+    const del = document.createElement('button');
+    del.textContent = '🗑';
+    del.title = t('removeText');
+    del.addEventListener('click', ()=>{
+      if(canvas.getObjects().indexOf(item.text) !== -1) canvas.remove(item.text);
+      detectedItems.splice(i, 1);
+      renderDetectedList();
+      canvas.requestRenderAll();
+    });
+    row.appendChild(input);
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+document.getElementById('detectTextBtn').addEventListener('click', async ()=>{
+  if(!baseImage){ showToast(t('tNeedImage')); return; }
+  const btn = document.getElementById('detectTextBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + escapeHtml(t('detecting'));
+  try{
+    // Yapay zekâya gönderilecek küçültülmüş kopya (şeffaf alanlar beyaz)
+    const small = imageToCanvas(baseImage, 1568);
+    const flat = document.createElement('canvas');
+    flat.width = small.c.width; flat.height = small.c.height;
+    const fctx = flat.getContext('2d');
+    fctx.fillStyle = '#ffffff'; fctx.fillRect(0, 0, flat.width, flat.height);
+    fctx.drawImage(small.c, 0, 0);
+    const dataUrl = flat.toDataURL('image/jpeg', 0.9);
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/image-text-detect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}`, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ imageBase64: dataUrl, language: lang() })
+    });
+    const data = await res.json().catch(()=> ({}));
+    if(!res.ok) throw new Error(data.error || t('tServerError', { s: res.status }));
+    const blocks = Array.isArray(data.blocks) ? data.blocks : [];
+    if(!blocks.length){ showToast(t('tNoText'), 3500); return; }
+
+    // Zemin rengi için tam çözünürlüklü kopya
+    const full = imageToCanvas(baseImage, 0);
+    const W = baseImage.width, H = baseImage.height;
+    const kx = full.c.width / W, ky = full.c.height / H;
+    const matrix = baseImage.calcTransformMatrix();
+    const sx = baseImage.scaleX || 1, sy = baseImage.scaleY || 1;
+
+    isRestoring = true; // her obje için ayrı geri-al kaydı oluşmasın
+    blocks.forEach((b)=>{
+      const bx = b.x * W, by = b.y * H, bw = b.w * W, bh = b.h * H;
+      const bg = sampleBgColor(full.ctx, full.c.width, full.c.height, bx * kx, by * ky, bw * kx, bh * ky) || '#ffffff';
+      const center = fabric.util.transformPoint(new fabric.Point(bx + bw / 2 - W / 2, by + bh / 2 - H / 2), matrix);
+      const padW = bw * 0.12, padH = bh * 0.25;
+      const cover = new fabric.Rect({
+        left: center.x, top: center.y, originX: 'center', originY: 'center',
+        width: (bw + padW) * sx, height: (bh + padH) * sy, angle: baseImage.angle || 0,
+        fill: bg, strokeWidth: 0,
+        cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+      });
+      const boxW = bw * sx, boxH = bh * sy;
+      const text = new fabric.IText(b.text, {
+        left: center.x, top: center.y, originX: 'center', originY: 'center',
+        fontSize: Math.max(8, boxH * 0.9), fontFamily: 'Arial', fontWeight: b.bold ? 'bold' : 'normal',
+        fill: b.color || '#000000', angle: baseImage.angle || 0,
+        cornerColor:'#1D9E75', cornerStyle:'circle', transparentCorners:false
+      });
+      // Genişlik taşarsa yazıyı kutuya sığdır
+      if(text.width > boxW * 1.05){ text.set('fontSize', Math.max(8, text.fontSize * (boxW / text.width))); }
+      canvas.add(cover);
+      canvas.add(text);
+      detectedItems.push({ text, cover });
+    });
+    isRestoring = false;
+    snapshotState();
+    refreshLayerList();
+    canvas.requestRenderAll();
+    renderDetectedList();
+    showToast(t('tTextFound', { n: blocks.length }), 4000);
+  }catch(err){
+    isRestoring = false;
+    showToast(t('tError') + err.message, 4000);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = t('detectText');
   }
 });
 
