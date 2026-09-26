@@ -128,6 +128,13 @@
     <h3 data-t="askTitle"></h3>
     <div class="modal-product" id="askModalProductName"></div>
     <div id="askAnswerBox" style="display:none; background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:13px; line-height:1.5; margin-bottom:12px; white-space:pre-wrap;"></div>
+    <div id="askContactBox" style="display:none; margin-bottom:12px;">
+      <label for="askContactInput" data-t="contactLabel"></label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="askContactInput" maxlength="120" style="flex:1;">
+        <button type="button" class="primary" id="askContactBtn" data-t="contactBtn"></button>
+      </div>
+    </div>
     <label for="askQuestionInput" data-t="askLabel"></label>
     <textarea id="askQuestionInput" maxlength="1000"></textarea>
     <div class="modal-actions">
@@ -179,6 +186,10 @@ const T = {
     answering: 'Yanıtlanıyor...',
     thinking: '🤖 Düşünüyor...',
     noAnswer: 'Cevap alınamadı.',
+    contactLabel: 'Satıcı sana dönüş yapsın mı? E-posta ya da telefonunu bırak:',
+    contactPh: 'ornek@mail.com veya 05xx xxx xx xx',
+    contactBtn: 'Bırak',
+    contactSending: 'Gönderiliyor...',
     pageSuffix: ' - HızlıSatıcı AI',
   },
   en: {
@@ -214,6 +225,10 @@ const T = {
     answering: 'Answering...',
     thinking: '🤖 Thinking...',
     noAnswer: 'No answer received.',
+    contactLabel: 'Want the seller to get back to you? Leave your email or phone:',
+    contactPh: 'name@mail.com or phone number',
+    contactBtn: 'Send',
+    contactSending: 'Sending...',
     pageSuffix: ' - HızlıSatıcı AI',
   }
 };
@@ -233,6 +248,7 @@ function applyStatic(){
   document.documentElement.lang = LANG;
   document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
   document.getElementById('askQuestionInput').placeholder = t('askPh');
+  document.getElementById('askContactInput').placeholder = t('contactPh');
 }
 function escapeHtml(str){
   return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -401,6 +417,7 @@ document.getElementById('orderForm').addEventListener('submit', async (e) => {
 
 /* ============== Soru Sor Modalı ============== */
 let askSelectedProduct = null;
+let askQuestionId = null;
 
 function openAskModal(product){
   askSelectedProduct = product;
@@ -409,6 +426,9 @@ function openAskModal(product){
   const answerBox = document.getElementById('askAnswerBox');
   answerBox.style.display = 'none';
   answerBox.textContent = '';
+  askQuestionId = null;
+  document.getElementById('askContactBox').style.display = 'none';
+  document.getElementById('askContactInput').value = '';
   document.getElementById('askModalOverlay').classList.add('open');
 }
 function closeAskModal(){
@@ -430,9 +450,9 @@ document.getElementById('askSubmitBtn').addEventListener('click', async () => {
   btn.textContent = t('answering');
   answerBox.style.display = 'block';
   answerBox.textContent = t('thinking');
+  document.getElementById('askContactBox').style.display = 'none';
+  askQuestionId = null;
   try {
-    const desc = (askSelectedProduct.generated_description || '').replace(/<[^>]*>/g, '');
-    const cur = (askSelectedProduct.currency || 'TRY').toUpperCase();
     const res = await fetch(SUPABASE_URL + '/functions/v1/customer-support-chat', {
       method: 'POST',
       headers: {
@@ -441,11 +461,8 @@ document.getElementById('askSubmitBtn').addEventListener('click', async () => {
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
-        productName: productTitle(askSelectedProduct),
-        productDescription: desc,
-        salePrice: askSelectedProduct.sale_price,
-        currency: CUR_SYMBOL[cur] || cur,
-        storeName: getStoreName(currentStore),
+        store_slug: slug,
+        listing_id: askSelectedProduct.listing_id || null,
         question,
         language: LANG
       })
@@ -453,12 +470,46 @@ document.getElementById('askSubmitBtn').addEventListener('click', async () => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) throw new Error(data.error || t('noAnswer'));
     answerBox.textContent = data.answer || t('noAnswer');
+    if (data.needs_human && data.question_id) {
+      askQuestionId = data.question_id;
+      document.getElementById('askContactBox').style.display = 'block';
+    }
   } catch (err) {
     console.error(err);
     answerBox.textContent = t('error') + err.message;
   } finally {
     btn.disabled = false;
     btn.textContent = t('send2');
+  }
+});
+
+document.getElementById('askContactBtn').addEventListener('click', async () => {
+  if (!askQuestionId) return;
+  const contact = document.getElementById('askContactInput').value.trim();
+  if (!contact) return;
+  const btn = document.getElementById('askContactBtn');
+  btn.disabled = true;
+  btn.textContent = t('contactSending');
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/customer-support-chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({ action: 'contact', store_slug: slug, question_id: askQuestionId, contact, language: LANG })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || t('noAnswer'));
+    document.getElementById('askContactBox').style.display = 'none';
+    askQuestionId = null;
+    showToast(data.message || 'OK', 4000);
+  } catch (err) {
+    showToast(t('error') + err.message, 4000, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('contactBtn');
   }
 });
 
