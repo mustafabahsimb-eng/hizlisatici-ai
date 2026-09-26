@@ -114,7 +114,7 @@
             'Authorization': 'Bearer ' + SUPABASE_KEY,
             'apikey': SUPABASE_KEY,
           },
-          body: JSON.stringify({ shop, code, userId: session.user.id }),
+          body: JSON.stringify({ shop, code, userId: session.user.id, userAccessToken: session.access_token }),
         });
         const result = await res.json();
 
