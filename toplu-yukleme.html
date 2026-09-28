@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HızlıSatıcı AI - Toplu Ürün Yükleme</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn {
+    background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .logout-btn:hover { border-color: #3a4258; color: #fff; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; max-width: 700px; line-height: 1.5; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+
+  .step { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .step.disabled { opacity: .45; pointer-events: none; }
+  .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: #123222; color: #6ee7b7; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-title { font-size: 16px; font-weight: 600; color: #fff; }
+  .hint { font-size: 12px; color: #9aa3b2; line-height: 1.6; margin-top: 8px; }
+  .muted { color: #6b7385; font-size: 12px; }
+
+  .src-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .src-tab { background: #0d0f16; border: 1px solid #2a3040; color: #9aa3b2; padding: 8px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; }
+  .src-tab.active { border-color: #1D9E75; color: #fff; background: #123222; }
+  .src-tab:disabled { opacity: .5; cursor: not-allowed; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  input[type=text], input[type=url], input[type=number], select {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid #2a3040;
+    background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit;
+  }
+  input.grow { flex: 1; min-width: 240px; }
+  .rules-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .field label { display: block; font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c3c9d4; cursor: pointer; line-height: 1.5; }
+  .chk input { accent-color: #1D9E75; width: 16px; height: 16px; flex-shrink: 0; }
+
+  .btn-primary {
+    background: #1D9E75; color: #fff; border: none; padding: 10px 18px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-primary:hover { background: #178a65; }
+  .btn-secondary {
+    background: transparent; color: #c3c9d4; border: 1px solid #2a3040; padding: 10px 16px;
+    border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;
+  }
+  .btn-secondary:hover { border-color: #3a4258; color: #fff; }
+  .btn-small { padding: 6px 10px; font-size: 12px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .progress { margin-top: 14px; display: none; }
+  .bar { height: 8px; background: #1c212c; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  .bar > div { height: 100%; background: #1D9E75; width: 0; transition: width .3s; }
+  .progress-text { font-size: 13px; color: #c3c9d4; }
+
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { background: #0d0f16; border: 1px solid #2a3040; color: #9aa3b2; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .chip.active { border-color: #1D9E75; color: #fff; background: #123222; }
+  .chip b { color: #fff; }
+
+  .table-wrap { border: 1px solid #232838; border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7385; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid #232838; white-space: nowrap; background: #11151d; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1c212c; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .thumb { width: 54px; height: 54px; border-radius: 8px; object-fit: cover; background: #1c212c; display: block; }
+  .thumb-empty { width: 54px; height: 54px; border-radius: 8px; background: #1c212c; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .pname { color: #fff; font-weight: 600; line-height: 1.35; }
+  .pmeta { font-size: 11px; color: #9aa3b2; margin-top: 3px; }
+  .img-count { font-size: 11px; color: #9aa3b2; margin-top: 4px; text-align: center; }
+  .spec-toggle { background: none; border: none; color: #6ee7b7; font-size: 12px; cursor: pointer; padding: 0; margin-top: 4px; }
+  .spec-list { margin-top: 6px; font-size: 12px; color: #c3c9d4; line-height: 1.6; }
+  .spec-list span { color: #9aa3b2; }
+  .price-input { width: 110px; padding: 6px 8px; font-size: 13px; text-align: right; }
+  .warn { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; display: inline-block; margin: 2px 2px 0 0; }
+  .w-bad { background: #2a1414; color: #f28b8b; }
+  .w-mid { background: #2a2410; color: #e6c96a; }
+  .w-exist { background: #142230; color: #7db8e6; }
+  .more-row { text-align: center; padding: 12px; }
+
+  .consent { background: #11151d; border: 1px solid #2a3040; border-radius: 10px; padding: 14px; margin: 16px 0; }
+  .result { margin-top: 14px; font-size: 14px; line-height: 1.6; display: none; }
+  .result.ok { color: #6ee7b7; }
+  .result.err { color: #f28b8b; }
+  .result a { color: #6ee7b7; }
+  .empty-state { text-align: center; color: #9aa3b2; padding: 30px 20px; border: 1px dashed #232838; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1c212c; border: 1px solid #1D9E75; color: #fff; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; z-index: 1000; display: none; max-width: 90%; text-align: center;
+  }
+  .toast.err { border-color: #e0554f; }
+
+  @media (max-width: 800px) {
+    .rules-grid { grid-template-columns: 1fr 1fr; }
+    main { padding: 20px 16px 60px; }
+  }
+  @media (max-width: 520px) { .rules-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot">H</div><div class="logo-text">HızlıSatıcı AI</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+
+<main>
+  <div class="top-row">
+    <div>
+      <h1 data-t="title"></h1>
+      <div class="subtitle" data-t="subtitle"></div>
+    </div>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+
+  <!-- 1) Kaynak -->
+  <div class="step" id="step1">
+    <div class="step-head"><div class="step-num">1</div><div class="step-title" data-t="s1Title"></div></div>
+    <div class="src-tabs">
+      <button class="src-tab active" data-t="tabLink"></button>
+      <button class="src-tab" disabled data-t="tabFile"></button>
+    </div>
+    <div class="row">
+      <input type="url" class="grow" id="srcUrl" autocomplete="off">
+      <button class="btn-primary" id="fetchBtn" onclick="startFetch()" data-t="fetchBtn"></button>
+    </div>
+    <div class="hint" data-th="s1Hint"></div>
+    <div class="progress" id="progress">
+      <div class="progress-text" id="progressText"></div>
+      <div class="bar"><div id="progressBar"></div></div>
+      <div class="row">
+        <span class="muted" id="progressSub"></span>
+        <div class="spacer"></div>
+        <button class="btn-secondary btn-small" id="stopBtn" onclick="stopFetch()" data-t="stop"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2) Kurallar -->
+  <div class="step" id="step2">
+    <div class="step-head"><div class="step-num">2</div><div class="step-title" data-t="s2Title"></div></div>
+    <div class="rules-grid">
+      <div class="field">
+        <label data-t="rPriceBase"></label>
+        <select id="rPriceBase" onchange="onRulesChange()">
+          <option value="cost" data-t="rBaseCost"></option>
+          <option value="list" data-t="rBaseList"></option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-t="rMargin"></label>
+        <input type="number" id="rMargin" value="30" min="0" max="1000" step="1" oninput="onRulesChange()">
+      </div>
+      <div class="field">
+        <label data-t="rRound"></label>
+        <select id="rRound" onchange="onRulesChange()">
+          <option value="none" data-t="rRoundNone"></option>
+          <option value="1" data-t="rRound1"></option>
+          <option value="5" data-t="rRound5"></option>
+          <option value="10" data-t="rRound10"></option>
+          <option value="99" data-t="rRound99"></option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-t="rCurrency"></label>
+        <select id="rCurrency" onchange="onRulesChange()">
+          <option value="auto" data-t="rCurAuto"></option>
+          <option value="TRY">TRY (₺)</option>
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-t="rCategory"></label>
+        <input type="text" id="rCategory" maxlength="120" oninput="onRulesChange()">
+      </div>
+      <div class="field">
+        <label data-t="rBrand"></label>
+        <input type="text" id="rBrand" maxlength="80" oninput="onRulesChange()">
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <span class="muted" id="rulesMsg"></span>
+      <div class="spacer"></div>
+      <button class="btn-secondary btn-small" onclick="saveRules()" data-t="saveRules"></button>
+    </div>
+  </div>
+
+  <!-- 3) Önizleme -->
+  <div class="step disabled" id="step3">
+    <div class="step-head"><div class="step-num">3</div><div class="step-title" data-t="s3Title"></div></div>
+    <div id="previewBox"><div class="empty-state" data-t="noItems"></div></div>
+  </div>
+
+  <!-- 4) Aktar -->
+  <div class="step disabled" id="step4">
+    <div class="step-head"><div class="step-num">4</div><div class="step-title" data-t="s4Title"></div></div>
+    <div class="consent">
+      <label class="chk"><input type="checkbox" id="consentChk" onchange="updateImportBtn()"> <span data-t="consent"></span></label>
+    </div>
+    <label class="chk" style="margin-bottom:14px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
+    <div class="row">
+      <button class="btn-primary" id="importBtn" onclick="doImport()" disabled></button>
+      <button class="btn-secondary" disabled data-t="excelSoon"></button>
+    </div>
+    <div class="progress" id="importProgress">
+      <div class="progress-text" id="importText"></div>
+      <div class="bar"><div id="importBar"></div></div>
+    </div>
+    <div class="result" id="resultBox"></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Toplu Ürün Yükleme',
+      logout: 'Çıkış yap',
+      back: '← Panele dön',
+      title: '📥 Toplu Ürün Yükleme',
+      subtitle: 'Tedarikçinin linkini yapıştır; ürünler resimleri, açıklamaları ve teknik özellikleriyle gelsin. Excel doldurmak yok.',
+      s1Title: 'Kaynak',
+      tabLink: '🔗 Link yapıştır',
+      tabFile: '📄 Dosya yükle (PDF/Excel) · yakında',
+      urlPh: 'https://tedarikci.com/kategori/ip-kameralar  veya  https://.../bayi.xml',
+      fetchBtn: '🔍 Ürünleri Çek',
+      s1Hint: '<b>Tek ürün linki</b> → o ürün gelir. <b>Kategori linki</b> → o kategorideki tüm ürünler (sayfa sayfa) gelir. <b>XML linki</b> (bayi panelindeki XML entegrasyon adresi) → firmanın tüm ürünleri saniyeler içinde gelir; en hızlısı budur.',
+      stop: 'Durdur',
+      fetching: 'Sayfa okunuyor...',
+      scanning: 'Kategori taranıyor: {n} ürün linki bulundu (sayfa {p})',
+      pulling: '{d} / {t} ürün çekildi',
+      pullErr: '{e} ürün okunamadı',
+      fetchDone: '{n} ürün hazır. Aşağıda kontrol et.',
+      stopped: 'Durduruldu. {n} ürün çekildi.',
+      feedDone: 'XML okundu: {n} ürün bulundu.',
+      needUrl: 'Önce bir link yapıştır.',
+      s2Title: 'Kurallar',
+      rPriceBase: 'Satış fiyatı nasıl hesaplansın?',
+      rBaseCost: 'Tedarikçi fiyatı + kâr oranı',
+      rBaseList: 'Tavsiye satış fiyatını (PSF) kullan, yoksa kâr ekle',
+      rMargin: 'Kâr oranı (%)',
+      rRound: 'Fiyat yuvarlama',
+      rRoundNone: 'Yuvarlama yok',
+      rRound1: 'Tam sayıya (1)',
+      rRound5: "5'in katına",
+      rRound10: "10'un katına",
+      rRound99: ',90 ile bitir (ör. 1.249,90)',
+      rCurrency: 'Kaynak fiyatların para birimi',
+      rCurAuto: 'Otomatik (sayfadan anla)',
+      rCategory: 'Kategori (boşsa sayfadaki kullanılır)',
+      rBrand: 'Marka (boşsa sayfadaki kullanılır)',
+      catPh: 'ör. Güvenlik Kameraları',
+      brandPh: 'ör. Hikvision',
+      saveRules: '💾 Kuralı kaydet',
+      rulesSaved: '✓ Kurallar kaydedildi, bir dahaki sefere hazır gelecek.',
+      s3Title: 'Önizleme',
+      noItems: 'Henüz ürün çekilmedi. Yukarıya bir link yapıştırıp "Ürünleri Çek"e bas.',
+      fAll: 'Tümü',
+      fSelected: 'Seçili',
+      fProblem: '⚠️ Sorunlu',
+      fExists: 'Zaten var',
+      selectAll: 'Tümünü seç',
+      thProduct: 'Ürün',
+      thSpecs: 'Özellik',
+      thSource: 'Kaynak fiyat',
+      thNew: 'Yeni fiyat',
+      thStatus: 'Durum',
+      specsN: '{n} özellik',
+      specsShow: 'göster',
+      specsHide: 'gizle',
+      imgN: '{n} resim',
+      wNoPrice: 'Fiyat yok',
+      wNoImage: 'Resim yok',
+      wNoSpecs: 'Özellik yok',
+      wExists: 'Zaten ekli',
+      ok: '✓ Hazır',
+      showMore: '{n} ürün daha göster',
+      s4Title: 'Aktar',
+      consent: 'Bu ürün görsellerini, açıklamalarını ve bilgilerini kullanma hakkım olduğunu (ör. tedarikçimin/bayisi olduğum firmanın ürünleri) ve bu içeriklerden doğacak sorumluluğun bana ait olduğunu kabul ediyorum.',
+      consentLog: 'Kullanıcı, içe aktarılan ürün görsellerini ve içeriklerini kullanma hakkı olduğunu ve sorumluluğun kendisine ait olduğunu onayladı.',
+      publishStore: '🏪 Kendi mağazamda da hemen yayınla',
+      importBtn: '🏪 Ürünlerime ekle ({n})',
+      excelSoon: '📊 Excel indir (ikas / Ticimax / Trendyol) · yakında',
+      needConsent: 'Devam etmek için kullanım hakkı onayını işaretle.',
+      importing: '{d} / {t} ürün ekleniyor...',
+      importDone: '✓ {n} ürün eklendi.',
+      importPartial: '{n} ürün eklendi, {e} ürün eklenemedi: {m}',
+      goPanel: 'Panelde gör →',
+      fnError: 'Hata: ',
+      confirmLeave: 'Çekme işlemi devam ediyor. Sayfadan çıkarsan durur.',
+      specsHeader: 'Teknik Özellikler',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Bulk Product Import',
+      logout: 'Sign out',
+      back: '← Back to dashboard',
+      title: '📥 Bulk Product Import',
+      subtitle: 'Paste your supplier\'s link; products arrive with images, descriptions and technical specs. No spreadsheets.',
+      s1Title: 'Source',
+      tabLink: '🔗 Paste a link',
+      tabFile: '📄 Upload a file (PDF/Excel) · soon',
+      urlPh: 'https://supplier.com/category/ip-cameras  or  https://.../dealer.xml',
+      fetchBtn: '🔍 Fetch Products',
+      s1Hint: '<b>Single product link</b> → that product. <b>Category link</b> → every product in that category (page by page). <b>XML link</b> (the XML integration address in your dealer panel) → all of the supplier\'s products in seconds; the fastest option.',
+      stop: 'Stop',
+      fetching: 'Reading the page...',
+      scanning: 'Scanning category: {n} product links found (page {p})',
+      pulling: '{d} / {t} products fetched',
+      pullErr: '{e} products could not be read',
+      fetchDone: '{n} products ready. Review them below.',
+      stopped: 'Stopped. {n} products fetched.',
+      feedDone: 'XML read: {n} products found.',
+      needUrl: 'Paste a link first.',
+      s2Title: 'Rules',
+      rPriceBase: 'How should the sale price be calculated?',
+      rBaseCost: 'Supplier price + margin',
+      rBaseList: 'Use the recommended retail price (MSRP), else add margin',
+      rMargin: 'Margin (%)',
+      rRound: 'Price rounding',
+      rRoundNone: 'No rounding',
+      rRound1: 'Whole number (1)',
+      rRound5: 'Multiple of 5',
+      rRound10: 'Multiple of 10',
+      rRound99: 'End with .90 (e.g. 1,249.90)',
+      rCurrency: 'Currency of source prices',
+      rCurAuto: 'Automatic (detect from page)',
+      rCategory: 'Category (page value if empty)',
+      rBrand: 'Brand (page value if empty)',
+      catPh: 'e.g. Security Cameras',
+      brandPh: 'e.g. Hikvision',
+      saveRules: '💾 Save rules',
+      rulesSaved: '✓ Rules saved; they will be ready next time.',
+      s3Title: 'Preview',
+      noItems: 'No products fetched yet. Paste a link above and press "Fetch Products".',
+      fAll: 'All',
+      fSelected: 'Selected',
+      fProblem: '⚠️ Issues',
+      fExists: 'Already added',
+      selectAll: 'Select all',
+      thProduct: 'Product',
+      thSpecs: 'Specs',
+      thSource: 'Source price',
+      thNew: 'New price',
+      thStatus: 'Status',
+      specsN: '{n} specs',
+      specsShow: 'show',
+      specsHide: 'hide',
+      imgN: '{n} images',
+      wNoPrice: 'No price',
+      wNoImage: 'No image',
+      wNoSpecs: 'No specs',
+      wExists: 'Already added',
+      ok: '✓ Ready',
+      showMore: 'Show {n} more products',
+      s4Title: 'Import',
+      consent: 'I confirm that I have the right to use these product images, descriptions and details (e.g. products of my supplier / the brand I am a dealer of) and that I am responsible for this content.',
+      consentLog: 'The user confirmed they have the right to use the imported product images and content and that they are responsible for it.',
+      publishStore: '🏪 Also publish in my store right away',
+      importBtn: '🏪 Add to my products ({n})',
+      excelSoon: '📊 Download Excel (ikas / Ticimax / Trendyol) · soon',
+      needConsent: 'Tick the usage-rights confirmation to continue.',
+      importing: 'Adding {d} / {t} products...',
+      importDone: '✓ {n} products added.',
+      importPartial: '{n} products added, {e} failed: {m}',
+      goPanel: 'See in dashboard →',
+      fnError: 'Error: ',
+      confirmLeave: 'Fetching is in progress. Leaving the page will stop it.',
+      specsHeader: 'Technical Specifications',
+    }
+  });
+
+  const t = HS.t;
+  const esc = HS.escapeHtml;
+  const db = HS.db;
+  const PAGE_SIZE = 150;
+  const CONCURRENCY = 4;
+  const MAX_CATEGORY_PAGES = 30;
+  const MAX_LINKS = 3000;
+
+  let userId = null;
+  let items = [];          // { key, url, name, price, list_price, currency, images, specs, model_code, brand, category, description, stock, selected, exists, newPrice, priceEdited, open }
+  let filter = 'all';
+  let shown = PAGE_SIZE;
+  let running = false;
+  let stopFlag = false;
+  let sourceUrl = '';
+
+  function fmt(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m); }
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (isErr ? ' err' : '');
+    el.style.display = 'block';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+
+  function applyStatic() {
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.querySelectorAll('[data-th]').forEach(el => { el.innerHTML = t(el.getAttribute('data-th')); });
+    document.getElementById('srcUrl').placeholder = t('urlPh');
+    document.getElementById('rCategory').placeholder = t('catPh');
+    document.getElementById('rBrand').placeholder = t('brandPh');
+    updateImportBtn();
+  }
+
+  // ---------- Kurallar ----------
+  function rules() {
+    return {
+      base: document.getElementById('rPriceBase').value,
+      margin: Math.max(0, parseFloat(document.getElementById('rMargin').value) || 0),
+      round: document.getElementById('rRound').value,
+      currency: document.getElementById('rCurrency').value,
+      category: document.getElementById('rCategory').value.trim(),
+      brand: document.getElementById('rBrand').value.trim(),
+    };
+  }
+  function applyRuleValues(r) {
+    if (!r) return;
+    if (r.base) document.getElementById('rPriceBase').value = r.base;
+    if (r.margin != null) document.getElementById('rMargin').value = r.margin;
+    if (r.round) document.getElementById('rRound').value = r.round;
+    if (r.currency) document.getElementById('rCurrency').value = r.currency;
+    if (r.category != null) document.getElementById('rCategory').value = r.category;
+    if (r.brand != null) document.getElementById('rBrand').value = r.brand;
+  }
+  function roundPrice(v, mode) {
+    if (!(v > 0)) return null;
+    if (mode === '1') return Math.ceil(v);
+    if (mode === '5') return Math.ceil(v / 5) * 5;
+    if (mode === '10') return Math.ceil(v / 10) * 10;
+    if (mode === '99') return Math.ceil((v + 0.1) / 10) * 10 - 0.10;
+    return Math.round(v * 100) / 100;
+  }
+  function calcPrice(it, r) {
+    if (r.base === 'list' && it.list_price > 0) return roundPrice(it.list_price, r.round);
+    if (!(it.price > 0)) return null;
+    return roundPrice(it.price * (1 + r.margin / 100), r.round);
+  }
+  function itemCurrency(it, r) {
+    if (r.currency && r.currency !== 'auto') return r.currency;
+    return it.currency || 'TRY';
+  }
+  let rulesTimer = null;
+  function onRulesChange() {
+    clearTimeout(rulesTimer);
+    rulesTimer = setTimeout(() => {
+      const r = rules();
+      items.forEach(it => { if (!it.priceEdited) it.newPrice = calcPrice(it, r); });
+      renderPreview();
+    }, 250);
+  }
+  async function loadRules() {
+    const res = await db.from('import_rules').select('rules').eq('user_id', userId).maybeSingle();
+    if (res.data && res.data.rules) applyRuleValues(res.data.rules);
+  }
+  async function saveRules() {
+    const res = await db.from('import_rules').upsert({ user_id: userId, rules: rules(), updated_at: new Date().toISOString() });
+    const el = document.getElementById('rulesMsg');
+    if (res.error) { el.textContent = res.error.message; el.style.color = '#f28b8b'; return; }
+    el.textContent = t('rulesSaved'); el.style.color = '#6ee7b7';
+    setTimeout(() => { el.textContent = ''; }, 4000);
+  }
+
+  // ---------- Çekme ----------
+  async function callImport(url) {
+    const res = await fetch(HS.SUPABASE_URL + '/functions/v1/product-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ url: url, language: HS.lang })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  function setProgress(text, pct, sub) {
+    document.getElementById('progress').style.display = 'block';
+    document.getElementById('progressText').textContent = text;
+    document.getElementById('progressBar').style.width = Math.max(0, Math.min(100, pct || 0)) + '%';
+    document.getElementById('progressSub').textContent = sub || '';
+  }
+
+  function itemKey(it) {
+    return (it.url || '') + '|' + (it.model_code || '') + '|' + (it.name || '');
+  }
+
+  function addItems(list) {
+    const r = rules();
+    const seen = new Set(items.map(i => i.key));
+    list.forEach(raw => {
+      if (!raw || !raw.name) return;
+      const it = Object.assign({}, raw);
+      it.images = Array.isArray(it.images) ? it.images : [];
+      it.specs = Array.isArray(it.specs) ? it.specs : [];
+      it.key = itemKey(it);
+      if (seen.has(it.key)) return;
+      seen.add(it.key);
+      it.selected = true;
+      it.exists = false;
+      it.priceEdited = false;
+      it.newPrice = calcPrice(it, r);
+      items.push(it);
+    });
+  }
+
+  function stopFetch() { stopFlag = true; }
+
+  async function startFetch() {
+    if (running) return;
+    const url = document.getElementById('srcUrl').value.trim();
+    if (!url) { toast(t('needUrl'), true); return; }
+    running = true; stopFlag = false; sourceUrl = url;
+    items = []; filter = 'all'; shown = PAGE_SIZE;
+    document.getElementById('resultBox').style.display = 'none';
+    const btn = document.getElementById('fetchBtn');
+    btn.disabled = true;
+    document.getElementById('stopBtn').style.display = '';
+    setProgress(t('fetching'), 5);
+
+    try {
+      const first = await callImport(url);
+      if (first.kind === 'feed') {
+        addItems(first.items || []);
+        setProgress(fmt(t('feedDone'), { n: HS.number(items.length) }), 100);
+      } else if (first.kind === 'product') {
+        addItems([first.item]);
+        setProgress(fmt(t('fetchDone'), { n: 1 }), 100);
+      } else if (first.kind === 'category') {
+        // 1) Tüm sayfaları dolaşıp ürün linklerini topla
+        let links = (first.links || []).slice();
+        let next = first.next_page || '';
+        let page = 1;
+        const seenPages = new Set([url, first.url]);
+        setProgress(fmt(t('scanning'), { n: links.length, p: page }), 10);
+        while (next && !seenPages.has(next) && page < MAX_CATEGORY_PAGES && links.length < MAX_LINKS && !stopFlag) {
+          seenPages.add(next);
+          page++;
+          try {
+            const pr = await callImport(next);
+            if (pr.kind !== 'category') break;
+            const before = links.length;
+            links = Array.from(new Set(links.concat(pr.links || [])));
+            next = pr.next_page || '';
+            if (links.length === before) break;
+          } catch (e) { break; }
+          setProgress(fmt(t('scanning'), { n: links.length, p: page }), 10);
+        }
+        links = links.slice(0, MAX_LINKS);
+
+        // 2) Ürünleri aynı anda birkaç tane çek
+        let done = 0, errors = 0, idx = 0;
+        const total = links.length;
+        const worker = async () => {
+          while (idx < total && !stopFlag) {
+            const my = links[idx++];
+            try {
+              const pr = await callImport(my);
+              if (pr.kind === 'product' && pr.item) addItems([pr.item]);
+              else errors++;
+            } catch (e) { errors++; }
+            done++;
+            setProgress(fmt(t('pulling'), { d: HS.number(done), t: HS.number(total) }), 10 + (done / Math.max(1, total)) * 90,
+              errors ? fmt(t('pullErr'), { e: errors }) : '');
+            if (done % 10 === 0) renderPreview();
+          }
+        };
+        await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+        setProgress(stopFlag ? fmt(t('stopped'), { n: HS.number(items.length) }) : fmt(t('fetchDone'), { n: HS.number(items.length) }), 100,
+          errors ? fmt(t('pullErr'), { e: errors }) : '');
+      }
+      await markExisting();
+    } catch (e) {
+      setProgress(t('fnError') + e.message, 0);
+      toast(t('fnError') + e.message, true);
+    } finally {
+      running = false;
+      btn.disabled = false;
+      document.getElementById('stopBtn').style.display = 'none';
+      renderPreview();
+    }
+  }
+
+  // Daha önce eklenmiş ürünleri işaretle (aynı kaynak link ya da aynı model kodu)
+  async function markExisting() {
+    const urls = Array.from(new Set(items.map(i => i.url).filter(Boolean)));
+    const codes = Array.from(new Set(items.map(i => i.model_code).filter(Boolean)));
+    const existUrls = new Set(), existCodes = new Set();
+    for (let i = 0; i < urls.length; i += 150) {
+      const r = await db.from('products').select('source_url').eq('user_id', userId).is('deleted_at', null).in('source_url', urls.slice(i, i + 150));
+      (r.data || []).forEach(x => existUrls.add(x.source_url));
+    }
+    for (let i = 0; i < codes.length; i += 150) {
+      const r = await db.from('products').select('model_code').eq('user_id', userId).is('deleted_at', null).in('model_code', codes.slice(i, i + 150));
+      (r.data || []).forEach(x => existCodes.add(x.model_code));
+    }
+    items.forEach(it => {
+      it.exists = (it.url && existUrls.has(it.url)) || (it.model_code && existCodes.has(it.model_code));
+      if (it.exists) it.selected = false;
+    });
+  }
+
+  // ---------- Önizleme ----------
+  function problems(it) {
+    const p = [];
+    if (!(it.newPrice > 0)) p.push(['bad', t('wNoPrice')]);
+    if (!it.images.length) p.push(['bad', t('wNoImage')]);
+    if (!it.specs.length) p.push(['mid', t('wNoSpecs')]);
+    return p;
+  }
+  function filtered() {
+    if (filter === 'selected') return items.filter(i => i.selected);
+    if (filter === 'problem') return items.filter(i => problems(i).some(p => p[0] === 'bad'));
+    if (filter === 'exists') return items.filter(i => i.exists);
+    return items;
+  }
+  function setFilter(f) { filter = f; shown = PAGE_SIZE; renderPreview(); }
+
+  function renderPreview() {
+    const box = document.getElementById('previewBox');
+    const has = items.length > 0;
+    document.getElementById('step3').classList.toggle('disabled', !has);
+    document.getElementById('step4').classList.toggle('disabled', !has);
+    if (!has) { box.innerHTML = '<div class="empty-state">' + esc(t('noItems')) + '</div>'; updateImportBtn(); return; }
+
+    const r = rules();
+    const nSel = items.filter(i => i.selected).length;
+    const nProb = items.filter(i => problems(i).some(p => p[0] === 'bad')).length;
+    const nEx = items.filter(i => i.exists).length;
+    const chip = (key, label, n) => '<button class="chip' + (filter === key ? ' active' : '') + '" onclick="setFilter(\'' + key + '\')">' + esc(label) + ' <b>' + HS.number(n) + '</b></button>';
+    const list = filtered();
+    const visible = list.slice(0, shown);
+    const allChecked = list.length > 0 && list.every(i => i.selected);
+
+    const rows = visible.map(it => {
+      const idx = items.indexOf(it);
+      const cur = itemCurrency(it, r);
+      const img = it.images[0]
+        ? '<img class="thumb" loading="lazy" referrerpolicy="no-referrer" src="' + esc(it.images[0]) + '" onerror="this.outerHTML=\'<div class=thumb-empty>📦</div>\'">'
+        : '<div class="thumb-empty">📦</div>';
+      const meta = [it.brand || r.brand, it.model_code, r.category || it.category].filter(Boolean).map(esc).join(' · ');
+      const specs = it.specs.length
+        ? '<button class="spec-toggle" onclick="toggleSpecs(' + idx + ')">' + esc(fmt(t('specsN'), { n: it.specs.length })) + ' · ' + esc(it.open ? t('specsHide') : t('specsShow')) + '</button>' +
+          (it.open ? '<div class="spec-list">' + it.specs.slice(0, 40).map(s => '<div><span>' + esc(s.k) + ':</span> ' + esc(s.v) + '</div>').join('') + '</div>' : '')
+        : '<span class="muted">–</span>';
+      const warns = problems(it).map(p => '<span class="warn ' + (p[0] === 'bad' ? 'w-bad' : 'w-mid') + '">' + esc(p[1]) + '</span>');
+      if (it.exists) warns.unshift('<span class="warn w-exist">' + esc(t('wExists')) + '</span>');
+      const src = it.price > 0 ? HS.money(it.price, cur) : '–';
+      const lp = it.list_price > 0 ? '<div class="muted">PSF ' + esc(HS.money(it.list_price, cur)) + '</div>' : '';
+      return '<tr>' +
+        '<td><input type="checkbox" ' + (it.selected ? 'checked' : '') + ' onchange="toggleItem(' + idx + ', this.checked)"></td>' +
+        '<td>' + img + (it.images.length > 1 ? '<div class="img-count">' + esc(fmt(t('imgN'), { n: it.images.length })) + '</div>' : '') + '</td>' +
+        '<td><div class="pname">' + esc(it.name) + '</div>' + (meta ? '<div class="pmeta">' + meta + '</div>' : '') + '</td>' +
+        '<td>' + specs + '</td>' +
+        '<td class="num">' + esc(src) + lp + '</td>' +
+        '<td class="num"><input type="number" class="price-input" min="0" step="0.01" value="' + (it.newPrice > 0 ? it.newPrice.toFixed(2) : '') + '" onchange="editPrice(' + idx + ', this.value)"><div class="muted">' + esc(cur) + '</div></td>' +
+        '<td>' + (warns.length ? warns.join('') : '<span class="warn" style="background:#123222;color:#6ee7b7">' + esc(t('ok')) + '</span>') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    box.innerHTML =
+      '<div class="summary">' +
+        chip('all', t('fAll'), items.length) + chip('selected', t('fSelected'), nSel) +
+        chip('problem', t('fProblem'), nProb) + chip('exists', t('fExists'), nEx) +
+      '</div>' +
+      '<div class="table-wrap"><table><thead><tr>' +
+        '<th><input type="checkbox" title="' + esc(t('selectAll')) + '" ' + (allChecked ? 'checked' : '') + ' onchange="toggleAll(this.checked)"></th>' +
+        '<th></th><th>' + esc(t('thProduct')) + '</th><th>' + esc(t('thSpecs')) + '</th>' +
+        '<th class="num">' + esc(t('thSource')) + '</th><th class="num">' + esc(t('thNew')) + '</th><th>' + esc(t('thStatus')) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      (list.length > shown ? '<div class="more-row"><button class="btn-secondary btn-small" onclick="showMore()">' + esc(fmt(t('showMore'), { n: HS.number(Math.min(PAGE_SIZE, list.length - shown)) })) + '</button></div>' : '') +
+      '</div>';
+    updateImportBtn();
+  }
+  function showMore() { shown += PAGE_SIZE; renderPreview(); }
+  function toggleItem(i, v) { items[i].selected = v; renderPreview(); }
+  function toggleAll(v) { filtered().forEach(i => { i.selected = v; }); renderPreview(); }
+  function toggleSpecs(i) { items[i].open = !items[i].open; renderPreview(); }
+  function editPrice(i, v) {
+    const n = parseFloat(String(v).replace(',', '.'));
+    items[i].newPrice = n > 0 ? Math.round(n * 100) / 100 : null;
+    items[i].priceEdited = true;
+    renderPreview();
+  }
+
+  function updateImportBtn() {
+    const n = items.filter(i => i.selected).length;
+    const btn = document.getElementById('importBtn');
+    btn.textContent = fmt(t('importBtn'), { n: HS.number(n) });
+    btn.disabled = !n || !document.getElementById('consentChk').checked;
+  }
+
+  // ---------- Aktar ----------
+  function fullDescription(it) {
+    let d = (it.description || '').trim();
+    if (it.specs.length) {
+      d += (d ? '\n\n' : '') + t('specsHeader') + ':\n' + it.specs.map(s => '• ' + s.k + ': ' + s.v).join('\n');
+    }
+    return d.slice(0, 8000);
+  }
+
+  async function doImport() {
+    const sel = items.filter(i => i.selected);
+    if (!sel.length) return;
+    if (!document.getElementById('consentChk').checked) { toast(t('needConsent'), true); return; }
+    const r = rules();
+    const publish = document.getElementById('publishChk').checked;
+    const btn = document.getElementById('importBtn');
+    btn.disabled = true;
+    const resBox = document.getElementById('resultBox');
+    resBox.style.display = 'none';
+    document.getElementById('importProgress').style.display = 'block';
+
+    // Kullanım hakkı onayı kaydı
+    await db.from('import_consents').insert({ user_id: userId, source_url: sourceUrl, item_count: sel.length, consent_text: t('consentLog') });
+
+    let added = 0, failed = 0, lastErr = '';
+    const CHUNK = 40;
+    for (let i = 0; i < sel.length; i += CHUNK) {
+      const chunk = sel.slice(i, i + CHUNK);
+      document.getElementById('importText').textContent = fmt(t('importing'), { d: HS.number(Math.min(i + chunk.length, sel.length)), t: HS.number(sel.length) });
+      document.getElementById('importBar').style.width = ((i + chunk.length) / sel.length * 100) + '%';
+      try {
+        const rows = chunk.map(it => ({
+          user_id: userId,
+          name: it.name.slice(0, 300),
+          supplier_price: it.price > 0 ? it.price : 0,
+          weight_kg: 0,
+          platform: null,
+          commission_rate: 0,
+          sale_price: it.newPrice > 0 ? it.newPrice : 0,
+          generated_title: it.name.slice(0, 300),
+          generated_description: fullDescription(it),
+          supplier: null,
+          image_url: it.images[0] || null,
+          cost_currency: itemCurrency(it, r),
+          content_language: 'tr',
+          store_visible: publish,
+          specs: it.specs.length ? it.specs : null,
+          source_url: it.url || null,
+          model_code: it.model_code || null,
+          brand: r.brand || it.brand || null
+        }));
+        const ins = await db.from('products').insert(rows).select('id, source_url, model_code, name');
+        if (ins.error) throw ins.error;
+        const created = ins.data || [];
+        // Oluşan kayıtları ürünlerle eşleştir
+        const pairs = chunk.map((it, k) => {
+          let row = created[k];
+          if (!row || row.name !== rows[k].name) row = created.find(c => c.name === rows[k].name && (c.source_url || null) === rows[k].source_url && (c.model_code || null) === rows[k].model_code);
+          return row ? { it: it, id: row.id } : null;
+        }).filter(Boolean);
+
+        // Görseller
+        const imgRows = [];
+        pairs.forEach(p => p.it.images.slice(0, 12).forEach((u, pos) => imgRows.push({ product_id: p.id, user_id: userId, url: u, position: pos, source: 'import' })));
+        if (imgRows.length) await db.from('product_images').insert(imgRows);
+
+        // Kendi mağazada yayın
+        if (publish && pairs.length) {
+          const listingRows = [];
+          for (const p of pairs) {
+            let price = p.it.newPrice > 0 ? p.it.newPrice : 0;
+            const cur = itemCurrency(p.it, r);
+            if (cur !== 'TRY' && price > 0) {
+              const conv = await HS.convert(price, cur, 'TRY');
+              price = conv != null ? Math.round(conv * 100) / 100 : price;
+            }
+            listingRows.push({
+              user_id: userId, product_id: p.id, source_product_id: p.id,
+              marketplace_code: 'own_store', language: 'tr', currency: 'TRY',
+              title: p.it.name.slice(0, 300), description: fullDescription(p.it), keywords: [],
+              category_key: null, price: price, commission_pct: 0, vat_payer: 'seller',
+              price_mode: 'manual', status: 'published', published_at: new Date().toISOString()
+            });
+          }
+          const li = await db.from('listings').insert(listingRows).select('id, product_id, price, status');
+          if (li.error) throw li.error;
+          const ids = pairs.map(p => p.id);
+          const vr = await db.from('product_variants').select('id, product_id').in('product_id', ids).eq('is_default', true);
+          const vmap = {};
+          (vr.data || []).forEach(v => { vmap[v.product_id] = v.id; });
+          const lvRows = (li.data || []).filter(l => vmap[l.product_id]).map(l => ({ listing_id: l.id, variant_id: vmap[l.product_id], user_id: userId, price: l.price, status: l.status }));
+          if (lvRows.length) await db.from('listing_variants').insert(lvRows);
+        }
+        added += pairs.length;
+        pairs.forEach(p => { p.it.selected = false; p.it.exists = true; });
+      } catch (e) {
+        failed += chunk.length;
+        lastErr = e.message || String(e);
+        console.error(e);
+      }
+    }
+
+    document.getElementById('importProgress').style.display = 'none';
+    resBox.style.display = 'block';
+    if (failed) {
+      resBox.className = 'result err';
+      resBox.innerHTML = esc(fmt(t('importPartial'), { n: added, e: failed, m: lastErr })) + ' <a href="dashboard.html">' + esc(t('goPanel')) + '</a>';
+    } else {
+      resBox.className = 'result ok';
+      resBox.innerHTML = esc(fmt(t('importDone'), { n: HS.number(added) })) + ' <a href="dashboard.html">' + esc(t('goPanel')) + '</a>';
+    }
+    renderPreview();
+  }
+
+  window.addEventListener('beforeunload', (e) => {
+    if (running) { e.preventDefault(); e.returnValue = t('confirmLeave'); return t('confirmLeave'); }
+  });
+  document.getElementById('srcUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') startFetch(); });
+
+  // ---------- Başlat ----------
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    document.getElementById('stopBtn').style.display = 'none';
+    applyStatic();
+    await loadRules();
+    renderPreview();
+  })();
+
+  window.addEventListener('hs:langchange', () => { applyStatic(); renderPreview(); });
+</script>
+</body>
+</html>
