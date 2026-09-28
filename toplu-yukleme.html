@@ -386,6 +386,7 @@
       rowDel: 'Listeden çıkar',
       confirmDelSel: '{n} ürün önizleme listesinden çıkarılsın mı? (Panelindeki ürünler etkilenmez.)',
       confirmClear: 'Önizleme listesi tamamen temizlensin mi? (Panelindeki ürünler etkilenmez.)',
+      confirmDup: 'Seçtiğin ürünlerden {n} tanesi panelinde zaten var. Yine de tekrar eklensin mi? (Aynı üründen iki tane olur.)',
     },
     en: {
       pageTitle: 'HızlıSatıcı AI - Bulk Product Import',
@@ -497,6 +498,7 @@
       rowDel: 'Remove from list',
       confirmDelSel: 'Remove {n} products from the preview list? (Products in your dashboard are not affected.)',
       confirmClear: 'Clear the whole preview list? (Products in your dashboard are not affected.)',
+      confirmDup: '{n} of the selected products are already in your dashboard. Add them again anyway? (You will have duplicates.)',
     }
   });
 
@@ -763,7 +765,8 @@
     const chip = (key, label, n) => '<button class="chip' + (filter === key ? ' active' : '') + '" onclick="setFilter(\'' + key + '\')">' + esc(label) + ' <b>' + HS.number(n) + '</b></button>';
     const list = filtered();
     const visible = list.slice(0, shown);
-    const allChecked = list.length > 0 && list.every(i => i.selected);
+    const selectable = list.filter(i => !i.exists);
+    const allChecked = selectable.length > 0 && selectable.every(i => i.selected);
 
     const rows = visible.map(it => {
       const idx = items.indexOf(it);
@@ -824,7 +827,8 @@
     renderPreview();
   }
   function toggleItem(i, v) { items[i].selected = v; renderPreview(); }
-  function toggleAll(v) { filtered().forEach(i => { i.selected = v; }); renderPreview(); }
+  // "Tümünü seç" zaten ekli ürünleri atlar (tekrar eklenmesin)
+  function toggleAll(v) { filtered().forEach(i => { if (v && i.exists) return; i.selected = v; }); renderPreview(); }
   function toggleSpecs(i) { items[i].open = !items[i].open; renderPreview(); }
   function editPrice(i, v) {
     const n = parseFloat(String(v).replace(',', '.'));
@@ -1300,6 +1304,8 @@
     const sel = items.filter(i => i.selected);
     if (!sel.length) return;
     if (!document.getElementById('consentChk').checked) { toast(t('needConsent'), true); return; }
+    const dupN = sel.filter(i => i.exists).length;
+    if (dupN && !confirm(fmt(t('confirmDup'), { n: dupN }))) return;
     const r = rules();
     const publish = document.getElementById('publishChk').checked;
     const btn = document.getElementById('importBtn');
