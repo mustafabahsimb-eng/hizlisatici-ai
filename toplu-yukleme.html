@@ -115,6 +115,9 @@
   .w-mid { background: #2a2410; color: #e6c96a; }
   .w-exist { background: #142230; color: #7db8e6; }
   .more-row { text-align: center; padding: 12px; }
+  .lookup-bar { display: none; font-size: 13px; color: #c3c9d4; background: #11151d; border: 1px solid #232838; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; line-height: 1.6; }
+  .lookup-bar b { color: #fff; }
+  .lookup-bar a { color: #6ee7b7; cursor: pointer; text-decoration: underline; }
 
   .consent { background: #11151d; border: 1px solid #2a3040; border-radius: 10px; padding: 14px; margin: 16px 0; }
   .result { margin-top: 14px; font-size: 14px; line-height: 1.6; display: none; }
@@ -250,6 +253,7 @@
   <!-- 3) Önizleme -->
   <div class="step disabled" id="step3">
     <div class="step-head"><div class="step-num">3</div><div class="step-title" data-t="s3Title"></div></div>
+    <div class="lookup-bar" id="lookupBar"></div>
     <div id="previewBox"><div class="empty-state" data-t="noItems"></div></div>
   </div>
 
@@ -387,6 +391,16 @@
       confirmDelSel: '{n} ürün önizleme listesinden çıkarılsın mı? (Panelindeki ürünler etkilenmez.)',
       confirmClear: 'Önizleme listesi tamamen temizlensin mi? (Panelindeki ürünler etkilenmez.)',
       confirmDup: 'Seçtiğin ürünlerden {n} tanesi panelinde zaten var. Yine de tekrar eklensin mi? (Aynı üründen iki tane olur.)',
+      lkFindingSite: '🌐 Üreticinin sitesi bulunuyor...',
+      lkRunning: '🌐 Eksik resim ve özellikler <b>{site}</b> sitesinden tamamlanıyor... ({d} / {t})',
+      lkDone: '🌐 Eksik resim ve özellikler <b>{site}</b> sitesinden alındı · <b>{f}</b> bulundu, <b>{n}</b> bulunamadı',
+      lkStopped: '🌐 Durduruldu · <b>{site}</b> sitesinden <b>{f}</b> ürün tamamlandı',
+      lkNoSite: '🌐 Üreticinin sitesi bulunamadı, eksik resim ve özellikler tamamlanamadı.',
+      lkChange: 'değiştir',
+      lkSetSite: 'siteyi yaz',
+      lkAsk: 'Üreticinin sitesini yaz (ör. cenova.com.tr):',
+      lkBadSite: 'Geçerli bir site adresi yaz (ör. cenova.com.tr).',
+      wNotFound: 'Sitede bulunamadı',
     },
     en: {
       pageTitle: 'HızlıSatıcı AI - Bulk Product Import',
@@ -499,6 +513,16 @@
       confirmDelSel: 'Remove {n} products from the preview list? (Products in your dashboard are not affected.)',
       confirmClear: 'Clear the whole preview list? (Products in your dashboard are not affected.)',
       confirmDup: '{n} of the selected products are already in your dashboard. Add them again anyway? (You will have duplicates.)',
+      lkFindingSite: '🌐 Finding the manufacturer\'s website...',
+      lkRunning: '🌐 Completing missing images and specs from <b>{site}</b>... ({d} / {t})',
+      lkDone: '🌐 Missing images and specs were taken from <b>{site}</b> · <b>{f}</b> found, <b>{n}</b> not found',
+      lkStopped: '🌐 Stopped · <b>{f}</b> products completed from <b>{site}</b>',
+      lkNoSite: '🌐 The manufacturer\'s website could not be found, so missing images and specs were not completed.',
+      lkChange: 'change',
+      lkSetSite: 'enter the site',
+      lkAsk: 'Enter the manufacturer\'s website (e.g. cenova.com.tr):',
+      lkBadSite: 'Enter a valid website (e.g. cenova.com.tr).',
+      wNotFound: 'Not found on site',
     }
   });
 
@@ -517,6 +541,10 @@
   let running = false;
   let stopFlag = false;
   let sourceUrl = '';
+  let lookupSite = '';     // üreticinin sitesi (ör. cenova.com.tr), kurallarla birlikte kaydedilir
+  let lookupTpl = '';      // o sitede arama adresi şablonu
+  let lookupSkip = false;  // sitenin kendi araması çalışmıyorsa atla
+  let lookupState = null;  // { mode: 'finding'|'running'|'done'|'stopped'|'nosite', d, t, f, n }
 
   function fmt(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m); }
   function toast(msg, isErr) {
@@ -547,6 +575,8 @@
       currency: document.getElementById('rCurrency').value,
       category: document.getElementById('rCategory').value.trim(),
       brand: document.getElementById('rBrand').value.trim(),
+      site: lookupSite,
+      siteSearch: lookupTpl,
     };
   }
   function applyRuleValues(r) {
@@ -557,6 +587,8 @@
     if (r.currency) document.getElementById('rCurrency').value = r.currency;
     if (r.category != null) document.getElementById('rCategory').value = r.category;
     if (r.brand != null) document.getElementById('rBrand').value = r.brand;
+    if (r.site) lookupSite = r.site;
+    if (r.siteSearch) lookupTpl = r.siteSearch;
   }
   function roundPrice(v, mode) {
     if (!(v > 0)) return null;
@@ -781,6 +813,7 @@
         : '<span class="muted">–</span>';
       const warns = problems(it).map(p => '<span class="warn ' + (p[0] === 'bad' ? 'w-bad' : 'w-mid') + '">' + esc(p[1]) + '</span>');
       if (it.exists) warns.unshift('<span class="warn w-exist">' + esc(t('wExists')) + '</span>');
+      if (it.lookupDone && !it.lookupFound) warns.push('<span class="warn w-mid">' + esc(t('wNotFound')) + '</span>');
       const src = it.price > 0 ? HS.money(it.price, cur) : '–';
       const lp = it.list_price > 0 ? '<div class="muted">PSF ' + esc(HS.money(it.list_price, cur)) + '</div>' : '';
       return '<tr>' +
@@ -824,6 +857,8 @@
   function clearList() {
     if (!items.length || !confirm(t('confirmClear'))) return;
     items = []; filter = 'all'; shown = PAGE_SIZE;
+    lookupState = null;
+    renderLookupBar();
     renderPreview();
   }
   function toggleItem(i, v) { items[i].selected = v; renderPreview(); }
@@ -1139,6 +1174,7 @@
     } finally {
       running = false;
     }
+    if (priceRows.length) await autoComplete();
   }
 
   function findRow(code, byNorm) {
@@ -1248,6 +1284,7 @@
     unmatchedRows = [];
     renderFileResult(null);
     renderPreview();
+    autoComplete();
   }
 
   async function applyDbUpdates() {
@@ -1269,6 +1306,144 @@
     dbUpdates = dbUpdates.filter(u => !u.selected);
     renderFileResult(null);
     toast(fail ? fmt(t('updFail'), { n: ok, e: fail, m: lastErr }) : fmt(t('updDone'), { n: ok }), !!fail);
+  }
+
+  // ---------- Eksikleri üretici sitesinden tamamla (otomatik) ----------
+  async function callLookup(body) {
+    const res = await fetch(HS.SUPABASE_URL + '/functions/v1/product-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify(Object.assign({ language: HS.lang }, body))
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  }
+  function normSiteC(v) {
+    const s = String(v || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[\/?#\s]/)[0];
+    return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(s) ? s : '';
+  }
+  // Site bilgisini kurallara ekle (diğer kural ayarlarına dokunmadan)
+  async function saveRulesPatch(patch) {
+    try {
+      const cur = await db.from('import_rules').select('rules').eq('user_id', userId).maybeSingle();
+      const r = Object.assign({}, (cur.data && cur.data.rules) || {}, patch);
+      await db.from('import_rules').upsert({ user_id: userId, rules: r, updated_at: new Date().toISOString() });
+    } catch (e) { console.warn('rules patch', e); }
+  }
+  function needsLookup(it) {
+    return !it.lookupDone && normCode(it.model_code).length >= 3 && (!it.images.length || !it.specs.length);
+  }
+  function renderLookupBar() {
+    const el = document.getElementById('lookupBar');
+    const s = lookupState;
+    if (!s) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    const site = esc(lookupSite);
+    let h = '';
+    if (s.mode === 'finding') h = esc(t('lkFindingSite'));
+    else if (s.mode === 'running') h = fmt(t('lkRunning'), { site: site, d: HS.number(s.d), t: HS.number(s.t) });
+    else if (s.mode === 'done') h = fmt(t('lkDone'), { site: site, f: HS.number(s.f), n: HS.number(s.n) }) + ' · <a onclick="changeSite()">' + esc(t('lkChange')) + '</a>';
+    else if (s.mode === 'stopped') h = fmt(t('lkStopped'), { site: site, f: HS.number(s.f) }) + ' · <a onclick="changeSite()">' + esc(t('lkChange')) + '</a>';
+    else if (s.mode === 'nosite') h = esc(t('lkNoSite')) + ' <a onclick="changeSite()">' + esc(t('lkSetSite')) + '</a>';
+    el.innerHTML = h;
+  }
+  function mergeLookup(it, x, url) {
+    it.lkFilled = it.lkFilled || {};
+    if (!it.images.length && Array.isArray(x.images) && x.images.length) { it.images = x.images.slice(0, 12); it.lkFilled.images = true; }
+    if (!it.specs.length && Array.isArray(x.specs) && x.specs.length) { it.specs = x.specs.slice(0, 80); it.lkFilled.specs = true; }
+    if (!it.description && x.description) { it.description = x.description; it.lkFilled.description = true; }
+    if (!it.brand && x.brand) { it.brand = x.brand; it.lkFilled.brand = true; }
+    if (!it.category && x.category) { it.category = x.category; it.lkFilled.category = true; }
+    if (!it.url && url) { it.url = url; it.lkFilled.url = true; }
+  }
+  // Önceki siteden gelen bilgileri geri al (site değiştirilince)
+  function undoLookup(it) {
+    const f = it.lkFilled || {};
+    if (f.images) it.images = [];
+    if (f.specs) it.specs = [];
+    if (f.description) it.description = '';
+    if (f.brand) it.brand = '';
+    if (f.category) it.category = '';
+    if (f.url) it.url = '';
+    it.lkFilled = {};
+    it.lookupDone = false;
+    it.lookupFound = false;
+  }
+
+  async function autoComplete() {
+    if (running) return;
+    const todo = items.filter(needsLookup);
+    if (!todo.length) return;
+    running = true; stopFlag = false;
+    document.getElementById('stopBtn').style.display = '';
+    try {
+      // 1) Site bilinmiyorsa kendimiz bulalım
+      if (!lookupSite) {
+        lookupState = { mode: 'finding' }; renderLookupBar();
+        const r = rules();
+        const brand = r.brand || (items.find(i => i.brand) || {}).brand || '';
+        try {
+          const res = await callLookup({ action: 'site', brand: brand, hint: sourceUrl, samples: todo.slice(0, 8).map(i => ({ code: i.model_code, name: i.name })) });
+          const site = normSiteC(res.site);
+          if (site) { lookupSite = site; lookupTpl = ''; lookupSkip = false; await saveRulesPatch({ site: site, siteSearch: '' }); }
+        } catch (e) { console.warn('site', e); }
+      }
+      if (!lookupSite) { lookupState = { mode: 'nosite' }; renderLookupBar(); return; }
+
+      // 2) Her ürünü sitede ara (aynı anda 4 ürün)
+      const r = rules();
+      let idx = 0, d = 0, f = 0, noTpl = 0;
+      const total = todo.length;
+      lookupState = { mode: 'running', d: 0, t: total }; renderLookupBar();
+      const worker = async () => {
+        while (idx < total && !stopFlag) {
+          const it = todo[idx++];
+          try {
+            const res = await callLookup({
+              action: 'find', site: lookupSite, brand: r.brand || it.brand || '', code: it.model_code, name: it.name,
+              searchTpl: lookupTpl, skipSiteSearch: lookupSkip
+            });
+            if (res.searchTpl && res.searchTpl !== lookupTpl) { lookupTpl = res.searchTpl; saveRulesPatch({ siteSearch: lookupTpl }); }
+            if (!lookupTpl && ++noTpl >= 3) lookupSkip = true; // sitenin araması çalışmıyor, sadece internet aramasıyla devam
+            it.lookupDone = true;
+            it.lookupFound = !!res.found;
+            if (res.found && res.item) { mergeLookup(it, res.item, res.url); f++; }
+          } catch (e) {
+            console.warn('lookup', it.model_code, e);
+            it.lookupDone = true; it.lookupFound = false;
+          }
+          d++;
+          lookupState = { mode: 'running', d: d, t: total }; renderLookupBar();
+          if (d % 4 === 0) renderPreview();
+        }
+      };
+      await Promise.all(Array.from({ length: 4 }, worker));
+      const nf = todo.filter(i => i.lookupDone && !i.lookupFound).length;
+      lookupState = stopFlag ? { mode: 'stopped', f: f } : { mode: 'done', f: f, n: nf };
+      renderLookupBar();
+    } finally {
+      running = false;
+      document.getElementById('stopBtn').style.display = 'none';
+      renderPreview();
+    }
+  }
+
+  async function changeSite() {
+    if (running) return;
+    const v = prompt(t('lkAsk'), lookupSite || '');
+    if (v == null) return;
+    const site = normSiteC(v);
+    if (!site) { toast(t('lkBadSite'), true); return; }
+    if (site !== lookupSite) {
+      lookupSite = site; lookupTpl = ''; lookupSkip = false;
+      await saveRulesPatch({ site: site, siteSearch: '' });
+      items.forEach(it => { if (it.lookupDone) undoLookup(it); });
+    } else {
+      items.forEach(it => { if (it.lookupDone && !it.lookupFound) undoLookup(it); });
+    }
+    renderPreview();
+    await autoComplete();
   }
 
   // ---------- Aktar ----------
