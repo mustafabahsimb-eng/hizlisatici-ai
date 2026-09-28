@@ -169,6 +169,7 @@
       <div class="subtitle" id="productCountText" data-i18n="common.loading">Yükleniyor...</div>
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn-secondary" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
       <button class="btn-secondary" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
       <button class="btn-secondary" onclick="go('orders.html')" data-i18n="menu.orders">📦 Siparişler</button>
       <button class="btn-secondary" onclick="go('musteri-sorulari.html')" data-i18n="menu.questions">💬 Müşteri Soruları</button>
@@ -283,6 +284,7 @@
       'menu.chat': '💬 Sohbetle Yönet',
       'menu.orders': '📦 Siparişler',
       'menu.questions': '💬 Müşteri Soruları',
+      'menu.admin': '🛡️ Admin Paneli',
       'menu.accounts': '🔑 Hesaplarım',
       'menu.report': '📊 Kâr-Zarar Raporu',
       'menu.trends': '🔥 Trend ürünler',
@@ -400,6 +402,7 @@
       'menu.chat': '💬 Manage by Chat',
       'menu.orders': '📦 Orders',
       'menu.questions': '💬 Customer Questions',
+      'menu.admin': '🛡️ Admin Panel',
       'menu.accounts': '🔑 My Accounts',
       'menu.report': '📊 Profit & Loss',
       'menu.trends': '🔥 Trending products',
@@ -503,6 +506,10 @@
     if (!ctx) return;
     document.getElementById('userEmail').textContent = ctx.user.email;
     window.addEventListener('hs:langchange', () => renderAll());
+    // Admin menü linki sadece yöneticilere görünür
+    HS.db.rpc('hs_is_admin').then(r => {
+      if (r && r.data === true) document.getElementById('adminBtn').style.display = '';
+    }, () => {});
     await loadProducts();
   }
 
