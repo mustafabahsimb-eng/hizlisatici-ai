@@ -49,6 +49,15 @@
   .src-tab { background: #0d0f16; border: 1px solid #2a3040; color: #9aa3b2; padding: 8px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; }
   .src-tab.active { border-color: #1D9E75; color: #fff; background: #123222; }
   .src-tab:disabled { opacity: .5; cursor: not-allowed; }
+  .drop { border: 2px dashed #2a3040; border-radius: 12px; padding: 26px 16px; text-align: center; color: #9aa3b2; font-size: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop:hover, .drop.over { border-color: #1D9E75; background: #0f1a16; color: #fff; }
+  .drop b { color: #fff; }
+  .file-result { margin-top: 14px; background: #11151d; border: 1px solid #232838; border-radius: 12px; padding: 14px; display: none; }
+  .file-result .stat-line { font-size: 14px; color: #e6e8ee; line-height: 1.7; }
+  .file-result .stat-line b { color: #6ee7b7; }
+  .up { color: #f28b8b; } .down { color: #6ee7b7; }
+  details summary { cursor: pointer; color: #9aa3b2; font-size: 13px; margin-top: 10px; }
+  .mini-table td, .mini-table th { padding: 7px 10px; font-size: 12px; }
 
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .spacer { flex: 1; }
@@ -152,14 +161,31 @@
   <div class="step" id="step1">
     <div class="step-head"><div class="step-num">1</div><div class="step-title" data-t="s1Title"></div></div>
     <div class="src-tabs">
-      <button class="src-tab active" data-t="tabLink"></button>
-      <button class="src-tab" disabled data-t="tabFile"></button>
+      <button class="src-tab active" id="tabLinkBtn" onclick="setSrc('link')" data-t="tabLink"></button>
+      <button class="src-tab" id="tabFileBtn" onclick="setSrc('file')" data-t="tabFile"></button>
     </div>
-    <div class="row">
-      <input type="url" class="grow" id="srcUrl" autocomplete="off">
-      <button class="btn-primary" id="fetchBtn" onclick="startFetch()" data-t="fetchBtn"></button>
+    <div id="linkPanel">
+      <div class="row">
+        <input type="url" class="grow" id="srcUrl" autocomplete="off">
+        <button class="btn-primary" id="fetchBtn" onclick="startFetch()" data-t="fetchBtn"></button>
+      </div>
+      <div class="hint" data-th="s1Hint"></div>
     </div>
-    <div class="hint" data-th="s1Hint"></div>
+    <div id="filePanel" style="display:none">
+      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" style="display:none" onchange="onFilePicked(this.files[0]); this.value='';">
+      <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()" data-th="dropText"></div>
+      <div class="row" style="margin-top:12px">
+        <label class="muted" data-t="vatLabel" style="font-size:13px;color:#c3c9d4"></label>
+        <select id="vatSel">
+          <option value="0" data-t="vat0"></option>
+          <option value="20" data-t="vat20"></option>
+          <option value="10" data-t="vat10"></option>
+          <option value="1" data-t="vat1"></option>
+        </select>
+      </div>
+      <div class="hint" data-th="fileHint"></div>
+      <div class="file-result" id="fileResult"></div>
+    </div>
     <div class="progress" id="progress">
       <div class="progress-text" id="progressText"></div>
       <div class="bar"><div id="progressBar"></div></div>
@@ -258,7 +284,31 @@
       subtitle: 'Tedarikçinin linkini yapıştır; ürünler resimleri, açıklamaları ve teknik özellikleriyle gelsin. Excel doldurmak yok.',
       s1Title: 'Kaynak',
       tabLink: '🔗 Link yapıştır',
-      tabFile: '📄 Dosya yükle (PDF/Excel) · yakında',
+      tabFile: '📄 Fiyat listesi yükle (PDF/Excel)',
+      dropText: '📄 <b>PDF, Excel ya da CSV fiyat listesini</b> buraya sürükle ya da tıklayıp seç',
+      fileHint: 'Fiyat listesindeki <b>model kodları</b>, yukarıda linkten çektiğin ürünlerle ve panelindeki ürünlerle eşleştirilir; fiyatlar otomatik dolar. İpucu: önce "🔗 Link yapıştır" ile ürünleri çek, sonra buraya fiyat listesini yükle.',
+      vatLabel: 'Listedeki fiyatlar:',
+      vat0: 'KDV dahil / olduğu gibi kullan',
+      vat20: 'KDV hariç → %20 KDV ekle',
+      vat10: 'KDV hariç → %10 KDV ekle',
+      vat1: 'KDV hariç → %1 KDV ekle',
+      fileReading: 'Fiyat listesi okunuyor... ({d} / {t} parça)',
+      fileLib: 'Dosya hazırlanıyor...',
+      fileBad: 'Bu dosya türü desteklenmiyor. PDF, XLSX, XLS ya da CSV yükle.',
+      fileNoRows: 'Dosyada fiyatlı ürün satırı bulunamadı.',
+      fileNoCols: 'Excel sütunları anlaşılamadı. İlk satırda "Model/Kod" ve "Fiyat" başlıkları olmalı.',
+      fileSummary: '<b>{n}</b> fiyat okundu. Önizlemedeki <b>{p}</b> ürünün fiyatı dolduruldu. Panelindeki <b>{u}</b> üründe fiyat değişikliği var. <b>{x}</b> satır eşleşmedi.',
+      updTitle: 'Panelindeki ürünlerde fiyat güncellemesi',
+      updBtn: '💾 Fiyatları güncelle ({n})',
+      updDone: '✓ {n} ürünün fiyatı güncellendi.',
+      updFail: '{n} ürün güncellendi, {e} ürün güncellenemedi: {m}',
+      thCode: 'Model kodu',
+      thOldCost: 'Eski alış',
+      thNewCost: 'Yeni alış',
+      thNewSale: 'Yeni satış',
+      unmatchedTitle: 'Eşleşmeyen {n} satırı göster',
+      addUnmatched: '➕ Eşleşmeyenleri de önizlemeye ekle ({n})',
+      addedUnmatched: '{n} ürün önizlemeye eklendi (resim ve özellikleri yok; istersen linkten çekip tamamlayabilirsin).',
       urlPh: 'https://tedarikci.com/kategori/ip-kameralar  veya  https://.../bayi.xml',
       fetchBtn: '🔍 Ürünleri Çek',
       s1Hint: '<b>Tek ürün linki</b> → o ürün gelir. <b>Kategori linki</b> → o kategorideki tüm ürünler (sayfa sayfa) gelir. <b>XML linki</b> (bayi panelindeki XML entegrasyon adresi) → firmanın tüm ürünleri saniyeler içinde gelir; en hızlısı budur.',
@@ -335,7 +385,31 @@
       subtitle: 'Paste your supplier\'s link; products arrive with images, descriptions and technical specs. No spreadsheets.',
       s1Title: 'Source',
       tabLink: '🔗 Paste a link',
-      tabFile: '📄 Upload a file (PDF/Excel) · soon',
+      tabFile: '📄 Upload price list (PDF/Excel)',
+      dropText: '📄 Drag your <b>PDF, Excel or CSV price list</b> here or click to choose',
+      fileHint: 'The <b>model codes</b> in the price list are matched with the products fetched above and with the products in your dashboard; prices fill in automatically. Tip: fetch products with "🔗 Paste a link" first, then upload the price list here.',
+      vatLabel: 'Prices in the list:',
+      vat0: 'VAT included / use as is',
+      vat20: 'VAT excluded → add 20% VAT',
+      vat10: 'VAT excluded → add 10% VAT',
+      vat1: 'VAT excluded → add 1% VAT',
+      fileReading: 'Reading the price list... ({d} / {t} parts)',
+      fileLib: 'Preparing the file...',
+      fileBad: 'This file type is not supported. Upload PDF, XLSX, XLS or CSV.',
+      fileNoRows: 'No priced product rows were found in the file.',
+      fileNoCols: 'Could not understand the spreadsheet columns. The first row should have "Model/Code" and "Price" headers.',
+      fileSummary: '<b>{n}</b> prices read. Prices filled for <b>{p}</b> products in the preview. <b>{u}</b> products in your dashboard have price changes. <b>{x}</b> rows did not match.',
+      updTitle: 'Price updates for products in your dashboard',
+      updBtn: '💾 Update prices ({n})',
+      updDone: '✓ Prices updated for {n} products.',
+      updFail: '{n} products updated, {e} failed: {m}',
+      thCode: 'Model code',
+      thOldCost: 'Old cost',
+      thNewCost: 'New cost',
+      thNewSale: 'New price',
+      unmatchedTitle: 'Show {n} unmatched rows',
+      addUnmatched: '➕ Add unmatched rows to the preview too ({n})',
+      addedUnmatched: '{n} products added to the preview (no images or specs; you can fetch them from a link to complete them).',
       urlPh: 'https://supplier.com/category/ip-cameras  or  https://.../dealer.xml',
       fetchBtn: '🔍 Fetch Products',
       s1Hint: '<b>Single product link</b> → that product. <b>Category link</b> → every product in that category (page by page). <b>XML link</b> (the XML integration address in your dealer panel) → all of the supplier\'s products in seconds; the fastest option.',
@@ -726,6 +800,290 @@
     const btn = document.getElementById('importBtn');
     btn.textContent = fmt(t('importBtn'), { n: HS.number(n) });
     btn.disabled = !n || !document.getElementById('consentChk').checked;
+  }
+
+  // ---------- Kaynak sekmeleri ----------
+  let srcMode = 'link';
+  function setSrc(m) {
+    srcMode = m;
+    document.getElementById('tabLinkBtn').classList.toggle('active', m === 'link');
+    document.getElementById('tabFileBtn').classList.toggle('active', m === 'file');
+    document.getElementById('linkPanel').style.display = m === 'link' ? '' : 'none';
+    document.getElementById('filePanel').style.display = m === 'file' ? '' : 'none';
+  }
+
+  // ---------- Fiyat listesi (PDF / Excel / CSV) ----------
+  let priceRows = [];
+  let unmatchedRows = [];
+  let dbUpdates = [];
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('script'));
+      document.head.appendChild(s);
+    });
+  }
+  function bytesToBase64(bytes) {
+    let bin = '';
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+  function normCode(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function numVal(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return v > 0 ? Math.round(v * 100) / 100 : null;
+    let s = String(v).replace(/[^\d.,]/g, '');
+    if (!s) return null;
+    const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+    if (lc > -1 && ld > -1) s = lc > ld ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    else if (lc > -1) s = /,\d{1,2}$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '');
+    else if (ld > -1) { const pp = s.split('.'); if (pp.length > 2 || pp[1].length === 3) s = s.replace(/\./g, ''); }
+    const n = parseFloat(s);
+    return n > 0 ? Math.round(n * 100) / 100 : null;
+  }
+  function curOf(v) {
+    const s = String(v || '').toUpperCase();
+    if (/TRY|TL|₺/.test(s)) return 'TRY';
+    if (/USD|\$/.test(s)) return 'USD';
+    if (/EUR|€/.test(s)) return 'EUR';
+    if (/GBP|£/.test(s)) return 'GBP';
+    return null;
+  }
+
+  (function setupDrop() {
+    const dz = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
+    dz.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) onFilePicked(f); });
+  })();
+
+  async function readPdf(file) {
+    setProgress(t('fileLib'), 5);
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
+    const src = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    const n = src.getPageCount();
+    const PER = 3;
+    const parts = [];
+    for (let i = 0; i < n; i += PER) {
+      const doc = await PDFLib.PDFDocument.create();
+      const idx = [];
+      for (let k = i; k < Math.min(n, i + PER); k++) idx.push(k);
+      const pages = await doc.copyPages(src, idx);
+      pages.forEach(pg => doc.addPage(pg));
+      parts.push(await doc.save());
+    }
+    const out = new Array(parts.length);
+    let done = 0, next = 0, lastErr = '';
+    setProgress(fmt(t('fileReading'), { d: 0, t: parts.length }), 10);
+    const worker = async () => {
+      while (next < parts.length) {
+        const my = next++;
+        try {
+          const res = await fetch(HS.SUPABASE_URL + '/functions/v1/price-list-parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+            body: JSON.stringify({ pdfBase64: 'data:application/pdf;base64,' + bytesToBase64(parts[my]), language: HS.lang })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+          out[my] = data.rows || [];
+        } catch (e) { lastErr = e.message; out[my] = []; }
+        done++;
+        setProgress(fmt(t('fileReading'), { d: done, t: parts.length }), 10 + done / parts.length * 90);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, parts.length) }, worker));
+    const rows = [].concat.apply([], out);
+    if (!rows.length && lastErr) throw new Error(lastErr);
+    return rows;
+  }
+
+  async function readSheet(file) {
+    setProgress(t('fileLib'), 10);
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const rows = [];
+    for (const name of wb.SheetNames) {
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
+      // Başlık satırını bul (ilk 20 satır içinde)
+      let hi = -1, col = null;
+      for (let r = 0; r < Math.min(20, data.length); r++) {
+        const h = data[r].map(x => String(x || '').toLowerCase());
+        const find = (re, not) => h.findIndex(x => re.test(x) && !(not && not.test(x)));
+        const code = find(/model|kod|code|sku|stok\s*no|ürün\s*no|urun\s*no|mpn/);
+        const list = find(/psf|tavsiye|liste|perakende|retail|msrp|son\s*kullan/);
+        let price = find(/bayi|net|alış|alis|dealer|maliyet/);
+        if (price < 0) price = find(/fiyat|price|tutar|birim/, /psf|tavsiye|liste|perakende|retail|msrp/);
+        if (code >= 0 && (price >= 0 || list >= 0)) {
+          col = { code, price, list, name: find(/ürün\s*ad|urun\s*ad|açıklama|aciklama|tanım|tanim|name|description|isim|ürün$|urun$/, /kod|code/), cur: find(/döviz|doviz|para|currency|kur|birim$/) };
+          hi = r; break;
+        }
+      }
+      if (hi < 0) continue;
+      const headerCur = curOf(data[hi].join(' '));
+      for (let r = hi + 1; r < data.length; r++) {
+        const row = data[r];
+        const code = String(row[col.code] || '').trim();
+        const price = col.price >= 0 ? numVal(row[col.price]) : null;
+        const list = col.list >= 0 ? numVal(row[col.list]) : null;
+        if (!code || (!price && !list)) continue;
+        rows.push({
+          code: code.slice(0, 80),
+          name: col.name >= 0 ? String(row[col.name] || '').slice(0, 200) : '',
+          price: price || list, list_price: price ? list : null,
+          currency: (col.cur >= 0 ? curOf(row[col.cur]) : null) || curOf(col.price >= 0 ? row[col.price] : '') || headerCur
+        });
+      }
+    }
+    if (!rows.length) throw new Error(t('fileNoCols'));
+    return rows;
+  }
+
+  async function onFilePicked(file) {
+    if (!file || running) return;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const box = document.getElementById('fileResult');
+    box.style.display = 'none';
+    if (!['pdf', 'xlsx', 'xls', 'csv'].includes(ext)) { toast(t('fileBad'), true); return; }
+    running = true;
+    document.getElementById('stopBtn').style.display = 'none';
+    try {
+      let rows = ext === 'pdf' ? await readPdf(file) : await readSheet(file);
+      const vat = parseFloat(document.getElementById('vatSel').value) || 0;
+      if (vat) rows = rows.map(r => Object.assign({}, r, {
+        price: r.price ? Math.round(r.price * (1 + vat / 100) * 100) / 100 : r.price,
+        list_price: r.list_price ? Math.round(r.list_price * (1 + vat / 100) * 100) / 100 : r.list_price
+      }));
+      priceRows = rows;
+      if (!rows.length) throw new Error(t('fileNoRows'));
+      sourceUrl = file.name;
+      await applyPriceList();
+      setProgress(fmt(t('feedDone'), { n: HS.number(rows.length) }).replace('XML', ext.toUpperCase()), 100);
+    } catch (e) {
+      setProgress(t('fnError') + e.message, 0);
+      toast(t('fnError') + e.message, true);
+    } finally {
+      running = false;
+    }
+  }
+
+  function findRow(code, byNorm) {
+    const n = normCode(code);
+    if (!n) return null;
+    if (byNorm.has(n)) return byNorm.get(n);
+    if (n.length < 5) return null;
+    let hit = null, count = 0;
+    byNorm.forEach((row, k) => { if (k.length >= 5 && (k.includes(n) || n.includes(k))) { hit = row; count++; } });
+    return count === 1 ? hit : null;
+  }
+
+  async function applyPriceList() {
+    const r = rules();
+    const byNorm = new Map();
+    priceRows.forEach(row => { const k = normCode(row.code); if (k && !byNorm.has(k)) byNorm.set(k, row); });
+    const used = new Set();
+
+    // 1) Önizlemedeki ürünler
+    let filled = 0;
+    items.forEach(it => {
+      const row = findRow(it.model_code, byNorm);
+      if (!row) return;
+      used.add(row);
+      it.price = row.price;
+      if (row.list_price) it.list_price = row.list_price;
+      if (row.currency) it.currency = row.currency;
+      if (!it.priceEdited) it.newPrice = calcPrice(it, r);
+      filled++;
+    });
+    const previewCodes = new Set(items.map(i => normCode(i.model_code)).filter(Boolean));
+
+    // 2) Paneldeki mevcut ürünler
+    dbUpdates = [];
+    const res = await db.from('products').select('id, name, model_code, supplier_price, sale_price, cost_currency')
+      .eq('user_id', userId).is('deleted_at', null).not('model_code', 'is', null).limit(5000);
+    (res.data || []).forEach(p => {
+      if (previewCodes.has(normCode(p.model_code))) return;
+      const row = findRow(p.model_code, byNorm);
+      if (!row) return;
+      used.add(row);
+      const it = { price: row.price, list_price: row.list_price };
+      const newSale = calcPrice(it, r);
+      const cur = (r.currency && r.currency !== 'auto') ? r.currency : (row.currency || p.cost_currency || 'TRY');
+      if (Number(p.supplier_price) === row.price && Number(p.sale_price) === newSale) return;
+      dbUpdates.push({ id: p.id, name: p.name, code: p.model_code, oldCost: Number(p.supplier_price) || 0, newCost: row.price, oldSale: Number(p.sale_price) || 0, newSale: newSale, cur: cur, selected: true });
+    });
+
+    unmatchedRows = priceRows.filter(row => !used.has(row));
+    renderFileResult(filled);
+    renderPreview();
+  }
+
+  function renderFileResult(filled) {
+    const box = document.getElementById('fileResult');
+    box.style.display = 'block';
+    let h = '<div class="stat-line">' + fmt(t('fileSummary'), { n: HS.number(priceRows.length), p: HS.number(filled || 0), u: HS.number(dbUpdates.length), x: HS.number(unmatchedRows.length) }) + '</div>';
+    if (dbUpdates.length) {
+      h += '<div style="margin-top:14px;font-weight:600;color:#fff;font-size:14px">' + esc(t('updTitle')) + '</div>' +
+        '<div class="table-wrap" style="margin-top:8px"><table class="mini-table"><thead><tr><th></th><th>' + esc(t('thProduct')) + '</th><th>' + esc(t('thCode')) + '</th>' +
+        '<th class="num">' + esc(t('thOldCost')) + '</th><th class="num">' + esc(t('thNewCost')) + '</th><th class="num">' + esc(t('thNewSale')) + '</th></tr></thead><tbody>' +
+        dbUpdates.slice(0, 300).map((u, i) => '<tr><td><input type="checkbox" ' + (u.selected ? 'checked' : '') + ' onchange="dbUpdates[' + i + '].selected=this.checked;updBtnText()"></td>' +
+          '<td>' + esc(u.name || '') + '</td><td>' + esc(u.code) + '</td>' +
+          '<td class="num">' + esc(HS.money(u.oldCost, u.cur)) + '</td>' +
+          '<td class="num ' + (u.newCost > u.oldCost ? 'up' : 'down') + '">' + esc(HS.money(u.newCost, u.cur)) + '</td>' +
+          '<td class="num">' + (u.newSale ? esc(HS.money(u.newSale, u.cur)) : '–') + '</td></tr>').join('') +
+        '</tbody></table></div>' +
+        '<div class="row" style="margin-top:10px"><div class="spacer"></div><button class="btn-primary btn-small" id="updBtn" onclick="applyDbUpdates()"></button></div>';
+    }
+    if (unmatchedRows.length) {
+      h += '<details><summary>' + esc(fmt(t('unmatchedTitle'), { n: unmatchedRows.length })) + '</summary>' +
+        '<div class="spec-list" style="max-height:220px;overflow:auto">' + unmatchedRows.slice(0, 200).map(u => '<div><span>' + esc(u.code || '–') + '</span> · ' + esc(u.name || '') + ' · ' + esc(HS.money(u.price, u.currency || 'TRY')) + '</div>').join('') + '</div>' +
+        '<div class="row" style="margin-top:8px"><button class="btn-secondary btn-small" onclick="addUnmatched()">' + esc(fmt(t('addUnmatched'), { n: unmatchedRows.length })) + '</button></div></details>';
+    }
+    box.innerHTML = h;
+    updBtnText();
+  }
+  function updBtnText() {
+    const b = document.getElementById('updBtn');
+    if (!b) return;
+    const n = dbUpdates.filter(u => u.selected).length;
+    b.textContent = fmt(t('updBtn'), { n: n });
+    b.disabled = !n;
+  }
+
+  function addUnmatched() {
+    const list = unmatchedRows.filter(u => u.code || u.name).map(u => ({
+      url: '', name: u.name || u.code, price: u.price, list_price: u.list_price, currency: u.currency,
+      model_code: u.code, brand: '', category: '', description: '', images: [], specs: [], stock: null
+    }));
+    addItems(list);
+    toast(fmt(t('addedUnmatched'), { n: list.length }));
+    unmatchedRows = [];
+    renderFileResult(null);
+    renderPreview();
+  }
+
+  async function applyDbUpdates() {
+    const sel = dbUpdates.filter(u => u.selected);
+    if (!sel.length) return;
+    const b = document.getElementById('updBtn');
+    b.disabled = true;
+    let ok = 0, fail = 0, lastErr = '';
+    for (const u of sel) {
+      const up = await db.from('products').update({ supplier_price: u.newCost, sale_price: u.newSale || u.oldSale, cost_currency: u.cur }).eq('id', u.id);
+      if (up.error) { fail++; lastErr = up.error.message; continue; }
+      if (u.newSale) {
+        let price = u.newSale;
+        if (u.cur !== 'TRY') { const c = await HS.convert(price, u.cur, 'TRY'); if (c != null) price = Math.round(c * 100) / 100; }
+        await db.from('listings').update({ price: price }).eq('product_id', u.id).eq('marketplace_code', 'own_store');
+      }
+      ok++;
+    }
+    dbUpdates = dbUpdates.filter(u => !u.selected);
+    renderFileResult(null);
+    toast(fail ? fmt(t('updFail'), { n: ok, e: fail, m: lastErr }) : fmt(t('updDone'), { n: ok }), !!fail);
   }
 
   // ---------- Aktar ----------
