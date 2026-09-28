@@ -1,6 +1,7 @@
 // Supabase Edge Function: weekly-briefing
 // Kullanıcının tüm ürünlerine bakıp en kârlı/en düşük marjlı ürünleri hesaplar
 // ve ürün kategorilerine göre kısa bir "trend özeti" üretir.
+// language: 'tr' (varsayılan) | 'en' -> özet ve hata mesajları bu dilde döner.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -11,6 +12,21 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const MSG = {
+  tr: {
+    needSession: "Oturum bilgisi gerekli",
+    productsFail: "Ürünler alınamadı: ",
+    noProducts: "Henüz ürün eklenmemiş",
+    noSummary: "Trend özeti için yeterli ürün bilgisi bulunamadı.",
+  },
+  en: {
+    needSession: "Session information is required",
+    productsFail: "Could not load products: ",
+    noProducts: "No products added yet",
+    noSummary: "Not enough product information to generate a trend summary.",
+  },
 };
 
 function json(body: unknown, status = 200) {
@@ -76,31 +92,41 @@ function extractJson(fullText: string): any {
   }
 }
 
-const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
+const INTERNATIONAL_PLATFORMS = ['Etsy', 'Amazon (Global)', 'Amazon Global', 'eBay', 'Facebook Marketplace', 'TikTok Shop', 'Shopify', 'WooCommerce', 'Wix'];
 function currencySymbolFor(platform: string) {
   return INTERNATIONAL_PLATFORMS.includes(platform) ? '$' : '₺';
 }
 
-Deno.serve(async (req: Request) => {
+const hsHandler = (async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  let lang: "tr" | "en" = "tr";
+
   try {
-    const { userAccessToken } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const userAccessToken = body?.userAccessToken;
+    lang = body?.language === "en" ? "en" : "tr";
+    const m = MSG[lang];
+
     if (!userAccessToken) {
-      return json({ error: "Oturum bilgisi gerekli" }, 400);
+      return json({ error: m.needSession }, 400);
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: "Bearer " + userAccessToken } },
     });
 
-    const { data: products, error: productsErr } = await supabase
+    const { data: allProducts, error: productsErr } = await supabase
       .from("products")
       .select("*");
 
-    if (productsErr) return json({ error: "Ürünler alınamadı: " + productsErr.message }, 500);
-    if (!products || products.length === 0) {
-      return json({ error: "Henüz ürün eklenmemiş" }, 400);
+    if (productsErr) return json({ error: m.productsFail + productsErr.message }, 500);
+
+    // Silinmiş veya başka ürünle birleştirilmiş ürünleri hesaba katma
+    const products = (allProducts || []).filter((p: any) => !p.deleted_at && !p.merged_into);
+
+    if (products.length === 0) {
+      return json({ error: m.noProducts }, 400);
     }
 
     const { data: rates } = await supabase.from("shipping_rates").select("*");
@@ -137,15 +163,18 @@ Deno.serve(async (req: Request) => {
     const topics = categories.length > 0 ? categories : productNames.slice(0, 8);
     const topicsAreCategories = categories.length > 0;
 
-    let trendSummary = "Trend özeti için yeterli ürün bilgisi bulunamadı.";
+    let trendSummary = m.noSummary;
 
     if (topics.length > 0) {
       const topicLabel = topicsAreCategories ? "ürün kategorileri" : "ürünleri (kategori bilgisi girilmediği için ürün isimlerine bakılıyor)";
+      const outLang = lang === "en" ? "İngilizce (English)" : "Türkçe";
       const systemPrompt = `Sen bir e-ticaret/dropshipping trend analistisin. Bir satıcının ${topicLabel} şunlar: ${topics.join(", ")}.
 
 ÖNEMLİ - HIZ KURALI: En fazla 2 web araması yap, sonra doğrudan yanıtı yaz.
 
-Görevin: Bunlarla ilgili bu haftaki/bu dönemki genel talep trendini (yükselen/düşen ürün tipi, mevsimsel fırsat, dikkat edilmesi gereken bir gelişme varsa) 2-3 cümlelik Türkçe, somut ve eyleme dönük bir özet olarak yaz.
+Görevin: Bunlarla ilgili bu haftaki/bu dönemki genel talep trendini (yükselen/düşen ürün tipi, mevsimsel fırsat, dikkat edilmesi gereken bir gelişme varsa) 2-3 cümlelik ${outLang}, somut ve eyleme dönük bir özet olarak yaz.
+
+DİL KURALI: "summary" alanını MUTLAKA ${outLang} yaz.
 
 Yanıtın SADECE tek satırlık, geçerli bir JSON nesnesi olsun. JSON dışında hiçbir metin, açıklama veya markdown ekleme. Metin alanında satır sonu kullanma.
 Format: {"summary": "..."}`;
@@ -161,7 +190,7 @@ Format: {"summary": "..."}`;
           model: "claude-sonnet-5",
           max_tokens: 1200,
           system: systemPrompt,
-          messages: [{ role: "user", content: `${topicsAreCategories ? "Kategoriler" : "Ürünler"}: ${topics.join(", ")}` }],
+          messages: [{ role: "user", content: `${topicsAreCategories ? "Kategoriler" : "Ürünler"}: ${topics.join(", ")}. Özeti ${outLang} yaz.` }],
           tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
         }),
       });
@@ -184,9 +213,38 @@ Format: {"summary": "..."}`;
       lowProducts,
       trendSummary,
       categoriesAnalyzed: topics,
+      language: lang,
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
     return json({ error: String(err) }, 500);
   }
+});
+
+
+// =========================================================
+// GÜVENLİK: sadece giriş yapmış kullanıcılar bu fonksiyonu çalıştırabilir
+// (sayfalar app.js sayesinde kullanıcının oturum anahtarını gönderir)
+// =========================================================
+async function hsIsLoggedIn(req: Request): Promise<boolean> {
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token || token.split(".").length !== 3) return false;
+  try {
+    const r = await fetch((Deno.env.get("SUPABASE_URL") ?? "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (_e) {
+    return false;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "OPTIONS" && !(await hsIsLoggedIn(req))) {
+    return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  }
+  return hsHandler(req);
 });

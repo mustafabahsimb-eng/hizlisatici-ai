@@ -5,19 +5,43 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { code, userId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const code = body?.code;
 
-    if (!code || !userId) {
-      return new Response(JSON.stringify({ error: 'code ve userId gerekli.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!code) {
+      return json({ error: 'code gerekli.' }, 400);
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // GÜVENLİK: kullanıcı, sayfanın gönderdiği numaradan değil, giriş anahtarından tespit edilir
+    const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const accessToken = String(body?.userAccessToken || bearer || '');
+    const { data: authData } = accessToken
+      ? await supabaseAdmin.auth.getUser(accessToken)
+      : { data: { user: null } };
+    const userId = authData?.user?.id;
+    if (!userId) {
+      return json({ connected: false, error: 'Oturum doğrulanamadı, lütfen tekrar giriş yap.' }, 401);
+    }
+    if (body?.userId && body.userId !== userId) {
+      return json({ connected: false, error: 'Kullanıcı eşleşmiyor.' }, 403);
     }
 
     const clientId = '1650835089949068';
@@ -25,21 +49,17 @@ Deno.serve(async (req) => {
     const redirectUri = 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/facebook-callback.html';
 
     if (!clientSecret) {
-      return new Response(JSON.stringify({ connected: false, error: 'FACEBOOK_CLIENT_SECRET tanımlı değil.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ connected: false, error: 'FACEBOOK_CLIENT_SECRET tanımlı değil.' });
     }
 
-    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${clientSecret}&code=${code}`;
+    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${clientSecret}&code=${encodeURIComponent(code)}`;
 
     const tokenResponse = await fetch(tokenUrl);
     const tokenData = await tokenResponse.json().catch(() => null);
 
     if (!tokenResponse.ok || !tokenData || !tokenData.access_token) {
       const msg = tokenData?.error?.message || 'Facebook token alışverişi başarısız oldu.';
-      return new Response(JSON.stringify({ connected: false, error: `Facebook: ${msg}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ connected: false, error: `Facebook: ${msg}` });
     }
 
     const shortLivedToken = tokenData.access_token;
@@ -51,11 +71,6 @@ Deno.serve(async (req) => {
 
     const finalToken = (longLivedResponse.ok && longLivedData?.access_token) ? longLivedData.access_token : shortLivedToken;
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
     const { error: dbError } = await supabaseAdmin
       .from('platform_tokens')
       .upsert({
@@ -65,18 +80,11 @@ Deno.serve(async (req) => {
       }, { onConflict: 'user_id,platform' });
 
     if (dbError) {
-      return new Response(JSON.stringify({ connected: false, error: `Veritabanı hatası: ${dbError.message}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ connected: false, error: `Veritabanı hatası: ${dbError.message}` });
     }
 
-    return new Response(JSON.stringify({ connected: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ connected: true });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: (err && (err as Error).message) || 'Sunucu hatası' }, 500);
   }
 });

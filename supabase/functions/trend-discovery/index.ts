@@ -2,6 +2,8 @@
 // Claude'a gerçek zamanlı web araması yaptırıp Türkiye e-ticaretinde
 // (ve istenirse uluslararası) şu an trend olan ürün fikirlerini döndürür.
 // Her ürün fikri için Pexels'ten gerçek bir stok fotoğraf çeker.
+// language: 'tr' (varsayılan) | 'en' -> ürün adı ve gerekçe bu dilde yazılır.
+// category ve demandLevel HER ZAMAN sabit Türkçe değerlerle döner (sayfa bunları kendi diline çevirir).
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const PEXELS_API_KEY = Deno.env.get("PEXELS_API_KEY");
@@ -11,14 +13,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req: Request) => {
+const MSG = {
+  tr: {
+    apiError: "Anthropic API hatası",
+    badFormat: "Model beklenen formatta yanıt vermedi",
+    parseError: "JSON ayrıştırma hatası",
+    empty: "AI bu taramada ürün fikri üretemedi, lütfen tekrar dene",
+  },
+  en: {
+    apiError: "Anthropic API error",
+    badFormat: "The model did not respond in the expected format",
+    parseError: "JSON parse error",
+    empty: "AI could not generate product ideas this time, please try again",
+  },
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+const hsHandler = (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let lang: "tr" | "en" = "tr";
+
   try {
-    const { scope } = await req.json().catch(() => ({ scope: "turkiye" }));
+    const body = await req.json().catch(() => ({}));
+    const scope = body?.scope || "turkiye";
+    lang = body?.language === "en" ? "en" : "tr";
     const isGlobal = scope === "global";
+    const m = MSG[lang];
+
+    const outLangName = lang === "en" ? "İngilizce (English)" : "Türkçe";
 
     const systemPrompt = `Sen bir e-ticaret trend analistisin. Web araması kullanarak ${
       isGlobal ? "hem Türkiye hem de uluslararası (AliExpress, Amazon, TikTok Shop, Etsy vb.)" : "Türkiye (Trendyol, Hepsiburada, N11 vb.)"
@@ -30,14 +61,16 @@ Her ürün için ayrıca kısa, İngilizce bir görsel arama terimi üret (image
 
 ÇOK ÖNEMLİ KURAL: Cevabında TAM OLARAK 25 (yirmi beş) ürün fikri olmalı. "En az" değil, TAM 25 - daha az verme, "yeterince bulamadım" diye erken durma. Farklı kategori ve alt-niş kombinasyonlarıyla (örn. aynı elektronik kategorisinde birden fazla farklı ürün tipi) listeyi 25'e tamamla. Emin olmadığın fikirler için demandLevel'i "Yükselişte" olarak işaretle ve reason alanında bunun bir tahmin olduğunu belirt. Aynı ürünü tekrar etme.
 
+DİL KURALI: "productIdea" ve "reason" alanlarını ${outLangName} yaz. "category" ve "demandLevel" alanları ise dil ne olursa olsun AŞAĞIDAKİ SABİT TÜRKÇE DEĞERLERDEN biri olmalı (çevirme, aynen yaz). "imageSearchQuery" her zaman İngilizce.
+
 Cevabını SADECE aşağıdaki JSON formatında ver, başka hiçbir metin ekleme:
 
 {
   "trends": [
     {
-      "productIdea": "kısa ürün adı (Türkçe)",
+      "productIdea": "kısa ürün adı (${outLangName})",
       "category": "Elektronik | Giyim | Ev & Yaşam | Kozmetik & Kişisel Bakım | Anne & Bebek | Spor & Outdoor | Aksesuar | Diğer kategorilerden biri",
-      "reason": "neden trend olduğuna dair 1-2 cümlelik somut gerekçe, kaynağa dayalı",
+      "reason": "neden trend olduğuna dair 1-2 cümlelik somut gerekçe, kaynağa dayalı (${outLangName})",
       "suggestedPlatforms": ["Trendyol", "Hepsiburada"],
       "demandLevel": "Yüksek | Orta | Yükselişte",
       "imageSearchQuery": "kısa İngilizce görsel arama terimi"
@@ -63,7 +96,7 @@ TAM OLARAK 25 ürün fikri ver.`;
             role: "user",
             content: `Bugünün tarihine göre ${
               isGlobal ? "Türkiye ve uluslararası" : "Türkiye"
-            } e-ticaret pazarında trend olan ürünleri araştır ve JSON formatında listele. TAM OLARAK 25 ürün fikri ver, daha az verme.`,
+            } e-ticaret pazarında trend olan ürünleri araştır ve JSON formatında listele. TAM OLARAK 25 ürün fikri ver, daha az verme. productIdea ve reason alanlarını ${outLangName} yaz.`,
           },
         ],
         tools: [
@@ -79,10 +112,7 @@ TAM OLARAK 25 ürün fikri ver.`;
     const data = await response.json();
 
     if (data.error) {
-      return new Response(JSON.stringify({ error: data.error.message || "Anthropic API hatası" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: data.error.message || m.apiError }, 500);
     }
 
     // content dizisinde birden fazla "text" bloğu olabilir (arama adımları arasında);
@@ -94,32 +124,22 @@ TAM OLARAK 25 ürün fikri ver.`;
 
     const jsonMatch = textParts.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return new Response(JSON.stringify({ error: "Model beklenen formatta yanıt vermedi", raw: textParts }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: m.badFormat, raw: textParts }, 500);
     }
 
     let parsed;
     try {
       parsed = JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      return new Response(JSON.stringify({ error: "JSON ayrıştırma hatası", raw: textParts }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    } catch (_e) {
+      return jsonResponse({ error: m.parseError, raw: textParts }, 500);
     }
 
     if (!parsed.trends || parsed.trends.length === 0) {
-      return new Response(JSON.stringify({ error: "AI bu taramada ürün fikri üretemedi, lütfen tekrar dene", raw: textParts }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: m.empty, raw: textParts }, 500);
     }
 
     // Her ürün fikri için Pexels'ten gerçek bir fotoğraf ara ve imageUrl olarak ekle.
-    // Bir ürün için görsel bulunamazsa veya Pexels anahtarı yoksa, sessizce geç -
-    // arayüz tarafında ikon fallback devreye girer.
+    // Görsel bulunamazsa veya Pexels anahtarı yoksa sessizce geç (arayüzde ikon fallback var).
     if (PEXELS_API_KEY) {
       await Promise.all(
         parsed.trends.map(async (t: any) => {
@@ -143,13 +163,37 @@ TAM OLARAK 25 ürün fikri ver.`;
       );
     }
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    parsed.language = lang;
+    return jsonResponse(parsed);
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: String(err) }, 500);
   }
+});
+
+
+// =========================================================
+// GÜVENLİK: sadece giriş yapmış kullanıcılar bu fonksiyonu çalıştırabilir
+// (sayfalar app.js sayesinde kullanıcının oturum anahtarını gönderir)
+// =========================================================
+async function hsIsLoggedIn(req: Request): Promise<boolean> {
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token || token.split(".").length !== 3) return false;
+  try {
+    const r = await fetch((Deno.env.get("SUPABASE_URL") ?? "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (_e) {
+    return false;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "OPTIONS" && !(await hsIsLoggedIn(req))) {
+    return jsonResponse({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  }
+  return hsHandler(req);
 });

@@ -66,7 +66,7 @@ function extractJson(fullText: string): any {
   }
 }
 
-Deno.serve(async (req: Request) => {
+const hsHandler = (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -148,4 +148,35 @@ Kurallar:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+});
+
+
+// =========================================================
+// GÜVENLİK: sadece giriş yapmış kullanıcılar bu fonksiyonu çalıştırabilir
+// (sayfalar app.js sayesinde kullanıcının oturum anahtarını gönderir)
+// =========================================================
+async function hsIsLoggedIn(req: Request): Promise<boolean> {
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token || token.split(".").length !== 3) return false;
+  try {
+    const r = await fetch((Deno.env.get("SUPABASE_URL") ?? "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (_e) {
+    return false;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "OPTIONS" && !(await hsIsLoggedIn(req))) {
+    return new Response(JSON.stringify({ error: "Bu işlem için giriş yapmalısın. / Please log in." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  return hsHandler(req);
 });
