@@ -376,6 +376,11 @@
       fnError: 'Hata: ',
       confirmLeave: 'Çekme işlemi devam ediyor. Sayfadan çıkarsan durur.',
       specsHeader: 'Teknik Özellikler',
+      delSel: '🗑 Seçilenleri listeden çıkar ({n})',
+      clearList: '↺ Listeyi temizle',
+      rowDel: 'Listeden çıkar',
+      confirmDelSel: '{n} ürün önizleme listesinden çıkarılsın mı? (Panelindeki ürünler etkilenmez.)',
+      confirmClear: 'Önizleme listesi tamamen temizlensin mi? (Panelindeki ürünler etkilenmez.)',
     },
     en: {
       pageTitle: 'HızlıSatıcı AI - Bulk Product Import',
@@ -477,6 +482,11 @@
       fnError: 'Error: ',
       confirmLeave: 'Fetching is in progress. Leaving the page will stop it.',
       specsHeader: 'Technical Specifications',
+      delSel: '🗑 Remove selected from list ({n})',
+      clearList: '↺ Clear list',
+      rowDel: 'Remove from list',
+      confirmDelSel: 'Remove {n} products from the preview list? (Products in your dashboard are not affected.)',
+      confirmClear: 'Clear the whole preview list? (Products in your dashboard are not affected.)',
     }
   });
 
@@ -682,6 +692,7 @@
           errors ? fmt(t('pullErr'), { e: errors }) : '');
       }
       await markExisting();
+      if (priceRows.length) await applyPriceList();
     } catch (e) {
       setProgress(t('fnError') + e.message, 0);
       toast(t('fnError') + e.message, true);
@@ -767,6 +778,7 @@
         '<td class="num">' + esc(src) + lp + '</td>' +
         '<td class="num"><input type="number" class="price-input" min="0" step="0.01" value="' + (it.newPrice > 0 ? it.newPrice.toFixed(2) : '') + '" onchange="editPrice(' + idx + ', this.value)"><div class="muted">' + esc(cur) + '</div></td>' +
         '<td>' + (warns.length ? warns.join('') : '<span class="warn" style="background:#123222;color:#6ee7b7">' + esc(t('ok')) + '</span>') + '</td>' +
+        '<td><button class="btn-secondary btn-small" title="' + esc(t('rowDel')) + '" onclick="removeItem(' + idx + ')">🗑</button></td>' +
       '</tr>';
     }).join('');
 
@@ -774,17 +786,33 @@
       '<div class="summary">' +
         chip('all', t('fAll'), items.length) + chip('selected', t('fSelected'), nSel) +
         chip('problem', t('fProblem'), nProb) + chip('exists', t('fExists'), nEx) +
+        '<div class="spacer"></div>' +
+        '<button class="btn-secondary btn-small" onclick="removeSelected()"' + (nSel ? '' : ' disabled') + '>' + esc(fmt(t('delSel'), { n: HS.number(nSel) })) + '</button>' +
+        '<button class="btn-secondary btn-small" onclick="clearList()">' + esc(t('clearList')) + '</button>' +
       '</div>' +
       '<div class="table-wrap"><table><thead><tr>' +
         '<th><input type="checkbox" title="' + esc(t('selectAll')) + '" ' + (allChecked ? 'checked' : '') + ' onchange="toggleAll(this.checked)"></th>' +
         '<th></th><th>' + esc(t('thProduct')) + '</th><th>' + esc(t('thSpecs')) + '</th>' +
-        '<th class="num">' + esc(t('thSource')) + '</th><th class="num">' + esc(t('thNew')) + '</th><th>' + esc(t('thStatus')) + '</th>' +
+        '<th class="num">' + esc(t('thSource')) + '</th><th class="num">' + esc(t('thNew')) + '</th><th>' + esc(t('thStatus')) + '</th><th></th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
       (list.length > shown ? '<div class="more-row"><button class="btn-secondary btn-small" onclick="showMore()">' + esc(fmt(t('showMore'), { n: HS.number(Math.min(PAGE_SIZE, list.length - shown)) })) + '</button></div>' : '') +
       '</div>';
     updateImportBtn();
   }
   function showMore() { shown += PAGE_SIZE; renderPreview(); }
+  function removeItem(i) { items.splice(i, 1); renderPreview(); }
+  function removeSelected() {
+    const n = items.filter(i => i.selected).length;
+    if (!n || !confirm(fmt(t('confirmDelSel'), { n: n }))) return;
+    items = items.filter(i => !i.selected);
+    if (filter === 'selected') filter = 'all';
+    renderPreview();
+  }
+  function clearList() {
+    if (!items.length || !confirm(t('confirmClear'))) return;
+    items = []; filter = 'all'; shown = PAGE_SIZE;
+    renderPreview();
+  }
   function toggleItem(i, v) { items[i].selected = v; renderPreview(); }
   function toggleAll(v) { filtered().forEach(i => { i.selected = v; }); renderPreview(); }
   function toggleSpecs(i) { items[i].open = !items[i].open; renderPreview(); }
