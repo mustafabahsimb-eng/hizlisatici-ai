@@ -26,9 +26,24 @@
     const origFetch = window.fetch.bind(window);
     const FN_PREFIX = SUPABASE_URL + '/functions/v1/';
     const PUBLIC_BEARER = 'Bearer ' + SUPABASE_KEY;
+    // Admin paneli için kullanım kaydı (hangi özellik ne kadar kullanılıyor).
+    // Sessizce çalışır; hata olursa asıl isteği hiç etkilemez.
+    const SKIP_LOG = /(token-exchange|^get-store$|^create-store-order$|^customer-support-chat$)/;
+    function logUsage(url) {
+      try {
+        const fn = url.slice(FN_PREFIX.length).split(/[?#/]/)[0];
+        if (!fn || SKIP_LOG.test(fn)) return;
+        db.auth.getSession().then(function (res) {
+          const uid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
+          if (!uid) return;
+          db.from('ai_usage_log').insert({ user_id: uid, fn: fn }).then(function () {}, function () {});
+        }, function () {});
+      } catch (e) { /* yok say */ }
+    }
     const patched = async function (input, init) {
       try {
         const url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (url.indexOf(FN_PREFIX) === 0) logUsage(url);
         if (url.indexOf(FN_PREFIX) === 0 && init && init.headers) {
           const h = init.headers;
           const isHeaders = (typeof Headers !== 'undefined') && (h instanceof Headers);
