@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>HızlıSatıcı AI - Admin Paneli</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .role-chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: #3a3012; color: #e6c96a; }
+  .logout-btn {
+    background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .logout-btn:hover { border-color: #3a4258; color: #fff; }
+
+  main { max-width: 1150px; margin: 0 auto; padding: 32px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-top: 4px; max-width: 680px; line-height: 1.5; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid #232838; margin-bottom: 20px; overflow-x: auto; }
+  .tab {
+    background: none; border: none; color: #9aa3b2; font-size: 14px; font-weight: 600;
+    padding: 12px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #fff; border-bottom-color: #1D9E75; }
+  .tab-count { font-size: 11px; background: #232838; color: #c3c9d4; border-radius: 10px; padding: 2px 8px; }
+  .tab-count.warn { background: #3a3012; color: #e6c96a; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: #1c212c; border-radius: 12px; padding: 16px; border: 1px solid #232838; min-width: 0; }
+  .stat-label { font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+  .stat-sub { font-size: 12px; color: #6ee7b7; margin-top: 4px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar input[type=text] { max-width: 320px; }
+  .chip-btn {
+    background: #141821; border: 1px solid #2a3040; color: #9aa3b2; padding: 7px 14px; border-radius: 20px;
+    font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .chip-btn.active { border-color: #1D9E75; color: #fff; background: #123222; }
+  .spacer { flex: 1; }
+  .muted { color: #6b7385; font-size: 12px; }
+
+  input[type=text], input[type=email], select {
+    width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #2a3040;
+    background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit;
+  }
+  select { width: auto; padding: 6px 10px; font-size: 13px; }
+
+  .table-wrap { background: #141821; border: 1px solid #232838; border-radius: 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7385; font-weight: 600; padding: 12px 14px; border-bottom: 1px solid #232838; white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid #1c212c; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  th.num { text-align: right; }
+  .email-cell { font-weight: 600; color: #fff; word-break: break-all; }
+  .badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .b-owner { background: #3a3012; color: #e6c96a; }
+  .b-admin { background: #142230; color: #7db8e6; }
+  .b-banned { background: #2a1414; color: #f28b8b; }
+  .b-gift { background: #2a1a3a; color: #d7a8f5; }
+  .b-stuck { background: #2a1414; color: #f28b8b; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .btn-primary {
+    background: #1D9E75; color: #fff; border: none; padding: 9px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-primary:hover { background: #178a65; }
+  .btn-small {
+    background: transparent; color: #c3c9d4; border: 1px solid #2a3040; padding: 5px 10px;
+    border-radius: 7px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .btn-small:hover { border-color: #3a4258; color: #fff; }
+  .btn-small.danger { color: #f28b8b; border-color: #4a2626; }
+  .btn-small.danger:hover { background: #2a1414; }
+  .btn-small.gift { color: #d7a8f5; border-color: #3e2a52; }
+  .btn-small.gift:hover { background: #2a1a3a; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .status-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; background: #232838; color: #c3c9d4; }
+  .status-beklemede { background: #2a2410; color: #e6c96a; }
+  .status-tedarikciye_verildi { background: #142230; color: #7db8e6; }
+  .status-kargoya_verildi { background: #1a2a40; color: #6ea8f2; }
+  .status-teslim_edildi { background: #123222; color: #6ee7b7; }
+  .status-iptal { background: #232838; color: #9aa3b2; }
+  .status-hata { background: #2a1414; color: #f28b8b; }
+
+  .section { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .section h3 { font-size: 15px; color: #fff; margin-bottom: 12px; }
+  .perm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .perm-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c3c9d4; background: #0d0f16; border: 1px solid #232838; border-radius: 8px; padding: 9px 10px; cursor: pointer; }
+  .perm-item input { accent-color: #1D9E75; }
+  .perm-item.disabled { opacity: .45; cursor: not-allowed; }
+  .perm-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .perm-chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #1c212c; color: #c3c9d4; white-space: nowrap; }
+
+  .info-note { font-size: 13px; color: #9aa3b2; background: #141821; border: 1px solid #232838; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; line-height: 1.5; }
+  .empty-state { text-align: center; color: #9aa3b2; padding: 40px 20px; background: #141821; border: 1px dashed #232838; border-radius: 14px; font-size: 14px; line-height: 1.6; }
+  .denied { max-width: 460px; margin: 80px auto; text-align: center; background: #141821; border: 1px solid #232838; border-radius: 16px; padding: 32px; }
+  .denied h2 { color: #fff; font-size: 18px; margin-bottom: 8px; }
+  .denied p { color: #9aa3b2; font-size: 14px; line-height: 1.5; margin-bottom: 18px; }
+  .denied a { color: #6ee7b7; text-decoration: none; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1c212c; border: 1px solid #1D9E75; color: #fff; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; z-index: 1000; display: none; max-width: 90%; text-align: center;
+  }
+  .toast.err { border-color: #e0554f; }
+  .loading { color: #9aa3b2; padding: 40px; text-align: center; font-size: 14px; }
+
+  @media (max-width: 800px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .perm-grid { grid-template-columns: 1fr 1fr; }
+    main { padding: 20px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot">H</div><div class="logo-text">HızlıSatıcı AI</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="role-chip" id="roleChip" style="display:none"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="loading" id="loading" data-t="loading"></div>
+
+  <div id="deniedBox" class="denied" style="display:none">
+    <h2 data-t="deniedTitle"></h2>
+    <p data-t="deniedText"></p>
+    <a href="dashboard.html" data-t="back"></a>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="top-row">
+      <div>
+        <h1 data-t="title"></h1>
+        <div class="subtitle" data-t="subtitle"></div>
+      </div>
+      <div style="display:flex; gap:14px; align-items:center;">
+        <button class="btn-small" onclick="loadData()" data-t="refresh"></button>
+        <a class="back-link" href="dashboard.html" data-t="back"></a>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <!-- 📊 Genel -->
+    <div class="tab-panel" id="panel-stats">
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <!-- 👤 Kullanıcılar -->
+    <div class="tab-panel" id="panel-users">
+      <div class="toolbar">
+        <input type="text" id="userSearch" oninput="renderUsers()">
+        <button class="chip-btn active" data-uf="all" onclick="setUserFilter('all')" data-t="fAll"></button>
+        <button class="chip-btn" data-uf="gift" onclick="setUserFilter('gift')" data-t="fGift"></button>
+        <button class="chip-btn" data-uf="banned" onclick="setUserFilter('banned')" data-t="fBanned"></button>
+        <button class="chip-btn" data-uf="admins" onclick="setUserFilter('admins')" data-t="fAdmins"></button>
+      </div>
+      <div id="usersBox"></div>
+    </div>
+
+    <!-- 📦 Siparişler -->
+    <div class="tab-panel" id="panel-orders">
+      <div class="toolbar">
+        <button class="chip-btn active" data-of="all" onclick="setOrderFilter('all')" data-t="oAll"></button>
+        <button class="chip-btn" data-of="stuck" onclick="setOrderFilter('stuck')" data-t="oStuck"></button>
+        <div class="spacer"></div>
+        <span class="muted" data-t="stuckInfo"></span>
+      </div>
+      <div id="ordersBox"></div>
+    </div>
+
+    <!-- 🤖 AI -->
+    <div class="tab-panel" id="panel-ai">
+      <div class="info-note" data-t="aiInfo"></div>
+      <div id="aiBox"></div>
+    </div>
+
+    <!-- 👥 Yöneticiler -->
+    <div class="tab-panel" id="panel-admins">
+      <div class="section">
+        <h3 id="adminFormTitle" data-t="adminAddTitle"></h3>
+        <input type="email" id="adminEmail">
+        <div class="perm-grid" id="permGrid"></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <span class="muted" data-t="adminNote"></span>
+          <div class="spacer"></div>
+          <button class="btn-small" id="adminCancelBtn" style="display:none" onclick="resetAdminForm()" data-t="cancel"></button>
+          <button class="btn-primary" id="adminSaveBtn" onclick="saveAdmin()" data-t="adminSave"></button>
+        </div>
+      </div>
+      <div id="adminsBox"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'HızlıSatıcı AI - Admin Paneli',
+      logout: 'Çıkış yap',
+      back: '← Panele dön',
+      loading: 'Yükleniyor...',
+      refresh: '↻ Yenile',
+      cancel: 'Vazgeç',
+      title: '🛡️ Admin Paneli',
+      subtitle: 'Sitenin genel durumu, kullanıcılar, siparişler ve yapay zekâ kullanımı. Bu sayfayı sadece yöneticiler görebilir.',
+      deniedTitle: 'Bu sayfaya erişim yetkin yok',
+      deniedText: 'Admin paneli sadece site yöneticileri içindir.',
+      roleOwner: '👑 Sahip',
+      roleAdmin: '🛡️ Admin',
+      tabStats: '📊 Genel',
+      tabUsers: '👤 Kullanıcılar',
+      tabOrders: '📦 Siparişler',
+      tabAi: '🤖 AI Kullanımı',
+      tabAdmins: '👥 Yöneticiler',
+      stUsers: 'Toplam kullanıcı',
+      stUsersSub: 'Bugün +{d} · 7 gün +{w}',
+      stProducts: 'Toplam ürün',
+      stOrders: 'Siparişler',
+      stStoreOrders: 'Mağaza siparişleri',
+      stStores: 'Mağazalar',
+      stQuestions: 'Müşteri soruları',
+      stGifts: '🎁 Ücretsiz üyelik',
+      stAi: 'AI kullanımı (bugün)',
+      stAiSub: '7 gün: {w}',
+      searchPh: 'E-posta ara...',
+      fAll: 'Tümü',
+      fGift: '🎁 Ücretsiz üyeler',
+      fBanned: '🚫 Dondurulmuş',
+      fAdmins: '🛡️ Yöneticiler',
+      thUser: 'Kullanıcı',
+      thJoined: 'Kayıt',
+      thLast: 'Son giriş',
+      thProducts: 'Ürün',
+      thOrders: 'Sipariş',
+      thAi30: 'AI (30 gün)',
+      thActions: 'İşlemler',
+      bOwner: 'Sahip',
+      bAdmin: 'Admin',
+      bBanned: 'Donduruldu',
+      bGiftForever: '🎁 Ücretsiz (süresiz)',
+      bGiftUntil: '🎁 Ücretsiz · {d} tarihine kadar',
+      you: '(sen)',
+      ban: '🚫 Dondur',
+      unban: '✓ Aç',
+      giftGive: '🎁 Ücretsiz ver',
+      giftRevoke: 'Ücretsizi kaldır',
+      gForever: 'Süresiz',
+      g30: '30 gün',
+      g90: '90 gün',
+      g365: '1 yıl',
+      confirmBan: '{e} hesabı dondurulsun mu? Bu kişi siteye giriş yapamaz.',
+      confirmUnban: '{e} hesabı tekrar açılsın mı?',
+      confirmGift: '{e} kullanıcısına ücretsiz üyelik ({p}) verilsin mi?',
+      confirmRevoke: '{e} kullanıcısının ücretsiz üyeliği kaldırılsın mı?',
+      banned: 'Hesap donduruldu.',
+      unbanned: 'Hesap açıldı.',
+      gifted: 'Ücretsiz üyelik verildi.',
+      revoked: 'Ücretsiz üyelik kaldırıldı.',
+      noUsers: 'Bu filtreye uyan kullanıcı yok.',
+      oAll: 'Son siparişler',
+      oStuck: '⚠️ Takılı kalanlar',
+      stuckInfo: 'Takılı: 24 saattir beklemede, hatalı ya da 10 gündür kargoya verilmemiş.',
+      thDate: 'Tarih',
+      thSeller: 'Satıcı',
+      thOrder: 'Sipariş',
+      thCustomer: 'Müşteri',
+      thStatus: 'Durum',
+      thSupplier: 'Tedarikçi',
+      stuck: 'Takılı',
+      noOrders: 'Gösterilecek sipariş yok.',
+      noStuck: 'Takılı kalan sipariş yok. 👍',
+      aiInfo: 'Son 30 günde hangi yapay zekâ özelliğinin kaç kez kullanıldığı. Kayıt, bu özellik eklendiği andan itibaren tutulmaya başladı.',
+      thFeature: 'Özellik',
+      thCalls: 'Kullanım (30 gün)',
+      thUsersCount: 'Kişi',
+      thToday: 'Bugün',
+      noAi: 'Henüz kayıt yok. Kullanıcılar AI özelliklerini kullandıkça burada görünecek.',
+      adminAddTitle: 'Yönetici ekle',
+      adminEditTitle: 'Yetkileri düzenle: {e}',
+      adminEmailPh: 'Eklenecek kişinin e-postası (önce siteye üye olmuş olmalı)',
+      adminNote: 'Hepsini işaretlersen tam yetkili olur. Ücretsiz üyelik verme sadece Sahip\'e aittir.',
+      adminSave: 'Kaydet',
+      adminSaved: 'Yönetici kaydedildi.',
+      adminRemoved: 'Yöneticilik kaldırıldı.',
+      confirmRemoveAdmin: '{e} artık yönetici olmasın mı?',
+      thRole: 'Rol',
+      thPerms: 'Yetkiler',
+      thAddedBy: 'Ekleyen',
+      edit: '✏️ Düzenle',
+      remove: 'Kaldır',
+      allPerms: 'Tüm yetkiler',
+      needEmail: 'E-posta yaz.',
+      p_stats: '📊 İstatistikler',
+      p_users: '👤 Kullanıcı listesi',
+      p_ban: '🚫 Dondurma/açma',
+      p_orders: '📦 Siparişler',
+      p_ai: '🤖 AI kullanımı',
+      p_admins: '👥 Yönetici ekleme',
+      e_not_admin: 'Bu işlem için yönetici olmalısın.',
+      e_no_permission: 'Bu işlem için yetkin yok.',
+      e_user_not_found: 'Bu e-postayla kayıtlı kullanıcı yok. Kişi önce siteye üye olmalı.',
+      e_cannot_ban_self: 'Kendi hesabını donduramazsın.',
+      e_cannot_touch_owner: 'Sahip hesabında değişiklik yapılamaz.',
+      e_only_owner_can_ban_admin: 'Yöneticileri sadece Sahip dondurabilir.',
+      e_only_owner: 'Bunu sadece Sahip yapabilir.',
+      e_cannot_edit_self: 'Kendi yetkilerini değiştiremezsin.',
+      e_cannot_give_more_than_you_have: 'Kendinde olmayan bir yetkiyi veremezsin.',
+      e_cannot_edit_higher_admin: 'Senden fazla yetkisi olan bir yöneticiyi değiştiremezsin.',
+    },
+    en: {
+      pageTitle: 'HızlıSatıcı AI - Admin Panel',
+      logout: 'Sign out',
+      back: '← Back to dashboard',
+      loading: 'Loading...',
+      refresh: '↻ Refresh',
+      cancel: 'Cancel',
+      title: '🛡️ Admin Panel',
+      subtitle: 'Site overview, users, orders and AI usage. Only administrators can see this page.',
+      deniedTitle: 'You don\'t have access to this page',
+      deniedText: 'The admin panel is for site administrators only.',
+      roleOwner: '👑 Owner',
+      roleAdmin: '🛡️ Admin',
+      tabStats: '📊 Overview',
+      tabUsers: '👤 Users',
+      tabOrders: '📦 Orders',
+      tabAi: '🤖 AI Usage',
+      tabAdmins: '👥 Administrators',
+      stUsers: 'Total users',
+      stUsersSub: 'Today +{d} · 7 days +{w}',
+      stProducts: 'Total products',
+      stOrders: 'Orders',
+      stStoreOrders: 'Store orders',
+      stStores: 'Stores',
+      stQuestions: 'Customer questions',
+      stGifts: '🎁 Free memberships',
+      stAi: 'AI usage (today)',
+      stAiSub: '7 days: {w}',
+      searchPh: 'Search email...',
+      fAll: 'All',
+      fGift: '🎁 Free members',
+      fBanned: '🚫 Suspended',
+      fAdmins: '🛡️ Administrators',
+      thUser: 'User',
+      thJoined: 'Joined',
+      thLast: 'Last sign-in',
+      thProducts: 'Products',
+      thOrders: 'Orders',
+      thAi30: 'AI (30 days)',
+      thActions: 'Actions',
+      bOwner: 'Owner',
+      bAdmin: 'Admin',
+      bBanned: 'Suspended',
+      bGiftForever: '🎁 Free (no end date)',
+      bGiftUntil: '🎁 Free · until {d}',
+      you: '(you)',
+      ban: '🚫 Suspend',
+      unban: '✓ Reactivate',
+      giftGive: '🎁 Give free',
+      giftRevoke: 'Remove free',
+      gForever: 'No end date',
+      g30: '30 days',
+      g90: '90 days',
+      g365: '1 year',
+      confirmBan: 'Suspend {e}? This person will not be able to sign in.',
+      confirmUnban: 'Reactivate {e}?',
+      confirmGift: 'Give {e} a free membership ({p})?',
+      confirmRevoke: 'Remove the free membership of {e}?',
+      banned: 'Account suspended.',
+      unbanned: 'Account reactivated.',
+      gifted: 'Free membership given.',
+      revoked: 'Free membership removed.',
+      noUsers: 'No users match this filter.',
+      oAll: 'Latest orders',
+      oStuck: '⚠️ Stuck',
+      stuckInfo: 'Stuck: pending for 24h, failed, or not shipped for 10 days.',
+      thDate: 'Date',
+      thSeller: 'Seller',
+      thOrder: 'Order',
+      thCustomer: 'Customer',
+      thStatus: 'Status',
+      thSupplier: 'Supplier',
+      stuck: 'Stuck',
+      noOrders: 'No orders to show.',
+      noStuck: 'No stuck orders. 👍',
+      aiInfo: 'How many times each AI feature was used in the last 30 days. Tracking started when this feature was added.',
+      thFeature: 'Feature',
+      thCalls: 'Uses (30 days)',
+      thUsersCount: 'People',
+      thToday: 'Today',
+      noAi: 'No records yet. They will appear here as users use AI features.',
+      adminAddTitle: 'Add administrator',
+      adminEditTitle: 'Edit permissions: {e}',
+      adminEmailPh: 'Email of the person (must have signed up first)',
+      adminNote: 'Tick everything for full access. Giving free memberships is Owner-only.',
+      adminSave: 'Save',
+      adminSaved: 'Administrator saved.',
+      adminRemoved: 'Administrator removed.',
+      confirmRemoveAdmin: 'Remove {e} as administrator?',
+      thRole: 'Role',
+      thPerms: 'Permissions',
+      thAddedBy: 'Added by',
+      edit: '✏️ Edit',
+      remove: 'Remove',
+      allPerms: 'All permissions',
+      needEmail: 'Enter an email.',
+      p_stats: '📊 Statistics',
+      p_users: '👤 User list',
+      p_ban: '🚫 Suspend/reactivate',
+      p_orders: '📦 Orders',
+      p_ai: '🤖 AI usage',
+      p_admins: '👥 Manage admins',
+      e_not_admin: 'You must be an administrator.',
+      e_no_permission: 'You don\'t have permission for this.',
+      e_user_not_found: 'No user with this email. They must sign up first.',
+      e_cannot_ban_self: 'You can\'t suspend your own account.',
+      e_cannot_touch_owner: 'The Owner account can\'t be changed.',
+      e_only_owner_can_ban_admin: 'Only the Owner can suspend administrators.',
+      e_only_owner: 'Only the Owner can do this.',
+      e_cannot_edit_self: 'You can\'t change your own permissions.',
+      e_cannot_give_more_than_you_have: 'You can\'t give a permission you don\'t have.',
+      e_cannot_edit_higher_admin: 'You can\'t change an admin with more permissions than you.',
+    }
+  });
+
+  const t = HS.t;
+  const esc = HS.escapeHtml;
+  const db = HS.db;
+  const ALL_PERMS = ['stats', 'users', 'ban', 'orders', 'ai', 'admins'];
+  const TAB_DEFS = [
+    { key: 'stats', perm: 'stats', label: 'tabStats' },
+    { key: 'users', perm: 'users', label: 'tabUsers' },
+    { key: 'orders', perm: 'orders', label: 'tabOrders' },
+    { key: 'ai', perm: 'ai', label: 'tabAi' },
+    { key: 'admins', perm: 'admins', label: 'tabAdmins' },
+  ];
+  const FN_NAMES = {
+    tr: {
+      'keyword-analysis': 'Anahtar kelime analizi', 'translate-listing': 'İlan çevirisi', 'ads-spy': 'Reklam casusu',
+      'review-analysis': 'Yorum analizi', 'price-check': 'Fiyat kontrolü', 'shipping-estimate': 'Kargo tahmini',
+      'hyper-api': 'İçerik üretimi', 'remove-background': 'Arka plan temizleme', 'aliexpress-search': 'AliExpress arama',
+      'trend-discovery': 'Trend keşfi', 'weekly-briefing': 'Haftalık özet', 'chat-to-sell': 'Sohbetle satış',
+      'winning-score': 'Kazanan ürün skoru', 'price-optimize': 'Fiyat optimizasyonu', 'image-text-detect': 'Resimdeki yazıyı bulma',
+      'cj-search': 'CJ arama', 'cj-place-order': 'CJ sipariş', 'store-builder': 'Mağaza kurucu', 'store-spy': 'Mağaza casusu',
+      'store-wizard': 'Mağaza sihirbazı', 'voice-product-parse': 'Sesle ürün ekleme', 'trend-calendar': 'Trend takvimi',
+      'trendyol-match': 'Trendyol eşleştirme', 'printify-create-product': 'Printify ürün oluşturma'
+    },
+    en: {
+      'keyword-analysis': 'Keyword analysis', 'translate-listing': 'Listing translation', 'ads-spy': 'Ad spy',
+      'review-analysis': 'Review analysis', 'price-check': 'Price check', 'shipping-estimate': 'Shipping estimate',
+      'hyper-api': 'Content generation', 'remove-background': 'Background removal', 'aliexpress-search': 'AliExpress search',
+      'trend-discovery': 'Trend discovery', 'weekly-briefing': 'Weekly briefing', 'chat-to-sell': 'Chat to sell',
+      'winning-score': 'Winning product score', 'price-optimize': 'Price optimization', 'image-text-detect': 'Find text in image',
+      'cj-search': 'CJ search', 'cj-place-order': 'CJ order', 'store-builder': 'Store builder', 'store-spy': 'Store spy',
+      'store-wizard': 'Store wizard', 'voice-product-parse': 'Voice product entry', 'trend-calendar': 'Trend calendar',
+      'trendyol-match': 'Trendyol matching', 'printify-create-product': 'Printify product creation'
+    }
+  };
+  const STATUS_TEXT = {
+    tr: { beklemede: 'Beklemede', tedarikciye_verildi: 'Tedarikçiye verildi', kargoya_verildi: 'Kargoda', teslim_edildi: 'Teslim edildi', iptal: 'İptal', hata: 'Hata' },
+    en: { beklemede: 'Pending', tedarikciye_verildi: 'Sent to supplier', kargoya_verildi: 'Shipped', teslim_edildi: 'Delivered', iptal: 'Cancelled', hata: 'Error' }
+  };
+
+  let me = null;          // { role, perms, email }
+  let myId = null;
+  let data = {};
+  let activeTab = null;
+  let userFilter = 'all';
+  let orderFilter = 'all';
+  let editingEmail = null;
+
+  function lang() { return HS.lang === 'en' ? 'en' : 'tr'; }
+  function has(p) { return !!(me && me.perms && me.perms.indexOf(p) !== -1); }
+  function isOwner() { return !!(me && me.role === 'owner'); }
+  function fmt(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m); }
+  function n(v) { return HS.number(Number(v || 0)); }
+  function d(v, withTime) { return v ? HS.date(v, withTime) : '–'; }
+
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (isErr ? ' err' : '');
+    el.style.display = 'block';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+
+  function errText(err) {
+    const m = String((err && err.message) || err || '');
+    const code = Object.keys(T_ERR()).find(k => m.indexOf(k) !== -1);
+    return code ? t('e_' + code) : m;
+  }
+  function T_ERR() {
+    return { not_admin: 1, no_permission: 1, user_not_found: 1, cannot_ban_self: 1, cannot_touch_owner: 1,
+      only_owner_can_ban_admin: 1, only_owner: 1, cannot_edit_self: 1, cannot_give_more_than_you_have: 1, cannot_edit_higher_admin: 1 };
+  }
+
+  function applyStatic() {
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+    document.getElementById('userSearch').placeholder = t('searchPh');
+    document.getElementById('adminEmail').placeholder = t('adminEmailPh');
+    if (editingEmail) document.getElementById('adminFormTitle').textContent = fmt(t('adminEditTitle'), { e: editingEmail });
+    if (me) {
+      const chip = document.getElementById('roleChip');
+      chip.textContent = isOwner() ? t('roleOwner') : t('roleAdmin');
+      chip.style.display = 'inline-block';
+    }
+  }
+
+  // ---------- Sekmeler ----------
+  function renderTabs() {
+    const box = document.getElementById('tabs');
+    const stuckCount = (data.orders || []).filter(isStuck).length;
+    box.innerHTML = TAB_DEFS.filter(tb => has(tb.perm)).map(tb => {
+      let extra = '';
+      if (tb.key === 'orders' && stuckCount) extra = ' <span class="tab-count warn">' + stuckCount + '</span>';
+      if (tb.key === 'users' && data.users) extra = ' <span class="tab-count">' + data.users.length + '</span>';
+      return '<button class="tab' + (tb.key === activeTab ? ' active' : '') + '" onclick="showTab(\'' + tb.key + '\')">' + esc(t(tb.label)) + extra + '</button>';
+    }).join('');
+  }
+
+  function showTab(key) {
+    activeTab = key;
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
+    renderTabs();
+    try { localStorage.setItem('hs_admin_tab', key); } catch (e) {}
+  }
+
+  // ---------- Veri ----------
+  async function loadData() {
+    const res = await db.rpc('admin_overview');
+    if (res.error) {
+      if (String(res.error.message || '').indexOf('not_admin') !== -1) { showDenied(); return false; }
+      toast(errText(res.error), true);
+      return false;
+    }
+    data = res.data || {};
+    me = data.me || { role: 'admin', perms: [] };
+    renderAll();
+    return true;
+  }
+
+  function showDenied() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('deniedBox').style.display = 'block';
+  }
+
+  function renderAll() {
+    applyStatic();
+    const allowed = TAB_DEFS.filter(tb => has(tb.perm)).map(tb => tb.key);
+    if (!activeTab || allowed.indexOf(activeTab) === -1) {
+      let saved = null;
+      try { saved = localStorage.getItem('hs_admin_tab'); } catch (e) {}
+      activeTab = allowed.indexOf(saved) !== -1 ? saved : allowed[0];
+    }
+    if (activeTab) showTab(activeTab); else renderTabs();
+    if (has('stats')) renderStats();
+    if (has('users')) renderUsers();
+    if (has('orders')) renderOrders();
+    if (has('ai')) renderAi();
+    if (has('admins')) { renderPermGrid(); renderAdmins(); }
+  }
+
+  // ---------- 📊 Genel ----------
+  function renderStats() {
+    const s = data.stats || {};
+    const card = (label, value, sub) =>
+      '<div class="stat-card"><div class="stat-label">' + esc(label) + '</div><div class="stat-value">' + esc(value) + '</div>' +
+      (sub ? '<div class="stat-sub">' + esc(sub) + '</div>' : '') + '</div>';
+    document.getElementById('statsGrid').innerHTML =
+      card(t('stUsers'), n(s.users), fmt(t('stUsersSub'), { d: n(s.users_today), w: n(s.users_week) })) +
+      card(t('stProducts'), n(s.products)) +
+      card(t('stOrders'), n(s.orders)) +
+      card(t('stStoreOrders'), n(s.store_orders)) +
+      card(t('stStores'), n(s.stores)) +
+      card(t('stQuestions'), n(s.questions)) +
+      card(t('stGifts'), n(s.gifts)) +
+      card(t('stAi'), n(s.ai_today), fmt(t('stAiSub'), { w: n(s.ai_week) }));
+  }
+
+  // ---------- 👤 Kullanıcılar ----------
+  function setUserFilter(f) {
+    userFilter = f;
+    document.querySelectorAll('[data-uf]').forEach(b => b.classList.toggle('active', b.dataset.uf === f));
+    renderUsers();
+  }
+
+  function renderUsers() {
+    const box = document.getElementById('usersBox');
+    const q = (document.getElementById('userSearch').value || '').trim().toLowerCase();
+    let list = (data.users || []).slice();
+    if (q) list = list.filter(u => String(u.email || '').toLowerCase().indexOf(q) !== -1);
+    if (userFilter === 'gift') list = list.filter(u => u.gift_active);
+    if (userFilter === 'banned') list = list.filter(u => u.banned);
+    if (userFilter === 'admins') list = list.filter(u => u.admin_role);
+    if (!list.length) { box.innerHTML = '<div class="empty-state">' + esc(t('noUsers')) + '</div>'; return; }
+
+    const rows = list.map(u => {
+      const isMe = u.id === myId;
+      const badges = [];
+      if (u.admin_role === 'owner') badges.push('<span class="badge b-owner">' + esc(t('bOwner')) + '</span>');
+      else if (u.admin_role) badges.push('<span class="badge b-admin">' + esc(t('bAdmin')) + '</span>');
+      if (u.banned) badges.push('<span class="badge b-banned">' + esc(t('bBanned')) + '</span>');
+      if (u.gift_active) badges.push('<span class="badge b-gift">' + esc(u.gift_expires ? fmt(t('bGiftUntil'), { d: d(u.gift_expires) }) : t('bGiftForever')) + '</span>');
+
+      const acts = [];
+      const canBan = has('ban') && !isMe && u.admin_role !== 'owner' && (isOwner() || !u.admin_role);
+      if (canBan) {
+        acts.push(u.banned
+          ? '<button class="btn-small" onclick="setBan(\'' + u.id + '\', false)">' + esc(t('unban')) + '</button>'
+          : '<button class="btn-small danger" onclick="setBan(\'' + u.id + '\', true)">' + esc(t('ban')) + '</button>');
+      }
+      if (isOwner()) {
+        if (u.gift_active) {
+          acts.push('<button class="btn-small" onclick="setGift(\'' + u.id + '\', false)">' + esc(t('giftRevoke')) + '</button>');
+        }
+        acts.push('<select id="gd-' + u.id + '">' +
+          '<option value="0">' + esc(t('gForever')) + '</option>' +
+          '<option value="30">' + esc(t('g30')) + '</option>' +
+          '<option value="90">' + esc(t('g90')) + '</option>' +
+          '<option value="365">' + esc(t('g365')) + '</option></select>' +
+          '<button class="btn-small gift" onclick="setGift(\'' + u.id + '\', true)">' + esc(t('giftGive')) + '</button>');
+      }
+
+      return '<tr>' +
+        '<td><div class="email-cell">' + esc(u.email || '–') + (isMe ? ' <span class="muted">' + esc(t('you')) + '</span>' : '') + '</div>' +
+          (badges.length ? '<div class="badges">' + badges.join('') + '</div>' : '') + '</td>' +
+        '<td>' + esc(d(u.created_at)) + '</td>' +
+        '<td>' + esc(d(u.last_sign_in_at, true)) + '</td>' +
+        '<td class="num">' + esc(n(u.products)) + '</td>' +
+        '<td class="num">' + esc(n(u.orders)) + '</td>' +
+        '<td class="num">' + esc(n(u.ai_30d)) + '</td>' +
+        '<td><div class="actions">' + (acts.join('') || '<span class="muted">–</span>') + '</div></td>' +
+      '</tr>';
+    }).join('');
+
+    box.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th>' + esc(t('thUser')) + '</th><th>' + esc(t('thJoined')) + '</th><th>' + esc(t('thLast')) + '</th>' +
+      '<th class="num">' + esc(t('thProducts')) + '</th><th class="num">' + esc(t('thOrders')) + '</th>' +
+      '<th class="num">' + esc(t('thAi30')) + '</th><th>' + esc(t('thActions')) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function emailOf(id) {
+    const u = (data.users || []).find(x => x.id === id);
+    return u ? u.email : '';
+  }
+
+  async function setBan(id, ban) {
+    const e = emailOf(id);
+    if (!confirm(fmt(t(ban ? 'confirmBan' : 'confirmUnban'), { e: e }))) return;
+    const res = await db.rpc('admin_set_user_ban', { target: id, ban: ban });
+    if (res.error) { toast(errText(res.error), true); return; }
+    toast(t(ban ? 'banned' : 'unbanned'));
+    await loadData();
+  }
+
+  async function setGift(id, grant) {
+    const e = emailOf(id);
+    let days = null;
+    if (grant) {
+      const sel = document.getElementById('gd-' + id);
+      const v = parseInt(sel ? sel.value : '0', 10) || 0;
+      days = v > 0 ? v : null;
+      const label = sel ? sel.options[sel.selectedIndex].text : t('gForever');
+      if (!confirm(fmt(t('confirmGift'), { e: e, p: label }))) return;
+    } else {
+      if (!confirm(fmt(t('confirmRevoke'), { e: e }))) return;
+    }
+    const res = await db.rpc('admin_set_gift', { target: id, grant_it: grant, days: days });
+    if (res.error) { toast(errText(res.error), true); return; }
+    toast(t(grant ? 'gifted' : 'revoked'));
+    await loadData();
+  }
+
+  // ---------- 📦 Siparişler ----------
+  function isStuck(o) {
+    const age = (Date.now() - new Date(o.created_at).getTime()) / 36e5; // saat
+    if (o.status === 'hata') return true;
+    if (o.status === 'beklemede' && age > 24) return true;
+    if (o.status === 'tedarikciye_verildi' && age > 240) return true;
+    return false;
+  }
+
+  function setOrderFilter(f) {
+    orderFilter = f;
+    document.querySelectorAll('[data-of]').forEach(b => b.classList.toggle('active', b.dataset.of === f));
+    renderOrders();
+  }
+
+  function renderOrders() {
+    const box = document.getElementById('ordersBox');
+    let list = (data.orders || []).slice();
+    if (orderFilter === 'stuck') list = list.filter(isStuck);
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-state">' + esc(t(orderFilter === 'stuck' ? 'noStuck' : 'noOrders')) + '</div>';
+      return;
+    }
+    const st = STATUS_TEXT[lang()];
+    const rows = list.map(o => {
+      const orderNo = o.marketplace_order_no || (o.id ? String(o.id).slice(0, 8) : '–');
+      const customer = o.customer_name || o.buyer_name || '–';
+      const supplier = o.supplier ? (o.supplier + (o.supplier_order_id ? ' · ' + o.supplier_order_id : '')) : '–';
+      const tracking = o.tracking_number || o.tracking_no || '';
+      return '<tr>' +
+        '<td>' + esc(d(o.created_at, true)) + '</td>' +
+        '<td style="word-break:break-all">' + esc(o.user_email || '–') + '</td>' +
+        '<td>' + esc(orderNo) + (o.platform ? '<div class="muted">' + esc(o.platform) + '</div>' : '') + '</td>' +
+        '<td>' + esc(customer) + '</td>' +
+        '<td><span class="status-badge status-' + esc(o.status || '') + '">' + esc(st[o.status] || o.status || '–') + '</span>' +
+          (isStuck(o) ? ' <span class="badge b-stuck">' + esc(t('stuck')) + '</span>' : '') + '</td>' +
+        '<td>' + esc(supplier) + (tracking ? '<div class="muted">' + esc(tracking) + '</div>' : '') + '</td>' +
+      '</tr>';
+    }).join('');
+    box.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th>' + esc(t('thDate')) + '</th><th>' + esc(t('thSeller')) + '</th><th>' + esc(t('thOrder')) + '</th>' +
+      '<th>' + esc(t('thCustomer')) + '</th><th>' + esc(t('thStatus')) + '</th><th>' + esc(t('thSupplier')) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ---------- 🤖 AI ----------
+  function renderAi() {
+    const box = document.getElementById('aiBox');
+    const list = data.ai || [];
+    if (!list.length) { box.innerHTML = '<div class="empty-state">' + esc(t('noAi')) + '</div>'; return; }
+    const names = FN_NAMES[lang()];
+    const rows = list.map(a =>
+      '<tr><td><div style="color:#fff;font-weight:600">' + esc(names[a.fn] || a.fn) + '</div><div class="muted">' + esc(a.fn) + '</div></td>' +
+      '<td class="num">' + esc(n(a.calls)) + '</td><td class="num">' + esc(n(a.users)) + '</td><td class="num">' + esc(n(a.today)) + '</td></tr>'
+    ).join('');
+    box.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th>' + esc(t('thFeature')) + '</th><th class="num">' + esc(t('thCalls')) + '</th>' +
+      '<th class="num">' + esc(t('thUsersCount')) + '</th><th class="num">' + esc(t('thToday')) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ---------- 👥 Yöneticiler ----------
+  function renderPermGrid(selected) {
+    const sel = selected || [];
+    document.getElementById('permGrid').innerHTML = ALL_PERMS.map(p => {
+      const allowed = has(p);
+      return '<label class="perm-item' + (allowed ? '' : ' disabled') + '">' +
+        '<input type="checkbox" value="' + p + '"' + (sel.indexOf(p) !== -1 ? ' checked' : '') + (allowed ? '' : ' disabled') + '>' +
+        esc(t('p_' + p)) + '</label>';
+    }).join('');
+  }
+
+  function renderAdmins() {
+    const box = document.getElementById('adminsBox');
+    const list = data.admins || [];
+    const rows = list.map(a => {
+      const isMe = a.user_id === myId;
+      const owner = a.role === 'owner';
+      const perms = owner ? '<span class="perm-chip">' + esc(t('allPerms')) + '</span>'
+        : ((a.perms || []).map(p => '<span class="perm-chip">' + esc(t('p_' + p)) + '</span>').join('') || '<span class="muted">–</span>');
+      const canEdit = !owner && !isMe && (isOwner() || (a.perms || []).every(p => has(p)));
+      const acts = canEdit
+        ? '<button class="btn-small" onclick="editAdmin(\'' + a.user_id + '\')">' + esc(t('edit')) + '</button>' +
+          '<button class="btn-small danger" onclick="removeAdmin(\'' + a.user_id + '\')">' + esc(t('remove')) + '</button>'
+        : '<span class="muted">–</span>';
+      return '<tr>' +
+        '<td><div class="email-cell">' + esc(a.email || '–') + (isMe ? ' <span class="muted">' + esc(t('you')) + '</span>' : '') + '</div></td>' +
+        '<td><span class="badge ' + (owner ? 'b-owner' : 'b-admin') + '">' + esc(owner ? t('bOwner') : t('bAdmin')) + '</span></td>' +
+        '<td><div class="perm-chips">' + perms + '</div></td>' +
+        '<td>' + esc(a.added_by_email || '–') + '<div class="muted">' + esc(d(a.created_at)) + '</div></td>' +
+        '<td><div class="actions">' + acts + '</div></td>' +
+      '</tr>';
+    }).join('');
+    box.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th>' + esc(t('thUser')) + '</th><th>' + esc(t('thRole')) + '</th><th>' + esc(t('thPerms')) + '</th>' +
+      '<th>' + esc(t('thAddedBy')) + '</th><th>' + esc(t('thActions')) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function editAdmin(id) {
+    const a = (data.admins || []).find(x => x.user_id === id);
+    if (!a) return;
+    editingEmail = a.email;
+    document.getElementById('adminEmail').value = a.email;
+    document.getElementById('adminEmail').disabled = true;
+    document.getElementById('adminFormTitle').textContent = fmt(t('adminEditTitle'), { e: a.email });
+    document.getElementById('adminCancelBtn').style.display = 'inline-block';
+    renderPermGrid(a.perms || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetAdminForm() {
+    editingEmail = null;
+    const inp = document.getElementById('adminEmail');
+    inp.value = '';
+    inp.disabled = false;
+    document.getElementById('adminFormTitle').textContent = t('adminAddTitle');
+    document.getElementById('adminCancelBtn').style.display = 'none';
+    renderPermGrid();
+  }
+
+  async function saveAdmin() {
+    const email = (document.getElementById('adminEmail').value || '').trim();
+    if (!email) { toast(t('needEmail'), true); return; }
+    const perms = Array.from(document.querySelectorAll('#permGrid input:checked')).map(i => i.value);
+    const btn = document.getElementById('adminSaveBtn');
+    btn.disabled = true;
+    const res = await db.rpc('admin_upsert_admin', { p_email: email, p_perms: perms });
+    btn.disabled = false;
+    if (res.error) { toast(errText(res.error), true); return; }
+    toast(t('adminSaved'));
+    resetAdminForm();
+    await loadData();
+  }
+
+  async function removeAdmin(id) {
+    const a = (data.admins || []).find(x => x.user_id === id);
+    if (!a || !confirm(fmt(t('confirmRemoveAdmin'), { e: a.email }))) return;
+    const res = await db.rpc('admin_remove_admin', { target: id });
+    if (res.error) { toast(errText(res.error), true); return; }
+    toast(t('adminRemoved'));
+    if (editingEmail === a.email) resetAdminForm();
+    await loadData();
+  }
+
+  // ---------- Başlat ----------
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    myId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    const ok = await loadData();
+    if (!ok) {
+      if (document.getElementById('deniedBox').style.display !== 'block') {
+        document.getElementById('loading').textContent = t('e_no_permission');
+      }
+      return;
+    }
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  })();
+
+  window.addEventListener('hs:langchange', () => { if (me) renderAll(); else applyStatic(); });
+</script>
+</body>
+</html>
