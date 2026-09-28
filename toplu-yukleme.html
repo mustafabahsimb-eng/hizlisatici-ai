@@ -286,7 +286,7 @@
       tabLink: '🔗 Link yapıştır',
       tabFile: '📄 Fiyat listesi yükle (PDF/Excel)',
       dropText: '📄 <b>PDF, Excel ya da CSV fiyat listesini</b> buraya sürükle ya da tıklayıp seç',
-      fileHint: 'Fiyat listesindeki <b>model kodları</b>, yukarıda linkten çektiğin ürünlerle ve panelindeki ürünlerle eşleştirilir; fiyatlar otomatik dolar. İpucu: önce "🔗 Link yapıştır" ile ürünleri çek, sonra buraya fiyat listesini yükle.',
+      fileHint: 'Sadece fiyat listesini yüklersen içindeki ürünler doğrudan önizlemeye gelir. Linkten ürün çektiysen (resim ve özellikler için) listedeki <b>model kodları</b> onlarla eşleşir ve fiyatlar otomatik dolar. Panelindeki ürünlerin fiyatları da güncellenebilir.',
       vatLabel: 'Listedeki fiyatlar:',
       vat0: 'KDV dahil / olduğu gibi kullan',
       vat20: 'KDV hariç → %20 KDV ekle',
@@ -392,7 +392,7 @@
       tabLink: '🔗 Paste a link',
       tabFile: '📄 Upload price list (PDF/Excel)',
       dropText: '📄 Drag your <b>PDF, Excel or CSV price list</b> here or click to choose',
-      fileHint: 'The <b>model codes</b> in the price list are matched with the products fetched above and with the products in your dashboard; prices fill in automatically. Tip: fetch products with "🔗 Paste a link" first, then upload the price list here.',
+      fileHint: 'If you upload only the price list, its products appear directly in the preview. If you fetched products from a link (for images and specs), the <b>model codes</b> are matched with them and prices fill in automatically. Prices of products in your dashboard can be updated too.',
       vatLabel: 'Prices in the list:',
       vat0: 'VAT included / use as is',
       vat20: 'VAT excluded → add 20% VAT',
@@ -727,7 +727,7 @@
   function problems(it) {
     const p = [];
     if (!(it.newPrice > 0)) p.push(['bad', t('wNoPrice')]);
-    if (!it.images.length) p.push(['bad', t('wNoImage')]);
+    if (!it.images.length) p.push(['mid', t('wNoImage')]);
     if (!it.specs.length) p.push(['mid', t('wNoSpecs')]);
     return p;
   }
@@ -1008,7 +1008,19 @@
     return count === 1 ? hit : null;
   }
 
+  function rowToItem(u) {
+    return {
+      url: '', name: u.name || u.code, price: u.price, list_price: u.list_price, currency: u.currency,
+      model_code: u.code, brand: '', category: '', description: '', images: [], specs: [], stock: null
+    };
+  }
+
   async function applyPriceList() {
+    // Önizleme boşsa (sadece fiyat listesi yüklendiyse) listedeki ürünleri doğrudan göster
+    if (!items.length) {
+      addItems(priceRows.filter(u => u.code || u.name).map(rowToItem));
+      await markExisting();
+    }
     const r = rules();
     const byNorm = new Map();
     priceRows.forEach(row => { const k = normCode(row.code); if (k && !byNorm.has(k)) byNorm.set(k, row); });
@@ -1082,10 +1094,7 @@
   }
 
   function addUnmatched() {
-    const list = unmatchedRows.filter(u => u.code || u.name).map(u => ({
-      url: '', name: u.name || u.code, price: u.price, list_price: u.list_price, currency: u.currency,
-      model_code: u.code, brand: '', category: '', description: '', images: [], specs: [], stock: null
-    }));
+    const list = unmatchedRows.filter(u => u.code || u.name).map(rowToItem);
     addItems(list);
     toast(fmt(t('addedUnmatched'), { n: list.length }));
     unmatchedRows = [];
