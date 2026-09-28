@@ -297,6 +297,8 @@
       pdfImgs: 'PDF\'teki resimler çıkarılıyor... (sayfa {d} / {t})',
       fileImgs: ' <b>{n}</b> ürüne PDF\'ten resim eklendi.',
       uploadingImgs: 'Resimler yükleniyor... ({d} / {t})',
+      secs: '{s} sn',
+      imgSaveErr: 'Bazı ürün resimleri galeriye kaydedilemedi: ',
       fileBad: 'Bu dosya türü desteklenmiyor. PDF, XLSX, XLS ya da CSV yükle.',
       fileNoRows: 'Dosyada fiyatlı ürün satırı bulunamadı.',
       fileNoCols: 'Excel sütunları anlaşılamadı. İlk satırda "Model/Kod" ve "Fiyat" başlıkları olmalı.',
@@ -406,6 +408,8 @@
       pdfImgs: 'Extracting images from the PDF... (page {d} / {t})',
       fileImgs: ' Images from the PDF were added to <b>{n}</b> products.',
       uploadingImgs: 'Uploading images... ({d} / {t})',
+      secs: '{s} s',
+      imgSaveErr: 'Some product images could not be saved to the gallery: ',
       fileBad: 'This file type is not supported. Upload PDF, XLSX, XLS or CSV.',
       fileNoRows: 'No priced product rows were found in the file.',
       fileNoCols: 'Could not understand the spreadsheet columns. The first row should have "Model/Code" and "Price" headers.',
@@ -1023,7 +1027,16 @@
     }
     const out = new Array(parts.length);
     let done = 0, next = 0, lastErr = '';
-    setProgress(fmt(t('fileReading'), { d: 0, t: parts.length }), 10);
+    // Beklerken takılmış gibi görünmesin: geçen süre + yavaşça ilerleyen çubuk
+    const t0 = Date.now();
+    const tick = () => {
+      const sec = Math.round((Date.now() - t0) / 1000);
+      const creep = done < parts.length ? Math.min(0.9, sec / 45) : 0;
+      setProgress(fmt(t('fileReading'), { d: done, t: parts.length }) + ' · ' + fmt(t('secs'), { s: sec }),
+        10 + Math.min(0.97, (done + creep) / parts.length) * 80);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
     const worker = async () => {
       while (next < parts.length) {
         const my = next++;
@@ -1038,10 +1051,11 @@
           out[my] = data.rows || [];
         } catch (e) { lastErr = e.message; out[my] = []; }
         done++;
-        setProgress(fmt(t('fileReading'), { d: done, t: parts.length }), 10 + done / parts.length * 90);
+        tick();
       }
     };
-    await Promise.all(Array.from({ length: Math.min(3, parts.length) }, worker));
+    try { await Promise.all(Array.from({ length: Math.min(3, parts.length) }, worker)); }
+    finally { clearInterval(timer); }
     const rows = [].concat.apply([], out);
     if (!rows.length && lastErr) throw new Error(lastErr);
     return rows;
@@ -1299,7 +1313,7 @@
 
     await uploadPdfImages(sel);
 
-    let added = 0, failed = 0, lastErr = '';
+    let added = 0, failed = 0, lastErr = '', imgErr = '';
     const CHUNK = 40;
     for (let i = 0; i < sel.length; i += CHUNK) {
       const chunk = sel.slice(i, i + CHUNK);
@@ -1338,8 +1352,11 @@
 
         // Görseller
         const imgRows = [];
-        pairs.forEach(p => p.it.images.slice(0, 12).forEach((u, pos) => imgRows.push({ product_id: p.id, user_id: userId, url: u, position: pos, source: 'import' })));
-        if (imgRows.length) await db.from('product_images').insert(imgRows);
+        pairs.forEach(p => p.it.images.slice(0, 12).forEach((u, pos) => imgRows.push({ product_id: p.id, user_id: userId, url: u, position: pos, source: 'supplier' })));
+        if (imgRows.length) {
+          const ir = await db.from('product_images').insert(imgRows);
+          if (ir.error) { imgErr = ir.error.message; console.warn('product_images', ir.error); }
+        }
 
         // Kendi mağazada yayın
         if (publish && pairs.length) {
@@ -1385,6 +1402,9 @@
     } else {
       resBox.className = 'result ok';
       resBox.innerHTML = esc(fmt(t('importDone'), { n: HS.number(added) })) + ' <a href="dashboard.html">' + esc(t('goPanel')) + '</a>';
+    }
+    if (imgErr) {
+      resBox.innerHTML += '<div style="color:#e6c96a;margin-top:6px">' + esc(t('imgSaveErr') + imgErr) + '</div>';
     }
     renderPreview();
   }
