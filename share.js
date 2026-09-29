@@ -148,7 +148,7 @@
   // ---------- Veri ----------
   async function loadData(ids) {
     const [pr, im, li, ss] = await Promise.all([
-      db.from('products').select('id, name, generated_title, generated_description, specs, image_url, sale_price, cost_currency, model_code, brand, category').in('id', ids),
+      db.from('products').select('*').in('id', ids),
       db.from('product_images').select('product_id, url, position').in('product_id', ids).order('position', { ascending: true }),
       db.from('listings').select('product_id, price, currency, marketplace_code, status').in('product_id', ids).eq('marketplace_code', 'own_store').is('deleted_at', null),
       db.from('store_settings').select('store_slug').eq('user_id', HS.user.id).maybeSingle(),
