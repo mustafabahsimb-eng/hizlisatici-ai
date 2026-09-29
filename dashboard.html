@@ -6,6 +6,8 @@
 <title>HızlıSatıcı AI - Panel</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
+<script src="share.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -148,6 +150,21 @@
     color: #9aa3b2; cursor: pointer; white-space: nowrap;
   }
   .auto-price-label input { width: 14px; height: 14px; cursor: pointer; }
+  .share-btn {
+    background: transparent; border: 1px solid #2a3040; color: #e6e8ee; border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .share-btn:hover { border-color: #1D9E75; background: #0f1a16; }
+  .share-btn .fa-whatsapp { color: #25D366; }
+  .share-btn .fa-instagram { color: #E1306C; }
+  .share-btn .fa-facebook { color: #1877F2; }
+  .share-btn .fa-telegram { color: #229ED9; }
+  .share-icons { display: inline-flex; gap: 4px; font-size: 13px; }
+  .btn-share-bulk {
+    background: #123222; color: #6ee7b7; border: 1px solid #1D9E75;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-share-bulk:hover { background: #164a31; }
   .load-error { padding: 40px 20px; text-align: center; color: #f28b8b; font-size: 14px; }
 </style>
 </head>
@@ -217,6 +234,7 @@
     </label>
     <div class="bulk-delete-controls" id="bulkDeleteControls">
       <span id="selectedCountText"></span>
+      <button class="btn-share-bulk" onclick="HSShare.open(Array.from(selectedProductIds))"><span data-i18n="dash.shareSelected">📣 Sosyal medyada paylaş</span><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span></button>
       <button class="btn-danger" onclick="bulkDeleteProducts()" data-i18n="dash.deleteSelected">🗑 Seçilenleri sil</button>
     </div>
   </div>
@@ -242,6 +260,9 @@
       'dash.profitNoRate': 'Kur bulunamadı, para birimlerine göre: {parts}',
       'dash.selectAll': 'Tümünü seç',
       'dash.deleteSelected': '🗑 Seçilenleri sil',
+      'dash.shareSelected': '📣 Sosyal medyada paylaş',
+      'dash.share': 'Paylaş',
+      'dash.shareTitle': 'Sosyal medyada paylaş',
       'dash.selected': '{n} ürün seçildi',
       'dash.confirmBulk': '{n} ürünü silmek istediğine emin misin? Bu işlem geri alınamaz.',
       'dash.confirmOne': 'Bu ürünü silmek istediğine emin misin?',
@@ -361,6 +382,9 @@
       'dash.profitNoRate': 'No exchange rate found, by currency: {parts}',
       'dash.selectAll': 'Select all',
       'dash.deleteSelected': '🗑 Delete selected',
+      'dash.shareSelected': '📣 Share on social media',
+      'dash.share': 'Share',
+      'dash.shareTitle': 'Share on social media',
       'dash.selected': '{n} products selected',
       'dash.confirmBulk': 'Are you sure you want to delete {n} products? This cannot be undone.',
       'dash.confirmOne': 'Are you sure you want to delete this product?',
@@ -748,6 +772,7 @@
           ${autoPriceHtml}
           ${scoreHtml}
           ${priceHtml}
+          <button class="share-btn" title="${esc(t('dash.shareTitle'))}" onclick="HSShare.open(['${id}'])"><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span>${esc(t('dash.share'))}</button>
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">${profitHtml}</div>
           <button class="delete-btn" title="${esc(t('dash.deleteTitle'))}" onclick="deleteProduct('${id}')">🗑</button>
         </div>
