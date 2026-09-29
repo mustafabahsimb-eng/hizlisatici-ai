@@ -166,6 +166,26 @@
   }
   .btn-share-bulk:hover { background: #164a31; }
   .load-error { padding: 40px 20px; text-align: center; color: #f28b8b; font-size: 14px; }
+
+  /* ---------- Telefon görünümü ---------- */
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .menu-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  .menu-toggle { display: none; }
+  @media (max-width: 700px) {
+    header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+    .header-right { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .user-email { display: none; }
+    main { padding: 20px 14px; }
+    .menu-toggle { display: inline-flex; align-items: center; gap: 6px; }
+    .menu-btns .menu-extra { display: none; }
+    .menu-btns.open .menu-extra { display: inline-block; }
+    .menu-btns.open { padding-bottom: 4px; }
+    .btn-primary, .btn-secondary { padding: 10px 14px; font-size: 14px; }
+    .product-row { padding: 14px; align-items: flex-start; }
+    .product-right { gap: 8px; width: 100%; }
+    .bulk-actions-bar { flex-wrap: wrap; gap: 10px; }
+    .bulk-delete-controls { flex-wrap: wrap; gap: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -185,22 +205,23 @@
       <h1 data-i18n="dash.title">Ürünlerin</h1>
       <div class="subtitle" id="productCountText" data-i18n="common.loading">Yükleniyor...</div>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn-secondary" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
-      <button class="btn-secondary" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
-      <button class="btn-secondary" onclick="go('orders.html')" data-i18n="menu.orders">📦 Siparişler</button>
-      <button class="btn-secondary" onclick="go('musteri-sorulari.html')" data-i18n="menu.questions">💬 Müşteri Soruları</button>
-      <button class="btn-secondary" onclick="go('accounts.html')" data-i18n="menu.accounts">🔑 Hesaplarım</button>
-      <button class="btn-secondary" onclick="go('report.html')" data-i18n="menu.report">📊 Kâr-Zarar Raporu</button>
-      <button class="btn-secondary" onclick="go('trends.html')" data-i18n="menu.trends">🔥 Trend ürünler</button>
-      <button class="btn-secondary" onclick="go('briefing.html')" data-i18n="menu.briefing">📅 Haftalık Brifing</button>
-      <button class="btn-secondary" onclick="go('store-builder.html')" data-i18n="menu.storeBuilder">🧭 Mağazanı Kur</button>
-      <button class="btn-secondary" onclick="go('store-xray.html')" data-i18n="menu.xray">🔍 Mağaza X-Ray</button>
-      <button class="btn-secondary" onclick="go('trend-calendar.html')" data-i18n="menu.calendar">📅 Trend Takvimi</button>
-      <button class="btn-secondary" onclick="go('ayarlar.html')" data-i18n="menu.settings">⚙️ Ayarlar</button>
-      <button class="btn-secondary" onclick="go('gorsel-studyosu.html')" data-i18n="menu.studio">🎨 Görsel Stüdyosu</button>
-      <button class="btn-secondary" onclick="go('pod.html')" data-i18n="menu.pod">Print on Demand</button>
-      <button class="btn-secondary" id="monitorBtn" onclick="runStockPriceMonitor(this)" data-i18n="menu.monitor">📡 Stok ve Fiyat Takibi</button>
+    <div class="menu-btns" id="menuBtns">
+      <button class="btn-secondary menu-toggle" id="menuToggle" onclick="toggleMenu()" data-i18n="menu.toggle">☰ Menü</button>
+      <button class="btn-secondary menu-extra" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
+      <button class="btn-secondary menu-extra" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
+      <button class="btn-secondary menu-extra" onclick="go('orders.html')" data-i18n="menu.orders">📦 Siparişler</button>
+      <button class="btn-secondary menu-extra" onclick="go('musteri-sorulari.html')" data-i18n="menu.questions">💬 Müşteri Soruları</button>
+      <button class="btn-secondary menu-extra" onclick="go('accounts.html')" data-i18n="menu.accounts">🔑 Hesaplarım</button>
+      <button class="btn-secondary menu-extra" onclick="go('report.html')" data-i18n="menu.report">📊 Kâr-Zarar Raporu</button>
+      <button class="btn-secondary menu-extra" onclick="go('trends.html')" data-i18n="menu.trends">🔥 Trend ürünler</button>
+      <button class="btn-secondary menu-extra" onclick="go('briefing.html')" data-i18n="menu.briefing">📅 Haftalık Brifing</button>
+      <button class="btn-secondary menu-extra" onclick="go('store-builder.html')" data-i18n="menu.storeBuilder">🧭 Mağazanı Kur</button>
+      <button class="btn-secondary menu-extra" onclick="go('store-xray.html')" data-i18n="menu.xray">🔍 Mağaza X-Ray</button>
+      <button class="btn-secondary menu-extra" onclick="go('trend-calendar.html')" data-i18n="menu.calendar">📅 Trend Takvimi</button>
+      <button class="btn-secondary menu-extra" onclick="go('ayarlar.html')" data-i18n="menu.settings">⚙️ Ayarlar</button>
+      <button class="btn-secondary menu-extra" onclick="go('gorsel-studyosu.html')" data-i18n="menu.studio">🎨 Görsel Stüdyosu</button>
+      <button class="btn-secondary menu-extra" onclick="go('pod.html')" data-i18n="menu.pod">Print on Demand</button>
+      <button class="btn-secondary menu-extra" id="monitorBtn" onclick="runStockPriceMonitor(this)" data-i18n="menu.monitor">📡 Stok ve Fiyat Takibi</button>
       <button class="btn-secondary" onclick="go('toplu-yukleme.html')" data-i18n="menu.bulk" style="border-color:#1D9E75; color:#6ee7b7;">📥 Toplu Ürün Yükleme</button>
       <button class="btn-primary" onclick="go('add-product.html')" data-i18n="menu.add">+ Yeni ürün ekle</button>
     </div>
@@ -320,6 +341,7 @@
       'menu.monitor': '📡 Stok ve Fiyat Takibi',
       'menu.add': '+ Yeni ürün ekle',
       'menu.bulk': '📥 Toplu Ürün Yükleme',
+      'menu.toggle': '☰ Menü',
 
       'score.calc': '🏆 Skor Hesapla',
       'score.refresh': 'Skoru yenile',
@@ -442,6 +464,7 @@
       'menu.monitor': '📡 Stock & Price Monitor',
       'menu.add': '+ Add new product',
       'menu.bulk': '📥 Bulk Product Import',
+      'menu.toggle': '☰ Menu',
 
       'score.calc': '🏆 Calculate Score',
       'score.refresh': 'Refresh score',
@@ -510,6 +533,11 @@
   let renderToken = 0;
 
   function go(url) { window.location.href = url; }
+
+  // Telefonda menü butonlarını aç / kapat
+  function toggleMenu() {
+    document.getElementById('menuBtns').classList.toggle('open');
+  }
 
   function productCurrency(p) {
     const c = (p.cost_currency || '').trim();
