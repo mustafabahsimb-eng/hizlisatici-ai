@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reklam Görseli - HızlıSatıcı AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700;800&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; white-space: nowrap; }
+  .back-link:hover { color: #fff; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 22px; line-height: 1.5; }
+
+  .card { background: #141821; border-radius: 14px; border: 1px solid #232838; padding: 18px; }
+  .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 18px; }
+  .full { grid-column: 1 / -1; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #cfd4de; margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="tel"] {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px;
+    color: #fff; padding: 9px 11px; font-size: 14px; font-family: inherit;
+  }
+  .field input:focus { outline: none; border-color: #1D9E75; }
+  .hint { font-size: 12px; color: #7d8596; margin-top: 5px; line-height: 1.45; }
+
+  .tpl-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tpl-btn {
+    display: inline-flex; align-items: center; gap: 8px; background: #0d0f16; color: #cfd4de;
+    border: 1px solid #2a3040; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+  }
+  .tpl-btn.active { border-color: #1D9E75; background: #0f1a16; color: #fff; }
+  .tpl-sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(255,255,255,.25); }
+  .tpl-row input[type="color"] { width: 38px; height: 34px; border: 1px solid #2a3040; border-radius: 8px; background: #0d0f16; padding: 2px; cursor: pointer; }
+  .check-inline { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: #e6e8ee; margin-right: 18px; cursor: pointer; }
+  .check-inline input { width: 17px; height: 17px; accent-color: #1D9E75; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .btn {
+    background: #1D9E75; color: #fff; border: none; border-radius: 8px; padding: 10px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: #17875f; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn-sec { background: #1c2230; color: #e6e8ee; border: 1px solid #2a3040; }
+  .btn-sec:hover { background: #232a3a; }
+  .btn-sm { padding: 7px 11px; font-size: 13px; font-weight: 500; }
+  .status { font-size: 13px; color: #9aa3b2; }
+
+  .prod { margin-bottom: 18px; }
+  .prod-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .prod-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .img-nav { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #9aa3b2; }
+  .prod-fields { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .previews { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .pv { display: flex; flex-direction: column; gap: 8px; }
+  .pv canvas { display: block; border-radius: 10px; border: 1px solid #2a3040; background: #0d0f16; }
+  .pv.sq canvas { width: 300px; height: 300px; }
+  .pv.st canvas { width: 225px; height: 400px; }
+  .pv-label { font-size: 12px; color: #9aa3b2; }
+  .pv-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .warn { font-size: 12px; color: #f2d16b; margin-top: 8px; }
+  .empty { text-align: center; color: #9aa3b2; padding: 50px 10px; font-size: 14px; line-height: 1.6; }
+  .empty a { color: #6ee7b7; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 700px) {
+    header { padding: 12px 16px; }
+    main { padding: 20px 16px 60px; }
+    .settings, .prod-fields { grid-template-columns: 1fr; }
+    .pv.sq canvas { width: min(300px, calc(100vw - 70px)); height: auto; aspect-ratio: 1 / 1; }
+    .pv.st canvas { width: min(225px, calc(100vw - 70px)); height: auto; aspect-ratio: 9 / 16; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <a href="dashboard.html" class="back-link" data-i18n="common.back">← Panele dön</a>
+  </div>
+</header>
+
+<main>
+  <h1 data-i18n="ad.title">✨ Reklam görseli oluştur</h1>
+  <p class="subtitle" data-i18n="ad.subtitle"></p>
+
+  <div id="loading" class="empty" data-i18n="common.loading">Yükleniyor...</div>
+  <div id="emptyBox" class="empty hidden"></div>
+
+  <div id="app" class="hidden">
+    <div class="card settings">
+      <div class="field full">
+        <label data-i18n="ad.template"></label>
+        <div class="tpl-row" id="tplRow"></div>
+      </div>
+      <div class="field">
+        <label for="fStore" data-i18n="ad.storeName"></label>
+        <input type="text" id="fStore" maxlength="40">
+      </div>
+      <div class="field">
+        <label for="fPhone" data-i18n="ad.phone"></label>
+        <input type="tel" id="fPhone" maxlength="25" placeholder="0532 000 00 00">
+        <div class="hint" data-i18n="ad.phoneHint"></div>
+      </div>
+      <div class="field">
+        <label for="fBadge" data-i18n="ad.badge"></label>
+        <input type="text" id="fBadge" maxlength="24" data-i18n-placeholder="ad.badgePh">
+        <div class="hint" data-i18n="ad.badgeHint"></div>
+      </div>
+      <div class="field">
+        <label for="fCta" data-i18n="ad.cta"></label>
+        <input type="text" id="fCta" maxlength="40">
+      </div>
+      <div class="field full">
+        <label data-i18n="ad.sizes"></label>
+        <label class="check-inline"><input type="checkbox" id="szSq" checked> <span data-i18n="ad.sizeSq"></span></label>
+        <label class="check-inline"><input type="checkbox" id="szSt" checked> <span data-i18n="ad.sizeSt"></span></label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="btnDownloadAll" onclick="downloadAll()"></button>
+      <button class="btn btn-sec hidden" id="btnShareAll" onclick="shareAll()"></button>
+      <span class="status" id="status"></span>
+    </div>
+
+    <div id="list"></div>
+  </div>
+</main>
+
+<script>
+// =========================================================
+// HızlıSatıcı AI - Reklam görseli oluştur
+// Seçilen ürünler için hazır reklam görselleri üretir (kare + dikey).
+// Ürün fotoğrafı hiç değiştirilmez: olduğu gibi beyaz kartın içine yerleştirilir.
+// Her şey tarayıcıda çizilir; ek ücret yok.
+// =========================================================
+HS.i18n.add({
+  tr: {
+    'ad.title': '✨ Reklam görseli oluştur',
+    'ad.subtitle': 'Seçtiğin ürünler için Instagram, Facebook ve WhatsApp durumuna hazır reklam görselleri. Ürün fotoğrafı değiştirilmez, olduğu gibi kullanılır. Yazıları aşağıdan değiştirebilirsin; görseller anında güncellenir.',
+    'ad.template': 'Şablon',
+    'ad.brandColor': 'Renk',
+    'ad.storeName': 'Mağaza adı (görselin üstünde)',
+    'ad.phone': 'WhatsApp numarası (isteğe bağlı)',
+    'ad.phoneHint': 'Yazarsan görselin altında çıkar.',
+    'ad.badge': 'Köşe rozeti (isteğe bağlı)',
+    'ad.badgePh': 'Örn: YENİ, %20 İNDİRİM',
+    'ad.badgeHint': 'Boş bırakırsan rozet çıkmaz.',
+    'ad.cta': 'Alt yazı',
+    'ad.ctaDefault': "WhatsApp'tan sipariş verin",
+    'ad.sizes': 'Boyutlar',
+    'ad.sizeSq': 'Kare (Instagram / Facebook gönderisi)',
+    'ad.sizeSt': 'Dikey (Instagram hikâye / WhatsApp durumu)',
+    'ad.sq': 'Kare 1080×1080',
+    'ad.st': 'Dikey 1080×1920',
+    'ad.prodTitle': 'Görseldeki ürün adı',
+    'ad.prodPrice': 'Fiyat',
+    'ad.prodPricePh': 'Boş = fiyat yok',
+    'ad.photo': 'Fotoğraf',
+    'ad.download': '⬇️ İndir',
+    'ad.share': '📤 Paylaş',
+    'ad.downloadAll': '⬇️ Hepsini indir ({n})',
+    'ad.shareAll': '📤 Hepsini paylaş ({n})',
+    'ad.preparing': 'Hazırlanıyor... {i}/{n}',
+    'ad.done': '✓ {n} görsel hazır',
+    'ad.noImage': 'Bu ürünün fotoğrafı yok ya da açılamadı; görsel fotoğrafsız çıkar.',
+    'ad.noSize': 'En az bir boyut seç.',
+    'ad.noIds': 'Önce ürün listesinde ürünleri seç, sonra "✨ Reklam görseli oluştur" butonuna bas.',
+    'ad.goDash': 'Ürün listesine git',
+    'ad.loadErr': 'Ürünler yüklenemedi: ',
+    'ad.shareFail': 'Paylaşım açılamadı. Görselleri indirip paylaşabilirsin.',
+    'ad.tooMany': 'En fazla {n} ürün için yapılır; ilk {n} ürün alındı.',
+    'ad.tpl.dark': 'Şık koyu',
+    'ad.tpl.light': 'Temiz açık',
+    'ad.tpl.sale': 'Kampanya',
+    'ad.tpl.brand': 'Kendi rengim'
+  },
+  en: {
+    'ad.title': '✨ Create ad visual',
+    'ad.subtitle': 'Ready-made ad visuals for Instagram, Facebook and WhatsApp Status for the products you selected. The product photo is used as-is, never altered. Change the texts below; the visuals update instantly.',
+    'ad.template': 'Template',
+    'ad.brandColor': 'Color',
+    'ad.storeName': 'Store name (top of the visual)',
+    'ad.phone': 'WhatsApp number (optional)',
+    'ad.phoneHint': 'If filled, it appears at the bottom of the visual.',
+    'ad.badge': 'Corner badge (optional)',
+    'ad.badgePh': 'e.g. NEW, 20% OFF',
+    'ad.badgeHint': 'Leave empty for no badge.',
+    'ad.cta': 'Bottom text',
+    'ad.ctaDefault': 'Order on WhatsApp',
+    'ad.sizes': 'Sizes',
+    'ad.sizeSq': 'Square (Instagram / Facebook post)',
+    'ad.sizeSt': 'Vertical (Instagram story / WhatsApp Status)',
+    'ad.sq': 'Square 1080×1080',
+    'ad.st': 'Vertical 1080×1920',
+    'ad.prodTitle': 'Product name on the visual',
+    'ad.prodPrice': 'Price',
+    'ad.prodPricePh': 'Empty = no price',
+    'ad.photo': 'Photo',
+    'ad.download': '⬇️ Download',
+    'ad.share': '📤 Share',
+    'ad.downloadAll': '⬇️ Download all ({n})',
+    'ad.shareAll': '📤 Share all ({n})',
+    'ad.preparing': 'Preparing... {i}/{n}',
+    'ad.done': '✓ {n} visuals ready',
+    'ad.noImage': 'This product has no photo or it could not be opened; the visual is made without a photo.',
+    'ad.noSize': 'Select at least one size.',
+    'ad.noIds': 'First select products in the product list, then press "✨ Create ad visual".',
+    'ad.goDash': 'Go to product list',
+    'ad.loadErr': 'Could not load products: ',
+    'ad.shareFail': 'Sharing could not be opened. You can download the visuals and share them.',
+    'ad.tooMany': 'Up to {n} products at a time; the first {n} were taken.',
+    'ad.tpl.dark': 'Elegant dark',
+    'ad.tpl.light': 'Clean light',
+    'ad.tpl.sale': 'Sale',
+    'ad.tpl.brand': 'My color'
+  }
+});
+
+const MAX_PRODUCTS = 20;
+const PREVIEW_SCALE = 0.5;
+const SETTINGS_KEY = 'hs_ad_settings';
+const $ = (id) => document.getElementById(id);
+const t = (k, v) => HS.t(k, v);
+
+const TEMPLATES = {
+  dark:  { bg: ['#0b1220', '#1f2937'], glow: 'rgba(250,204,21,0.22)', text: '#ffffff', sub: 'rgba(255,255,255,0.72)', price: '#facc15', priceText: '#111111', badge: '#ef4444', badgeText: '#ffffff', sw: '#1f2937' },
+  light: { bg: ['#ffffff', '#e2e8f0'], glow: 'rgba(22,163,74,0.18)', text: '#0f172a', sub: '#475569', price: '#0f172a', priceText: '#ffffff', badge: '#dc2626', badgeText: '#ffffff', sw: '#e2e8f0' },
+  sale:  { bg: ['#dc2626', '#7f1d1d'], glow: 'rgba(250,204,21,0.30)', text: '#ffffff', sub: 'rgba(255,255,255,0.82)', price: '#facc15', priceText: '#7f1d1d', badge: '#facc15', badgeText: '#7f1d1d', sw: '#dc2626' },
+  brand: null // kullanıcının rengine göre hesaplanır
+};
+
+let S = { tpl: 'dark', color: '#1D9E75', store: '', phone: '', badge: '', cta: '', sq: true, st: true };
+let products = [];      // { id, title, price, images[], idx, bmp, bmpFailed }
+let homeCur = 'TRY';
+
+// ---------- Ayarları hatırla ----------
+function loadSettings() {
+  try { Object.assign(S, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) {}
+  const meta = HS.user && HS.user.user_metadata && HS.user.user_metadata.ad_settings;
+  if (meta && typeof meta === 'object') Object.assign(S, meta);
+}
+let saveTimer = null;
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(S)); } catch (e) {}
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    HS.db.auth.updateUser({ data: { ad_settings: S } }).catch(() => {});
+  }, 1500);
+}
+
+// ---------- Yardımcılar ----------
+function darken(hex, k) {
+  const n = parseInt(String(hex).replace('#', ''), 16);
+  if (isNaN(n)) return '#111111';
+  const r = Math.round(((n >> 16) & 255) * (1 - k)), g = Math.round(((n >> 8) & 255) * (1 - k)), b = Math.round((n & 255) * (1 - k));
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function theme() {
+  if (S.tpl !== 'brand') return TEMPLATES[S.tpl] || TEMPLATES.dark;
+  const c = /^#[0-9a-f]{6}$/i.test(S.color) ? S.color : '#1D9E75';
+  return { bg: [c, darken(c, 0.55)], glow: 'rgba(255,255,255,0.18)', text: '#ffffff', sub: 'rgba(255,255,255,0.8)', price: '#ffffff', priceText: darken(c, 0.35), badge: '#facc15', badgeText: '#111111', sw: c };
+}
+function priceText(v, cur) {
+  if (!(v > 0)) return '';
+  const frac = Math.round(v * 100) % 100 !== 0;
+  try {
+    return new Intl.NumberFormat(HS.lang === 'en' ? 'en-US' : 'tr-TR', {
+      style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: frac ? 2 : 0, maximumFractionDigits: 2
+    }).format(v);
+  } catch (e) { return v + ' ' + cur; }
+}
+function shortTitle(s) {
+  s = String(s || '').replace(/\s+/g, ' ').trim();
+  if (s.length <= 70) return s;
+  const cut = s.slice(0, 70);
+  return cut.slice(0, Math.max(40, cut.lastIndexOf(' '))).replace(/[,\-–|:;\s]+$/, '');
+}
+function fileName(p, kind) {
+  const base = String(p.title || 'urun').toLocaleLowerCase('tr')
+    .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'urun';
+  return base + '-' + kind + '.jpg';
+}
+function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+// Yazıyı en fazla maxLines satıra sığdır; sığmazsa küçült, yine sığmazsa "…" ile kes
+function fitLines(ctx, text, maxW, maxLines, size, minSize, weight) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  for (let fs = size; fs >= minSize; fs -= 2) {
+    ctx.font = weight + ' ' + fs + 'px Poppins, sans-serif';
+    const lines = []; let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width <= maxW) cur = test;
+      else { if (cur) lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    const fits = lines.every(l => ctx.measureText(l).width <= maxW);
+    if (lines.length <= maxLines && fits) return { lines, fs };
+    if (fs - 2 < minSize) {
+      const out = lines.slice(0, maxLines);
+      let last = out[out.length - 1] || '';
+      while (last && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
+      out[out.length - 1] = last.trim() + (lines.length > maxLines || !fits ? '…' : '');
+      return { lines: out, fs };
+    }
+  }
+  return { lines: [], fs: minSize };
+}
+
+// ---------- Resim getirme (başka sitelerin resmi için image-proxy) ----------
+function isOwnStorage(u) {
+  try { return new URL(u).hostname === new URL(HS.SUPABASE_URL).hostname; } catch (e) { return false; }
+}
+async function fetchBlob(u) {
+  if (isOwnStorage(u)) {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.blob();
+  }
+  try {
+    const r = await fetch(u, { mode: 'cors' });
+    if (r.ok) { const b = await r.blob(); if (b.type.indexOf('image/') === 0) return b; }
+  } catch (e) {}
+  const r = await fetch(HS.SUPABASE_URL + '/functions/v1/image-proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+    body: JSON.stringify({ url: u })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.blob();
+}
+async function ensureBitmap(p) {
+  const url = p.images[p.idx];
+  if (!url) { p.bmp = null; p.bmpFailed = true; return; }
+  if (p.bmpUrl === url && (p.bmp || p.bmpFailed)) return;
+  p.bmpUrl = url; p.bmp = null; p.bmpFailed = false;
+  try {
+    p.bmp = await createImageBitmap(await fetchBlob(url));
+  } catch (e) {
+    console.warn('resim açılamadı', url, e);
+    if (p.bmpUrl === url) p.bmpFailed = true;
+  }
+}
+
+// ---------- Çizim ----------
+// Tüm ölçüler 1080 genişliğe göre; kare 1080×1080, dikey 1080×1920
+function draw(canvas, p, kind, scale) {
+  const W = 1080, H = kind === 'st' ? 1920 : 1080;
+  canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const th = theme();
+  const L = kind === 'st'
+    ? { pad: 70, storeY: 170, storeFs: 40, cardY: 250, cardH: 900, titleY: 1200, titleFs: 64, titleMin: 44, titleLines: 3, priceH: 130, priceFs: 82, ctaH: 110, ctaFs: 44, bottom: 1750 }
+    : { pad: 60, storeY: 72, storeFs: 34, cardY: 125, cardH: 525, titleY: 678, titleFs: 50, titleMin: 36, titleLines: 2, priceH: 100, priceFs: 62, ctaH: 84, ctaFs: 36, bottom: 1030 };
+
+  // Arka plan
+  const g = ctx.createLinearGradient(0, 0, W * 0.3, H);
+  g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = L.cardY + L.cardH / 2;
+  const rg = ctx.createRadialGradient(cx, cy, 50, cx, cy, W * 0.75);
+  rg.addColorStop(0, th.glow); rg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+
+  // Mağaza adı
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  if (S.store) {
+    ctx.fillStyle = th.sub;
+    const f = fitLines(ctx, S.store.toLocaleUpperCase(HS.lang === 'en' ? 'en' : 'tr'), W - L.pad * 2 - (S.badge ? 330 : 0), 1, L.storeFs, 22, '700');
+    ctx.font = '700 ' + f.fs + 'px Poppins, sans-serif';
+    ctx.fillText(f.lines[0] || '', L.pad, L.storeY);
+  }
+
+  // Ürün kartı (fotoğraf olduğu gibi, beyaz zemin üstünde)
+  const cardX = L.pad, cardW = W - L.pad * 2;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.28)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16;
+  ctx.fillStyle = '#ffffff';
+  rr(ctx, cardX, L.cardY, cardW, L.cardH, 36); ctx.fill();
+  ctx.restore();
+  if (p.bmp) {
+    const ip = 36, bw = cardW - ip * 2, bh = L.cardH - ip * 2;
+    const k = Math.min(bw / p.bmp.width, bh / p.bmp.height);
+    const dw = p.bmp.width * k, dh = p.bmp.height * k;
+    ctx.save();
+    rr(ctx, cardX, L.cardY, cardW, L.cardH, 36); ctx.clip();
+    ctx.drawImage(p.bmp, cardX + (cardW - dw) / 2, L.cardY + (L.cardH - dh) / 2, dw, dh);
+    ctx.restore();
+  } else if (!p.bmpFailed) {
+    ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center';
+    ctx.font = '500 34px Poppins, sans-serif';
+    ctx.fillText('…', W / 2, L.cardY + L.cardH / 2);
+    ctx.textAlign = 'left';
+  }
+
+  // Köşe rozeti
+  if (S.badge) {
+    ctx.font = '800 ' + (kind === 'st' ? 40 : 34) + 'px Poppins, sans-serif';
+    const txt = S.badge.toLocaleUpperCase(HS.lang === 'en' ? 'en' : 'tr');
+    const bw = Math.min(ctx.measureText(txt).width + 56, W - L.pad * 2);
+    const bh = kind === 'st' ? 78 : 66;
+    const bx = W - L.pad - bw, by = L.cardY - bh / 2 - (kind === 'st' ? 10 : 6);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+    ctx.fillStyle = th.badge; rr(ctx, bx, by, bw, bh, bh / 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = th.badgeText; ctx.textAlign = 'center';
+    ctx.fillText(txt, bx + bw / 2, by + bh / 2 + 2, bw - 30);
+    ctx.textAlign = 'left';
+  }
+
+  // Ürün adı
+  ctx.fillStyle = th.text;
+  const tl = fitLines(ctx, p.title, W - L.pad * 2, L.titleLines, L.titleFs, L.titleMin, '700');
+  ctx.font = '700 ' + tl.fs + 'px Poppins, sans-serif';
+  ctx.textBaseline = 'top';
+  const lh = Math.round(tl.fs * 1.22);
+  tl.lines.forEach((line, i) => ctx.fillText(line, L.pad, L.titleY + i * lh));
+  let y = L.titleY + tl.lines.length * lh + (kind === 'st' ? 36 : 22);
+
+  // Alt kısım: fiyat + WhatsApp çubuğu (alttan yukarı doğru yerleşir)
+  const hasCta = !!(S.cta || S.phone);
+  const ctaY = L.bottom - L.ctaH;
+  const priceY = hasCta ? ctaY - L.priceH - (kind === 'st' ? 34 : 22) : L.bottom - L.priceH;
+  ctx.textBaseline = 'middle';
+  const pt = p.price;
+  if (pt) {
+    ctx.font = '800 ' + L.priceFs + 'px Poppins, sans-serif';
+    const pw = Math.min(ctx.measureText(pt).width + 80, W - L.pad * 2);
+    ctx.fillStyle = th.price; rr(ctx, L.pad, Math.max(y, priceY), pw, L.priceH, 22); ctx.fill();
+    ctx.fillStyle = th.priceText;
+    ctx.fillText(pt, L.pad + 40, Math.max(y, priceY) + L.priceH / 2 + 3, pw - 80);
+  }
+  if (hasCta) {
+    ctx.fillStyle = '#25D366'; rr(ctx, L.pad, ctaY, W - L.pad * 2, L.ctaH, L.ctaH / 2); ctx.fill();
+    const label = [S.cta, S.phone].filter(Boolean).join('  ·  ');
