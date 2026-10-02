@@ -174,17 +174,57 @@
 
   /* ---------- Telefon görünümü ---------- */
   html, body { max-width: 100%; overflow-x: hidden; }
-  .menu-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-  .menu-toggle { display: none; }
+  /* ---------- Sade ana ekran: 4 büyük buton + Diğer araçlar ---------- */
+  .main-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; }
+  .main-wrap { position: relative; }
+  .main-btn {
+    width: 100%; height: 100%; background: #141821; border: 1px solid #2a3040; border-radius: 14px;
+    padding: 16px 16px 14px; color: #fff; cursor: pointer; text-align: left;
+    display: flex; flex-direction: column; gap: 4px; font-family: inherit; transition: border-color .15s, background .15s;
+  }
+  .main-btn:hover { border-color: #1D9E75; background: #161d24; }
+  .main-btn .mb-title { font-size: 15px; font-weight: 600; }
+  .main-btn .mb-sub { font-size: 12px; color: #9aa3b2; }
+  .main-btn.primary { background: #10271d; border-color: #1D9E75; }
+  .main-btn.primary:hover { background: #133325; }
+  .pop {
+    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; min-width: 270px;
+    background: #1c212c; border: 1px solid #2a3040; border-radius: 12px; padding: 6px;
+    box-shadow: 0 14px 34px rgba(0,0,0,.45);
+  }
+  .pop.open { display: block; }
+  .pop-item {
+    display: block; width: 100%; text-align: left; background: none; border: 0; color: #e6e8ee;
+    padding: 11px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .pop-item:hover { background: #262c3a; }
+  .pop-item small { display: block; font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .pop-sep { height: 1px; background: #2a3040; margin: 6px 4px; }
+  .store-link { font-size: 12px; color: #9aa3b2; word-break: break-all; padding: 8px 12px 4px; }
+  .store-link-btns { display: flex; gap: 6px; padding: 4px 8px 8px; }
+  .store-link-btns button { flex: 1; font-size: 12px; padding: 8px 10px; }
+  .tools-row { width: 100%; }
+  .tools-toggle { font-size: 13px; padding: 8px 14px; }
+  .tools-menu { display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tools-menu.open { display: flex; }
+  .tools-menu .btn-secondary { font-size: 13px; padding: 9px 14px; }
+  .select-hint {
+    display: none; background: #2a2410; border: 1px solid #5a4a1a; color: #e6c96a;
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
+  }
+  .select-hint.show { display: block; }
+  .flash { animation: flash 1.2s ease 2; }
+  @keyframes flash { 50% { border-color: #e6c96a; box-shadow: 0 0 0 3px rgba(230,201,106,.25); } }
   @media (max-width: 700px) {
     header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
     .header-right { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
     .user-email { display: none; }
     main { padding: 20px 14px; }
-    .menu-toggle { display: inline-flex; align-items: center; gap: 6px; }
-    .menu-btns .menu-extra { display: none; }
-    .menu-btns.open .menu-extra { display: inline-block; }
-    .menu-btns.open { padding-bottom: 4px; }
+    .main-actions { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .main-btn { padding: 14px 12px 12px; }
+    .main-btn .mb-title { font-size: 14px; }
+    .pop { min-width: 0; width: calc(100vw - 28px); max-width: 340px; }
+    .main-wrap:nth-child(even) .pop { left: auto; right: 0; }
     .btn-primary, .btn-secondary { padding: 10px 14px; font-size: 14px; }
     .product-row { padding: 14px; align-items: flex-start; }
     .product-right { gap: 8px; width: 100%; }
@@ -210,25 +250,60 @@
       <h1 data-i18n="dash.title">Ürünlerin</h1>
       <div class="subtitle" id="productCountText" data-i18n="common.loading">Yükleniyor...</div>
     </div>
-    <div class="menu-btns" id="menuBtns">
-      <button class="btn-secondary menu-toggle" id="menuToggle" onclick="toggleMenu()" data-i18n="menu.toggle">☰ Menü</button>
-      <button class="btn-secondary menu-extra" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
-      <button class="btn-secondary menu-extra" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
-      <button class="btn-secondary menu-extra" onclick="go('orders.html')" data-i18n="menu.orders">📦 Siparişler</button>
-      <button class="btn-secondary menu-extra" onclick="go('musteri-sorulari.html')" data-i18n="menu.questions">💬 Müşteri Soruları</button>
-      <button class="btn-secondary menu-extra" onclick="go('accounts.html')" data-i18n="menu.accounts">🔑 Hesaplarım</button>
-      <button class="btn-secondary menu-extra" onclick="go('report.html')" data-i18n="menu.report">📊 Kâr-Zarar Raporu</button>
-      <button class="btn-secondary menu-extra" onclick="go('trends.html')" data-i18n="menu.trends">🔥 Trend ürünler</button>
-      <button class="btn-secondary menu-extra" onclick="go('briefing.html')" data-i18n="menu.briefing">📅 Haftalık Brifing</button>
-      <button class="btn-secondary menu-extra" onclick="go('store-builder.html')" data-i18n="menu.storeBuilder">🧭 Mağazanı Kur</button>
-      <button class="btn-secondary menu-extra" onclick="go('store-xray.html')" data-i18n="menu.xray">🔍 Mağaza X-Ray</button>
-      <button class="btn-secondary menu-extra" onclick="go('trend-calendar.html')" data-i18n="menu.calendar">📅 Trend Takvimi</button>
-      <button class="btn-secondary menu-extra" onclick="go('ayarlar.html')" data-i18n="menu.settings">⚙️ Ayarlar</button>
-      <button class="btn-secondary menu-extra" onclick="go('gorsel-studyosu.html')" data-i18n="menu.studio">🎨 Görsel Stüdyosu</button>
-      <button class="btn-secondary menu-extra" onclick="go('pod.html')" data-i18n="menu.pod">Print on Demand</button>
-      <button class="btn-secondary menu-extra" id="monitorBtn" onclick="runStockPriceMonitor(this)" data-i18n="menu.monitor">📡 Stok ve Fiyat Takibi</button>
-      <button class="btn-secondary" onclick="go('toplu-yukleme.html')" data-i18n="menu.bulk" style="border-color:#1D9E75; color:#6ee7b7;">📥 Toplu Ürün Yükleme</button>
-      <button class="btn-primary" onclick="go('add-product.html')" data-i18n="menu.add">+ Yeni ürün ekle</button>
+    <div class="main-actions">
+      <div class="main-wrap">
+        <button class="main-btn primary" onclick="togglePop('popAdd', event)">
+          <span class="mb-title" data-i18n="main.add">📥 Ürün ekle</span>
+          <span class="mb-sub" data-i18n="main.addSub">PDF, Excel ya da tek ürün</span>
+        </button>
+        <div class="pop" id="popAdd">
+          <button class="pop-item" onclick="go('toplu-yukleme.html')"><span data-i18n="main.addBulk">📄 Fiyat listesinden yükle</span><small data-i18n="main.addBulkSub">PDF veya Excel: resim ve özellikler otomatik gelir</small></button>
+          <button class="pop-item" onclick="go('add-product.html')"><span data-i18n="main.addOne">➕ Tek ürün ekle</span><small data-i18n="main.addOneSub">Elle ya da tedarikçiden (CJ, AliExpress)</small></button>
+        </div>
+      </div>
+      <div class="main-wrap">
+        <button class="main-btn" onclick="mainShare()">
+          <span class="mb-title" data-i18n="main.share">📣 Paylaş</span>
+          <span class="mb-sub" data-i18n="main.shareSub">WhatsApp, Instagram, Facebook</span>
+        </button>
+      </div>
+      <div class="main-wrap">
+        <button class="main-btn" onclick="mainAd()">
+          <span class="mb-title" data-i18n="main.ad">✨ Reklam görseli</span>
+          <span class="mb-sub" data-i18n="main.adSub">Seçtiğin ürünlere hazır görsel</span>
+        </button>
+      </div>
+      <div class="main-wrap">
+        <button class="main-btn" onclick="togglePop('popStore', event)">
+          <span class="mb-title" data-i18n="main.store">🏪 Mağazam</span>
+          <span class="mb-sub" data-i18n="main.storeSub">Mağaza linki, siparişler</span>
+        </button>
+        <div class="pop" id="popStore">
+          <div id="storeLinkBox"></div>
+          <div class="pop-sep"></div>
+          <button class="pop-item" onclick="go('orders.html')" data-i18n="menu.orders">📦 Siparişler</button>
+          <button class="pop-item" onclick="go('musteri-sorulari.html')" data-i18n="menu.questions">💬 Müşteri Soruları</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tools-row">
+      <button class="btn-secondary tools-toggle" id="toolsToggle" onclick="toggleTools()" data-i18n="main.tools">⋯ Diğer araçlar</button>
+      <div class="tools-menu" id="toolsMenu">
+        <button class="btn-secondary" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
+        <button class="btn-secondary" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
+        <button class="btn-secondary" onclick="go('accounts.html')" data-i18n="menu.accounts">🔑 Hesaplarım</button>
+        <button class="btn-secondary" onclick="go('report.html')" data-i18n="menu.report">📊 Kâr-Zarar Raporu</button>
+        <button class="btn-secondary" onclick="go('trends.html')" data-i18n="menu.trends">🔥 Trend ürünler</button>
+        <button class="btn-secondary" onclick="go('briefing.html')" data-i18n="menu.briefing">📅 Haftalık Brifing</button>
+        <button class="btn-secondary" onclick="go('store-builder.html')" data-i18n="menu.storeBuilder">🧭 Mağazanı Kur</button>
+        <button class="btn-secondary" onclick="go('store-xray.html')" data-i18n="menu.xray">🔍 Mağaza X-Ray</button>
+        <button class="btn-secondary" onclick="go('trend-calendar.html')" data-i18n="menu.calendar">📅 Trend Takvimi</button>
+        <button class="btn-secondary" onclick="go('gorsel-studyosu.html')" data-i18n="menu.studio">🎨 Görsel Stüdyosu</button>
+        <button class="btn-secondary" onclick="go('pod.html')" data-i18n="menu.pod">Print on Demand</button>
+        <button class="btn-secondary" id="monitorBtn" onclick="runStockPriceMonitor(this)" data-i18n="menu.monitor">📡 Stok ve Fiyat Takibi</button>
+        <button class="btn-secondary" onclick="go('ayarlar.html')" data-i18n="menu.settings">⚙️ Ayarlar</button>
+      </div>
     </div>
   </div>
 
@@ -252,6 +327,8 @@
       <div class="stat-note" id="totalProfitNote"></div>
     </div>
   </div>
+
+  <div class="select-hint" id="selectHint"></div>
 
   <div class="bulk-actions-bar" id="bulkActionsBar">
     <label>
@@ -349,6 +426,26 @@
       'menu.add': '+ Yeni ürün ekle',
       'menu.bulk': '📥 Toplu Ürün Yükleme',
       'menu.toggle': '☰ Menü',
+      'main.add': '📥 Ürün ekle',
+      'main.addSub': 'PDF, Excel ya da tek ürün',
+      'main.addBulk': '📄 Fiyat listesinden yükle',
+      'main.addBulkSub': 'PDF veya Excel: resim ve özellikler otomatik gelir',
+      'main.addOne': '➕ Tek ürün ekle',
+      'main.addOneSub': 'Elle ya da tedarikçiden (CJ, AliExpress)',
+      'main.share': '📣 Paylaş',
+      'main.shareSub': 'WhatsApp, Instagram, Facebook',
+      'main.ad': '✨ Reklam görseli',
+      'main.adSub': 'Seçtiğin ürünlere hazır görsel',
+      'main.store': '🏪 Mağazam',
+      'main.storeSub': 'Mağaza linki, siparişler',
+      'main.tools': '⋯ Diğer araçlar',
+      'main.toolsClose': '✕ Araçları kapat',
+      'main.selectFirst': '👇 Önce aşağıdaki listeden ürünlerin yanındaki kutucukları işaretle, sonra tekrar bas.',
+      'main.storeOpen': '🔗 Mağazayı aç',
+      'main.storeCopy': '📋 Linki kopyala',
+      'main.copied': '✓ Kopyalandı',
+      'main.noStore': '🧭 Henüz mağazan yok: Mağazanı kur',
+      'main.storeLoading': 'Yükleniyor...',
 
       'score.calc': '🏆 Skor Hesapla',
       'score.refresh': 'Skoru yenile',
@@ -473,6 +570,26 @@
       'menu.add': '+ Add new product',
       'menu.bulk': '📥 Bulk Product Import',
       'menu.toggle': '☰ Menu',
+      'main.add': '📥 Add products',
+      'main.addSub': 'PDF, Excel or a single product',
+      'main.addBulk': '📄 Import from a price list',
+      'main.addBulkSub': 'PDF or Excel: images and specs are filled in automatically',
+      'main.addOne': '➕ Add a single product',
+      'main.addOneSub': 'Manually or from a supplier (CJ, AliExpress)',
+      'main.share': '📣 Share',
+      'main.shareSub': 'WhatsApp, Instagram, Facebook',
+      'main.ad': '✨ Ad visual',
+      'main.adSub': 'Ready visuals for selected products',
+      'main.store': '🏪 My store',
+      'main.storeSub': 'Store link, orders',
+      'main.tools': '⋯ More tools',
+      'main.toolsClose': '✕ Close tools',
+      'main.selectFirst': '👇 First tick the boxes next to products in the list below, then press again.',
+      'main.storeOpen': '🔗 Open store',
+      'main.storeCopy': '📋 Copy link',
+      'main.copied': '✓ Copied',
+      'main.noStore': '🧭 No store yet: Build your store',
+      'main.storeLoading': 'Loading...',
 
       'score.calc': '🏆 Calculate Score',
       'score.refresh': 'Refresh score',
@@ -547,9 +664,75 @@
     go('reklam-gorseli.html?ids=' + encodeURIComponent(ids.join(',')));
   }
 
-  // Telefonda menü butonlarını aç / kapat
-  function toggleMenu() {
-    document.getElementById('menuBtns').classList.toggle('open');
+  // ---------- Sade ana ekran ----------
+  function togglePop(id, ev) {
+    if (ev) ev.stopPropagation();
+    document.querySelectorAll('.pop.open').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+    if (id === 'popStore' && el.classList.contains('open')) loadStoreLink();
+  }
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('.pop')) return;
+    document.querySelectorAll('.pop.open').forEach(p => p.classList.remove('open'));
+  });
+
+  function toggleTools() {
+    const m = document.getElementById('toolsMenu');
+    const open = m.classList.toggle('open');
+    const b = document.getElementById('toolsToggle');
+    b.setAttribute('data-i18n', open ? 'main.toolsClose' : 'main.tools');
+    b.textContent = t(open ? 'main.toolsClose' : 'main.tools');
+  }
+
+  let hintTimer = null;
+  function needSelection() {
+    if (selectedProductIds.size > 0) return false;
+    const h = document.getElementById('selectHint');
+    h.textContent = t('main.selectFirst');
+    h.classList.add('show');
+    const bar = document.getElementById('bulkActionsBar');
+    bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    bar.classList.remove('flash'); void bar.offsetWidth; bar.classList.add('flash');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => h.classList.remove('show'), 6000);
+    return true;
+  }
+  function mainShare() {
+    if (needSelection()) return;
+    HSShare.open(Array.from(selectedProductIds));
+  }
+  function mainAd() {
+    if (needSelection()) return;
+    openAdVisual();
+  }
+
+  let storeUrl = null;
+  async function loadStoreLink() {
+    const box = document.getElementById('storeLinkBox');
+    if (storeUrl === null) {
+      box.innerHTML = '<div class="store-link">' + esc(t('main.storeLoading')) + '</div>';
+      const r = await db.from('store_settings').select('store_slug').eq('user_id', HS.user.id).limit(1);
+      const slug = r.data && r.data[0] && r.data[0].store_slug;
+      storeUrl = slug ? new URL('magaza.html?slug=' + encodeURIComponent(slug), location.href).href : '';
+    }
+    if (!storeUrl) {
+      box.innerHTML = '<button class="pop-item" onclick="go(\'store-builder.html\')">' + esc(t('main.noStore')) + '</button>';
+      return;
+    }
+    box.innerHTML =
+      '<div class="store-link">' + esc(storeUrl) + '</div>' +
+      '<div class="store-link-btns">' +
+        '<button class="btn-secondary" onclick="window.open(storeUrl, \'_blank\')">' + esc(t('main.storeOpen')) + '</button>' +
+        '<button class="btn-secondary" id="copyStoreBtn" onclick="copyStoreLink(event)">' + esc(t('main.storeCopy')) + '</button>' +
+      '</div>';
+  }
+  function copyStoreLink(ev) {
+    if (ev) ev.stopPropagation();
+    const b = document.getElementById('copyStoreBtn');
+    const done = () => { b.textContent = t('main.copied'); setTimeout(() => { b.textContent = t('main.storeCopy'); }, 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(storeUrl).then(done, () => prompt('', storeUrl));
+    else prompt('', storeUrl);
   }
 
   function productCurrency(p) {
@@ -843,6 +1026,7 @@
     const countText = document.getElementById('selectedCountText');
     const selectAllCb = document.getElementById('selectAllCheckbox');
     if (selectedProductIds.size > 0) {
+      document.getElementById('selectHint').classList.remove('show');
       controls.style.display = 'flex';
       countText.textContent = t('dash.selected', { n: selectedProductIds.size });
     } else {
