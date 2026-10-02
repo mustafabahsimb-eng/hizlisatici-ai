@@ -291,6 +291,7 @@ function theme() {
 }
 function priceText(v, cur) {
   if (!(v > 0)) return '';
+  if (v >= 100) v = Math.round(v); // reklamda kuruş göstermeyelim
   const frac = Math.round(v * 100) % 100 !== 0;
   try {
     return new Intl.NumberFormat(HS.lang === 'en' ? 'en-US' : 'tr-TR', {
@@ -388,15 +389,26 @@ function draw(canvas, p, kind, scale) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   const th = theme();
-  const L = kind === 'st'
-    ? { pad: 70, storeY: 170, storeFs: 40, cardY: 250, cardH: 900, titleY: 1200, titleFs: 64, titleMin: 44, titleLines: 3, priceH: 130, priceFs: 82, ctaH: 110, ctaFs: 44, bottom: 1750 }
-    : { pad: 60, storeY: 72, storeFs: 34, cardY: 125, cardH: 525, titleY: 678, titleFs: 50, titleMin: 36, titleLines: 2, priceH: 100, priceFs: 62, ctaH: 84, ctaFs: 36, bottom: 1030 };
+  const st = kind === 'st';
+  const L = st
+    ? { pad: 70, storeY: 150, storeFs: 42, cardY: 225, gap: 40, titleFs: 68, titleMin: 46, titleLines: 3, priceH: 140, priceFs: 90, ctaH: 118, ctaFs: 46, bottom: 1830, badgeFs: 62, badgeH: 116 }
+    : { pad: 60, storeY: 66, storeFs: 34, cardY: 116, gap: 22, titleFs: 52, titleMin: 38, titleLines: 2, priceH: 100, priceFs: 64, ctaH: 84, ctaFs: 36, bottom: 1040, badgeFs: 46, badgeH: 86 };
+  const cardX = L.pad, cardW = W - L.pad * 2;
 
   // Arka plan
   const g = ctx.createLinearGradient(0, 0, W * 0.3, H);
   g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const cx = W / 2, cy = L.cardY + L.cardH / 2;
+
+  // Ölçüleri önce hesapla: ürün adı + fiyat + WhatsApp çubuğu alttan yerleşir, kalan yükseklik ürün fotoğrafının
+  const tl = fitLines(ctx, p.title, cardW, L.titleLines, L.titleFs, L.titleMin, '700');
+  const lh = Math.round(tl.fs * 1.2);
+  const titleH = tl.lines.length * lh;
+  const pt = p.price;
+  const hasCta = !!(S.cta || S.phone);
+  const cardH = L.bottom - L.cardY - L.gap - titleH - (pt ? L.gap + L.priceH : 0) - (hasCta ? L.gap + L.ctaH : 0);
+
+  const cx = W / 2, cy = L.cardY + cardH / 2;
   const rg = ctx.createRadialGradient(cx, cy, 50, cx, cy, W * 0.75);
   rg.addColorStop(0, th.glow); rg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
@@ -406,82 +418,86 @@ function draw(canvas, p, kind, scale) {
   ctx.textAlign = 'left';
   if (S.store) {
     ctx.fillStyle = th.sub;
-    const f = fitLines(ctx, S.store.toLocaleUpperCase(HS.lang === 'en' ? 'en' : 'tr'), W - L.pad * 2 - (S.badge ? 330 : 0), 1, L.storeFs, 22, '700');
+    const f = fitLines(ctx, S.store.toLocaleUpperCase(HS.lang === 'en' ? 'en' : 'tr'), cardW - (S.badge ? (st ? 420 : 340) : 0), 1, L.storeFs, 22, '700');
     ctx.font = '700 ' + f.fs + 'px Poppins, sans-serif';
     ctx.fillText(f.lines[0] || '', L.pad, L.storeY);
   }
 
   // Ürün kartı (fotoğraf olduğu gibi, beyaz zemin üstünde)
-  const cardX = L.pad, cardW = W - L.pad * 2;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.28)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16;
   ctx.fillStyle = '#ffffff';
-  rr(ctx, cardX, L.cardY, cardW, L.cardH, 36); ctx.fill();
+  rr(ctx, cardX, L.cardY, cardW, cardH, 36); ctx.fill();
   ctx.restore();
   if (p.bmp) {
-    const ip = 36, bw = cardW - ip * 2, bh = L.cardH - ip * 2;
+    const ip = 30, bw = cardW - ip * 2, bh = cardH - ip * 2;
     const k = Math.min(bw / p.bmp.width, bh / p.bmp.height);
     const dw = p.bmp.width * k, dh = p.bmp.height * k;
     ctx.save();
-    rr(ctx, cardX, L.cardY, cardW, L.cardH, 36); ctx.clip();
-    ctx.drawImage(p.bmp, cardX + (cardW - dw) / 2, L.cardY + (L.cardH - dh) / 2, dw, dh);
+    rr(ctx, cardX, L.cardY, cardW, cardH, 36); ctx.clip();
+    ctx.drawImage(p.bmp, cardX + (cardW - dw) / 2, L.cardY + (cardH - dh) / 2, dw, dh);
     ctx.restore();
   } else if (!p.bmpFailed) {
     ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center';
     ctx.font = '500 34px Poppins, sans-serif';
-    ctx.fillText('…', W / 2, L.cardY + L.cardH / 2);
+    ctx.fillText('…', W / 2, L.cardY + cardH / 2);
     ctx.textAlign = 'left';
   }
 
-  // Köşe rozeti
+  // Köşe rozeti: büyük, hafif eğik, kartın sağ üst köşesine taşan etiket
   if (S.badge) {
-    ctx.font = '800 ' + (kind === 'st' ? 40 : 34) + 'px Poppins, sans-serif';
     const txt = S.badge.toLocaleUpperCase(HS.lang === 'en' ? 'en' : 'tr');
-    const bw = Math.min(ctx.measureText(txt).width + 56, W - L.pad * 2);
-    const bh = kind === 'st' ? 78 : 66;
-    const bx = W - L.pad - bw, by = L.cardY - bh / 2 - (kind === 'st' ? 10 : 6);
+    const bf = fitLines(ctx, txt, cardW * 0.6, 1, L.badgeFs, 24, '800');
+    ctx.font = '800 ' + bf.fs + 'px Poppins, sans-serif';
+    const bw = ctx.measureText(bf.lines[0] || '').width + L.badgeH * 0.9;
+    const bh = L.badgeH;
+    const bcx = W - L.pad - bw / 2 + 14, bcy = L.cardY + 8;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
-    ctx.fillStyle = th.badge; rr(ctx, bx, by, bw, bh, bh / 2); ctx.fill();
+    ctx.translate(bcx, bcy);
+    ctx.rotate(-6 * Math.PI / 180);
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+    ctx.fillStyle = th.badge; rr(ctx, -bw / 2, -bh / 2, bw, bh, bh / 2); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = st ? 6 : 5; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    rr(ctx, -bw / 2, -bh / 2, bw, bh, bh / 2); ctx.stroke();
+    ctx.fillStyle = th.badgeText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(bf.lines[0] || '', 0, 3);
     ctx.restore();
-    ctx.fillStyle = th.badgeText; ctx.textAlign = 'center';
-    ctx.fillText(txt, bx + bw / 2, by + bh / 2 + 2, bw - 30);
     ctx.textAlign = 'left';
   }
 
-  // Ürün adı
+  // Ürün adı (kartın hemen altında)
+  let y = L.cardY + cardH + L.gap;
   ctx.fillStyle = th.text;
-  const tl = fitLines(ctx, p.title, W - L.pad * 2, L.titleLines, L.titleFs, L.titleMin, '700');
   ctx.font = '700 ' + tl.fs + 'px Poppins, sans-serif';
   ctx.textBaseline = 'top';
-  const lh = Math.round(tl.fs * 1.22);
-  tl.lines.forEach((line, i) => ctx.fillText(line, L.pad, L.titleY + i * lh));
-  let y = L.titleY + tl.lines.length * lh + (kind === 'st' ? 36 : 22);
+  tl.lines.forEach((line, i) => ctx.fillText(line, L.pad, y + i * lh));
+  y += titleH;
 
-  // Alt kısım: fiyat + WhatsApp çubuğu (alttan yukarı doğru yerleşir)
-  const hasCta = !!(S.cta || S.phone);
-  const ctaY = L.bottom - L.ctaH;
-  const priceY = hasCta ? ctaY - L.priceH - (kind === 'st' ? 34 : 22) : L.bottom - L.priceH;
+  // Fiyat (ürün adının hemen altında)
   ctx.textBaseline = 'middle';
-  const pt = p.price;
   if (pt) {
+    y += L.gap;
     ctx.font = '800 ' + L.priceFs + 'px Poppins, sans-serif';
-    const pw = Math.min(ctx.measureText(pt).width + 80, W - L.pad * 2);
-    ctx.fillStyle = th.price; rr(ctx, L.pad, Math.max(y, priceY), pw, L.priceH, 22); ctx.fill();
+    const pw = Math.min(ctx.measureText(pt).width + 80, cardW);
+    ctx.fillStyle = th.price; rr(ctx, L.pad, y, pw, L.priceH, 24); ctx.fill();
     ctx.fillStyle = th.priceText;
-    ctx.fillText(pt, L.pad + 40, Math.max(y, priceY) + L.priceH / 2 + 3, pw - 80);
+    ctx.fillText(pt, L.pad + 40, y + L.priceH / 2 + 3, pw - 80);
+    y += L.priceH;
   }
+
+  // WhatsApp çubuğu (en altta)
   if (hasCta) {
-    ctx.fillStyle = '#25D366'; rr(ctx, L.pad, ctaY, W - L.pad * 2, L.ctaH, L.ctaH / 2); ctx.fill();
+    const ctaY = L.bottom - L.ctaH;
+    ctx.fillStyle = '#25D366'; rr(ctx, L.pad, ctaY, cardW, L.ctaH, L.ctaH / 2); ctx.fill();
     const label = [S.cta, S.phone].filter(Boolean).join('  ·  ');
     const iconFs = Math.round(L.ctaFs * 1.25);
     ctx.font = '400 ' + iconFs + 'px "Font Awesome 6 Brands"';
     const iw = ctx.measureText('\uf232').width;
-    const lf = fitLines(ctx, label, W - L.pad * 2 - iw - 120, 1, L.ctaFs, 22, '700');
+    const lf = fitLines(ctx, label, cardW - iw - 120, 1, L.ctaFs, 22, '700');
     ctx.font = '700 ' + lf.fs + 'px Poppins, sans-serif';
     const tw = ctx.measureText(lf.lines[0] || '').width;
-    const total = iw + 18 + tw;
-    let x = (W - total) / 2;
+    const x = (W - (iw + 18 + tw)) / 2;
     ctx.fillStyle = '#ffffff';
     ctx.font = '400 ' + iconFs + 'px "Font Awesome 6 Brands"';
     ctx.fillText('\uf232', x, ctaY + L.ctaH / 2 + 2);
