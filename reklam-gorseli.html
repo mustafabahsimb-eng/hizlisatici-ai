@@ -474,3 +474,282 @@ function draw(canvas, p, kind, scale) {
   if (hasCta) {
     ctx.fillStyle = '#25D366'; rr(ctx, L.pad, ctaY, W - L.pad * 2, L.ctaH, L.ctaH / 2); ctx.fill();
     const label = [S.cta, S.phone].filter(Boolean).join('  ·  ');
+    const iconFs = Math.round(L.ctaFs * 1.25);
+    ctx.font = '400 ' + iconFs + 'px "Font Awesome 6 Brands"';
+    const iw = ctx.measureText('\uf232').width;
+    const lf = fitLines(ctx, label, W - L.pad * 2 - iw - 120, 1, L.ctaFs, 22, '700');
+    ctx.font = '700 ' + lf.fs + 'px Poppins, sans-serif';
+    const tw = ctx.measureText(lf.lines[0] || '').width;
+    const total = iw + 18 + tw;
+    let x = (W - total) / 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '400 ' + iconFs + 'px "Font Awesome 6 Brands"';
+    ctx.fillText('\uf232', x, ctaY + L.ctaH / 2 + 2);
+    ctx.font = '700 ' + lf.fs + 'px Poppins, sans-serif';
+    ctx.fillText(lf.lines[0] || '', x + iw + 18, ctaY + L.ctaH / 2 + 3);
+  }
+}
+
+// ---------- Ekran ----------
+function kinds() { return [S.sq ? 'sq' : null, S.st ? 'st' : null].filter(Boolean); }
+
+function renderTemplates() {
+  const row = $('tplRow');
+  row.innerHTML = '';
+  ['dark', 'light', 'sale', 'brand'].forEach(k => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tpl-btn' + (S.tpl === k ? ' active' : '');
+    const sw = k === 'brand' ? S.color : TEMPLATES[k].sw;
+    b.innerHTML = '<span class="tpl-sw" style="background:' + sw + '"></span>' + HS.escapeHtml(t('ad.tpl.' + k));
+    b.onclick = () => { S.tpl = k; saveSettings(); renderTemplates(); redrawAll(); };
+    row.appendChild(b);
+  });
+  if (S.tpl === 'brand') {
+    const c = document.createElement('input');
+    c.type = 'color'; c.value = S.color; c.title = t('ad.brandColor');
+    c.oninput = () => { S.color = c.value; saveSettings(); const s = row.querySelector('.tpl-btn.active .tpl-sw'); if (s) s.style.background = c.value; redrawAll(); };
+    row.appendChild(c);
+  }
+}
+
+function renderList() {
+  const list = $('list');
+  list.innerHTML = '';
+  products.forEach((p, i) => {
+    const box = document.createElement('div');
+    box.className = 'card prod';
+    box.innerHTML =
+      '<div class="prod-head"><div class="prod-name"></div>' +
+      '<div class="img-nav"><span>' + HS.escapeHtml(t('ad.photo')) + '</span>' +
+      '<button class="btn btn-sec btn-sm" data-a="prev">◀</button><span data-a="idx"></span>' +
+      '<button class="btn btn-sec btn-sm" data-a="next">▶</button></div></div>' +
+      '<div class="prod-fields">' +
+      '<div class="field"><label>' + HS.escapeHtml(t('ad.prodTitle')) + '</label><input type="text" data-a="title" maxlength="120"></div>' +
+      '<div class="field"><label>' + HS.escapeHtml(t('ad.prodPrice')) + '</label><input type="text" data-a="price" maxlength="30" placeholder="' + HS.escapeHtml(t('ad.prodPricePh')) + '"></div>' +
+      '</div>' +
+      '<div class="previews"></div><div class="warn hidden" data-a="warn"></div>';
+    box.querySelector('.prod-name').textContent = (i + 1) + '. ' + (p.origTitle || '');
+    const ti = box.querySelector('[data-a="title"]'); ti.value = p.title;
+    ti.oninput = () => { p.title = ti.value; redraw(p); };
+    const pi = box.querySelector('[data-a="price"]'); pi.value = p.price;
+    pi.oninput = () => { p.price = pi.value.trim(); redraw(p); };
+    const nav = box.querySelector('.img-nav');
+    if (p.images.length < 2) nav.classList.add('hidden');
+    box.querySelector('[data-a="prev"]').onclick = () => { p.idx = (p.idx - 1 + p.images.length) % p.images.length; loadAndDraw(p); };
+    box.querySelector('[data-a="next"]').onclick = () => { p.idx = (p.idx + 1) % p.images.length; loadAndDraw(p); };
+    const pv = box.querySelector('.previews');
+    p.canvases = {};
+    kinds().forEach(k => {
+      const d = document.createElement('div');
+      d.className = 'pv ' + k;
+      d.innerHTML = '<div class="pv-label">' + HS.escapeHtml(t('ad.' + k)) + '</div><canvas></canvas><div class="pv-btns"></div>';
+      const btns = d.querySelector('.pv-btns');
+      const dl = document.createElement('button');
+      dl.className = 'btn btn-sec btn-sm'; dl.textContent = t('ad.download');
+      dl.onclick = () => downloadOne(p, k);
+      btns.appendChild(dl);
+      if (canShareFiles()) {
+        const sh = document.createElement('button');
+        sh.className = 'btn btn-sm'; sh.textContent = t('ad.share');
+        sh.onclick = () => shareFiles([{ p, k }]);
+        btns.appendChild(sh);
+      }
+      pv.appendChild(d);
+      p.canvases[k] = d.querySelector('canvas');
+    });
+    p.box = box;
+    list.appendChild(box);
+    redraw(p);
+  });
+  updateButtons();
+}
+
+function redraw(p) {
+  if (!p.canvases) return;
+  Object.keys(p.canvases).forEach(k => draw(p.canvases[k], p, k, PREVIEW_SCALE));
+  const idx = p.box && p.box.querySelector('[data-a="idx"]');
+  if (idx) idx.textContent = (p.idx + 1) + '/' + p.images.length;
+  const w = p.box && p.box.querySelector('[data-a="warn"]');
+  if (w) { w.textContent = t('ad.noImage'); w.classList.toggle('hidden', !p.bmpFailed); }
+}
+let redrawTimer = null;
+function redrawAll() {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(() => products.forEach(redraw), 60);
+}
+async function loadAndDraw(p) {
+  redraw(p);
+  await ensureBitmap(p);
+  redraw(p);
+}
+
+function updateButtons() {
+  const n = products.length * kinds().length;
+  $('btnDownloadAll').textContent = t('ad.downloadAll', { n });
+  $('btnDownloadAll').disabled = n === 0;
+  const sa = $('btnShareAll');
+  sa.textContent = t('ad.shareAll', { n: Math.min(n, 10) });
+  sa.classList.toggle('hidden', !canShareFiles() || n === 0);
+  $('status').textContent = kinds().length ? '' : t('ad.noSize');
+}
+
+// ---------- İndir / paylaş ----------
+function canShareFiles() {
+  try {
+    return !!(navigator.canShare && navigator.canShare({ files: [new File([new Blob(['x'], { type: 'image/jpeg' })], 'a.jpg', { type: 'image/jpeg' })] }));
+  } catch (e) { return false; }
+}
+async function makeFile(p, k) {
+  await ensureBitmap(p);
+  const c = document.createElement('canvas');
+  draw(c, p, k, 1);
+  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+  c.width = c.height = 1;
+  return new File([blob], fileName(p, k === 'st' ? 'dikey' : 'kare'), { type: 'image/jpeg' });
+}
+function saveFile(file) {
+  const a = document.createElement('a');
+  const u = URL.createObjectURL(file);
+  a.href = u; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 4000);
+}
+async function downloadOne(p, k) {
+  saveFile(await makeFile(p, k));
+}
+async function downloadAll() {
+  const jobs = [];
+  products.forEach(p => kinds().forEach(k => jobs.push({ p, k })));
+  const btn = $('btnDownloadAll'); btn.disabled = true;
+  for (let i = 0; i < jobs.length; i++) {
+    $('status').textContent = t('ad.preparing', { i: i + 1, n: jobs.length });
+    saveFile(await makeFile(jobs[i].p, jobs[i].k));
+    await new Promise(r => setTimeout(r, 450));
+  }
+  $('status').textContent = t('ad.done', { n: jobs.length });
+  btn.disabled = false;
+}
+async function shareFiles(jobs) {
+  try {
+    const files = [];
+    for (let i = 0; i < jobs.length; i++) {
+      if (jobs.length > 1) $('status').textContent = t('ad.preparing', { i: i + 1, n: jobs.length });
+      files.push(await makeFile(jobs[i].p, jobs[i].k));
+    }
+    $('status').textContent = '';
+    await navigator.share({ files });
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    console.warn(e);
+    $('status').textContent = t('ad.shareFail');
+  }
+}
+function shareAll() {
+  const jobs = [];
+  products.forEach(p => kinds().forEach(k => jobs.push({ p, k })));
+  shareFiles(jobs.slice(0, 10));
+}
+
+// ---------- Veriler ----------
+async function loadProducts(ids) {
+  const db = HS.db;
+  const [pr, im, li, ss] = await Promise.all([
+    db.from('products').select('*').in('id', ids),
+    db.from('product_images').select('product_id, url, position').in('product_id', ids).order('position', { ascending: true }),
+    db.from('listings').select('product_id, price, currency, marketplace_code').in('product_id', ids).eq('marketplace_code', 'own_store').is('deleted_at', null),
+    db.from('store_settings').select('*').eq('user_id', HS.user.id).limit(1)
+  ]);
+  if (pr.error) throw pr.error;
+  const store = (ss.data && ss.data[0]) || {};
+  const storeName = store.store_name || store.business_name || store.name || '';
+  const imgs = {}, lst = {};
+  (im.data || []).forEach(r => { (imgs[r.product_id] = imgs[r.product_id] || []).push(r.url); });
+  (li.data || []).forEach(r => { lst[r.product_id] = r; });
+  const order = new Map(ids.map((id, i) => [String(id), i]));
+  const rows = (pr.data || []).sort((a, b) => order.get(String(a.id)) - order.get(String(b.id)));
+  const out = [];
+  for (const p of rows) {
+    const list = [];
+    if (p.image_url) list.push(p.image_url);
+    (imgs[p.id] || []).forEach(u => { if (list.indexOf(u) === -1) list.push(u); });
+    const l = lst[p.id];
+    let v = null, c = homeCur;
+    if (l && Number(l.price) > 0) { v = Number(l.price); c = l.currency || 'TRY'; }
+    else if (Number(p.sale_price) > 0) { v = Number(p.sale_price); c = p.cost_currency || 'TRY'; }
+    if (v && c !== homeCur) {
+      try { const x = await HS.convert(v, c, homeCur); if (x != null && x > 0) { v = Math.round(x * 100) / 100; c = homeCur; } } catch (e) {}
+    }
+    const full = p.generated_title || p.name || '';
+    out.push({
+      id: p.id, origTitle: full, title: shortTitle(full),
+      price: v ? priceText(v, c) : '',
+      images: list.filter(u => /^https?:\/\//i.test(u)), idx: 0, bmp: null, bmpFailed: false
+    });
+  }
+  return { list: out, storeName };
+}
+
+function bindSettings() {
+  const map = [['fStore', 'store'], ['fPhone', 'phone'], ['fBadge', 'badge'], ['fCta', 'cta']];
+  map.forEach(([id, key]) => {
+    const el = $(id);
+    el.value = S[key] || '';
+    el.oninput = () => { S[key] = el.value.trim(); saveSettings(); redrawAll(); };
+  });
+  $('szSq').checked = !!S.sq; $('szSt').checked = !!S.st;
+  $('szSq').onchange = () => { S.sq = $('szSq').checked; saveSettings(); renderList(); };
+  $('szSt').onchange = () => { S.st = $('szSt').checked; saveSettings(); renderList(); };
+}
+
+async function start() {
+  const ok = await HS.init();
+  if (!ok) return;
+  homeCur = HS.homeCurrency();
+  let ids = (new URLSearchParams(location.search).get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+  ids = Array.from(new Set(ids));
+  if (!ids.length) {
+    $('loading').classList.add('hidden');
+    const e = $('emptyBox');
+    e.innerHTML = HS.escapeHtml(t('ad.noIds')) + '<br><br><a href="dashboard.html">' + HS.escapeHtml(t('ad.goDash')) + '</a>';
+    e.classList.remove('hidden');
+    return;
+  }
+  const tooMany = ids.length > MAX_PRODUCTS;
+  ids = ids.slice(0, MAX_PRODUCTS);
+  loadSettings();
+  let data;
+  try {
+    data = await loadProducts(ids);
+  } catch (err) {
+    console.error(err);
+    $('loading').textContent = t('ad.loadErr') + (err.message || err);
+    return;
+  }
+  if (!S.store) S.store = data.storeName || '';
+  if (!S.cta) S.cta = t('ad.ctaDefault');
+  products = data.list;
+  // Yazı tiplerini bekle ki görseller doğru yazıyla çizilsin
+  try {
+    await Promise.all([
+      document.fonts.load('700 40px Poppins'), document.fonts.load('800 40px Poppins'),
+      document.fonts.load('400 40px "Font Awesome 6 Brands"')
+    ]);
+  } catch (e) {}
+  $('loading').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  bindSettings();
+  renderTemplates();
+  renderList();
+  if (tooMany) $('status').textContent = t('ad.tooMany', { n: MAX_PRODUCTS });
+  // Resimleri 3'er 3'er yükle
+  let next = 0;
+  const worker = async () => { while (next < products.length) { const p = products[next++]; await loadAndDraw(p); } };
+  await Promise.all([worker(), worker(), worker()]);
+}
+
+window.addEventListener('hs:langchange', () => { if (products.length) { renderTemplates(); renderList(); } });
+start();
+</script>
+</body>
+</html>
