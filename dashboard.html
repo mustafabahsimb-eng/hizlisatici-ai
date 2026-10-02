@@ -165,6 +165,11 @@
     padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
   }
   .btn-share-bulk:hover { background: #164a31; }
+  .btn-ad-bulk {
+    background: #2a2140; color: #d8c8ff; border: 1px solid #7c5cff;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .btn-ad-bulk:hover { background: #352a52; }
   .load-error { padding: 40px 20px; text-align: center; color: #f28b8b; font-size: 14px; }
 
   /* ---------- Telefon görünümü ---------- */
@@ -256,6 +261,7 @@
     <div class="bulk-delete-controls" id="bulkDeleteControls">
       <span id="selectedCountText"></span>
       <button class="btn-share-bulk" onclick="HSShare.open(Array.from(selectedProductIds))"><span data-i18n="dash.shareSelected">📣 Sosyal medyada paylaş</span><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span></button>
+      <button class="btn-ad-bulk" onclick="openAdVisual()" data-i18n="dash.adSelected">✨ Reklam görseli oluştur</button>
       <button class="btn-danger" onclick="bulkDeleteProducts()" data-i18n="dash.deleteSelected">🗑 Seçilenleri sil</button>
     </div>
   </div>
@@ -282,6 +288,7 @@
       'dash.selectAll': 'Tümünü seç',
       'dash.deleteSelected': '🗑 Seçilenleri sil',
       'dash.shareSelected': '📣 Sosyal medyada paylaş',
+      'dash.adSelected': '✨ Reklam görseli oluştur',
       'dash.share': 'Paylaş',
       'dash.shareTitle': 'Sosyal medyada paylaş',
       'dash.selected': '{n} ürün seçildi',
@@ -405,6 +412,7 @@
       'dash.selectAll': 'Select all',
       'dash.deleteSelected': '🗑 Delete selected',
       'dash.shareSelected': '📣 Share on social media',
+      'dash.adSelected': '✨ Create ad visual',
       'dash.share': 'Share',
       'dash.shareTitle': 'Share on social media',
       'dash.selected': '{n} products selected',
@@ -533,6 +541,11 @@
   let renderToken = 0;
 
   function go(url) { window.location.href = url; }
+  function openAdVisual() {
+    const ids = Array.from(selectedProductIds);
+    if (!ids.length) return;
+    go('reklam-gorseli.html?ids=' + encodeURIComponent(ids.join(',')));
+  }
 
   // Telefonda menü butonlarını aç / kapat
   function toggleMenu() {
