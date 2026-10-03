@@ -103,6 +103,14 @@
   .publish:hover { background: #17875f; }
   .publish:disabled { opacity: .5; cursor: default; }
   .hint { font-size: 12px; color: #7d8596; margin-top: 8px; line-height: 1.5; }
+  .footer-box { margin-bottom: 14px; }
+  .footer-label { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #cfd4de; margin-bottom: 6px; }
+  .footer-label small { color: #7d8596; font-size: 12px; }
+  .footer-box textarea {
+    width: 100%; min-height: 64px; resize: vertical; background: #0d0f16; border: 1px solid #2a3040; border-radius: 10px;
+    color: #fff; padding: 10px 12px; font-size: 14px; font-family: inherit; line-height: 1.5;
+  }
+  .footer-box textarea:focus { outline: none; border-color: #1D9E75; }
 
   /* Geçmiş */
   .hist-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #232838; }
@@ -188,6 +196,13 @@
   <div class="card">
     <h2><span class="step-no">3</span><span data-i18n="so.where">Nerede paylaşılsın?</span></h2>
     <div class="chan-row" id="chanRow"></div>
+    <div class="footer-box">
+      <div class="footer-label">
+        <span><span data-i18n="so.footer">✍️ Gönderinin sonuna eklenecek yazı</span> <small data-i18n="so.optional">(isteğe bağlı)</small></span>
+        <button class="link-btn hidden" id="addStoreLink" data-i18n="so.addStore">🏪 Mağaza linkimi ekle</button>
+      </div>
+      <textarea id="footerText" maxlength="500" data-i18n-placeholder="so.footerPh" placeholder="Boş bırakırsan hiçbir şey eklenmez. Örn: Sipariş için DM at · WhatsApp: 0555 000 00 00 · www.siteniz.com"></textarea>
+    </div>
     <button class="publish" id="publishBtn" data-i18n="so.publish">🚀 Hepsine paylaş</button>
     <div class="hint" id="publishHint"></div>
   </div>
@@ -261,7 +276,11 @@ HS.i18n.add({
     'so.tgOk': '✓ Kanal bağlandı.',
     'so.cancel': 'Vazgeç',
     'so.confirmRemove': 'Bu hesabın bağlantısı kaldırılsın mı?',
-    'so.hintNoAcc': 'Paylaşmak için yukarıdan en az bir hesap bağla.'
+    'so.hintNoAcc': 'Paylaşmak için yukarıdan en az bir hesap bağla.',
+    'so.footer': '✍️ Gönderinin sonuna eklenecek yazı',
+    'so.optional': '(isteğe bağlı)',
+    'so.addStore': '🏪 Mağaza linkimi ekle',
+    'so.footerPh': 'Boş bırakırsan hiçbir şey eklenmez. Örn: Sipariş için DM at · WhatsApp: 0555 000 00 00 · www.siteniz.com'
   },
   en: {
     'so.title': '📱 Social media',
@@ -305,7 +324,11 @@ HS.i18n.add({
     'so.tgOk': '✓ Channel connected.',
     'so.cancel': 'Cancel',
     'so.confirmRemove': 'Disconnect this account?',
-    'so.hintNoAcc': 'Connect at least one account above to share.'
+    'so.hintNoAcc': 'Connect at least one account above to share.',
+    'so.footer': '✍️ Text added to the end of the post',
+    'so.optional': '(optional)',
+    'so.addStore': '🏪 Add my store link',
+    'so.footerPh': 'Leave empty to add nothing. E.g. DM us to order · WhatsApp: +1 555 000 0000 · www.yoursite.com'
   }
 });
 
@@ -511,7 +534,9 @@ async function publish() {
   const btn = $('publishBtn');
   btn.disabled = true;
   try {
-    const job = callFn('social-publish', { productIds: [...selected], channelIds: [...chosen] });
+    const footer = $('footerText').value.trim();
+    try { localStorage.setItem('seltigo_social_footer', footer); } catch (e) {}
+    const job = callFn('social-publish', { productIds: [...selected], channelIds: [...chosen], footer });
     // Gönderim sürerken geçmişi canlı izle: her ürün gittikçe ✓ yansın
     setTimeout(pollHistory, 700);
     selected = new Set();
@@ -574,6 +599,22 @@ async function start() {
   };
   $('selNone').onclick = () => { selected = new Set(); renderProducts(); };
   $('publishBtn').onclick = publish;
+  // Satıcının son yazdığı yazıyı hatırla (bir dahaki paylaşımda hazır gelsin)
+  try { $('footerText').value = localStorage.getItem('seltigo_social_footer') || ''; } catch (e) {}
+  // Seltigo mağazası varsa: tek tıkla linkini ekleyebilsin
+  HS.db.from('store_settings').select('store_slug').eq('user_id', HS.user.id).limit(1).then(r => {
+    const slug = r.data && r.data[0] && r.data[0].store_slug;
+    if (!slug) return;
+    const url = new URL('magaza.html?slug=' + encodeURIComponent(slug), location.href).href;
+    const b = $('addStoreLink');
+    b.classList.remove('hidden');
+    b.onclick = () => {
+      const ta = $('footerText');
+      if (ta.value.includes(url)) return;
+      ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + '🛒 ' + url;
+      ta.focus();
+    };
+  });
   await Promise.all([loadChannels(), loadProducts()]);
   const qIds = (new URLSearchParams(location.search).get('ids') || '').split(',').filter(Boolean);
   qIds.forEach(id => { if (products.some(p => p.id === id)) selected.add(id); });
