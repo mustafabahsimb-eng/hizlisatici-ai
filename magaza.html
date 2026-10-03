@@ -47,6 +47,16 @@
     flex-direction:column;
   }
   .card img{width:100%; aspect-ratio:1/1; object-fit:cover; background:var(--bg-panel-2); display:block;}
+  .card-img-wrap{position:relative;}
+  .bundle-tag{
+    position:absolute; top:10px; left:10px; background:#f2c94c; color:#1a1400; font-size:12px; font-weight:700;
+    padding:5px 10px; border-radius:20px; box-shadow:0 2px 8px rgba(0,0,0,.35);
+  }
+  .bundle-list{margin:0; padding:0; list-style:none; font-size:12px; color:var(--text); line-height:1.6;}
+  .bundle-list li{display:flex; gap:6px;}
+  .bundle-list li span.q{color:var(--accent); font-weight:700; min-width:24px;}
+  .old-price{font-size:13px; color:var(--text-dim); text-decoration:line-through; margin-right:6px; font-weight:400;}
+  .save-note{font-size:12px; color:#f2c94c; font-weight:600;}
   .card-body{padding:14px; display:flex; flex-direction:column; gap:8px; flex:1;}
   .card-title{font-size:15px; font-weight:600; line-height:1.35; min-height:40px;}
   .card-desc{font-size:12px; color:var(--text-dim); line-height:1.5; flex:1;
@@ -191,6 +201,8 @@ const T = {
     contactBtn: 'Bırak',
     contactSending: 'Gönderiliyor...',
     pageSuffix: ' - HızlıSatıcı AI',
+    bundleTag: '📦 Paket · {n} ürün',
+    bundleSave: 'Tek tek almaktan {v} daha uygun',
   },
   en: {
     loadingStore: 'Loading store...',
@@ -230,6 +242,8 @@ const T = {
     contactBtn: 'Send',
     contactSending: 'Sending...',
     pageSuffix: ' - HızlıSatıcı AI',
+    bundleTag: '📦 Bundle · {n} items',
+    bundleSave: 'Save {v} vs. buying separately',
   }
 };
 
@@ -287,6 +301,10 @@ function getStoreName(store){
   return store.store_name || store.name || store.magaza_adi || store.title || t('store');
 }
 function productTitle(p){ return p.generated_title || p.name || t('product'); }
+function bundleItems(p){
+  if (!p || !p.is_bundle || !Array.isArray(p.bundle_items)) return [];
+  return p.bundle_items.filter(it => it && it.name);
+}
 
 function renderStore(){
   const name = getStoreName(currentStore);
@@ -309,14 +327,30 @@ function renderProducts(){
     const title = productTitle(p);
     const desc = (p.generated_description || '').replace(/<[^>]*>/g, '').slice(0, 140);
     const img = safeImg(p.image_url) || placeholderImg;
+    const items = bundleItems(p);
+    let tagHtml = '', descHtml = '<div class="card-desc">' + escapeHtml(desc) + '</div>', oldHtml = '', saveHtml = '';
+    if (items.length) {
+      const count = items.reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0);
+      tagHtml = '<div class="bundle-tag">' + escapeHtml(t('bundleTag', { n: count })) + '</div>';
+      descHtml = '<ul class="bundle-list">' + items.map(it =>
+        '<li><span class="q">' + escapeHtml((parseInt(it.qty, 10) || 1) + '×') + '</span><span>' + escapeHtml(it.name) + '</span></li>'
+      ).join('') + '</ul>';
+      const total = items.reduce((s, it) => s + (parseFloat(it.price) || 0) * (parseInt(it.qty, 10) || 1), 0);
+      const price = parseFloat(p.sale_price) || 0;
+      if (total > price && price > 0) {
+        oldHtml = '<span class="old-price">' + escapeHtml(formatPrice(total, p.currency)) + '</span>';
+        saveHtml = '<div class="save-note">' + escapeHtml(t('bundleSave', { v: formatPrice(total - price, p.currency) })) + '</div>';
+      }
+    }
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML =
-      '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(title) + '" loading="lazy">' +
+      '<div class="card-img-wrap"><img src="' + escapeHtml(img) + '" alt="' + escapeHtml(title) + '" loading="lazy">' + tagHtml + '</div>' +
       '<div class="card-body">' +
         '<div class="card-title">' + escapeHtml(title) + '</div>' +
-        '<div class="card-desc">' + escapeHtml(desc) + '</div>' +
-        '<div class="card-price">' + escapeHtml(formatPrice(p.sale_price, p.currency)) + '</div>' +
+        descHtml +
+        '<div class="card-price">' + oldHtml + escapeHtml(formatPrice(p.sale_price, p.currency)) + '</div>' +
+        saveHtml +
         '<div style="display:flex; gap:8px;">' +
           '<button class="primary buy-btn" style="flex:1;">' + escapeHtml(t('buy')) + '</button>' +
           '<button class="ask-btn">' + escapeHtml(t('ask')) + '</button>' +
