@@ -552,6 +552,8 @@ async function start() {
   $('selNone').onclick = () => { selected = new Set(); renderProducts(); };
   $('publishBtn').onclick = publish;
   await Promise.all([loadChannels(), loadProducts()]);
+  const qIds = (new URLSearchParams(location.search).get('ids') || '').split(',').filter(Boolean);
+  qIds.forEach(id => { if (products.some(p => p.id === id)) selected.add(id); });
   renderAccounts();
   renderProducts();
   renderChannelPicker();
