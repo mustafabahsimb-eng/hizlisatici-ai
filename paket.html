@@ -82,6 +82,18 @@
   }
   .collage-note { flex: 1; min-width: 200px; font-size: 13px; color: #9aa3b2; line-height: 1.6; }
 
+  .sug-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sug-head h2 { margin: 0; }
+  .sug { background: #0d0f16; border: 1px solid #2a3040; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .sug-name { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .sug-items { font-size: 13px; color: #cfd4de; line-height: 1.6; margin-bottom: 6px; }
+  .sug-reason { font-size: 12px; color: #9aa3b2; line-height: 1.5; margin-bottom: 10px; }
+  .sug-disc { display: inline-block; font-size: 11px; font-weight: 700; color: #f2d16b; background: #2a2410; border: 1px solid #5a4a1a; border-radius: 10px; padding: 1px 8px; margin-left: 6px; vertical-align: middle; }
+  .btn-sm { width: auto; padding: 9px 14px; font-size: 13px; border-radius: 8px; }
+  .btn-sec { background: #1c2230; color: #e6e8ee; border: 1px solid #2a3040; }
+  .btn-sec:hover { background: #232a3a; }
+  .sug-status { font-size: 13px; color: #9aa3b2; padding: 6px 0; }
+
   .check-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e6e8ee; cursor: pointer; }
   .check-inline input { width: 17px; height: 17px; accent-color: #1D9E75; }
 
@@ -125,6 +137,14 @@
 
   <div id="loading" class="empty" data-i18n="common.loading">Yükleniyor...</div>
   <div id="emptyBox" class="empty hidden"></div>
+
+  <div class="card hidden" id="sugCard">
+    <div class="sug-head">
+      <h2 data-i18n="pk.sugTitle">🤖 AI paket önerileri</h2>
+      <button class="btn btn-sm btn-sec" id="sugBtn" onclick="loadSuggestions()" data-i18n="pk.sugRefresh">🔄 Yeni öneri al</button>
+    </div>
+    <div id="sugList"></div>
+  </div>
 
   <div id="app" class="hidden">
     <div class="card">
@@ -208,7 +228,15 @@ HS.i18n.add({
     'pk.collageNote': 'Paketteki ürünlerin resimleri tek görselde birleşir. Mağazanda, paylaşımlarda ve reklam görselinde bu görsel kullanılır.',
     'pk.collageBadge': 'PAKET · {n} ÜRÜN',
     'pk.collageMissing': 'Bazı ürünlerin resmi açılamadı, görselde boş kutu olarak görünür.',
-    'pk.saving3': 'Görsel yükleniyor...'
+    'pk.saving3': 'Görsel yükleniyor...',
+    'pk.sugTitle': '🤖 AI paket önerileri',
+    'pk.sugRefresh': '🔄 Yeni öneri al',
+    'pk.sugLoading': '🤖 Ürünlerine bakıyorum, birlikte iyi satacak paketleri seçiyorum...',
+    'pk.sugNone': 'Şu an öneri çıkmadı. Biraz daha ürün ekleyince tekrar dene.',
+    'pk.sugFail': 'Öneri alınamadı: {e}',
+    'pk.sugUse': '📦 Bu paketi oluştur',
+    'pk.sugDisc': '%{n} indirim',
+    'pk.sugIntro': 'Kendin seçmek istersen panelde en az 2 ürün işaretleyip "📦 Paket oluştur"a bas.'
   },
   en: {
     'pk.title': '📦 Create bundle',
@@ -244,7 +272,15 @@ HS.i18n.add({
     'pk.collageNote': 'The product images are combined into one picture. It is used in your store, in shares and in ad visuals.',
     'pk.collageBadge': 'BUNDLE · {n} ITEMS',
     'pk.collageMissing': 'Some product images could not be loaded and appear as empty boxes.',
-    'pk.saving3': 'Uploading image...'
+    'pk.saving3': 'Uploading image...',
+    'pk.sugTitle': '🤖 AI bundle ideas',
+    'pk.sugRefresh': '🔄 New ideas',
+    'pk.sugLoading': '🤖 Looking at your products and picking bundles that sell well together...',
+    'pk.sugNone': 'No ideas right now. Add a few more products and try again.',
+    'pk.sugFail': 'Could not get ideas: {e}',
+    'pk.sugUse': '📦 Create this bundle',
+    'pk.sugDisc': '{n}% off',
+    'pk.sugIntro': 'To pick products yourself, tick at least 2 on the dashboard and press "📦 Create bundle".'
   }
 });
 
@@ -555,6 +591,50 @@ async function uploadCollage(userId) {
   return HS.db.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
+// ---------- AI paket önerileri ----------
+async function loadSuggestions() {
+  const list = $('sugList');
+  const btn = $('sugBtn');
+  btn.disabled = true;
+  list.innerHTML = '<div class="sug-status">' + esc(t('pk.sugLoading')) + '</div>';
+  try {
+    const { data: { session } } = await HS.db.auth.getSession();
+    if (!session) throw new Error('Session');
+    const r = await fetch(HS.SUPABASE_URL + '/functions/v1/bundle-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ userAccessToken: session.access_token, language: (document.documentElement.lang || 'tr').slice(0, 2) })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+    const sugs = data.suggestions || [];
+    if (!sugs.length) {
+      list.innerHTML = '<div class="sug-status">' + esc(data.message || t('pk.sugNone')) + '</div>';
+      return;
+    }
+    list.innerHTML = sugs.map((s, i) => `
+      <div class="sug">
+        <div class="sug-name">${esc(s.name)}<span class="sug-disc">${esc(t('pk.sugDisc', { n: s.discount }))}</span></div>
+        <div class="sug-items">${s.product_names.map(n => '• ' + esc(n)).join('<br>')}</div>
+        <div class="sug-reason">${esc(s.reason)}</div>
+        <button class="btn btn-sm" onclick="useSuggestion(${i})">${esc(t('pk.sugUse'))}</button>
+      </div>`).join('') + '<div class="sug-status">' + esc(t('pk.sugIntro')) + '</div>';
+    window._sugs = sugs;
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = '<div class="sug-status">' + esc(t('pk.sugFail', { e: e.message || e })) + '</div>';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function useSuggestion(i) {
+  const s = (window._sugs || [])[i];
+  if (!s) return;
+  const q = new URLSearchParams({ ids: s.product_ids.join(','), name: s.name, disc: String(s.discount) });
+  location.href = 'paket.html?' + q.toString();
+}
+
 // ---------- Kaydet ----------
 async function savePackage() {
   hideMsg();
@@ -675,14 +755,24 @@ async function start() {
   const ok = await HS.init();
   if (!ok) return;
   homeCur = HS.homeCurrency();
-  let ids = (new URLSearchParams(location.search).get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const qs = new URLSearchParams(location.search);
+  let ids = (qs.get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
   ids = Array.from(new Set(ids)).slice(0, 20);
   const showEmpty = (msg) => {
     $('loading').classList.add('hidden');
     $('emptyBox').innerHTML = esc(msg) + '<br><br><a href="dashboard.html">' + esc(t('pk.goDash')) + '</a>';
     $('emptyBox').classList.remove('hidden');
   };
-  if (ids.length < 2) return showEmpty(t('pk.noIds'));
+  // Ürün seçilmeden gelindiyse: AI önerilerini göster
+  if (ids.length < 2) {
+    $('loading').classList.add('hidden');
+    $('sugCard').classList.remove('hidden');
+    loadSuggestions();
+    return;
+  }
+  const qName = (qs.get('name') || '').trim();
+  const qDisc = parseInt(qs.get('disc'), 10);
+  if (DISCOUNTS.includes(qDisc)) discount = qDisc;
   try {
     items = await loadItems(ids);
   } catch (err) {
@@ -693,6 +783,7 @@ async function start() {
   if (items.length < 2) return showEmpty(t('pk.noIds'));
   $('loading').classList.add('hidden');
   $('app').classList.remove('hidden');
+  if (qName) { $('fName').value = qName.slice(0, 120); nameTouched = true; }
   $('fName').oninput = () => { nameTouched = true; };
   $('fDesc').oninput = () => { descTouched = true; };
   $('fPrice').oninput = () => { priceTouched = true; renderDiscounts(); renderPrices(); };
