@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paket Oluştur - HızlıSatıcı AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; white-space: nowrap; }
+  .back-link:hover { color: #fff; }
+
+  main { max-width: 820px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 22px; line-height: 1.5; }
+  h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 12px; }
+
+  .card { background: #141821; border-radius: 14px; border: 1px solid #232838; padding: 18px; margin-bottom: 18px; }
+
+  .item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #232838; }
+  .item:last-child { border-bottom: none; }
+  .item img, .item .noimg {
+    width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+    background: #1c212c; border: 1px solid #2a3040;
+  }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name { font-size: 14px; font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item-price { font-size: 12px; color: #9aa3b2; margin-top: 3px; }
+  .qty { display: flex; align-items: center; gap: 6px; }
+  .qty button {
+    width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2a3040; background: #0d0f16;
+    color: #fff; font-size: 16px; cursor: pointer;
+  }
+  .qty button:hover { border-color: #1D9E75; }
+  .qty span { min-width: 22px; text-align: center; font-weight: 600; }
+  .remove { background: none; border: none; color: #7d8596; font-size: 16px; cursor: pointer; padding: 4px; }
+  .remove:hover { color: #f28b8b; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #cfd4de; margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="number"], .field textarea {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px;
+    color: #fff; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .field textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: #1D9E75; }
+  .hint { font-size: 12px; color: #7d8596; margin-top: 5px; line-height: 1.45; }
+
+  .price-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .pbox { background: #0d0f16; border: 1px solid #2a3040; border-radius: 10px; padding: 12px; }
+  .pbox .lbl { font-size: 12px; color: #9aa3b2; margin-bottom: 4px; }
+  .pbox .val { font-size: 18px; font-weight: 600; color: #fff; }
+  .pbox .val.green { color: #5DCAA5; }
+  .pbox .val.red { color: #f28b8b; }
+  .disc-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .disc-btn {
+    background: #0d0f16; color: #cfd4de; border: 1px solid #2a3040; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  .disc-btn.active { border-color: #1D9E75; background: #0f1a16; color: #fff; }
+
+  .check-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e6e8ee; cursor: pointer; }
+  .check-inline input { width: 17px; height: 17px; accent-color: #1D9E75; }
+
+  .btn {
+    background: #1D9E75; color: #fff; border: none; border-radius: 10px; padding: 13px 20px;
+    font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+  }
+  .btn:hover { background: #17875f; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .msg { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+  .msg.error { display: block; background: #2a1414; border: 1px solid #4a2020; color: #f28b8b; }
+  .msg.success { display: block; background: #123222; border: 1px solid #1D9E75; color: #6ee7b7; }
+  .msg a { color: #fff; }
+  .empty { text-align: center; color: #9aa3b2; padding: 50px 10px; font-size: 14px; line-height: 1.6; }
+  .empty a { color: #6ee7b7; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 700px) {
+    header { padding: 12px 16px; }
+    main { padding: 20px 16px 60px; }
+    .price-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">H</div>
+    <div class="logo-text">HızlıSatıcı AI</div>
+  </div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <a href="dashboard.html" class="back-link" data-i18n="common.back">← Panele dön</a>
+  </div>
+</header>
+
+<main>
+  <h1 data-i18n="pk.title">📦 Paket oluştur</h1>
+  <p class="subtitle" data-i18n="pk.subtitle">Seçtiğin ürünleri tek bir paket olarak sat. Müşteri tek tıkla hepsini birden alır.</p>
+
+  <div id="loading" class="empty" data-i18n="common.loading">Yükleniyor...</div>
+  <div id="emptyBox" class="empty hidden"></div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <h2 data-i18n="pk.items">Paketin içindekiler</h2>
+      <div id="itemList"></div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="fName" data-i18n="pk.name">Paket adı</label>
+        <input type="text" id="fName" maxlength="120">
+      </div>
+
+      <h2 data-i18n="pk.price">Fiyat</h2>
+      <div class="disc-row" id="discRow"></div>
+      <div class="price-grid">
+        <div class="pbox"><div class="lbl" data-i18n="pk.total">Tek tek alırsa</div><div class="val" id="vTotal">-</div></div>
+        <div class="pbox"><div class="lbl" data-i18n="pk.bundlePrice">Paket fiyatı</div><div class="val" id="vPrice">-</div></div>
+        <div class="pbox"><div class="lbl" data-i18n="pk.profit">Senin kârın</div><div class="val green" id="vProfit">-</div></div>
+      </div>
+      <div class="field">
+        <label for="fPrice" data-i18n="pk.priceEdit">Paket fiyatı (istersen elle değiştir)</label>
+        <input type="number" id="fPrice" min="0" step="1">
+        <div class="hint" id="priceHint"></div>
+      </div>
+
+      <div class="field">
+        <label for="fDesc" data-i18n="pk.desc">Açıklama</label>
+        <textarea id="fDesc"></textarea>
+      </div>
+
+      <label class="check-inline"><input type="checkbox" id="fStore" checked> <span data-i18n="pk.ownStore">Mağazamda hemen yayınla</span></label>
+    </div>
+
+    <button class="btn" id="saveBtn" onclick="savePackage()" data-i18n="pk.save">📦 Paketi kaydet</button>
+    <div class="msg" id="msgBox"></div>
+  </div>
+</main>
+
+<script>
+HS.i18n.add({
+  tr: {
+    'pk.title': '📦 Paket oluştur',
+    'pk.subtitle': 'Seçtiğin ürünleri tek bir paket olarak sat. Müşteri tek tıkla hepsini birden alır.',
+    'pk.items': 'Paketin içindekiler',
+    'pk.name': 'Paket adı',
+    'pk.nameSet': '{a} Seti',
+    'pk.price': 'Fiyat',
+    'pk.noDisc': 'İndirimsiz',
+    'pk.disc': '%{n} indirim',
+    'pk.total': 'Tek tek alırsa',
+    'pk.bundlePrice': 'Paket fiyatı',
+    'pk.profit': 'Senin kârın',
+    'pk.priceEdit': 'Paket fiyatı (istersen elle değiştir)',
+    'pk.saving': 'Müşteri {v} kazanır',
+    'pk.noCost': 'Bazı ürünlerin alış fiyatı girilmemiş, kâr tahmini eksik olabilir.',
+    'pk.desc': 'Açıklama',
+    'pk.descAuto': 'Bu pakette:\n{list}\n\nHepsi bir arada, tek tek almaktan daha uygun.',
+    'pk.ownStore': 'Mağazamda hemen yayınla',
+    'pk.save': '📦 Paketi kaydet',
+    'pk.saving2': 'Kaydediliyor...',
+    'pk.saved': '✓ Paket kaydedildi. Panele dönülüyor...',
+    'pk.saveFail': 'Kaydedilemedi: {e}',
+    'pk.noIds': 'Paket yapmak için önce panelde en az 2 ürün seç.',
+    'pk.needTwo': 'Pakette en az 2 ürün olmalı.',
+    'pk.needName': 'Paket adını yaz.',
+    'pk.needPrice': 'Paket fiyatını yaz.',
+    'pk.goDash': 'Panele dön',
+    'pk.loadErr': 'Ürünler yüklenemedi: ',
+    'pk.noPrice': 'fiyat yok',
+    'pk.remove': 'Paketten çıkar'
+  },
+  en: {
+    'pk.title': '📦 Create bundle',
+    'pk.subtitle': 'Sell the selected products as one bundle. Customers buy them all in one click.',
+    'pk.items': 'In this bundle',
+    'pk.name': 'Bundle name',
+    'pk.nameSet': '{a} Set',
+    'pk.price': 'Price',
+    'pk.noDisc': 'No discount',
+    'pk.disc': '{n}% off',
+    'pk.total': 'Bought separately',
+    'pk.bundlePrice': 'Bundle price',
+    'pk.profit': 'Your profit',
+    'pk.priceEdit': 'Bundle price (edit if you like)',
+    'pk.saving': 'Customer saves {v}',
+    'pk.noCost': 'Some products have no cost price, so the profit estimate may be incomplete.',
+    'pk.desc': 'Description',
+    'pk.descAuto': 'This bundle includes:\n{list}\n\nAll in one, cheaper than buying separately.',
+    'pk.ownStore': 'Publish in my store now',
+    'pk.save': '📦 Save bundle',
+    'pk.saving2': 'Saving...',
+    'pk.saved': '✓ Bundle saved. Going back to the dashboard...',
+    'pk.saveFail': 'Could not save: {e}',
+    'pk.noIds': 'To create a bundle, first select at least 2 products on the dashboard.',
+    'pk.needTwo': 'A bundle needs at least 2 products.',
+    'pk.needName': 'Enter a bundle name.',
+    'pk.needPrice': 'Enter a bundle price.',
+    'pk.goDash': 'Back to dashboard',
+    'pk.loadErr': 'Could not load products: ',
+    'pk.noPrice': 'no price',
+    'pk.remove': 'Remove from bundle'
+  }
+});
+
+const t = (k, v) => HS.t(k, v);
+const esc = HS.escapeHtml;
+const $ = (id) => document.getElementById(id);
+const DISCOUNTS = [0, 5, 10, 15, 20];
+
+let homeCur = 'TRY';
+let items = [];          // { id, name, image, price, cost, qty }
+let discount = 10;
+let priceTouched = false;
+let descTouched = false;
+let nameTouched = false;
+
+function round2(v) { return Math.round(v * 100) / 100; }
+function roundNice(v) { return v >= 100 ? Math.round(v) : round2(v); }
+function money(v) { return HS.money(v, homeCur); }
+
+// ---------- Veriler ----------
+async function toHome(v, cur) {
+  if (!(Number(v) > 0)) return null;
+  v = Number(v);
+  cur = (cur || 'TRY').toUpperCase();
+  if (cur === homeCur) return v;
+  try { const x = await HS.convert(v, cur, homeCur); return x != null && x > 0 ? round2(x) : null; } catch (e) { return null; }
+}
+
+async function loadItems(ids) {
+  const db = HS.db;
+  const [pr, im, li] = await Promise.all([
+    db.from('products').select('*').in('id', ids),
+    db.from('product_images').select('product_id, url, position').in('product_id', ids).order('position', { ascending: true }),
+    db.from('listings').select('product_id, price, currency').in('product_id', ids).eq('marketplace_code', 'own_store').is('deleted_at', null)
+  ]);
+  if (pr.error) throw pr.error;
+  const imgs = {}, lst = {};
+  (im.data || []).forEach(r => { if (!imgs[r.product_id]) imgs[r.product_id] = r.url; });
+  (li.data || []).forEach(r => { lst[r.product_id] = r; });
+  const order = new Map(ids.map((id, i) => [String(id), i]));
+  const rows = (pr.data || []).filter(p => !p.is_bundle)
+    .sort((a, b) => order.get(String(a.id)) - order.get(String(b.id)));
+  const out = [];
+  for (const p of rows) {
+    const l = lst[p.id];
+    let price = null;
+    if (l && Number(l.price) > 0) price = await toHome(l.price, l.currency || 'TRY');
+    if (price == null) price = await toHome(p.sale_price, p.cost_currency || 'TRY');
+    const cost = await toHome(p.supplier_price, p.cost_currency || 'TRY');
+    let image = p.image_url || imgs[p.id] || '';
+    if (!/^https?:\/\//i.test(image)) image = '';
+    out.push({
+      id: p.id,
+      name: p.generated_title || p.name || '',
+      image, price, cost,
+      weight: Number(p.weight_kg) || 0,
+      qty: 1
+    });
+  }
+  return out;
+}
+
+// ---------- Hesap ----------
+function totals() {
+  let total = 0, cost = 0, missingCost = false;
+  items.forEach(it => {
+    total += (it.price || 0) * it.qty;
+    if (it.cost != null) cost += it.cost * it.qty; else missingCost = true;
+  });
+  return { total: round2(total), cost: round2(cost), missingCost };
+}
+
+function suggestedPrice() {
+  return roundNice(totals().total * (1 - discount / 100));
+}
+
+function autoName() {
+  const short = items.map(it => it.name.split(/[\s,\-–|]+/).slice(0, 2).join(' '));
+  return t('pk.nameSet', { a: short.join(' + ') }).slice(0, 120);
+}
+
+function autoDesc() {
+  const list = items.map(it => '• ' + (it.qty > 1 ? it.qty + ' x ' : '') + it.name).join('\n');
+  return t('pk.descAuto', { list });
+}
+
+// ---------- Çizim ----------
+function renderItems() {
+  $('itemList').innerHTML = items.map((it, i) => `
+    <div class="item">
+      ${it.image ? `<img src="${esc(it.image)}" alt="" onerror="this.outerHTML='<div class=&quot;noimg&quot;></div>'">` : '<div class="noimg"></div>'}
+      <div class="item-info">
+        <div class="item-name">${esc(it.name)}</div>
+        <div class="item-price">${it.price != null ? esc(money(it.price)) : esc(t('pk.noPrice'))}</div>
+      </div>
+      <div class="qty">
+        <button onclick="changeQty(${i}, -1)">−</button>
+        <span>${it.qty}</span>
+        <button onclick="changeQty(${i}, 1)">+</button>
+      </div>
+      <button class="remove" title="${esc(t('pk.remove'))}" onclick="removeItem(${i})">✕</button>
+    </div>`).join('');
+}
+
+function renderDiscounts() {
+  $('discRow').innerHTML = DISCOUNTS.map(d =>
+    `<button class="disc-btn ${d === discount && !priceTouched ? 'active' : ''}" onclick="setDiscount(${d})">${esc(d === 0 ? t('pk.noDisc') : t('pk.disc', { n: d }))}</button>`
+  ).join('');
+}
+
+function renderPrices() {
+  const tt = totals();
+  if (!priceTouched) $('fPrice').value = suggestedPrice() || '';
+  const price = Number($('fPrice').value) || 0;
+  $('vTotal').textContent = tt.total ? money(tt.total) : '-';
+  $('vPrice').textContent = price ? money(price) : '-';
+  const profit = round2(price - tt.cost);
+  const pe = $('vProfit');
+  pe.textContent = price ? money(profit) : '-';
+  pe.className = 'val ' + (profit < 0 ? 'red' : 'green');
+  const hints = [];
+  if (tt.total > price && price > 0) hints.push(t('pk.saving', { v: money(round2(tt.total - price)) }));
+  if (tt.missingCost) hints.push(t('pk.noCost'));
+  $('priceHint').textContent = hints.join(' · ');
+}
+
+function renderAll() {
+  renderItems();
+  renderDiscounts();
+  if (!nameTouched) $('fName').value = autoName();
+  if (!descTouched) $('fDesc').value = autoDesc();
+  renderPrices();
+}
+
+function changeQty(i, d) {
+  items[i].qty = Math.max(1, Math.min(99, items[i].qty + d));
+  renderAll();
+}
+function removeItem(i) {
+  if (items.length <= 2) { showMsg(t('pk.needTwo'), 'error'); return; }
+  items.splice(i, 1);
+  renderAll();
+}
+function setDiscount(d) {
+  discount = d;
+  priceTouched = false;
+  renderAll();
+}
+
+// ---------- Kaydet ----------
+async function savePackage() {
+  hideMsg();
+  const name = $('fName').value.trim();
+  const price = Number($('fPrice').value) || 0;
+  const desc = $('fDesc').value.trim() || null;
+  const ownStore = $('fStore').checked;
+  if (items.length < 2) return showMsg(t('pk.needTwo'), 'error');
+  if (!name) return showMsg(t('pk.needName'), 'error');
+  if (!(price > 0)) return showMsg(t('pk.needPrice'), 'error');
+
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  btn.textContent = t('pk.saving2');
+
+  const db = HS.db;
+  const userId = HS.user.id;
+  const tt = totals();
+  const weight = round2(items.reduce((s, it) => s + it.weight * it.qty, 0)) || null;
+  const firstImage = (items.find(it => it.image) || {}).image || null;
+  const bundleItems = items.map(it => ({ product_id: it.id, qty: it.qty, name: it.name, price: it.price }));
+
+  const { data: product, error } = await db.from('products').insert({
+    user_id: userId,
+    name: name,
+    generated_title: name,
+    generated_description: desc,
+    supplier_price: tt.cost || null,
+    sale_price: price,
+    weight_kg: weight,
+    cost_currency: homeCur,
+    image_url: firstImage,
+    content_language: 'tr',
+    store_visible: ownStore,
+    is_bundle: true,
+    bundle_items: bundleItems
+  }).select('id').single();
+
+  if (error) {
+    showMsg(t('pk.saveFail', { e: error.message }), 'error');
+    btn.disabled = false;
+    btn.textContent = t('pk.save');
+    return;
+  }
+
+  try {
+    // Görseller: her ürünün ilk resmi
+    const imgRows = [];
+    items.forEach(it => {
+      if (it.image && !imgRows.some(r => r.url === it.image)) {
+        imgRows.push({ product_id: product.id, user_id: userId, url: it.image, position: imgRows.length, source: 'supplier' });
+      }
+    });
+    if (imgRows.length) {
+      const { error: ie } = await db.from('product_images').insert(imgRows);
+      if (ie) throw ie;
+    }
+
+    // Kendi mağazada ilan
+    if (ownStore) {
+      const { data: variant } = await db.from('product_variants')
+        .select('id').eq('product_id', product.id).eq('is_default', true).maybeSingle();
+      const { data: listings, error: le } = await db.from('listings').insert({
+        user_id: userId,
+        product_id: product.id,
+        source_product_id: product.id,
+        marketplace_code: 'own_store',
+        language: 'tr',
+        currency: homeCur,
+        title: name,
+        description: desc,
+        price: price,
+        commission_pct: 0,
+        vat_payer: 'seller',
+        price_mode: 'manual',
+        status: 'published',
+        published_at: new Date().toISOString()
+      }).select('id, price, status');
+      if (le) throw le;
+      if (variant && listings && listings.length) {
+        const { error: lve } = await db.from('listing_variants').insert(listings.map(l => ({
+          listing_id: l.id, variant_id: variant.id, user_id: userId, price: l.price, status: l.status
+        })));
+        if (lve) throw lve;
+      }
+    }
+
+    showMsg(t('pk.saved'), 'success');
+    setTimeout(() => { location.href = 'dashboard.html'; }, 1300);
+  } catch (err) {
+    // Yarım kayıt kalmasın
+    await db.from('products').delete().eq('id', product.id);
+    showMsg(t('pk.saveFail', { e: err.message || err }), 'error');
+    btn.disabled = false;
+    btn.textContent = t('pk.save');
+  }
+}
+
+function showMsg(text, type) {
+  const b = $('msgBox');
+  b.textContent = text;
+  b.className = 'msg ' + type;
+}
+function hideMsg() { $('msgBox').className = 'msg'; }
+
+// ---------- Başlangıç ----------
+async function start() {
+  const ok = await HS.init();
+  if (!ok) return;
+  homeCur = HS.homeCurrency();
+  let ids = (new URLSearchParams(location.search).get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+  ids = Array.from(new Set(ids)).slice(0, 20);
+  const showEmpty = (msg) => {
+    $('loading').classList.add('hidden');
+    $('emptyBox').innerHTML = esc(msg) + '<br><br><a href="dashboard.html">' + esc(t('pk.goDash')) + '</a>';
+    $('emptyBox').classList.remove('hidden');
+  };
+  if (ids.length < 2) return showEmpty(t('pk.noIds'));
+  try {
+    items = await loadItems(ids);
+  } catch (err) {
+    console.error(err);
+    $('loading').textContent = t('pk.loadErr') + (err.message || err);
+    return;
+  }
+  if (items.length < 2) return showEmpty(t('pk.noIds'));
+  $('loading').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('fName').oninput = () => { nameTouched = true; };
+  $('fDesc').oninput = () => { descTouched = true; };
+  $('fPrice').oninput = () => { priceTouched = true; renderDiscounts(); renderPrices(); };
+  renderAll();
+}
+
+window.addEventListener('hs:langchange', () => { if (items.length) renderAll(); });
+start();
+</script>
+</body>
+</html>
