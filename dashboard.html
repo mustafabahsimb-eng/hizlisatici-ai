@@ -300,6 +300,7 @@
       <button class="btn-secondary tools-toggle" id="toolsToggle" onclick="toggleTools()" data-i18n="main.tools">⋯ Diğer araçlar</button>
       <div class="tools-menu" id="toolsMenu">
         <button class="btn-secondary" id="adminBtn" style="display:none; border-color:#5a4a1a; color:#e6c96a;" onclick="go('admin.html')" data-i18n="menu.admin">🛡️ Admin Paneli</button>
+        <button class="btn-secondary" onclick="go('paket.html')" data-i18n="menu.bundleIdeas">🤖 Paket önerileri</button>
         <button class="btn-secondary" onclick="go('chat.html')" data-i18n="menu.chat">💬 Sohbetle Yönet</button>
         <button class="btn-secondary" onclick="go('accounts.html')" data-i18n="menu.accounts">🔑 Hesaplarım</button>
         <button class="btn-secondary" onclick="go('report.html')" data-i18n="menu.report">📊 Kâr-Zarar Raporu</button>
@@ -421,6 +422,7 @@
       'prova.e.images_missing': 'görsel yok',
       'prova.e.barcode_missing': 'barkod yok',
 
+      'menu.bundleIdeas': '🤖 Paket önerileri',
       'menu.chat': '💬 Sohbetle Yönet',
       'menu.orders': '📦 Siparişler',
       'menu.questions': '💬 Müşteri Soruları',
@@ -568,6 +570,7 @@
       'prova.e.images_missing': 'no image',
       'prova.e.barcode_missing': 'no barcode',
 
+      'menu.bundleIdeas': '🤖 Bundle ideas',
       'menu.chat': '💬 Manage by Chat',
       'menu.orders': '📦 Orders',
       'menu.questions': '💬 Customer Questions',
@@ -685,7 +688,8 @@
       const p = currentProducts.find(x => String(x.id) === id);
       return p && !p.is_bundle;
     });
-    if (ids.length < 2) { alert(t('dash.bundleNeedTwo')); return; }
+    // 2'den az ürün seçiliyse: AI paket önerilerine git
+    if (ids.length < 2) { go('paket.html'); return; }
     go('paket.html?ids=' + encodeURIComponent(ids.join(',')));
   }
 
