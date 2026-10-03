@@ -76,6 +76,12 @@
   }
   .disc-btn.active { border-color: #1D9E75; background: #0f1a16; color: #fff; }
 
+  .collage-wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .collage-wrap canvas {
+    width: 260px; height: 260px; border-radius: 12px; border: 1px solid #2a3040; background: #fff; display: block;
+  }
+  .collage-note { flex: 1; min-width: 200px; font-size: 13px; color: #9aa3b2; line-height: 1.6; }
+
   .check-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e6e8ee; cursor: pointer; }
   .check-inline input { width: 17px; height: 17px; accent-color: #1D9E75; }
 
@@ -124,6 +130,14 @@
     <div class="card">
       <h2 data-i18n="pk.items">Paketin içindekiler</h2>
       <div id="itemList"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="pk.collage">Paket görseli</h2>
+      <div class="collage-wrap">
+        <canvas id="collage" width="1080" height="1080"></canvas>
+        <div class="collage-note" id="collageNote" data-i18n="pk.collageNote">Paketteki ürünlerin resimleri tek görselde birleşir. Mağazanda, paylaşımlarda ve reklam görselinde bu görsel kullanılır.</div>
+      </div>
     </div>
 
     <div class="card">
@@ -189,7 +203,12 @@ HS.i18n.add({
     'pk.goDash': 'Panele dön',
     'pk.loadErr': 'Ürünler yüklenemedi: ',
     'pk.noPrice': 'fiyat yok',
-    'pk.remove': 'Paketten çıkar'
+    'pk.remove': 'Paketten çıkar',
+    'pk.collage': 'Paket görseli',
+    'pk.collageNote': 'Paketteki ürünlerin resimleri tek görselde birleşir. Mağazanda, paylaşımlarda ve reklam görselinde bu görsel kullanılır.',
+    'pk.collageBadge': 'PAKET · {n} ÜRÜN',
+    'pk.collageMissing': 'Bazı ürünlerin resmi açılamadı, görselde boş kutu olarak görünür.',
+    'pk.saving3': 'Görsel yükleniyor...'
   },
   en: {
     'pk.title': '📦 Create bundle',
@@ -220,7 +239,12 @@ HS.i18n.add({
     'pk.goDash': 'Back to dashboard',
     'pk.loadErr': 'Could not load products: ',
     'pk.noPrice': 'no price',
-    'pk.remove': 'Remove from bundle'
+    'pk.remove': 'Remove from bundle',
+    'pk.collage': 'Bundle image',
+    'pk.collageNote': 'The product images are combined into one picture. It is used in your store, in shares and in ad visuals.',
+    'pk.collageBadge': 'BUNDLE · {n} ITEMS',
+    'pk.collageMissing': 'Some product images could not be loaded and appear as empty boxes.',
+    'pk.saving3': 'Uploading image...'
   }
 });
 
@@ -353,6 +377,7 @@ function renderAll() {
   if (!nameTouched) $('fName').value = autoName();
   if (!descTouched) $('fDesc').value = autoDesc();
   renderPrices();
+  renderCollage();
 }
 
 function changeQty(i, d) {
@@ -368,6 +393,166 @@ function setDiscount(d) {
   discount = d;
   priceTouched = false;
   renderAll();
+}
+
+// ---------- Paket görseli (kolaj) ----------
+function isOwnStorage(u) {
+  try { return new URL(u).hostname === new URL(HS.SUPABASE_URL).hostname; } catch (e) { return false; }
+}
+async function fetchBlob(u) {
+  if (isOwnStorage(u)) {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.blob();
+  }
+  try {
+    const r = await fetch(u, { mode: 'cors' });
+    if (r.ok) { const b = await r.blob(); if (b.type.indexOf('image/') === 0) return b; }
+  } catch (e) {}
+  const r = await fetch(HS.SUPABASE_URL + '/functions/v1/image-proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+    body: JSON.stringify({ url: u })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.blob();
+}
+async function loadBitmaps() {
+  await Promise.all(items.map(async it => {
+    if (it.bmp !== undefined) return;
+    it.bmp = null;
+    if (!it.image) return;
+    try { it.bmp = await createImageBitmap(await fetchBlob(it.image)); }
+    catch (e) { console.warn('resim açılamadı', it.image, e); }
+  }));
+}
+
+function drawContain(ctx, bmp, x, y, w, h) {
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, x, y, w, h, 28); ctx.fill();
+  ctx.strokeStyle = '#e3e8f0'; ctx.lineWidth = 4;
+  roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 26); ctx.stroke();
+  if (!bmp) {
+    ctx.fillStyle = '#f1f4f9';
+    roundRect(ctx, x + 24, y + 24, w - 48, h - 48, 18); ctx.fill();
+    return;
+  }
+  const ip = 24;
+  const iw = w - ip * 2, ih = h - ip * 2;
+  const r = Math.min(iw / bmp.width, ih / bmp.height);
+  const dw = bmp.width * r, dh = bmp.height * r;
+  ctx.save();
+  roundRect(ctx, x, y, w, h, 28); ctx.clip();
+  ctx.drawImage(bmp, x + ip + (iw - dw) / 2, y + ip + (ih - dh) / 2, dw, dh);
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function plusSign(ctx, cx, cy) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.18)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+  ctx.fillStyle = '#1D9E75';
+  ctx.beginPath(); ctx.arc(cx, cy, 46, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(cx - 22, cy - 6, 44, 12);
+  ctx.fillRect(cx - 6, cy - 22, 12, 44);
+}
+
+function drawCollage(canvas) {
+  const W = 1080, H = 1080;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  const list = items.slice(0, 4);
+  const extra = items.length - list.length;
+  const pad = 40, top = 40, bottomBar = 150;
+  const areaW = W - pad * 2, areaH = H - top - bottomBar - 20;
+  const gap = 24;
+  const cells = [];
+  if (list.length === 2) {
+    const cw = (areaW - gap) / 2;
+    cells.push([pad, top, cw, areaH], [pad + cw + gap, top, cw, areaH]);
+  } else if (list.length === 3) {
+    const cw = (areaW - gap) / 2, ch = (areaH - gap) / 2;
+    cells.push([pad, top, cw, areaH], [pad + cw + gap, top, cw, ch], [pad + cw + gap, top + ch + gap, cw, ch]);
+  } else {
+    const cw = (areaW - gap) / 2, ch = (areaH - gap) / 2;
+    cells.push([pad, top, cw, ch], [pad + cw + gap, top, cw, ch], [pad, top + ch + gap, cw, ch], [pad + cw + gap, top + ch + gap, cw, ch]);
+  }
+  list.forEach((it, i) => {
+    const c = cells[i];
+    if (!c) return;
+    drawContain(ctx, it.bmp, c[0], c[1], c[2], c[3]);
+    if (it.qty > 1) {
+      ctx.fillStyle = '#0f1a2e';
+      roundRect(ctx, c[0] + 12, c[1] + 12, 110, 64, 32); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 38px -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(it.qty + '×', c[0] + 67, c[1] + 45);
+    }
+  });
+  if (extra > 0 && cells[3]) {
+    const c = cells[3];
+    ctx.fillStyle = 'rgba(15,26,46,.72)';
+    ctx.fillRect(c[0], c[1], c[2], c[3]);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 96px -apple-system, Segoe UI, Roboto, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('+' + extra, c[0] + c[2] / 2, c[1] + c[3] / 2);
+  }
+  // Artı işaretleri
+  if (list.length === 2) plusSign(ctx, W / 2, top + areaH / 2);
+  else if (list.length >= 3) plusSign(ctx, W / 2, top + areaH / 2);
+
+  // Alt bant
+  const count = items.reduce((s, it) => s + it.qty, 0);
+  const label = t('pk.collageBadge', { n: count });
+  ctx.font = '800 54px -apple-system, Segoe UI, Roboto, sans-serif';
+  const tw = ctx.measureText('📦  ' + label).width;
+  const bw = tw + 90, bh = 104, bx = (W - bw) / 2, by = H - bottomBar + 10;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.2)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  ctx.fillStyle = '#f2c94c';
+  roundRect(ctx, bx, by, bw, bh, 52); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#1a1400';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('📦  ' + label, W / 2, by + bh / 2 + 2);
+}
+
+let collageToken = 0;
+async function renderCollage() {
+  const my = ++collageToken;
+  await loadBitmaps();
+  if (my !== collageToken) return;
+  drawCollage($('collage'));
+  const missing = items.some(it => it.image && !it.bmp);
+  $('collageNote').textContent = t('pk.collageNote') + (missing ? ' ' + t('pk.collageMissing') : '');
+}
+
+async function uploadCollage(userId) {
+  await loadBitmaps();
+  const c = document.createElement('canvas');
+  drawCollage(c);
+  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
+  if (!blob) throw new Error('canvas');
+  const path = userId + '/bundle/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const up = await HS.db.storage.from('product-images').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  if (up.error) throw up.error;
+  return HS.db.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
 // ---------- Kaydet ----------
@@ -389,7 +574,16 @@ async function savePackage() {
   const userId = HS.user.id;
   const tt = totals();
   const weight = round2(items.reduce((s, it) => s + it.weight * it.qty, 0)) || null;
-  const firstImage = (items.find(it => it.image) || {}).image || null;
+  let firstImage = (items.find(it => it.image) || {}).image || null;
+  let collageUrl = null;
+  try {
+    btn.textContent = t('pk.saving3');
+    collageUrl = await uploadCollage(userId);
+    firstImage = collageUrl;
+  } catch (e) {
+    console.warn('paket görseli yüklenemedi, ilk ürün resmi kullanılacak', e);
+  }
+  btn.textContent = t('pk.saving2');
   const bundleItems = items.map(it => ({ product_id: it.id, qty: it.qty, name: it.name, price: it.price }));
 
   const { data: product, error } = await db.from('products').insert({
@@ -418,6 +612,7 @@ async function savePackage() {
   try {
     // Görseller: her ürünün ilk resmi
     const imgRows = [];
+    if (collageUrl) imgRows.push({ product_id: product.id, user_id: userId, url: collageUrl, position: 0, source: 'supplier' });
     items.forEach(it => {
       if (it.image && !imgRows.some(r => r.url === it.image)) {
         imgRows.push({ product_id: product.id, user_id: userId, url: it.image, position: imgRows.length, source: 'supplier' });
