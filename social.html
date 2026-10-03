@@ -104,6 +104,17 @@
   .publish:disabled { opacity: .5; cursor: default; }
   .hint { font-size: 12px; color: #7d8596; margin-top: 8px; line-height: 1.5; }
   .footer-box { margin-bottom: 14px; }
+  .mode-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .mode-btn {
+    border: 1px solid #2a3040; background: #0d0f16; color: #cfd4de; border-radius: 10px; padding: 9px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .mode-btn.on { border-color: #1D9E75; background: #10271d; color: #6ee7b7; }
+  .mode-label { font-size: 13px; color: #cfd4de; margin-bottom: 6px; }
+  .mode-label small { color: #7d8596; font-size: 12px; }
+  .opt-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cfd4de; margin-bottom: 12px; cursor: pointer; user-select: none; width: fit-content; }
+  .opt-row input { width: 16px; height: 16px; accent-color: #1D9E75; }
+  .opt-row small { color: #7d8596; font-size: 12px; }
   .footer-label { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #cfd4de; margin-bottom: 6px; }
   .footer-label small { color: #7d8596; font-size: 12px; }
   .footer-box textarea {
@@ -202,6 +213,13 @@
   <div class="card">
     <h2><span class="step-no">3</span><span data-i18n="so.where">Nerede paylaşılsın?</span></h2>
     <div class="chan-row" id="chanRow"></div>
+    <div class="mode-label"><span data-i18n="so.modeLabel">Nasıl paylaşılsın?</span> <small data-i18n="so.modeHint">(Hikaye 24 saat sonra kaybolur · Telegram'da hikaye yok, orada gönderi olarak gider)</small></div>
+    <div class="mode-row" id="modeRow">
+      <button class="mode-btn on" data-mode="post" data-i18n="so.modePost">📰 Gönderi</button>
+      <button class="mode-btn" data-mode="story" data-i18n="so.modeStory">⏱ Hikaye</button>
+      <button class="mode-btn" data-mode="both" data-i18n="so.modeBoth">📰 + ⏱ İkisi birden</button>
+    </div>
+    <label class="opt-row"><input type="checkbox" id="allImages" checked> <span data-i18n="so.allImages">🖼 Ürünün tüm resimlerini paylaş</span> <small data-i18n="so.allImagesHint">(kapalıysa sadece ana resim gider)</small></label>
     <div class="footer-box">
       <div class="footer-label">
         <span><span data-i18n="so.footer">✍️ Gönderinin sonuna eklenecek yazı</span> <small data-i18n="so.optional">(isteğe bağlı)</small></span>
@@ -290,7 +308,15 @@ HS.i18n.add({
     'so.delTitle': 'Paylaşımı sil',
     'so.delConfirm': 'Bu paylaşım {p} üzerinden ve listeden silinsin mi?',
     'so.delOk': '✓ Paylaşım silindi.',
-    'so.delFail': 'Silinemedi: {e}'
+    'so.delFail': 'Silinemedi: {e}',
+    'so.allImages': '🖼 Ürünün tüm resimlerini paylaş',
+    'so.allImagesHint': '(kapalıysa sadece ana resim gider)',
+    'so.modeLabel': 'Nasıl paylaşılsın?',
+    'so.modeHint': '(Hikaye 24 saat sonra kaybolur · Telegram\'da hikaye yok, orada gönderi olarak gider)',
+    'so.modePost': '📰 Gönderi',
+    'so.modeStory': '⏱ Hikaye',
+    'so.modeBoth': '📰 + ⏱ İkisi birden',
+    'so.kindStory': 'Hikaye'
   },
   en: {
     'so.title': '📱 Social media',
@@ -342,7 +368,15 @@ HS.i18n.add({
     'so.delTitle': 'Delete post',
     'so.delConfirm': 'Delete this post from {p} and from the list?',
     'so.delOk': '✓ Post deleted.',
-    'so.delFail': 'Could not delete: {e}'
+    'so.delFail': 'Could not delete: {e}',
+    'so.allImages': '🖼 Share all product images',
+    'so.allImagesHint': '(if off, only the main image is shared)',
+    'so.modeLabel': 'How to share?',
+    'so.modeHint': '(Stories disappear after 24 hours · Telegram has no stories, a post is sent there)',
+    'so.modePost': '📰 Post',
+    'so.modeStory': '⏱ Story',
+    'so.modeBoth': '📰 + ⏱ Both',
+    'so.kindStory': 'Story'
   }
 });
 
@@ -363,6 +397,11 @@ let products = [];        // { id, name, image, price, cur, bundle }
 let selected = new Set(); // product id (string)
 let chosen = new Set();   // channel id
 let homeCur = 'TRY';
+let shareMode = 'post';    // post | story | both
+function setMode(m) {
+  shareMode = ['post', 'story', 'both'].includes(m) ? m : 'post';
+  document.querySelectorAll('#modeRow .mode-btn').forEach(b => b.classList.toggle('on', b.dataset.mode === shareMode));
+}
 
 function toast(text, err) {
   const el = $('toast');
@@ -549,8 +588,13 @@ async function publish() {
   btn.disabled = true;
   try {
     const footer = $('footerText').value.trim();
-    try { localStorage.setItem('seltigo_social_footer', footer); } catch (e) {}
-    const job = callFn('social-publish', { productIds: [...selected], channelIds: [...chosen], footer });
+    const allImages = $('allImages').checked;
+    try {
+      localStorage.setItem('seltigo_social_footer', footer);
+      localStorage.setItem('seltigo_social_allimg', allImages ? '1' : '0');
+      localStorage.setItem('seltigo_social_mode', shareMode);
+    } catch (e) {}
+    const job = callFn('social-publish', { productIds: [...selected], channelIds: [...chosen], footer, allImages, mode: shareMode });
     // Gönderim sürerken geçmişi canlı izle: her ürün gittikçe ✓ yansın
     setTimeout(pollHistory, 700);
     selected = new Set();
@@ -582,7 +626,7 @@ async function loadHistory() {
       ${img ? `<img src="${esc(img)}" alt="">` : '<div class="noimg"></div>'}
       <div class="hist-info">
         <div class="hist-name">${esc(p.name || '')}</div>
-        <div class="hist-meta">${esc(pl.name)} · ${esc(HS.date(r.created_at, true))}${r.status === 'error' && r.error ? ' · ' + esc(r.error) : ''}</div>
+        <div class="hist-meta">${esc(pl.name)}${r.kind === 'story' ? ' · ⏱ ' + esc(t('so.kindStory')) : ''} · ${esc(HS.date(r.created_at, true))}${r.status === 'error' && r.error ? ' · ' + esc(r.error) : ''}</div>
       </div>
       ${st}
       <button class="del-btn" title="${esc(t('so.delTitle'))}" onclick="deletePost('${r.id}', '${esc(pl.name)}', this)">🗑</button>
@@ -628,7 +672,12 @@ async function start() {
   $('selNone').onclick = () => { selected = new Set(); renderProducts(); };
   $('publishBtn').onclick = publish;
   // Satıcının son yazdığı yazıyı hatırla (bir dahaki paylaşımda hazır gelsin)
-  try { $('footerText').value = localStorage.getItem('seltigo_social_footer') || ''; } catch (e) {}
+  try {
+    $('footerText').value = localStorage.getItem('seltigo_social_footer') || '';
+    if (localStorage.getItem('seltigo_social_allimg') === '0') $('allImages').checked = false;
+    setMode(localStorage.getItem('seltigo_social_mode') || 'post');
+  } catch (e) {}
+  document.querySelectorAll('#modeRow .mode-btn').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
   // Seltigo mağazası varsa: tek tıkla linkini ekleyebilsin
   HS.db.from('store_settings').select('store_slug').eq('user_id', HS.user.id).limit(1).then(r => {
     const slug = r.data && r.data[0] && r.data[0].store_slug;
