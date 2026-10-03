@@ -156,6 +156,7 @@
     font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block;
   }
   .btn2.primary { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+  .btn2.danger { color: #f28b8b; border-color: #4a2020; background: #2a1414; }
   .btn2:disabled { opacity: .5; cursor: default; }
   .cat-select { width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px; color: #fff; padding: 9px 12px; font-size: 14px; font-family: inherit; margin-bottom: 10px; }
   .cat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
@@ -371,7 +372,13 @@ HS.i18n.add({
     'so.catSending': 'Gönderiliyor...',
     'so.catDone': '✓ {n} ürün kataloğa gönderildi. Meta birkaç dakika içinde işler.',
     'so.catSkipped': '{n} ürün atlandı: {list}',
-    'so.catNote': 'Bir kerelik: Commerce Manager\'da bu kataloğu WhatsApp işletme hesabına, Instagram ve Facebook mağazana bağla. Sonrası otomatik.'
+    'so.catNote': 'Bir kerelik: Commerce Manager\'da bu kataloğu WhatsApp işletme hesabına, Instagram ve Facebook mağazana bağla. Sonrası otomatik.',
+    'so.catRemoveSel': '🗑 Seçili {n} ürünü katalogdan kaldır',
+    'so.catClear': '🧹 Kataloğu boşalt',
+    'so.catRemoveConfirm': 'Seçili {n} ürün katalogdan kaldırılsın mı? "Tüm ürünleri gönder" dediğinde de bir daha gitmezler (tek tek seçip gönderirsen geri gelirler).',
+    'so.catClearConfirm': 'Katalogdaki TÜM ürünler kaldırılsın mı? WhatsApp, Instagram ve Facebook mağazasında ürün kalmaz. İstediğin zaman tekrar gönderebilirsin.',
+    'so.catRemoved': '✓ {n} ürün katalogdan kaldırıldı.',
+    'so.catRemoving': 'Kaldırılıyor...'
   },
   en: {
     'so.title': '📱 Social media',
@@ -455,7 +462,13 @@ HS.i18n.add({
     'so.catSending': 'Sending...',
     'so.catDone': '✓ {n} products sent to the catalog. Meta processes them within a few minutes.',
     'so.catSkipped': '{n} products skipped: {list}',
-    'so.catNote': 'One time: in Commerce Manager, connect this catalog to your WhatsApp business account, Instagram and Facebook shop. After that it is automatic.'
+    'so.catNote': 'One time: in Commerce Manager, connect this catalog to your WhatsApp business account, Instagram and Facebook shop. After that it is automatic.',
+    'so.catRemoveSel': '🗑 Remove {n} selected from catalog',
+    'so.catClear': '🧹 Empty catalog',
+    'so.catRemoveConfirm': 'Remove {n} selected products from the catalog? They will not be sent again with "Send all" (select and send them to add them back).',
+    'so.catClearConfirm': 'Remove ALL products from the catalog? Your WhatsApp, Instagram and Facebook shop will be empty. You can send them again any time.',
+    'so.catRemoved': '✓ {n} products removed from the catalog.',
+    'so.catRemoving': 'Removing...'
   }
 });
 
@@ -727,8 +740,10 @@ function renderCatalog(resultHtml) {
       + '<div class="cat-btns">'
       +   '<button class="btn2 primary" id="catSyncAll" onclick="syncCatalog(false)">' + esc(t('so.catSyncAll')) + '</button>'
       +   (selN ? '<button class="btn2" onclick="syncCatalog(true)">' + esc(t('so.catSyncSel', { n: selN })) + '</button>' : '')
+      +   (selN ? '<button class="btn2 danger" onclick="removeFromCatalog(false)">' + esc(t('so.catRemoveSel', { n: selN })) + '</button>' : '')
       +   '<a class="btn2" target="_blank" rel="noopener" href="https://business.facebook.com/commerce/catalogs/' + encodeURIComponent(cur.catalog_id) + '/products">' + esc(t('so.catOpen')) + '</a>'
       +   '<button class="btn2" onclick="catChanging=true; renderCatalog();">' + esc(t('so.catChange')) + '</button>'
+      +   '<button class="btn2 danger" onclick="removeFromCatalog(true)">' + esc(t('so.catClear')) + '</button>'
       + '</div>'
       + (resultHtml || (cur.last_error ? '<div class="cat-result err">' + esc(cur.last_error) + '</div>' : ''))
       + '<p class="cat-note">' + esc(t('so.catNote')) + '</p>'
@@ -786,6 +801,22 @@ async function syncCatalog(onlySelected) {
       const list = d.skipped.slice(0, 5).map(x => (x.name || '#' + x.id) + ' (' + x.reason + ')').join(', ') + (d.skipped.length > 5 ? '…' : '');
       html += '<div class="cat-result err">' + esc(t('so.catSkipped', { n: d.skipped.length, list })) + '</div>';
     }
+    if (d.errors && d.errors.length) html += '<div class="cat-result err">' + esc(d.errors[0]) + '</div>';
+    catState = await callFn('social-catalog', { action: 'status' });
+    renderCatalog(html);
+  } catch (e) {
+    toast(t('so.fail', { e: e.message || e }), true);
+    renderCatalog();
+  }
+}
+
+async function removeFromCatalog(all) {
+  const n = selected.size;
+  if (!confirm(all ? t('so.catClearConfirm') : t('so.catRemoveConfirm', { n }))) return;
+  document.querySelectorAll('#catBody button').forEach(b => { b.disabled = true; });
+  try {
+    const d = await callFn('social-catalog', all ? { action: 'clear' } : { action: 'remove', productIds: [...selected] });
+    let html = '<div class="cat-result ok">' + esc(t('so.catRemoved', { n: d.removed || 0 })) + '</div>';
     if (d.errors && d.errors.length) html += '<div class="cat-result err">' + esc(d.errors[0]) + '</div>';
     catState = await callFn('social-catalog', { action: 'status' });
     renderCatalog(html);
