@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo Social</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: #1D9E75;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; white-space: nowrap; }
+  .back-link:hover { color: #fff; }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #9aa3b2; margin-bottom: 22px; line-height: 1.5; }
+  h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .step-no {
+    width: 24px; height: 24px; border-radius: 50%; background: #1D9E75; color: #fff;
+    font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .card { background: #141821; border-radius: 14px; border: 1px solid #232838; padding: 18px; margin-bottom: 18px; }
+
+  /* Hesaplar */
+  .accounts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .acc {
+    background: #0d0f16; border: 1px solid #2a3040; border-radius: 12px; padding: 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  }
+  .acc-icon {
+    width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #fff;
+  }
+  .acc-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .acc-sub { font-size: 12px; color: #9aa3b2; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .badge { font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; }
+  .badge.on { background: #123222; color: #6ee7b7; border: 1px solid #1D9E75; }
+  .badge.off { background: #1c212c; color: #9aa3b2; border: 1px solid #2a3040; }
+  .acc button {
+    width: 100%; border-radius: 8px; padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid #2a3040; background: #1c2230; color: #e6e8ee;
+  }
+  .acc button.primary { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+  .acc button:hover { filter: brightness(1.1); }
+
+  /* Ürünler */
+  .prod-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .search {
+    flex: 1; min-width: 200px; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px;
+    color: #fff; padding: 9px 12px; font-size: 14px; font-family: inherit;
+  }
+  .search:focus { outline: none; border-color: #1D9E75; }
+  .link-btn { background: none; border: none; color: #6ee7b7; font-size: 13px; cursor: pointer; }
+  .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-height: 420px; overflow-y: auto; padding: 2px; }
+  .prod {
+    position: relative; background: #0d0f16; border: 2px solid #2a3040; border-radius: 12px; overflow: hidden; cursor: pointer;
+    transition: border-color .12s;
+  }
+  .prod.sel { border-color: #1D9E75; }
+  .prod img, .prod .noimg { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #fff; }
+  .prod .noimg { background: #1c212c; }
+  .prod-info { padding: 8px 10px; }
+  .prod-name { font-size: 12px; color: #fff; line-height: 1.35; height: 32px; overflow: hidden; }
+  .prod-price { font-size: 12px; color: #5DCAA5; font-weight: 600; margin-top: 4px; }
+  .prod .tick {
+    position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(13,15,22,.75); border: 2px solid #fff; display: flex; align-items: center; justify-content: center;
+    color: transparent; font-size: 13px; font-weight: 700;
+  }
+  .prod.sel .tick { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+  .prod .pk { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 700; background: #f2c94c; color: #1a1400; border-radius: 10px; padding: 2px 7px; }
+
+  /* Kanal seçimi + yayınla */
+  .chan-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chan {
+    display: inline-flex; align-items: center; gap: 8px; border: 1px solid #2a3040; background: #0d0f16;
+    border-radius: 10px; padding: 9px 14px; font-size: 14px; cursor: pointer; user-select: none;
+  }
+  .chan input { width: 16px; height: 16px; accent-color: #1D9E75; }
+  .chan.disabled { opacity: .45; cursor: not-allowed; }
+  .chan i { font-size: 16px; }
+  .publish {
+    width: 100%; background: #1D9E75; color: #fff; border: none; border-radius: 12px; padding: 15px 20px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .publish:hover { background: #17875f; }
+  .publish:disabled { opacity: .5; cursor: default; }
+  .hint { font-size: 12px; color: #7d8596; margin-top: 8px; line-height: 1.5; }
+
+  /* Geçmiş */
+  .hist-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #232838; }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row img, .hist-row .noimg { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: #fff; flex-shrink: 0; }
+  .hist-row .noimg { background: #1c212c; }
+  .hist-info { flex: 1; min-width: 0; }
+  .hist-name { font-size: 13px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-meta { font-size: 12px; color: #9aa3b2; margin-top: 2px; }
+  .st { font-size: 11px; font-weight: 700; border-radius: 10px; padding: 3px 9px; white-space: nowrap; }
+  .st.pending, .st.posting { background: #2a2410; color: #f2d16b; }
+  .st.posted { background: #123222; color: #6ee7b7; }
+  .st.error { background: #2a1414; color: #f28b8b; }
+  .st a { color: inherit; }
+  .empty { text-align: center; color: #9aa3b2; padding: 24px 10px; font-size: 13px; }
+
+  /* Modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(4,8,16,.7); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #141821; border: 1px solid #2a3040; border-radius: 14px; padding: 22px; width: 100%; max-width: 460px; }
+  .modal h3 { font-size: 17px; color: #fff; margin-bottom: 10px; }
+  .modal p, .modal li { font-size: 14px; color: #cfd4de; line-height: 1.6; }
+  .modal ol { padding-left: 20px; margin: 8px 0 14px; }
+  .modal input {
+    width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px; color: #fff;
+    padding: 10px 12px; font-size: 14px; margin-bottom: 12px; font-family: inherit;
+  }
+  .modal-btns { display: flex; gap: 8px; }
+  .modal-btns button { flex: 1; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #2a3040; background: #1c2230; color: #e6e8ee; }
+  .modal-btns button.primary { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+  .msg { font-size: 13px; margin-bottom: 10px; min-height: 18px; }
+  .msg.err { color: #f28b8b; }
+  .msg.ok { color: #6ee7b7; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1c2230; border: 1px solid #1D9E75;
+    color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 14px; z-index: 200; display: none; max-width: 90%;
+  }
+  .toast.err { border-color: #f28b8b; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 800px) { .accounts { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) {
+    header { padding: 12px 16px; }
+    main { padding: 20px 16px 60px; }
+    .prod-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">S</div>
+    <div class="logo-text">Seltigo Social</div>
+  </div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <a href="dashboard.html" class="back-link" data-i18n="common.back">← Panele dön</a>
+  </div>
+</header>
+
+<main>
+  <h1 data-i18n="so.title">📱 Sosyal medya</h1>
+  <p class="subtitle" data-i18n="so.subtitle">Hesaplarını bir kere bağla. Ürünlerini seç, tek tuşla hepsine aynı anda paylaş.</p>
+
+  <div class="card">
+    <h2><span class="step-no">1</span><span data-i18n="so.accounts">Hesapların</span></h2>
+    <div class="accounts" id="accounts"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-no">2</span><span data-i18n="so.products">Paylaşılacak ürünler</span></h2>
+    <div class="prod-tools">
+      <input class="search" id="search" data-i18n-placeholder="so.search" placeholder="Ürün ara...">
+      <button class="link-btn" id="selAll" data-i18n="so.selectAll">Tümünü seç</button>
+      <button class="link-btn" id="selNone" data-i18n="so.selectNone">Seçimi temizle</button>
+      <span class="hint" id="selCount" style="margin:0;"></span>
+    </div>
+    <div class="prod-grid" id="prodGrid"><div class="empty" data-i18n="common.loading">Yükleniyor...</div></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-no">3</span><span data-i18n="so.where">Nerede paylaşılsın?</span></h2>
+    <div class="chan-row" id="chanRow"></div>
+    <button class="publish" id="publishBtn" data-i18n="so.publish">🚀 Hepsine paylaş</button>
+    <div class="hint" id="publishHint"></div>
+  </div>
+
+  <div class="card">
+    <h2><span data-i18n="so.history">Paylaşım geçmişi</span></h2>
+    <div id="history"><div class="empty" data-i18n="common.loading">Yükleniyor...</div></div>
+  </div>
+</main>
+
+<div class="modal-bg" id="tgModal">
+  <div class="modal">
+    <h3 data-i18n="so.tgTitle">Telegram kanalını bağla</h3>
+    <ol>
+      <li data-i18n="so.tgStep1">Telegram'da kanalını aç ve "Yöneticiler" bölümüne gir.</li>
+      <li><span data-i18n="so.tgStep2">Şu botu yönetici olarak ekle:</span> <b id="tgBotName">@SeltigoBot</b></li>
+      <li data-i18n="so.tgStep3">Kanalının kullanıcı adını aşağıya yaz (örn. @konfordunyasi).</li>
+    </ol>
+    <input id="tgChannel" placeholder="@kanaladi">
+    <div class="msg" id="tgMsg"></div>
+    <div class="modal-btns">
+      <button onclick="closeTg()" data-i18n="so.cancel">Vazgeç</button>
+      <button class="primary" id="tgSave" onclick="saveTelegram()" data-i18n="so.connect">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+HS.i18n.add({
+  tr: {
+    'so.title': '📱 Sosyal medya',
+    'so.subtitle': 'Hesaplarını bir kere bağla. Ürünlerini seç, tek tuşla hepsine aynı anda paylaş.',
+    'so.accounts': 'Hesapların',
+    'so.products': 'Paylaşılacak ürünler',
+    'so.search': 'Ürün ara...',
+    'so.selectAll': 'Tümünü seç',
+    'so.selectNone': 'Seçimi temizle',
+    'so.selected': '{n} ürün seçildi',
+    'so.where': 'Nerede paylaşılsın?',
+    'so.publish': '🚀 Hepsine paylaş',
+    'so.publishN': '🚀 {p} ürünü {c} hesaba paylaş',
+    'so.history': 'Paylaşım geçmişi',
+    'so.noHistory': 'Henüz paylaşım yok. Yukarıdan ürün ve hesap seçip paylaş.',
+    'so.noProducts': 'Henüz ürün yok.',
+    'so.connected': 'Bağlı',
+    'so.notConnected': 'Bağlı değil',
+    'so.connect': 'Bağla',
+    'so.disconnect': 'Bağlantıyı kaldır',
+    'so.soon': 'Yakında',
+    'so.soonMsg': '{p} bağlantısı hazırlanıyor. Bağlantı açılınca tek tıkla bağlayabileceksin.',
+    'so.needAccount': 'Önce en az bir hesap bağla.',
+    'so.needProduct': 'Önce en az bir ürün seç.',
+    'so.needChannel': 'En az bir hesap seç.',
+    'so.queued': '✓ {n} paylaşım sıraya alındı. Birkaç saniye içinde gönderilecek.',
+    'so.fail': 'Olmadı: {e}',
+    'so.st.pending': '⏳ Sırada',
+    'so.st.posting': '⏳ Gönderiliyor',
+    'so.st.posted': '✓ Paylaşıldı',
+    'so.st.error': '⚠ Hata',
+    'so.view': 'Gör',
+    'so.tgTitle': 'Telegram kanalını bağla',
+    'so.tgStep1': 'Telegram\'da kanalını aç ve "Yöneticiler" bölümüne gir.',
+    'so.tgStep2': 'Şu botu yönetici olarak ekle:',
+    'so.tgStep3': 'Kanalının kullanıcı adını aşağıya yaz (örn. @konfordunyasi).',
+    'so.tgNeed': 'Kanal kullanıcı adını yaz.',
+    'so.tgChecking': 'Kontrol ediliyor...',
+    'so.tgOk': '✓ Kanal bağlandı.',
+    'so.cancel': 'Vazgeç',
+    'so.confirmRemove': 'Bu hesabın bağlantısı kaldırılsın mı?',
+    'so.hintNoAcc': 'Paylaşmak için yukarıdan en az bir hesap bağla.'
+  },
+  en: {
+    'so.title': '📱 Social media',
+    'so.subtitle': 'Connect your accounts once. Pick products and share to all of them with one tap.',
+    'so.accounts': 'Your accounts',
+    'so.products': 'Products to share',
+    'so.search': 'Search products...',
+    'so.selectAll': 'Select all',
+    'so.selectNone': 'Clear',
+    'so.selected': '{n} selected',
+    'so.where': 'Where to share?',
+    'so.publish': '🚀 Share everywhere',
+    'so.publishN': '🚀 Share {p} products to {c} accounts',
+    'so.history': 'Share history',
+    'so.noHistory': 'No shares yet. Pick products and accounts above.',
+    'so.noProducts': 'No products yet.',
+    'so.connected': 'Connected',
+    'so.notConnected': 'Not connected',
+    'so.connect': 'Connect',
+    'so.disconnect': 'Disconnect',
+    'so.soon': 'Soon',
+    'so.soonMsg': '{p} connection is being prepared. You will be able to connect it with one click.',
+    'so.needAccount': 'Connect at least one account first.',
+    'so.needProduct': 'Select at least one product.',
+    'so.needChannel': 'Select at least one account.',
+    'so.queued': '✓ {n} shares queued. They will be sent in a few seconds.',
+    'so.fail': 'Failed: {e}',
+    'so.st.pending': '⏳ Queued',
+    'so.st.posting': '⏳ Sending',
+    'so.st.posted': '✓ Shared',
+    'so.st.error': '⚠ Error',
+    'so.view': 'View',
+    'so.tgTitle': 'Connect Telegram channel',
+    'so.tgStep1': 'Open your channel in Telegram and go to "Administrators".',
+    'so.tgStep2': 'Add this bot as an administrator:',
+    'so.tgStep3': 'Type your channel username below (e.g. @mystore).',
+    'so.tgNeed': 'Type the channel username.',
+    'so.tgChecking': 'Checking...',
+    'so.tgOk': '✓ Channel connected.',
+    'so.cancel': 'Cancel',
+    'so.confirmRemove': 'Disconnect this account?',
+    'so.hintNoAcc': 'Connect at least one account above to share.'
+  }
+});
+
+const t = (k, v) => HS.t(k, v);
+const esc = HS.escapeHtml;
+const $ = (id) => document.getElementById(id);
+
+const PLATFORMS = [
+  { key: 'telegram',  name: 'Telegram',  icon: 'fa-brands fa-telegram',  color: '#229ED9', ready: true },
+  { key: 'instagram', name: 'Instagram', icon: 'fa-brands fa-instagram', color: 'linear-gradient(135deg,#F58529,#DD2A7B,#8134AF)', ready: false },
+  { key: 'facebook',  name: 'Facebook',  icon: 'fa-brands fa-facebook-f', color: '#1877F2', ready: false },
+  { key: 'whatsapp',  name: 'WhatsApp',  icon: 'fa-brands fa-whatsapp',  color: '#25D366', ready: false },
+  { key: 'tiktok',    name: 'TikTok',    icon: 'fa-brands fa-tiktok',    color: '#111111', ready: false }
+];
+
+let channels = [];        // social_channels
+let products = [];        // { id, name, image, price, cur, bundle }
+let selected = new Set(); // product id (string)
+let chosen = new Set();   // channel id
+let homeCur = 'TRY';
+
+function toast(text, err) {
+  const el = $('toast');
+  el.textContent = text;
+  el.className = 'toast' + (err ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+async function callFn(name, body) {
+  const { data: { session } } = await HS.db.auth.getSession();
+  if (!session) throw new Error('Session');
+  const r = await fetch(HS.SUPABASE_URL + '/functions/v1/' + name, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+    body: JSON.stringify(Object.assign({}, body, { userAccessToken: session.access_token }))
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+
+// ---------- Hesaplar ----------
+async function loadChannels() {
+  const { data, error } = await HS.db.from('social_channels').select('*').eq('active', true).order('created_at');
+  channels = error ? [] : (data || []);
+}
+
+function renderAccounts() {
+  $('accounts').innerHTML = PLATFORMS.map(p => {
+    const mine = channels.filter(c => c.platform === p.key);
+    const on = mine.length > 0;
+    const sub = on ? mine.map(c => c.account_name || c.account_id).join(', ') : '';
+    const btn = on
+      ? `<button onclick="disconnect('${p.key}')">${esc(t('so.disconnect'))}</button>`
+      : `<button class="primary" onclick="connect('${p.key}')">${esc(p.ready ? t('so.connect') : t('so.connect'))}</button>`;
+    return `
+      <div class="acc">
+        <div class="acc-icon" style="background:${p.color}"><i class="${p.icon}"></i></div>
+        <div class="acc-name">${esc(p.name)}</div>
+        <span class="badge ${on ? 'on' : 'off'}">${esc(on ? t('so.connected') : t('so.notConnected'))}</span>
+        <div class="acc-sub" title="${esc(sub)}">${esc(sub)}</div>
+        ${btn}
+      </div>`;
+  }).join('');
+}
+
+function connect(key) {
+  const p = PLATFORMS.find(x => x.key === key);
+  if (!p.ready) { toast(t('so.soonMsg', { p: p.name })); return; }
+  if (key === 'telegram') openTg();
+}
+
+async function disconnect(key) {
+  if (!confirm(t('so.confirmRemove'))) return;
+  const ids = channels.filter(c => c.platform === key).map(c => c.id);
+  const { error } = await HS.db.from('social_channels').update({ active: false }).in('id', ids);
+  if (error) { toast(t('so.fail', { e: error.message }), true); return; }
+  await refreshChannels();
+}
+
+async function refreshChannels() {
+  await loadChannels();
+  renderAccounts();
+  renderChannelPicker();
+}
+
+// Telegram
+function openTg() { $('tgMsg').textContent = ''; $('tgChannel').value = ''; $('tgModal').classList.add('open'); }
+function closeTg() { $('tgModal').classList.remove('open'); }
+async function saveTelegram() {
+  let ch = $('tgChannel').value.trim();
+  const msg = $('tgMsg');
+  if (!ch) { msg.className = 'msg err'; msg.textContent = t('so.tgNeed'); return; }
+  ch = ch.replace(/^https?:\/\/t\.me\//i, '');
+  if (!/^-?\d+$/.test(ch) && ch[0] !== '@') ch = '@' + ch;
+  msg.className = 'msg'; msg.textContent = t('so.tgChecking');
+  $('tgSave').disabled = true;
+  try {
+    await callFn('social-connect', { platform: 'telegram', channel: ch });
+    msg.className = 'msg ok'; msg.textContent = t('so.tgOk');
+    await refreshChannels();
+    setTimeout(closeTg, 900);
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = t('so.fail', { e: e.message || e });
+  } finally {
+    $('tgSave').disabled = false;
+  }
+}
+
+// ---------- Ürünler ----------
+async function loadProducts() {
+  const db = HS.db;
+  const [pr, li] = await Promise.all([
+    db.from('products').select('*').eq('user_id', HS.user.id).is('deleted_at', null).is('merged_into', null)
+      .order('created_at', { ascending: false }),
+    db.from('listings').select('product_id, price, currency').eq('marketplace_code', 'own_store').is('deleted_at', null)
+  ]);
+  const lst = {};
+  (li.data || []).forEach(r => { lst[r.product_id] = r; });
+  products = (pr.data || []).map(p => {
+    const l = lst[p.id];
+    const price = l && Number(l.price) > 0 ? Number(l.price) : (Number(p.sale_price) > 0 ? Number(p.sale_price) : null);
+    const cur = l && Number(l.price) > 0 ? (l.currency || 'TRY') : (p.cost_currency || 'TRY');
+    const img = /^https?:\/\//i.test(p.image_url || '') ? p.image_url : '';
+    return { id: String(p.id), name: p.generated_title || p.name || '', image: img, price, cur, bundle: !!p.is_bundle };
+  });
+}
+
+function renderProducts() {
+  const q = $('search').value.trim().toLocaleLowerCase('tr');
+  const list = q ? products.filter(p => p.name.toLocaleLowerCase('tr').includes(q)) : products;
+  if (!products.length) { $('prodGrid').innerHTML = '<div class="empty">' + esc(t('so.noProducts')) + '</div>'; updateCounts(); return; }
+  $('prodGrid').innerHTML = list.map(p => `
+    <div class="prod ${selected.has(p.id) ? 'sel' : ''}" onclick="toggleProd('${p.id}')">
+      ${p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy">` : '<div class="noimg"></div>'}
+      ${p.bundle ? '<span class="pk">📦</span>' : ''}
+      <span class="tick">✓</span>
+      <div class="prod-info">
+        <div class="prod-name">${esc(p.name)}</div>
+        <div class="prod-price">${p.price != null ? esc(HS.money(p.price, p.cur)) : ''}</div>
+      </div>
+    </div>`).join('');
+  updateCounts();
+}
+
+function toggleProd(id) {
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  renderProducts();
+}
+
+// ---------- Kanal seçimi ----------
+function renderChannelPicker() {
+  if (!channels.length) {
+    $('chanRow').innerHTML = '';
+    $('publishHint').textContent = t('so.hintNoAcc');
+    updateCounts();
+    return;
+  }
+  // varsayılan: hepsi seçili
+  if (!chosen.size) channels.forEach(c => chosen.add(c.id));
+  chosen = new Set([...chosen].filter(id => channels.some(c => c.id === id)));
+  $('chanRow').innerHTML = channels.map(c => {
+    const p = PLATFORMS.find(x => x.key === c.platform) || {};
+    return `<label class="chan"><input type="checkbox" ${chosen.has(c.id) ? 'checked' : ''} onchange="toggleChan('${c.id}', this.checked)">
+      <i class="${p.icon || ''}" style="color:${(p.color || '').startsWith('#') ? p.color : '#E1306C'}"></i>${esc(p.name || c.platform)} <span style="color:#9aa3b2;font-size:12px;">${esc(c.account_name || c.account_id)}</span></label>`;
+  }).join('');
+  $('publishHint').textContent = '';
+  updateCounts();
+}
+function toggleChan(id, on) { if (on) chosen.add(id); else chosen.delete(id); updateCounts(); }
+
+function updateCounts() {
+  $('selCount').textContent = selected.size ? t('so.selected', { n: selected.size }) : '';
+  const btn = $('publishBtn');
+  btn.textContent = (selected.size && chosen.size) ? t('so.publishN', { p: selected.size, c: chosen.size }) : t('so.publish');
+  btn.disabled = !(selected.size && chosen.size);
+}
+
+// ---------- Paylaş ----------
+async function publish() {
+  if (!channels.length) return toast(t('so.needAccount'), true);
+  if (!selected.size) return toast(t('so.needProduct'), true);
+  if (!chosen.size) return toast(t('so.needChannel'), true);
+  const btn = $('publishBtn');
+  btn.disabled = true;
+  try {
+    const data = await callFn('social-publish', { productIds: [...selected], channelIds: [...chosen] });
+    toast(t('so.queued', { n: data.queued || 0 }));
+    selected = new Set();
+    renderProducts();
+    await loadHistory();
+    pollHistory();
+  } catch (e) {
+    toast(t('so.fail', { e: e.message || e }), true);
+  } finally {
+    updateCounts();
+  }
+}
+
+// ---------- Geçmiş ----------
+let pollTimer = null;
+async function loadHistory() {
+  const { data, error } = await HS.db.from('social_posts').select('*').order('created_at', { ascending: false }).limit(50);
+  const rows = error ? [] : (data || []);
+  if (!rows.length) { $('history').innerHTML = '<div class="empty">' + esc(t('so.noHistory')) + '</div>'; return rows; }
+  const byId = {};
+  products.forEach(p => { byId[p.id] = p; });
+  $('history').innerHTML = rows.map(r => {
+    const p = byId[String(r.product_id)] || {};
+    const pl = PLATFORMS.find(x => x.key === r.platform) || { name: r.platform };
+    const img = r.image_url || p.image || '';
+    const st = `<span class="st ${r.status}" title="${esc(r.error || '')}">${esc(t('so.st.' + r.status))}${r.post_url ? ` · <a href="${esc(r.post_url)}" target="_blank" rel="noopener">${esc(t('so.view'))}</a>` : ''}</span>`;
+    return `<div class="hist-row">
+      ${img ? `<img src="${esc(img)}" alt="">` : '<div class="noimg"></div>'}
+      <div class="hist-info">
+        <div class="hist-name">${esc(p.name || '')}</div>
+        <div class="hist-meta">${esc(pl.name)} · ${esc(HS.date(r.created_at, true))}${r.status === 'error' && r.error ? ' · ' + esc(r.error) : ''}</div>
+      </div>
+      ${st}
+    </div>`;
+  }).join('');
+  return rows;
+}
+function pollHistory() {
+  clearInterval(pollTimer);
+  let n = 0;
+  pollTimer = setInterval(async () => {
+    n++;
+    const rows = await loadHistory();
+    const busy = rows.some(r => r.status === 'pending' || r.status === 'posting');
+    if (!busy || n > 30) clearInterval(pollTimer);
+  }, 3000);
+}
+
+// ---------- Başlangıç ----------
+async function start() {
+  const ok = await HS.init();
+  if (!ok) return;
+  homeCur = HS.homeCurrency();
+  $('search').oninput = renderProducts;
+  $('selAll').onclick = () => {
+    const q = $('search').value.trim().toLocaleLowerCase('tr');
+    products.filter(p => !q || p.name.toLocaleLowerCase('tr').includes(q)).forEach(p => selected.add(p.id));
+    renderProducts();
+  };
+  $('selNone').onclick = () => { selected = new Set(); renderProducts(); };
+  $('publishBtn').onclick = publish;
+  await Promise.all([loadChannels(), loadProducts()]);
+  renderAccounts();
+  renderProducts();
+  renderChannelPicker();
+  const rows = await loadHistory();
+  if (rows.some(r => r.status === 'pending' || r.status === 'posting')) pollHistory();
+}
+
+window.addEventListener('hs:langchange', () => { renderAccounts(); renderProducts(); renderChannelPicker(); loadHistory(); });
+start();
+</script>
+</body>
+</html>
