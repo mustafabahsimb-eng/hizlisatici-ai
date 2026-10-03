@@ -244,6 +244,8 @@ HS.i18n.add({
     'so.needProduct': 'Önce en az bir ürün seç.',
     'so.needChannel': 'En az bir hesap seç.',
     'so.queued': '✓ {n} paylaşım sıraya alındı. Birkaç saniye içinde gönderilecek.',
+    'so.doneOk': '✓ {ok} paylaşım yapıldı.',
+    'so.doneErr': '{ok} paylaşım yapıldı, {err} paylaşımda hata var. Nedenini geçmişte görebilirsin.',
     'so.fail': 'Olmadı: {e}',
     'so.st.pending': '⏳ Sırada',
     'so.st.posting': '⏳ Gönderiliyor',
@@ -286,6 +288,8 @@ HS.i18n.add({
     'so.needProduct': 'Select at least one product.',
     'so.needChannel': 'Select at least one account.',
     'so.queued': '✓ {n} shares queued. They will be sent in a few seconds.',
+    'so.doneOk': '✓ {ok} posts shared.',
+    'so.doneErr': '{ok} shared, {err} failed. See the reason in the history.',
     'so.fail': 'Failed: {e}',
     'so.st.pending': '⏳ Queued',
     'so.st.posting': '⏳ Sending',
@@ -311,8 +315,8 @@ const $ = (id) => document.getElementById(id);
 
 const PLATFORMS = [
   { key: 'telegram',  name: 'Telegram',  icon: 'fa-brands fa-telegram',  color: '#229ED9', ready: true },
-  { key: 'instagram', name: 'Instagram', icon: 'fa-brands fa-instagram', color: 'linear-gradient(135deg,#F58529,#DD2A7B,#8134AF)', ready: false },
-  { key: 'facebook',  name: 'Facebook',  icon: 'fa-brands fa-facebook-f', color: '#1877F2', ready: false },
+  { key: 'instagram', name: 'Instagram', icon: 'fa-brands fa-instagram', color: 'linear-gradient(135deg,#F58529,#DD2A7B,#8134AF)', ready: true },
+  { key: 'facebook',  name: 'Facebook',  icon: 'fa-brands fa-facebook-f', color: '#1877F2', ready: true },
   { key: 'whatsapp',  name: 'WhatsApp',  icon: 'fa-brands fa-whatsapp',  color: '#25D366', ready: false },
   { key: 'tiktok',    name: 'TikTok',    icon: 'fa-brands fa-tiktok',    color: '#111111', ready: false }
 ];
@@ -347,7 +351,7 @@ async function callFn(name, body) {
 
 // ---------- Hesaplar ----------
 async function loadChannels() {
-  const { data, error } = await HS.db.from('social_channels').select('*').eq('active', true).order('created_at');
+  const { data, error } = await HS.db.from('social_channels').select('id, platform, account_id, account_name, extra, active, created_at').eq('active', true).order('created_at');
   channels = error ? [] : (data || []);
 }
 
@@ -374,6 +378,23 @@ function connect(key) {
   const p = PLATFORMS.find(x => x.key === key);
   if (!p.ready) { toast(t('so.soonMsg', { p: p.name })); return; }
   if (key === 'telegram') openTg();
+  if (key === 'instagram' || key === 'facebook') connectMeta();
+}
+
+// Instagram + Facebook: Facebook'un kendi giriş penceresi
+const META_APP_ID = '1650835089949068';
+const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
+function connectMeta() {
+  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  try { sessionStorage.setItem('meta_oauth_state', state); } catch (e) {}
+  const redirect = new URL('meta-callback.html', location.href);
+  redirect.search = '';
+  location.href = 'https://www.facebook.com/v21.0/dialog/oauth'
+    + '?client_id=' + META_APP_ID
+    + '&redirect_uri=' + encodeURIComponent(redirect.href)
+    + '&state=' + encodeURIComponent(state)
+    + '&response_type=code'
+    + '&scope=' + encodeURIComponent(META_SCOPES);
 }
 
 async function disconnect(key) {
@@ -490,12 +511,14 @@ async function publish() {
   const btn = $('publishBtn');
   btn.disabled = true;
   try {
-    const data = await callFn('social-publish', { productIds: [...selected], channelIds: [...chosen] });
-    toast(t('so.queued', { n: data.queued || 0 }));
+    const job = callFn('social-publish', { productIds: [...selected], channelIds: [...chosen] });
+    // Gönderim sürerken geçmişi canlı izle: her ürün gittikçe ✓ yansın
+    setTimeout(pollHistory, 700);
     selected = new Set();
     renderProducts();
+    const data = await job;
     await loadHistory();
-    pollHistory();
+    toast(data.failed ? t('so.doneErr', { ok: data.posted || 0, err: data.failed }) : t('so.doneOk', { ok: data.posted || 0 }), !!data.failed && !data.posted);
   } catch (e) {
     toast(t('so.fail', { e: e.message || e }), true);
   } finally {
@@ -534,8 +557,8 @@ function pollHistory() {
     n++;
     const rows = await loadHistory();
     const busy = rows.some(r => r.status === 'pending' || r.status === 'posting');
-    if (!busy || n > 30) clearInterval(pollTimer);
-  }, 3000);
+    if ((!busy && n > 2) || n > 60) clearInterval(pollTimer);
+  }, 2000);
 }
 
 // ---------- Başlangıç ----------
