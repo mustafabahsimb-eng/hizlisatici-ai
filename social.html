@@ -142,6 +142,28 @@
   }
   .del-btn:hover { border-color: #f28b8b; color: #f28b8b; background: #2a1414; }
   .del-btn:disabled { opacity: .5; cursor: default; }
+  /* Katalog */
+  .cat-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .cat-sub { font-size: 13px; color: #9aa3b2; line-height: 1.6; margin-bottom: 12px; }
+  .cat-icons { display: inline-flex; gap: 8px; font-size: 18px; }
+  .cat-icons .fa-whatsapp { color: #25D366; } .cat-icons .fa-instagram { color: #E1306C; } .cat-icons .fa-facebook { color: #1877F2; }
+  .cat-box { background: #0d0f16; border: 1px solid #2a3040; border-radius: 12px; padding: 14px; }
+  .cat-stat { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #cfd4de; margin-bottom: 12px; }
+  .cat-stat b { color: #fff; }
+  .cat-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn2 {
+    border: 1px solid #2a3040; background: #1c2230; color: #e6e8ee; border-radius: 10px; padding: 10px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block;
+  }
+  .btn2.primary { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+  .btn2:disabled { opacity: .5; cursor: default; }
+  .cat-select { width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px; color: #fff; padding: 9px 12px; font-size: 14px; font-family: inherit; margin-bottom: 10px; }
+  .cat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .cat-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #2a3040; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .cat-note { font-size: 12px; color: #7d8596; margin-top: 10px; line-height: 1.6; }
+  .cat-note a { color: #6ee7b7; }
+  .cat-result { font-size: 13px; margin-top: 10px; line-height: 1.6; }
+  .cat-result.ok { color: #6ee7b7; } .cat-result.err { color: #f28b8b; }
   .empty { text-align: center; color: #9aa3b2; padding: 24px 10px; font-size: 13px; }
 
   /* Modal */
@@ -231,6 +253,15 @@
     <div class="hint" id="publishHint"></div>
   </div>
 
+  <div class="card" id="catalogCard">
+    <div class="cat-head">
+      <h2><span data-i18n="so.catTitle">🛍 Katalog</span></h2>
+      <span class="cat-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i></span>
+    </div>
+    <p class="cat-sub" data-i18n="so.catSub">Ürünlerini tek tıkla Meta kataloğuna yükle. Aynı katalog WhatsApp kataloğunda, Instagram Mağazası'nda ve Facebook Mağazası'nda görünür. Fiyat ve stok değişince tekrar gönder, katalog güncellenir.</p>
+    <div id="catBody"><div class="empty" data-i18n="common.loading">Yükleniyor...</div></div>
+  </div>
+
   <div class="card">
     <h2><span data-i18n="so.history">Paylaşım geçmişi</span></h2>
     <div id="history"><div class="empty" data-i18n="common.loading">Yükleniyor...</div></div>
@@ -316,7 +347,31 @@ HS.i18n.add({
     'so.modePost': '📰 Gönderi',
     'so.modeStory': '⏱ Hikaye',
     'so.modeBoth': '📰 + ⏱ İkisi birden',
-    'so.kindStory': 'Hikaye'
+    'so.kindStory': 'Hikaye',
+    'so.catTitle': '🛍 Katalog',
+    'so.catSub': 'Ürünlerini tek tıkla Meta kataloğuna yükle. Aynı katalog WhatsApp kataloğunda, Instagram Mağazası\'nda ve Facebook Mağazası\'nda görünür. Fiyat ve stok değişince tekrar gönder, katalog güncellenir.',
+    'so.catNeedFb': 'Katalog için önce yukarıdan Facebook\'u bağla.',
+    'so.catReconnect': 'Katalog izni için Facebook\'u bir kez daha bağla (yeni izin eklendi).',
+    'so.catReconnectBtn': '🔄 Facebook\'u tekrar bağla',
+    'so.catNoBiz': 'Facebook hesabında bir işletme (Business) bulunamadı. business.facebook.com adresinden ücretsiz bir işletme hesabı açıp tekrar dene.',
+    'so.catBiz': 'İşletme',
+    'so.catPick': 'Bir katalog seç ya da yeni oluştur:',
+    'so.catUse': 'Bunu kullan',
+    'so.catNew': '➕ Yeni katalog oluştur',
+    'so.catNewName': 'Seltigo Katalog',
+    'so.catItems': '{n} ürün',
+    'so.catName': 'Katalog',
+    'so.catCount': 'Katalogdaki ürün',
+    'so.catLast': 'Son gönderim',
+    'so.catNever': 'henüz yok',
+    'so.catSyncAll': '🛍 Tüm ürünleri kataloğa gönder',
+    'so.catSyncSel': 'Seçili {n} ürünü gönder',
+    'so.catChange': 'Kataloğu değiştir',
+    'so.catOpen': 'Commerce Manager\'da aç',
+    'so.catSending': 'Gönderiliyor...',
+    'so.catDone': '✓ {n} ürün kataloğa gönderildi. Meta birkaç dakika içinde işler.',
+    'so.catSkipped': '{n} ürün atlandı: {list}',
+    'so.catNote': 'Bir kerelik: Commerce Manager\'da bu kataloğu WhatsApp işletme hesabına, Instagram ve Facebook mağazana bağla. Sonrası otomatik.'
   },
   en: {
     'so.title': '📱 Social media',
@@ -376,7 +431,31 @@ HS.i18n.add({
     'so.modePost': '📰 Post',
     'so.modeStory': '⏱ Story',
     'so.modeBoth': '📰 + ⏱ Both',
-    'so.kindStory': 'Story'
+    'so.kindStory': 'Story',
+    'so.catTitle': '🛍 Catalog',
+    'so.catSub': 'Upload your products to your Meta catalog with one click. The same catalog appears in your WhatsApp catalog, Instagram Shop and Facebook Shop. Send again when price or stock changes and the catalog updates.',
+    'so.catNeedFb': 'Connect Facebook above first to use the catalog.',
+    'so.catReconnect': 'Connect Facebook once more to grant catalog permission (a new permission was added).',
+    'so.catReconnectBtn': '🔄 Reconnect Facebook',
+    'so.catNoBiz': 'No business found on your Facebook account. Create a free business account at business.facebook.com and try again.',
+    'so.catBiz': 'Business',
+    'so.catPick': 'Pick a catalog or create a new one:',
+    'so.catUse': 'Use this',
+    'so.catNew': '➕ Create new catalog',
+    'so.catNewName': 'Seltigo Catalog',
+    'so.catItems': '{n} items',
+    'so.catName': 'Catalog',
+    'so.catCount': 'Items in catalog',
+    'so.catLast': 'Last sent',
+    'so.catNever': 'not yet',
+    'so.catSyncAll': '🛍 Send all products to catalog',
+    'so.catSyncSel': 'Send {n} selected products',
+    'so.catChange': 'Change catalog',
+    'so.catOpen': 'Open in Commerce Manager',
+    'so.catSending': 'Sending...',
+    'so.catDone': '✓ {n} products sent to the catalog. Meta processes them within a few minutes.',
+    'so.catSkipped': '{n} products skipped: {list}',
+    'so.catNote': 'One time: in Commerce Manager, connect this catalog to your WhatsApp business account, Instagram and Facebook shop. After that it is automatic.'
   }
 });
 
@@ -459,7 +538,7 @@ function connect(key) {
 
 // Instagram + Facebook: Facebook'un kendi giriş penceresi
 const META_APP_ID = '1650835089949068';
-const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management';
+const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,catalog_management';
 function connectMeta() {
   const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
   try { sessionStorage.setItem('meta_oauth_state', state); } catch (e) {}
@@ -549,6 +628,7 @@ function renderProducts() {
 function toggleProd(id) {
   if (selected.has(id)) selected.delete(id); else selected.add(id);
   renderProducts();
+  if (catState && catState.current && !catChanging) renderCatalog();
 }
 
 // ---------- Kanal seçimi ----------
@@ -606,6 +686,112 @@ async function publish() {
     toast(t('so.fail', { e: e.message || e }), true);
   } finally {
     updateCounts();
+  }
+}
+
+// ---------- Katalog ----------
+let catState = null;
+let catChanging = false;
+async function loadCatalog() {
+  const box = $('catBody');
+  if (!channels.some(c => c.platform === 'facebook' || c.platform === 'instagram')) {
+    box.innerHTML = '<div class="cat-box"><p class="cat-sub" style="margin:0;">' + esc(t('so.catNeedFb')) + '</p></div>';
+    return;
+  }
+  try {
+    catState = await callFn('social-catalog', { action: 'status' });
+  } catch (e) {
+    box.innerHTML = '<div class="cat-box"><p class="cat-result err">' + esc(e.message || e) + '</p>'
+      + '<div class="cat-btns" style="margin-top:10px;"><button class="btn2 primary" onclick="connectMeta()">' + esc(t('so.catReconnectBtn')) + '</button></div></div>';
+    return;
+  }
+  renderCatalog();
+}
+function renderCatalog(resultHtml) {
+  const box = $('catBody');
+  const s = catState || {};
+  if (!s.connected) {
+    box.innerHTML = '<div class="cat-box"><p class="cat-sub">' + esc(t('so.catReconnect')) + '</p>'
+      + '<button class="btn2 primary" onclick="connectMeta()">' + esc(t('so.catReconnectBtn')) + '</button></div>';
+    return;
+  }
+  const cur = s.current;
+  if (cur && !catChanging) {
+    const selN = selected.size;
+    box.innerHTML = '<div class="cat-box">'
+      + '<div class="cat-stat">'
+      +   '<span>' + esc(t('so.catName')) + ': <b>' + esc(cur.catalog_name || cur.catalog_id) + '</b></span>'
+      +   '<span>' + esc(t('so.catCount')) + ': <b>' + esc(HS.number(cur.item_count || 0)) + '</b></span>'
+      +   '<span>' + esc(t('so.catLast')) + ': <b>' + esc(cur.last_sync_at ? HS.date(cur.last_sync_at, true) : t('so.catNever')) + '</b></span>'
+      + '</div>'
+      + '<div class="cat-btns">'
+      +   '<button class="btn2 primary" id="catSyncAll" onclick="syncCatalog(false)">' + esc(t('so.catSyncAll')) + '</button>'
+      +   (selN ? '<button class="btn2" onclick="syncCatalog(true)">' + esc(t('so.catSyncSel', { n: selN })) + '</button>' : '')
+      +   '<a class="btn2" target="_blank" rel="noopener" href="https://business.facebook.com/commerce/catalogs/' + encodeURIComponent(cur.catalog_id) + '/products">' + esc(t('so.catOpen')) + '</a>'
+      +   '<button class="btn2" onclick="catChanging=true; renderCatalog();">' + esc(t('so.catChange')) + '</button>'
+      + '</div>'
+      + (resultHtml || (cur.last_error ? '<div class="cat-result err">' + esc(cur.last_error) + '</div>' : ''))
+      + '<p class="cat-note">' + esc(t('so.catNote')) + '</p>'
+      + '</div>';
+    return;
+  }
+  const biz = s.businesses || [];
+  if (!biz.length) {
+    box.innerHTML = '<div class="cat-box"><p class="cat-sub" style="margin:0;">' + esc(t('so.catNoBiz')) + '</p></div>';
+    return;
+  }
+  const bi = Math.min(renderCatalog._biz || 0, biz.length - 1);
+  const b = biz[bi];
+  box.innerHTML = '<div class="cat-box">'
+    + (biz.length > 1
+      ? '<select class="cat-select" onchange="renderCatalog._biz=this.selectedIndex; renderCatalog();">'
+        + biz.map((x, i) => '<option ' + (i === bi ? 'selected' : '') + '>' + esc(t('so.catBiz')) + ': ' + esc(x.name) + '</option>').join('')
+        + '</select>'
+      : '<p class="cat-sub" style="margin-bottom:8px;">' + esc(t('so.catBiz')) + ': <b>' + esc(b.name) + '</b></p>')
+    + '<p class="cat-sub" style="margin-bottom:8px;">' + esc(t('so.catPick')) + '</p>'
+    + '<div class="cat-list">'
+    + b.catalogs.map(c => '<div class="cat-item"><span>🛍 ' + esc(c.name) + ' · <span style="color:#9aa3b2;">' + esc(t('so.catItems', { n: c.count })) + '</span></span>'
+        + '<button class="btn2" onclick="selectCatalog(' + bi + ', \'' + esc(c.id) + '\')">' + esc(t('so.catUse')) + '</button></div>').join('')
+    + '</div>'
+    + '<button class="btn2 primary" onclick="createCatalog(' + bi + ', this)">' + esc(t('so.catNew')) + '</button>'
+    + '</div>';
+}
+async function selectCatalog(bi, catalogId) {
+  const b = catState.businesses[bi];
+  const c = b.catalogs.find(x => String(x.id) === String(catalogId));
+  try {
+    await callFn('social-catalog', { action: 'select', business_id: b.id, business_name: b.name, catalog_id: c.id, catalog_name: c.name });
+    catChanging = false;
+    await loadCatalog();
+  } catch (e) { toast(t('so.fail', { e: e.message || e }), true); }
+}
+async function createCatalog(bi, btn) {
+  const b = catState.businesses[bi];
+  btn.disabled = true;
+  try {
+    await callFn('social-catalog', { action: 'create', business_id: b.id, business_name: b.name, name: t('so.catNewName') });
+    catChanging = false;
+    await loadCatalog();
+  } catch (e) { toast(t('so.fail', { e: e.message || e }), true); btn.disabled = false; }
+}
+async function syncCatalog(onlySelected) {
+  const btns = document.querySelectorAll('#catBody button');
+  btns.forEach(b => { b.disabled = true; });
+  const main = $('catSyncAll');
+  if (main) main.textContent = t('so.catSending');
+  try {
+    const d = await callFn('social-catalog', { action: 'sync', productIds: onlySelected ? [...selected] : [] });
+    let html = '<div class="cat-result ok">' + esc(t('so.catDone', { n: d.sent || 0 })) + '</div>';
+    if (d.skipped && d.skipped.length) {
+      const list = d.skipped.slice(0, 5).map(x => (x.name || '#' + x.id) + ' (' + x.reason + ')').join(', ') + (d.skipped.length > 5 ? '…' : '');
+      html += '<div class="cat-result err">' + esc(t('so.catSkipped', { n: d.skipped.length, list })) + '</div>';
+    }
+    if (d.errors && d.errors.length) html += '<div class="cat-result err">' + esc(d.errors[0]) + '</div>';
+    catState = await callFn('social-catalog', { action: 'status' });
+    renderCatalog(html);
+  } catch (e) {
+    toast(t('so.fail', { e: e.message || e }), true);
+    renderCatalog();
   }
 }
 
@@ -698,11 +884,12 @@ async function start() {
   renderAccounts();
   renderProducts();
   renderChannelPicker();
+  loadCatalog();
   const rows = await loadHistory();
   if (rows.some(r => r.status === 'pending' || r.status === 'posting')) pollHistory();
 }
 
-window.addEventListener('hs:langchange', () => { renderAccounts(); renderProducts(); renderChannelPicker(); loadHistory(); });
+window.addEventListener('hs:langchange', () => { renderAccounts(); renderProducts(); renderChannelPicker(); loadHistory(); if (catState) renderCatalog(); });
 start();
 </script>
 </body>
