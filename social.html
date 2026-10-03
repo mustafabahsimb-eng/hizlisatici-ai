@@ -125,6 +125,12 @@
   .st.posted { background: #123222; color: #6ee7b7; }
   .st.error { background: #2a1414; color: #f28b8b; }
   .st a { color: inherit; }
+  .del-btn {
+    background: transparent; border: 1px solid #2a3040; color: #9aa3b2; width: 30px; height: 30px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .del-btn:hover { border-color: #f28b8b; color: #f28b8b; background: #2a1414; }
+  .del-btn:disabled { opacity: .5; cursor: default; }
   .empty { text-align: center; color: #9aa3b2; padding: 24px 10px; font-size: 13px; }
 
   /* Modal */
@@ -280,7 +286,11 @@ HS.i18n.add({
     'so.footer': '✍️ Gönderinin sonuna eklenecek yazı',
     'so.optional': '(isteğe bağlı)',
     'so.addStore': '🏪 Mağaza linkimi ekle',
-    'so.footerPh': 'Boş bırakırsan hiçbir şey eklenmez. Örn: Sipariş için DM at · WhatsApp: 0555 000 00 00 · www.siteniz.com'
+    'so.footerPh': 'Boş bırakırsan hiçbir şey eklenmez. Örn: Sipariş için DM at · WhatsApp: 0555 000 00 00 · www.siteniz.com',
+    'so.delTitle': 'Paylaşımı sil',
+    'so.delConfirm': 'Bu paylaşım {p} üzerinden ve listeden silinsin mi?',
+    'so.delOk': '✓ Paylaşım silindi.',
+    'so.delFail': 'Silinemedi: {e}'
   },
   en: {
     'so.title': '📱 Social media',
@@ -328,7 +338,11 @@ HS.i18n.add({
     'so.footer': '✍️ Text added to the end of the post',
     'so.optional': '(optional)',
     'so.addStore': '🏪 Add my store link',
-    'so.footerPh': 'Leave empty to add nothing. E.g. DM us to order · WhatsApp: +1 555 000 0000 · www.yoursite.com'
+    'so.footerPh': 'Leave empty to add nothing. E.g. DM us to order · WhatsApp: +1 555 000 0000 · www.yoursite.com',
+    'so.delTitle': 'Delete post',
+    'so.delConfirm': 'Delete this post from {p} and from the list?',
+    'so.delOk': '✓ Post deleted.',
+    'so.delFail': 'Could not delete: {e}'
   }
 });
 
@@ -571,9 +585,23 @@ async function loadHistory() {
         <div class="hist-meta">${esc(pl.name)} · ${esc(HS.date(r.created_at, true))}${r.status === 'error' && r.error ? ' · ' + esc(r.error) : ''}</div>
       </div>
       ${st}
+      <button class="del-btn" title="${esc(t('so.delTitle'))}" onclick="deletePost('${r.id}', '${esc(pl.name)}', this)">🗑</button>
     </div>`;
   }).join('');
   return rows;
+}
+async function deletePost(id, platformName, btn) {
+  if (!confirm(t('so.delConfirm', { p: platformName }))) return;
+  btn.disabled = true;
+  try {
+    const d = await callFn('social-delete', { postIds: [id] });
+    if (d.failed && d.failed.length) throw new Error(d.failed[0].error);
+    toast(t('so.delOk'));
+  } catch (e) {
+    toast(t('so.delFail', { e: e.message || e }), true);
+  } finally {
+    await loadHistory();
+  }
 }
 function pollHistory() {
   clearInterval(pollTimer);
