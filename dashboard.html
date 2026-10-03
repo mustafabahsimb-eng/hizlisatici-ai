@@ -170,6 +170,15 @@
     padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
   }
   .btn-ad-bulk:hover { background: #352a52; }
+  .btn-bundle-bulk {
+    background: #2a2410; color: #f2d16b; border: 1px solid #8a6d1f;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .btn-bundle-bulk:hover { background: #3a3216; }
+  .bundle-badge {
+    display: inline-block; font-size: 11px; font-weight: 600; color: #f2d16b; background: #2a2410;
+    border: 1px solid #5a4a1a; border-radius: 10px; padding: 1px 8px; margin-left: 6px; vertical-align: middle;
+  }
   .load-error { padding: 40px 20px; text-align: center; color: #f28b8b; font-size: 14px; }
 
   /* ---------- Telefon görünümü ---------- */
@@ -339,6 +348,7 @@
       <span id="selectedCountText"></span>
       <button class="btn-share-bulk" onclick="HSShare.open(Array.from(selectedProductIds))"><span data-i18n="dash.shareSelected">📣 Sosyal medyada paylaş</span><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span></button>
       <button class="btn-ad-bulk" onclick="openAdVisual()" data-i18n="dash.adSelected">✨ Reklam görseli oluştur</button>
+      <button class="btn-bundle-bulk" onclick="openBundle()" data-i18n="dash.bundleSelected">📦 Paket oluştur</button>
       <button class="btn-danger" onclick="bulkDeleteProducts()" data-i18n="dash.deleteSelected">🗑 Seçilenleri sil</button>
     </div>
   </div>
@@ -366,6 +376,9 @@
       'dash.deleteSelected': '🗑 Seçilenleri sil',
       'dash.shareSelected': '📣 Sosyal medyada paylaş',
       'dash.adSelected': '✨ Reklam görseli oluştur',
+      'dash.bundleSelected': '📦 Paket oluştur',
+      'dash.bundleNeedTwo': 'Paket yapmak için en az 2 ürün seç.',
+      'dash.bundleBadge': '📦 Paket',
       'dash.share': 'Paylaş',
       'dash.shareTitle': 'Sosyal medyada paylaş',
       'dash.selected': '{n} ürün seçildi',
@@ -510,6 +523,9 @@
       'dash.deleteSelected': '🗑 Delete selected',
       'dash.shareSelected': '📣 Share on social media',
       'dash.adSelected': '✨ Create ad visual',
+      'dash.bundleSelected': '📦 Create bundle',
+      'dash.bundleNeedTwo': 'Select at least 2 products to create a bundle.',
+      'dash.bundleBadge': '📦 Bundle',
       'dash.share': 'Share',
       'dash.shareTitle': 'Share on social media',
       'dash.selected': '{n} products selected',
@@ -664,6 +680,15 @@
     go('reklam-gorseli.html?ids=' + encodeURIComponent(ids.join(',')));
   }
 
+  function openBundle() {
+    const ids = Array.from(selectedProductIds).filter(id => {
+      const p = currentProducts.find(x => String(x.id) === id);
+      return p && !p.is_bundle;
+    });
+    if (ids.length < 2) { alert(t('dash.bundleNeedTwo')); return; }
+    go('paket.html?ids=' + encodeURIComponent(ids.join(',')));
+  }
+
   // ---------- Sade ana ekran ----------
   function togglePop(id, ev) {
     if (ev) ev.stopPropagation();
@@ -796,459 +821,3 @@
     (listRes.data || []).forEach(l => {
       const key = String(l.product_id);
       (listingsByProduct[key] = listingsByProduct[key] || []).push(l);
-    });
-
-    const existingIds = new Set(currentProducts.map(p => String(p.id)));
-    selectedProductIds = new Set(Array.from(selectedProductIds).filter(id => existingIds.has(id)));
-
-    await renderAll();
-  }
-
-  // ============================================================
-  // Çizim
-  // ============================================================
-  function computeRows() {
-    return currentProducts.map(p => {
-      const supplierPrice = p.supplier_price || 0;
-      const salePrice = p.sale_price || 0;
-      const commissionRate = p.commission_rate || 0;
-      const currency = productCurrency(p);
-      let netProfit = null;
-      let marginPct = null;
-      if (salePrice > 0) {
-        const shippingCost = getShippingCost(p.weight_kg);
-        const commissionCost = salePrice * (commissionRate / 100);
-        netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
-        marginPct = (netProfit / salePrice) * 100;
-      }
-      return { p, netProfit, marginPct, currency };
-    });
-  }
-
-  async function renderAll() {
-    const myToken = ++renderToken;
-    const products = currentProducts;
-
-    document.getElementById('totalProducts').textContent = HS.number(products.length);
-    document.getElementById('productCountText').textContent =
-      products.length === 0 ? t('dash.none') : t('dash.count', { n: HS.number(products.length) });
-    document.getElementById('bulkActionsBar').style.display = products.length > 0 ? 'flex' : 'none';
-
-    if (products.length === 0) {
-      document.getElementById('alarmBanner').style.display = 'none';
-      document.getElementById('avgMargin').textContent = '-';
-      document.getElementById('totalProfit').textContent = HS.money(0);
-      document.getElementById('totalProfitNote').textContent = '';
-      document.getElementById('productList').innerHTML =
-        '<div class="empty-state">' +
-          '<h3>' + esc(t('dash.emptyTitle')) + '</h3>' +
-          '<p>' + esc(t('dash.emptyText')) + '</p>' +
-          '<button class="btn-primary" onclick="go(\'add-product.html\')">' + esc(t('menu.add')) + '</button>' +
-        '</div>';
-      return;
-    }
-
-    const rows = computeRows();
-
-    // Ortalama marj
-    const margins = rows.filter(r => r.marginPct !== null).map(r => r.marginPct);
-    document.getElementById('avgMargin').textContent =
-      margins.length ? HS.percent(margins.reduce((a, b) => a + b, 0) / margins.length) : '-';
-
-    // Marj alarmı
-    renderAlarm(rows);
-
-    // Ürün listesi
-    renderList(rows);
-    updateBulkBar();
-
-    // Toplam kâr: para birimine göre topla, sonra senin para birimine çevir
-    const sums = {};
-    rows.forEach(r => {
-      if (r.netProfit === null) return;
-      sums[r.currency] = (sums[r.currency] || 0) + r.netProfit;
-    });
-    const parts = Object.keys(sums).map(c => HS.money(sums[c], c)).join(' + ') || HS.money(0);
-    const home = HS.homeCurrency();
-
-    let total = 0;
-    let missing = false;
-    for (const c of Object.keys(sums)) {
-      const v = await HS.convert(sums[c], c, home);
-      if (v === null) { missing = true; break; }
-      total += v;
-    }
-    if (myToken !== renderToken) return; // bu arada dil değiştiyse eski çizimi bırak
-
-    const profitEl = document.getElementById('totalProfit');
-    const noteEl = document.getElementById('totalProfitNote');
-    if (missing) {
-      profitEl.textContent = parts;
-      noteEl.textContent = t('dash.profitNoRate', { parts: parts });
-    } else {
-      profitEl.textContent = HS.money(total, home);
-      noteEl.textContent = Object.keys(sums).length > 1 || Object.keys(sums)[0] !== home
-        ? t('dash.profitNote', { cur: home, parts: parts })
-        : '';
-    }
-  }
-
-  function renderAlarm(rows) {
-    const risky = rows.filter(r => r.marginPct !== null && r.marginPct < MARGIN_ALARM_THRESHOLD);
-    const banner = document.getElementById('alarmBanner');
-    if (risky.length === 0) {
-      banner.style.display = 'none';
-      return;
-    }
-    banner.style.display = 'block';
-    document.getElementById('alarmSummary').textContent = t('dash.alarm', { n: risky.length });
-    document.getElementById('alarmDetail').innerHTML = risky.map(r => {
-      const marginText = r.marginPct < 0 ? t('dash.alarmLoss') : t('dash.margin', { p: HS.percent(r.marginPct) });
-      return '<div class="alarm-detail-item">' + esc(r.p.name || t('dash.unnamed')) + ' — ' +
-             esc(marginText) + ' (' + esc(HS.money(r.netProfit, r.currency)) + ')</div>';
-    }).join('');
-  }
-
-  // İlanın pazaryerine gönderim durumu (senkron işçisi):
-  // yeşil = gönderildi, sarı = bekliyor, kırmızı = hata, mavi = otomatik gönderim yakında, gri = taslak/diğer
-  function syncState(l, name) {
-    const stTitle = t('st.' + l.status);
-    if (l.status !== 'published') {
-      return { dot: l.status === 'error' ? 'error' : '', title: stTitle };
-    }
-    const err = l.last_sync_error;
-    if (err === 'adapter_not_ready') return { dot: 'soon', title: t('sync.soon') };
-    const synced = l.last_synced_at ? new Date(l.last_synced_at).getTime() : 0;
-    const changed = l.updated_at ? new Date(l.updated_at).getTime() : 0;
-    const isPending = !synced || changed - synced > 10000;
-    // Prova modu sonucu (ör. Trendyol): yeşil = geçti, sarı = eksik var
-    if (err === 'prova_ok' || err === 'prova_failed') {
-      if (isPending) return { dot: 'pending', title: t('sync.pending') };
-      if (err === 'prova_ok') return { dot: 'published', title: t('prova.ok', { m: name || l.marketplace_code }) };
-      const list = Array.isArray(l.prova_errors) ? l.prova_errors : [];
-      const names = list.map(e => {
-        const key = 'prova.e.' + (e && e.code);
-        const txt = t(key);
-        return txt && txt !== key ? txt : ((e && e.msg) || '');
-      }).filter(Boolean);
-      return { dot: 'pending', title: t('prova.failed', { n: list.length || 1, e: names.join(', ') }) };
-    }
-    if (err) return { dot: 'error', title: t('sync.error', { e: err }) };
-    // İşçi yazarken updated_at birkaç saniye sonra güncellenebilir: 10 sn tolerans
-    if (isPending) return { dot: 'pending', title: t('sync.pending') };
-    return { dot: 'published', title: t('sync.ok', { d: HS.date(l.last_synced_at, true) }) };
-  }
-
-  function channelChips(p) {
-    const list = listingsByProduct[String(p.id)] || [];
-    if (list.length === 0) {
-      return '<span class="channel-chip none">' + esc(t('dash.noListing')) + '</span>';
-    }
-    return list.map(l => {
-      const name = l.marketplace_code === 'own_store'
-        ? t('ch.own')
-        : (marketplaceNames[l.marketplace_code] || l.marketplace_code);
-      const s = syncState(l, name);
-      return '<span class="channel-chip" title="' + esc(s.title) + '">' +
-             '<span class="channel-dot ' + s.dot + '"></span>' + esc(name) + '</span>';
-    }).join('');
-  }
-
-  function renderList(rows) {
-    const listEl = document.getElementById('productList');
-    listEl.innerHTML = rows.map(({ p, netProfit, marginPct, currency }) => {
-      const id = esc(String(p.id));
-
-      const scoreHtml = p.winning_score != null
-        ? `<span class="score-badge ${scoreLevelClass(p.winning_score)}" onclick="showScoreDetail('${id}')" title="${esc(t('score.detail'))}">🏆 ${p.winning_score}/100</span>
-           <button class="icon-btn-mini" title="${esc(t('score.refresh'))}" onclick="calculateWinningScore('${id}', this)">🔄</button>`
-        : `<button class="btn-secondary score-calc-btn" onclick="calculateWinningScore('${id}', this)">${esc(t('score.calc'))}</button>`;
-
-      const priceHtml = p.suggested_price != null
-        ? `<span class="price-badge" onclick="showPriceSuggestion('${id}')" title="${esc(t('score.detail'))}">💡 ${esc(HS.money(p.suggested_price, currency))}</span>
-           <button class="icon-btn-mini" title="${esc(t('price.refresh'))}" onclick="calculatePriceSuggestion('${id}', this)">🔄</button>`
-        : `<button class="btn-secondary price-calc-btn" onclick="calculatePriceSuggestion('${id}', this)">${esc(t('price.suggest'))}</button>`;
-
-      const stockHtml = (p.stock_status && p.stock_status !== 'bilinmiyor')
-        ? `<span class="stock-badge ${stockClass(p.stock_status)}" onclick="showMonitorNote('${id}')" title="${esc(t('score.detail'))}">${esc(stockLabel(p))}</span>`
-        : '';
-
-      const autoPriceHtml = p.supplier === 'cj'
-        ? `<label class="auto-price-label" title="${esc(t('auto.title'))}"><input type="checkbox" ${p.auto_price ? 'checked' : ''} onchange="toggleAutoPrice('${id}', this)"> ${esc(t('auto.label'))}</label>`
-        : '';
-
-      const profitHtml = netProfit !== null
-        ? esc(HS.money(netProfit, currency))
-        : `<span style="color:#9aa3b2; font-weight:400; font-size:12px;">${esc(t('dash.noSalePrice'))}</span>`;
-
-      return `
-      <div class="product-row" data-id="${id}">
-        <div style="display:flex; align-items:flex-start; gap:12px;">
-          <input type="checkbox" class="product-checkbox" data-id="${id}" ${selectedProductIds.has(String(p.id)) ? 'checked' : ''} onchange="toggleProductSelect('${id}', this)">
-          <div>
-            <div class="product-name">${esc(p.name || t('dash.unnamed'))}</div>
-            ${marginPct !== null ? `<div class="product-meta">${esc(t('dash.margin', { p: HS.percent(marginPct) }))}</div>` : ''}
-            <div class="channel-row">${channelChips(p)}</div>
-          </div>
-        </div>
-        <div class="product-right">
-          ${stockHtml}
-          ${autoPriceHtml}
-          ${scoreHtml}
-          ${priceHtml}
-          <button class="share-btn" title="${esc(t('dash.shareTitle'))}" onclick="HSShare.open(['${id}'])"><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span>${esc(t('dash.share'))}</button>
-          <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">${profitHtml}</div>
-          <button class="delete-btn" title="${esc(t('dash.deleteTitle'))}" onclick="deleteProduct('${id}')">🗑</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // ============================================================
-  // Seçim ve silme
-  // ============================================================
-  function toggleProductSelect(id, checkbox) {
-    const key = String(id);
-    if (checkbox.checked) selectedProductIds.add(key);
-    else selectedProductIds.delete(key);
-    updateBulkBar();
-  }
-
-  function toggleSelectAll(checkbox) {
-    selectedProductIds = new Set();
-    if (checkbox.checked) currentProducts.forEach(p => selectedProductIds.add(String(p.id)));
-    document.querySelectorAll('.product-checkbox').forEach(cb => { cb.checked = checkbox.checked; });
-    updateBulkBar();
-  }
-
-  function updateBulkBar() {
-    const controls = document.getElementById('bulkDeleteControls');
-    const countText = document.getElementById('selectedCountText');
-    const selectAllCb = document.getElementById('selectAllCheckbox');
-    if (selectedProductIds.size > 0) {
-      document.getElementById('selectHint').classList.remove('show');
-      controls.style.display = 'flex';
-      countText.textContent = t('dash.selected', { n: selectedProductIds.size });
-    } else {
-      controls.style.display = 'none';
-    }
-    if (selectAllCb) {
-      selectAllCb.checked = currentProducts.length > 0 && selectedProductIds.size === currentProducts.length;
-    }
-  }
-
-  async function bulkDeleteProducts() {
-    const ids = Array.from(selectedProductIds);
-    if (ids.length === 0) return;
-    if (!confirm(t('dash.confirmBulk', { n: ids.length }))) return;
-    const { error } = await db.from('products').delete().in('id', ids);
-    if (error) {
-      alert(t('dash.deleteFail', { e: error.message }));
-      return;
-    }
-    selectedProductIds = new Set();
-    loadProducts();
-  }
-
-  async function deleteProduct(productId) {
-    if (!confirm(t('dash.confirmOne'))) return;
-    const { error } = await db.from('products').delete().eq('id', productId);
-    if (error) {
-      alert(t('dash.deleteFail', { e: error.message }));
-      return;
-    }
-    loadProducts();
-  }
-
-  function toggleAlarmDetail() {
-    const detail = document.getElementById('alarmDetail');
-    detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
-  }
-
-  // ============================================================
-  // Kazanan Ürün Skoru
-  // ============================================================
-  function scoreLevelClass(score) {
-    if (score >= 70) return 'score-high';
-    if (score >= 40) return 'score-mid';
-    return 'score-low';
-  }
-
-  async function callFunction(name, body) {
-    const { data: { session } } = await db.auth.getSession();
-    if (!session) throw new Error('Session');
-    const response = await fetch(HS.SUPABASE_URL + '/functions/v1/' + name, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + HS.SUPABASE_KEY,
-        'apikey': HS.SUPABASE_KEY,
-      },
-      body: JSON.stringify(Object.assign({}, body, { userAccessToken: session.access_token })),
-    });
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-    return data;
-  }
-
-  async function calculateWinningScore(productId, btn) {
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.textContent = '...';
-    try {
-      await callFunction('winning-score', { productId });
-      loadProducts();
-    } catch (err) {
-      alert(t('score.fail', { e: err.message }));
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
-
-  function showScoreDetail(productId) {
-    const p = currentProducts.find(x => String(x.id) === String(productId));
-    if (!p || !p.winning_score_data) return;
-    const m = p.winning_score_data.modules;
-    const lines = [
-      t('score.title', { n: p.winning_score_data.overall }),
-      '',
-      t('score.price') + ': ' + m.price.score + '/100 - ' + m.price.note,
-      t('score.review') + ': ' + m.review.score + '/100 - ' + m.review.note,
-      t('score.shipping') + ': ' + m.shipping.score + '/100 - ' + m.shipping.note,
-      t('score.keyword') + ': ' + m.keyword.score + '/100 - ' + m.keyword.note,
-      t('score.ad') + ': ' + m.ad.score + '/100 - ' + m.ad.note,
-      t('score.margin') + ': ' + m.margin.score + '/100 - ' + m.margin.note,
-    ];
-    alert(lines.join('\n'));
-  }
-
-  // ============================================================
-  // Fiyat önerisi
-  // ============================================================
-  async function calculatePriceSuggestion(productId, btn) {
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.textContent = '...';
-    try {
-      await callFunction('price-optimize', { productId });
-      loadProducts();
-    } catch (err) {
-      alert(t('price.fail', { e: err.message }));
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
-
-  function showPriceSuggestion(productId) {
-    const p = currentProducts.find(x => String(x.id) === String(productId));
-    if (!p || !p.suggested_price_reasoning) return;
-    let data;
-    try { data = JSON.parse(p.suggested_price_reasoning); } catch { return; }
-    const cur = productCurrency(p);
-    const lines = [
-      t('price.suggested', { v: HS.money(p.suggested_price, cur) }),
-      data.currentPrice != null ? t('price.current', { v: HS.money(data.currentPrice, cur) }) : t('price.currentNone'),
-      '',
-      data.competitorRangeNote ? t('price.competitor', { v: data.competitorRangeNote }) : '',
-      data.reasoning ? t('price.reason', { v: data.reasoning }) : '',
-      '',
-      data.currentMarginPct != null ? t('price.curMargin', { v: HS.percent(data.currentMarginPct) }) : '',
-      data.projectedMarginPct != null ? t('price.newMargin', { v: HS.percent(data.projectedMarginPct) }) : '',
-    ].filter(line => line !== '');
-    if (confirm(lines.join('\n') + '\n\n' + t('price.apply'))) {
-      applySuggestedPrice(productId, p.suggested_price);
-    }
-  }
-
-  async function applySuggestedPrice(productId, price) {
-    const { error } = await db.from('products').update({ sale_price: price }).eq('id', productId);
-    if (error) {
-      alert(t('price.applyFail', { e: error.message }));
-      return;
-    }
-    loadProducts();
-  }
-
-  // ============================================================
-  // Stok ve fiyat takibi
-  // ============================================================
-  function stockClass(status) {
-    if (status === 'tukendi') return 'stock-out';
-    if (status === 'az') return 'stock-low';
-    return 'stock-ok';
-  }
-
-  function stockLabel(p) {
-    const qty = p.stock_qty != null ? ' (' + HS.number(p.stock_qty) + ')' : '';
-    if (p.stock_status === 'tukendi') return t('stock.out');
-    if (p.stock_status === 'az') return t('stock.low') + qty;
-    return t('stock.ok') + qty;
-  }
-
-  function showMonitorNote(productId) {
-    const p = currentProducts.find(x => String(x.id) === String(productId));
-    if (!p) return;
-    const status = (p.stock_status || t('stock.unknown')) +
-      (p.stock_qty != null ? ' (' + t('stock.pieces', { n: HS.number(p.stock_qty) }) + ')' : '');
-    const lines = [
-      t('stock.status', { v: status }),
-      p.supplier_cost != null ? t('stock.cost', { v: HS.money(p.supplier_cost, 'USD') }) : '',
-      p.last_checked_at ? t('stock.lastCheck', { v: HS.date(p.last_checked_at, true) }) : '',
-      p.monitor_note ? t('stock.note', { v: p.monitor_note }) : '',
-    ].filter(line => line !== '');
-    alert(lines.join('\n'));
-  }
-
-  async function toggleAutoPrice(productId, checkbox) {
-    const { error } = await db.from('products').update({ auto_price: checkbox.checked }).eq('id', productId);
-    if (error) {
-      alert(t('auto.fail', { e: error.message }));
-      checkbox.checked = !checkbox.checked;
-      return;
-    }
-    const p = currentProducts.find(x => String(x.id) === String(productId));
-    if (p) p.auto_price = checkbox.checked;
-  }
-
-  async function runStockPriceMonitor(btn) {
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.textContent = t('mon.running');
-    try {
-      const data = await callFunction('stock-price-monitor', {});
-      if (!data.checked) {
-        alert(data.message || t('mon.none'));
-      } else {
-        const results = data.results || [];
-        const changed = results.filter(r => r.note && r.note !== 'Değişiklik yok');
-        const errors = results.filter(r => r.error);
-        const lines = [t('mon.checked', { n: data.checked })];
-        if (changed.length > 0) {
-          lines.push('', t('mon.changed'));
-          changed.forEach(r => lines.push('• ' + (r.name || t('mon.product')) + ': ' + r.note));
-        } else {
-          lines.push(t('mon.nochange'));
-        }
-        if (errors.length > 0) {
-          lines.push('', t('mon.errors'));
-          errors.forEach(r => lines.push('• ' + (r.name || t('mon.product')) + ': ' + r.error));
-        }
-        const raw = results.filter(r => r.stockRaw);
-        if (raw.length > 0) {
-          lines.push('', t('mon.raw'), raw[0].stockRaw);
-        }
-        alert(lines.join('\n'));
-      }
-      loadProducts();
-    } catch (err) {
-      alert(t('mon.fail', { e: err.message }));
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
-
-  init();
-</script>
-</body>
-</html>
