@@ -347,7 +347,7 @@
     </label>
     <div class="bulk-delete-controls" id="bulkDeleteControls">
       <span id="selectedCountText"></span>
-      <button class="btn-share-bulk" onclick="HSShare.open(Array.from(selectedProductIds))"><span data-i18n="dash.shareSelected">📣 Sosyal medyada paylaş</span><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span></button>
+      <button class="btn-share-bulk" onclick="mainShare()"><span data-i18n="dash.shareSelected">📣 Sosyal medyada paylaş</span><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span></button>
       <button class="btn-ad-bulk" onclick="openAdVisual()" data-i18n="dash.adSelected">✨ Reklam görseli oluştur</button>
       <button class="btn-bundle-bulk" onclick="openBundle()" data-i18n="dash.bundleSelected">📦 Paket oluştur</button>
       <button class="btn-danger" onclick="bulkDeleteProducts()" data-i18n="dash.deleteSelected">🗑 Seçilenleri sil</button>
@@ -728,8 +728,8 @@
     return true;
   }
   function mainShare() {
-    if (needSelection()) return;
-    HSShare.open(Array.from(selectedProductIds));
+    const ids = Array.from(selectedProductIds);
+    go('social.html' + (ids.length ? '?ids=' + encodeURIComponent(ids.join(',')) : ''));
   }
   function mainAd() {
     if (needSelection()) return;
@@ -1025,7 +1025,7 @@
           ${autoPriceHtml}
           ${scoreHtml}
           ${priceHtml}
-          <button class="share-btn" title="${esc(t('dash.shareTitle'))}" onclick="HSShare.open(['${id}'])"><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span>${esc(t('dash.share'))}</button>
+          <button class="share-btn" title="${esc(t('dash.shareTitle'))}" onclick="go('social.html?ids=${id}')"><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span>${esc(t('dash.share'))}</button>
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">${profitHtml}</div>
           <button class="delete-btn" title="${esc(t('dash.deleteTitle'))}" onclick="deleteProduct('${id}')">🗑</button>
         </div>
