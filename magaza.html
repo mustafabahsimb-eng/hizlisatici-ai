@@ -331,7 +331,9 @@ function renderProducts(){
     let tagHtml = '', descHtml = '<div class="card-desc">' + escapeHtml(desc) + '</div>', oldHtml = '', saveHtml = '';
     if (items.length) {
       const count = items.reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0);
-      tagHtml = '<div class="bundle-tag">' + escapeHtml(t('bundleTag', { n: count })) + '</div>';
+      // Kolaj görselinde zaten "PAKET" bandı var; köşe etiketini sadece kolajsız paketlerde göster
+      const hasCollage = /\/bundle\//.test(p.image_url || '');
+      if (!hasCollage) tagHtml = '<div class="bundle-tag">' + escapeHtml(t('bundleTag', { n: count })) + '</div>';
       descHtml = '<ul class="bundle-list">' + items.map(it =>
         '<li><span class="q">' + escapeHtml((parseInt(it.qty, 10) || 1) + '×') + '</span><span>' + escapeHtml(it.name) + '</span></li>'
       ).join('') + '</ul>';
