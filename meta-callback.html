@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo Social - Bağlanıyor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0f16; color: #e6e8ee; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .box {
+    width: 100%; max-width: 440px; background: #141821; border: 1px solid #232838;
+    border-radius: 16px; padding: 30px 24px; text-align: center;
+  }
+  .icons { font-size: 30px; margin-bottom: 12px; }
+  h1 { font-size: 19px; color: #fff; margin-bottom: 8px; }
+  p { font-size: 14px; color: #9aa3b2; line-height: 1.6; }
+  .spinner {
+    width: 34px; height: 34px; margin: 18px auto 4px; border-radius: 50%;
+    border: 3px solid #2a3040; border-top-color: #1D9E75; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .list { text-align: left; margin: 16px 0 4px; background: #0d0f16; border: 1px solid #2a3040; border-radius: 10px; padding: 12px 14px; }
+  .list div { font-size: 14px; color: #e6e8ee; padding: 4px 0; }
+  .ok { color: #6ee7b7; }
+  .err { color: #f28b8b; }
+  .btn {
+    display: inline-block; margin-top: 18px; background: #1D9E75; color: #fff; text-decoration: none;
+    padding: 12px 22px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icons">📘 📸</div>
+    <h1 id="title" data-i18n="mc.title">Hesapların bağlanıyor</h1>
+    <div class="spinner" id="spinner"></div>
+    <p id="msg" data-i18n="mc.wait">Facebook sayfaların ve Instagram hesapların bulunuyor...</p>
+    <div id="result"></div>
+    <a class="btn" href="social.html" id="back" style="display:none;" data-i18n="mc.back">Sosyal medyaya dön</a>
+  </div>
+
+<script>
+HS.i18n.add({
+  tr: {
+    'mc.title': 'Hesapların bağlanıyor',
+    'mc.wait': 'Facebook sayfaların ve Instagram hesapların bulunuyor...',
+    'mc.okTitle': '✓ Bağlandı',
+    'mc.okText': 'Artık bu hesaplara tek tuşla otomatik paylaşım yapabilirsin.',
+    'mc.noIg': 'Instagram hesabı bulunamadı. Instagram\'ın "İşletme" hesabı olmalı ve Facebook sayfana bağlı olmalı.',
+    'mc.failTitle': 'Bağlanamadı',
+    'mc.denied': 'Facebook izni verilmedi.',
+    'mc.noCode': 'Facebook\'tan dönüş bilgisi gelmedi. Sosyal medya sayfasından tekrar dene.',
+    'mc.state': 'Güvenlik kontrolü tutmadı. Sosyal medya sayfasından tekrar dene.',
+    'mc.back': 'Sosyal medyaya dön'
+  },
+  en: {
+    'mc.title': 'Connecting your accounts',
+    'mc.wait': 'Finding your Facebook pages and Instagram accounts...',
+    'mc.okTitle': '✓ Connected',
+    'mc.okText': 'You can now auto-share to these accounts with one tap.',
+    'mc.noIg': 'No Instagram account found. It must be an Instagram Business account linked to your Facebook page.',
+    'mc.failTitle': 'Could not connect',
+    'mc.denied': 'Facebook permission was not granted.',
+    'mc.noCode': 'No response came back from Facebook. Try again from the social media page.',
+    'mc.state': 'Security check failed. Try again from the social media page.',
+    'mc.back': 'Back to social media'
+  }
+});
+
+const t = (k, v) => HS.t(k, v);
+const esc = HS.escapeHtml;
+const $ = (id) => document.getElementById(id);
+
+function done(ok, title, html) {
+  $('spinner').style.display = 'none';
+  $('title').textContent = title;
+  $('title').className = ok ? 'ok' : 'err';
+  $('msg').innerHTML = html;
+  $('back').style.display = 'inline-block';
+}
+
+async function run() {
+  const ctx = await HS.init();
+  if (!ctx) return;
+
+  const q = new URLSearchParams(location.search);
+  if (q.get('error')) return done(false, t('mc.failTitle'), esc(t('mc.denied')));
+  const code = q.get('code');
+  if (!code) return done(false, t('mc.failTitle'), esc(t('mc.noCode')));
+
+  let saved = null;
+  try { saved = sessionStorage.getItem('meta_oauth_state'); } catch (e) {}
+  if (saved && q.get('state') !== saved) return done(false, t('mc.failTitle'), esc(t('mc.state')));
+
+  const redirectUri = location.origin + location.pathname;
+  try {
+    const { data: { session } } = await HS.db.auth.getSession();
+    const r = await fetch(HS.SUPABASE_URL + '/functions/v1/social-meta-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ code, redirectUri, userAccessToken: session.access_token })
+    });
+    const d = await r.json().catch(() => ({}));
+    try { sessionStorage.removeItem('meta_oauth_state'); } catch (e) {}
+    if (!r.ok || d.error) return done(false, t('mc.failTitle'), esc(d.error || ('HTTP ' + r.status)));
+
+    const rows = []
+      .concat((d.facebook || []).map(n => '<div>📘 Facebook · ' + esc(n) + '</div>'))
+      .concat((d.instagram || []).map(n => '<div>📸 Instagram · ' + esc(n) + '</div>'));
+    let html = esc(t('mc.okText')) + '<div class="list">' + rows.join('') + '</div>';
+    if (!(d.instagram || []).length) html += '<p style="margin-top:10px;color:#f2d16b;">' + esc(t('mc.noIg')) + '</p>';
+    done(true, t('mc.okTitle'), html);
+  } catch (e) {
+    done(false, t('mc.failTitle'), esc(e.message || String(e)));
+  }
+}
+run();
+</script>
+</body>
+</html>
