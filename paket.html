@@ -103,6 +103,7 @@
   }
   .btn:hover { background: #17875f; }
   .btn:disabled { opacity: .5; cursor: default; }
+  .btn.btn-sm { width: auto; padding: 9px 14px; font-size: 13px; border-radius: 8px; }
   .msg { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
   .msg.error { display: block; background: #2a1414; border: 1px solid #4a2020; color: #f28b8b; }
   .msg.success { display: block; background: #123222; border: 1px solid #1D9E75; color: #6ee7b7; }
@@ -607,7 +608,13 @@ async function loadSuggestions() {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
-    const sugs = data.suggestions || [];
+    // Zaten var olan paketleri tekrar önerme
+    const existing = await HS.db.from('products').select('bundle_items')
+      .eq('user_id', HS.user.id).eq('is_bundle', true).is('deleted_at', null);
+    const keyOf = (ids) => ids.map(String).sort().join(',');
+    const have = new Set((existing.data || []).map(b =>
+      keyOf((Array.isArray(b.bundle_items) ? b.bundle_items : []).map(it => it.product_id))));
+    const sugs = (data.suggestions || []).filter(s => !have.has(keyOf(s.product_ids)));
     if (!sugs.length) {
       list.innerHTML = '<div class="sug-status">' + esc(data.message || t('pk.sugNone')) + '</div>';
       return;
