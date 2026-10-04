@@ -165,6 +165,14 @@
   .cat-note a { color: #6ee7b7; }
   .cat-result { font-size: 13px; margin-top: 10px; line-height: 1.6; }
   .cat-result.ok { color: #6ee7b7; } .cat-result.err { color: #f28b8b; }
+  .wa-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .wa-input {
+    flex: 1; min-width: 200px; background: #0d0f16; border: 1px solid #2a3040; border-radius: 10px;
+    color: #fff; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .wa-input:focus { outline: none; border-color: #25D366; }
+  textarea.wa-input { width: 100%; min-height: 56px; resize: vertical; line-height: 1.5; margin-bottom: 10px; }
+  .btn2.wa { background: #25D366; border-color: #25D366; color: #06210f; }
   .empty { text-align: center; color: #9aa3b2; padding: 24px 10px; font-size: 13px; }
 
   /* Modal */
@@ -261,6 +269,15 @@
     </div>
     <p class="cat-sub" data-i18n="so.catSub">Ürünlerini tek tıkla Meta kataloğuna yükle. Aynı katalog WhatsApp kataloğunda, Instagram Mağazası'nda ve Facebook Mağazası'nda görünür. Fiyat ve stok değişince tekrar gönder, katalog güncellenir.</p>
     <div id="catBody"><div class="empty" data-i18n="common.loading">Yükleniyor...</div></div>
+  </div>
+
+  <div class="card" id="waCard">
+    <div class="cat-head">
+      <h2><span data-i18n="so.waTitle">💬 WhatsApp'tan ürün gönder</span></h2>
+      <span class="cat-icons"><i class="fa-brands fa-whatsapp"></i></span>
+    </div>
+    <p class="cat-sub" data-i18n="so.waSub">Yukarıdan ürünleri seç, müşterinin numarasını yaz. Ürünler müşterinin WhatsApp'ına resim, fiyat ve "Sepete ekle" düğmesiyle kart olarak gider (tek seferde en fazla 30 ürün).</p>
+    <div id="waBody"></div>
   </div>
 
   <div class="card">
@@ -381,7 +398,19 @@ HS.i18n.add({
     'so.catRemoveConfirm': 'Seçili {n} ürün katalogdan kaldırılsın mı? "Tüm ürünleri gönder" dediğinde de bir daha gitmezler (tek tek seçip gönderirsen geri gelirler).',
     'so.catClearConfirm': 'Katalogdaki TÜM ürünler kaldırılsın mı? WhatsApp, Instagram ve Facebook mağazasında ürün kalmaz. İstediğin zaman tekrar gönderebilirsin.',
     'so.catRemoved': '✓ {n} ürün katalogdan kaldırıldı.',
-    'so.catRemoving': 'Kaldırılıyor...'
+    'so.catRemoving': 'Kaldırılıyor...',
+    'so.waTitle': '💬 WhatsApp\'tan ürün gönder',
+    'so.waSub': 'Yukarıdan ürünleri seç, müşterinin numarasını yaz. Ürünler müşterinin WhatsApp\'ına resim, fiyat ve "Sepete ekle" düğmesiyle kart olarak gider (tek seferde en fazla 30 ürün).',
+    'so.waNeed': 'Bunun için yukarıdan WhatsApp\'ı bağla.',
+    'so.waPhone': 'Müşterinin numarası (örn. 0544 123 45 67)',
+    'so.waText': 'Mesaj (isteğe bağlı) — boş bırakırsan hazır bir mesaj gider',
+    'so.waBtn': '💬 Seçili {n} ürünü WhatsApp\'tan gönder',
+    'so.waBtn0': '💬 WhatsApp\'tan gönder',
+    'so.waSending': 'Gönderiliyor...',
+    'so.waOk': '✓ {n} ürün {to} numarasına WhatsApp\'tan gönderildi.',
+    'so.waNeedPhone': 'Müşterinin numarasını yaz.',
+    'so.waMax': 'Tek seferde en fazla 30 ürün gönderilebilir.',
+    'so.waNote': 'WhatsApp kuralı: müşteri son 24 saat içinde sana yazmış olmalı. Müşteri sana "fiyat?" ya da "merhaba" yazdığında ürünleri hemen gönderebilirsin.'
   },
   en: {
     'so.title': '📱 Social media',
@@ -474,7 +503,19 @@ HS.i18n.add({
     'so.catRemoveConfirm': 'Remove {n} selected products from the catalog? They will not be sent again with "Send all" (select and send them to add them back).',
     'so.catClearConfirm': 'Remove ALL products from the catalog? Your WhatsApp, Instagram and Facebook shop will be empty. You can send them again any time.',
     'so.catRemoved': '✓ {n} products removed from the catalog.',
-    'so.catRemoving': 'Removing...'
+    'so.catRemoving': 'Removing...',
+    'so.waTitle': '💬 Send products on WhatsApp',
+    'so.waSub': 'Pick products above and type the customer\'s number. Products arrive in their WhatsApp as cards with image, price and an "Add to cart" button (up to 30 at once).',
+    'so.waNeed': 'Connect WhatsApp above to use this.',
+    'so.waPhone': 'Customer\'s number (e.g. +1 555 123 4567)',
+    'so.waText': 'Message (optional) — a ready message is sent if empty',
+    'so.waBtn': '💬 Send {n} selected on WhatsApp',
+    'so.waBtn0': '💬 Send on WhatsApp',
+    'so.waSending': 'Sending...',
+    'so.waOk': '✓ {n} products sent to {to} on WhatsApp.',
+    'so.waNeedPhone': 'Type the customer\'s number.',
+    'so.waMax': 'You can send up to 30 products at once.',
+    'so.waNote': 'WhatsApp rule: the customer must have messaged you in the last 24 hours. When they write "price?" or "hi", you can send products right away.'
   }
 });
 
@@ -583,6 +624,7 @@ async function refreshChannels() {
   await loadChannels();
   renderAccounts();
   renderChannelPicker();
+  renderWa();
 }
 
 // Telegram
@@ -647,7 +689,12 @@ function renderProducts() {
 function toggleProd(id) {
   if (selected.has(id)) selected.delete(id); else selected.add(id);
   renderProducts();
+  refreshSelectionViews();
+}
+// Seçim değişince katalog ve WhatsApp kutularındaki "Seçili N ürün" yazıları da güncellensin
+function refreshSelectionViews() {
   if (catState && catState.current && !catChanging) renderCatalog();
+  if ($('waSend')) renderWa();
 }
 
 // ---------- Kanal seçimi ----------
@@ -701,6 +748,7 @@ async function publish() {
     setTimeout(pollHistory, 700);
     selected = new Set();
     renderProducts();
+    refreshSelectionViews();
     const data = await job;
     await loadHistory();
     toast(data.failed ? t('so.doneErr', { ok: data.posted || 0, err: data.failed }) : t('so.doneOk', { ok: data.posted || 0 }), !!data.failed && !data.posted);
@@ -850,6 +898,48 @@ async function removeFromCatalog(all) {
   }
 }
 
+// ---------- WhatsApp'tan ürün gönder ----------
+function renderWa(resultHtml) {
+  const box = $('waBody');
+  const wa = channels.filter(c => c.platform === 'whatsapp');
+  if (!wa.length) {
+    box.innerHTML = '<div class="cat-box"><p class="cat-sub" style="margin:0;">' + esc(t('so.waNeed')) + '</p></div>';
+    return;
+  }
+  const keepPhone = $('waPhone') ? $('waPhone').value : '';
+  const keepText = $('waText') ? $('waText').value : '';
+  const n = selected.size;
+  box.innerHTML = '<div class="cat-box">'
+    + '<div class="wa-row">'
+    +   (wa.length > 1 ? '<select class="wa-input" id="waFrom" style="flex:0 1 240px;">' + wa.map(c => '<option value="' + esc(c.id) + '">' + esc(c.account_name || c.account_id) + '</option>').join('') + '</select>' : '')
+    +   '<input class="wa-input" id="waPhone" type="tel" inputmode="tel" placeholder="' + esc(t('so.waPhone')) + '">'
+    + '</div>'
+    + '<textarea class="wa-input" id="waText" maxlength="1000" placeholder="' + esc(t('so.waText')) + '"></textarea>'
+    + '<div class="cat-btns"><button class="btn2 wa" id="waSend" ' + (n ? '' : 'disabled') + '>' + esc(n ? t('so.waBtn', { n }) : t('so.waBtn0')) + '</button></div>'
+    + (resultHtml || '')
+    + '<p class="cat-note">' + esc(t('so.waNote')) + '</p>'
+    + '</div>';
+  $('waPhone').value = keepPhone;
+  $('waText').value = keepText;
+  $('waSend').onclick = sendWa;
+}
+async function sendWa() {
+  const to = $('waPhone').value.trim();
+  if (!to) { toast(t('so.waNeedPhone'), true); $('waPhone').focus(); return; }
+  if (!selected.size) { toast(t('so.needProduct'), true); return; }
+  if (selected.size > 30) { toast(t('so.waMax'), true); return; }
+  const btn = $('waSend');
+  btn.disabled = true; btn.textContent = t('so.waSending');
+  const body = { to, productIds: [...selected], text: $('waText').value.trim() };
+  if ($('waFrom')) body.channelId = $('waFrom').value;
+  try {
+    const d = await callFn('whatsapp-send', body);
+    renderWa('<div class="cat-result ok">' + esc(t('so.waOk', { n: d.count, to: '+' + d.to })) + '</div>');
+  } catch (e) {
+    renderWa('<div class="cat-result err">' + esc(e.message || e) + '</div>');
+  }
+}
+
 // ---------- Geçmiş ----------
 let pollTimer = null;
 async function loadHistory() {
@@ -909,8 +999,9 @@ async function start() {
     const q = $('search').value.trim().toLocaleLowerCase('tr');
     products.filter(p => !q || p.name.toLocaleLowerCase('tr').includes(q)).forEach(p => selected.add(p.id));
     renderProducts();
+    refreshSelectionViews();
   };
-  $('selNone').onclick = () => { selected = new Set(); renderProducts(); };
+  $('selNone').onclick = () => { selected = new Set(); renderProducts(); refreshSelectionViews(); };
   $('publishBtn').onclick = publish;
   // Satıcının son yazdığı yazıyı hatırla (bir dahaki paylaşımda hazır gelsin)
   try {
@@ -939,12 +1030,13 @@ async function start() {
   renderAccounts();
   renderProducts();
   renderChannelPicker();
+  renderWa();
   loadCatalog();
   const rows = await loadHistory();
   if (rows.some(r => r.status === 'pending' || r.status === 'posting')) pollHistory();
 }
 
-window.addEventListener('hs:langchange', () => { renderAccounts(); renderProducts(); renderChannelPicker(); loadHistory(); if (catState) renderCatalog(); });
+window.addEventListener('hs:langchange', () => { renderAccounts(); renderProducts(); renderChannelPicker(); loadHistory(); if (catState) renderCatalog(); renderWa(); });
 start();
 </script>
 </body>
