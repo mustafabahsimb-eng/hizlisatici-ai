@@ -59,6 +59,7 @@
   }
   .conn-remove:hover { text-decoration: underline; }
   .conn-date { color: #6b7385; font-size: 11px; }
+  .conn-handle { color: #fff; font-weight: 600; }
 
   .acc-status { font-size: 11px; padding: 3px 10px; border-radius: 10px; white-space: nowrap; }
   .acc-status.connected { background: #123222; color: #6ee7b7; }
@@ -145,6 +146,9 @@
   <div class="section-title" data-t="secIntl"></div>
   <div class="acc-list" id="listIntl"></div>
 
+  <div class="section-title" data-t="secSocial"></div>
+  <div class="acc-list" id="listSocial"></div>
+
   <div class="section-title" data-t="secSup"></div>
   <div class="acc-list" id="listSup"></div>
 </main>
@@ -185,6 +189,16 @@
   const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
   let db = null;
 
+  // Instagram (Instagram girişi ile API) ayarları
+  const IG_APP_ID = '2894637194381994';
+  const IG_REDIRECT_URI = 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/instagram-callback.html';
+  const IG_SCOPES = [
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_comments',
+    'instagram_business_manage_messages'
+  ].join(',');
+
   // ---------- Dil ----------
   const T = {
     tr: {
@@ -195,6 +209,7 @@
       secureNote: '🔒 API anahtarların şifreli kasada (Vault) saklanır; tarayıcıya ve sayfaya geri gönderilmez. Canlı bağlantılarda bilgiler pazaryerinin kendi sisteminde hemen doğrulanır.',
       secTR: 'Türkiye pazaryerleri',
       secIntl: 'Uluslararası pazaryerleri',
+      secSocial: 'Sosyal Medya Hesapları',
       secSup: 'Tedarikçiler',
       openIfNone: 'hesabın yoksa aç',
       loading: 'yükleniyor...',
@@ -210,6 +225,7 @@
       stCheckFail: 'kontrol edilemedi',
       stShared: 'bağlı (paylaşımlı)',
       stOwn: 'kendi hesabın bağlı',
+      stPassive: 'pasif',
       envLive: 'Canlı',
       envSandbox: 'Test (Sandbox)',
       envLabel: 'Ortam',
@@ -239,8 +255,11 @@
       btnManage: 'Yönet',
       btnOpen: 'Aç',
       btnConnectOwn: 'Kendi Hesabını Bağla',
+      btnConnectInstagram: "Instagram'ı Bağla",
+      btnReconnect: 'Yeniden Bağla',
       checking: 'Kontrol ediliyor...',
       saving: 'Kaydediliyor...',
+      redirecting: "Instagram'a yönlendiriliyor...",
       fillAll: 'Lütfen zorunlu alanları doldur.',
       noVerifyNote: '{name} için otomatik doğrulama henüz yok. Bilgilerin şifreli kasada saklanır, entegrasyon hazır olunca otomatik devreye girer.',
       okConnected: '{name} bağlandı ✓',
@@ -248,6 +267,7 @@
       okSandbox: '{name} test bağlantısı kaydedildi.',
       okRemoved: 'Bağlantı kaldırıldı.',
       confirmRemove: '{name} bağlantısını ({env}) kaldırmak istediğine emin misin? Kayıtlı anahtarlar da silinir.',
+      igConfirmRemove: '@{name} Instagram bağlantısını kaldırmak istediğine emin misin? Bu hesaba otomatik paylaşım durur, kayıtlı erişim anahtarı da silinir.',
       errNotAuth: 'Oturumun sona ermiş. Tekrar giriş yap.',
       errUnsupported: 'Bu pazaryeri henüz desteklenmiyor.',
       errMissing: 'Eksik alan var: ',
@@ -269,6 +289,7 @@
       d_walmart: "Walmart'ın satıcı platformu — onaylı satıcılar ürünlerini Walmart.com üzerinden listeleyebilir",
       d_woocommerce: 'Kendi WordPress/WooCommerce mağazan varsa doğrudan bağla — pazaryeri değil, kendi sitendir',
       d_etsy: 'El yapımı, vintage ve özel ürünlere odaklı global pazaryeri',
+      d_instagram: 'Ürünlerin Instagram hesabında otomatik paylaşılır. Hesabın İşletme veya İçerik üreticisi türünde olmalı; birden fazla hesap bağlayabilirsin.',
       d_cj: 'Ürün arama ve tedarik için kullandığımız ana kaynak. İstersen kendi CJ hesabını bağlayıp aramaları kendi hesabınla yapabilirsin.',
       d_aliexpress: 'Ek ürün kaynağı ve komisyonlu bağlantı programı',
       d_printify: 'Tişört, kupa gibi ürünlere kendi tasarımını bas, sipariş gelince Printify üretip gönderir. Bağlantı ve ürün oluşturma Print on Demand sayfasından yapılır.',
@@ -297,6 +318,7 @@
       secureNote: '🔒 Your API keys are stored in an encrypted vault and are never sent back to the browser. Live connections are verified with the marketplace right away.',
       secTR: 'Turkish marketplaces',
       secIntl: 'International marketplaces',
+      secSocial: 'Social Media Accounts',
       secSup: 'Suppliers',
       openIfNone: "open an account if you don't have one",
       loading: 'loading...',
@@ -312,6 +334,7 @@
       stCheckFail: 'could not check',
       stShared: 'connected (shared)',
       stOwn: 'your own account',
+      stPassive: 'inactive',
       envLive: 'Live',
       envSandbox: 'Test (Sandbox)',
       envLabel: 'Environment',
@@ -341,8 +364,11 @@
       btnManage: 'Manage',
       btnOpen: 'Open',
       btnConnectOwn: 'Connect Your Own Account',
+      btnConnectInstagram: 'Connect Instagram',
+      btnReconnect: 'Reconnect',
       checking: 'Checking...',
       saving: 'Saving...',
+      redirecting: 'Redirecting to Instagram...',
       fillAll: 'Please fill in the required fields.',
       noVerifyNote: 'Automatic verification for {name} is not available yet. Your credentials are stored in the encrypted vault and will be used once the integration is ready.',
       okConnected: '{name} connected ✓',
@@ -350,6 +376,7 @@
       okSandbox: '{name} test connection saved.',
       okRemoved: 'Connection removed.',
       confirmRemove: 'Remove your {name} connection ({env})? Stored keys will be deleted too.',
+      igConfirmRemove: 'Remove the @{name} Instagram connection? Automatic posting to this account will stop and the stored access key will be deleted.',
       errNotAuth: 'Your session has expired. Please sign in again.',
       errUnsupported: 'This marketplace is not supported yet.',
       errMissing: 'Missing field(s): ',
@@ -370,6 +397,7 @@
       d_walmart: "Walmart's seller platform — approved sellers can list products on Walmart.com",
       d_woocommerce: 'Connect your own WordPress/WooCommerce store directly — it is your own site, not a marketplace',
       d_etsy: 'Global marketplace for handmade, vintage and unique items',
+      d_instagram: 'Your products are posted to your Instagram account automatically. The account must be a Business or Creator account; you can connect more than one.',
       d_cj: 'Our main source for product search and sourcing. You can connect your own CJ account to search with it.',
       d_aliexpress: 'Additional product source and affiliate program',
       d_printify: 'Print your designs on t-shirts, mugs and more; Printify produces and ships when an order comes in. Connection and product creation are on the Print on Demand page.',
@@ -517,6 +545,121 @@
       '<div class="acc-right"' + (idSuffix ? ' id="right-' + idSuffix + '"' : '') + '>' + rightHtml + '</div></div>';
   }
 
+  // ---------- Instagram (social_channels + Vault, Instagram girişi ile OAuth) ----------
+  let igChannels;          // undefined: yükleniyor, null: okunamadı, []: bağlı hesap yok
+  let igRedirecting = false;
+
+  async function loadInstagram() {
+    try {
+      const session = await getSession();
+      if (!session) { igChannels = null; return; }
+      const { data, error } = await db.from('social_channels')
+        .select('id, account_id, account_name, active, token_expires_at, connected_at, created_at')
+        .eq('user_id', session.user.id)
+        .eq('platform', 'instagram')
+        .order('created_at', { ascending: true });
+      igChannels = error ? null : (data || []);
+    } catch (e) {
+      igChannels = null;
+    }
+  }
+
+  function igStatus(c) {
+    if (c.active === false) return { cls: 'none', text: t('stPassive'), expired: false };
+    if (c.token_expires_at && new Date(c.token_expires_at).getTime() < Date.now()) {
+      return { cls: 'error', text: t('stExpired'), expired: true };
+    }
+    return { cls: 'connected', text: t('stConnected'), expired: false };
+  }
+
+  function instagramRowHtml() {
+    const signup = ' · <a href="https://www.instagram.com/accounts/emailsignup/" target="_blank" rel="noopener" class="inline-link">' + t('openIfNone') + '</a>';
+    const connectLabel = igRedirecting ? t('redirecting') : t('btnConnectInstagram');
+    const dis = igRedirecting ? ' disabled' : '';
+    let connHtml = '';
+    let right = '';
+
+    if (igChannels === undefined) {
+      right = '<span class="acc-status none">' + t('loading') + '</span>';
+    } else if (igChannels === null) {
+      right = '<span class="acc-status none">' + t('stCheckFail') + '</span>' +
+        '<button class="acc-btn" onclick="connectInstagram()"' + dis + '>' + connectLabel + '</button>';
+    } else if (igChannels.length === 0) {
+      right = '<span class="acc-status none">' + t('stNone') + '</span>' +
+        '<button class="acc-btn" onclick="connectInstagram()"' + dis + '>' + connectLabel + '</button>';
+    } else {
+      connHtml = '<div class="conn-list">' + igChannels.map(c => {
+        const s = igStatus(c);
+        const handle = c.account_name ? '@' + c.account_name : (c.account_id || '');
+        const when = c.connected_at || c.created_at;
+        return '<div class="conn-item">' +
+          '<span class="acc-status ' + s.cls + '">' + s.text + '</span>' +
+          '<span class="conn-handle">' + esc(handle) + '</span>' +
+          (when ? '<span class="conn-date">' + t('since') + fmtDate(when) + '</span>' : '') +
+          (s.expired ? '<button class="conn-remove" style="color:#6ee7b7" onclick="connectInstagram()"' + dis + '>' + t('btnReconnect') + '</button>' : '') +
+          '<button class="conn-remove" onclick="disconnectInstagram(\'' + esc(c.id) + '\')">' + t('btnRemove') + '</button>' +
+          '</div>';
+      }).join('') + '</div>';
+      right = '<button class="acc-btn secondary" onclick="connectInstagram()"' + dis + '>' +
+        (igRedirecting ? t('redirecting') : t('btnAddAnother')) + '</button>';
+    }
+
+    return '<div class="acc-row"><div class="acc-info"><div class="acc-name">Instagram</div>' +
+      '<div class="acc-desc">' + t('d_instagram') + signup + '</div>' + connHtml + '</div>' +
+      '<div class="acc-right">' + right + '</div></div>';
+  }
+
+  function renderInstagram() {
+    const el = document.getElementById('listSocial');
+    if (el) el.innerHTML = instagramRowHtml();
+  }
+
+  async function connectInstagram() {
+    if (igRedirecting) return;
+    const session = await getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    igRedirecting = true;
+    renderInstagram();
+    try {
+      const { data: state, error } = await db.rpc('create_oauth_state', { p_provider: 'instagram' });
+      if (error || !state) throw new Error(error ? error.message : 'state');
+      try { localStorage.setItem('lang', lang()); } catch (e) {}
+      const authUrl = 'https://www.instagram.com/oauth/authorize?' + new URLSearchParams({
+        client_id: IG_APP_ID,
+        redirect_uri: IG_REDIRECT_URI,
+        response_type: 'code',
+        scope: IG_SCOPES,
+        state: state,
+        enable_fb_login: '0',
+        force_reauth: 'true',
+      }).toString();
+      window.location.href = authUrl;
+    } catch (e) {
+      igRedirecting = false;
+      renderInstagram();
+      toast(t('failConnect') + e.message, true);
+    }
+  }
+
+  async function disconnectInstagram(channelId) {
+    const c = (igChannels || []).find(x => String(x.id) === String(channelId));
+    const name = c ? (c.account_name || c.account_id || 'instagram') : 'instagram';
+    if (!confirm(t('igConfirmRemove', { name: name }))) return;
+    const session = await getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    try {
+      const { error } = await db.from('social_channels').delete()
+        .eq('id', channelId)
+        .eq('user_id', session.user.id);
+      if (error) { toast(t('failRemove') + error.message, true); return; }
+      toast(t('okRemoved'));
+      await loadInstagram();
+      renderInstagram();
+    } catch (e) {
+      toast(t('errNetwork') + e.message, true);
+    }
+  }
+
   function renderAll() {
     applyStatic();
     const loading = '<span class="acc-status none">' + t('loading') + '</span>';
@@ -537,6 +680,9 @@
       ' · <a href="https://www.etsy.com/sell" target="_blank" rel="noopener" class="inline-link">' + t('openIfNone') + '</a></div></div>' +
       '<div class="acc-right" id="right-etsy">' + loading + '</div></div>';
     document.getElementById('listIntl').innerHTML = intl;
+
+    // Sosyal medya hesapları
+    renderInstagram();
 
     // Tedarikçiler
     let sup = '';
@@ -831,7 +977,7 @@
     if (!session) { window.location.href = 'index.html'; return; }
 
     renderAll();                 // önce iskelet
-    await loadMarketplaceData(); // sonra bağlantılar
+    await Promise.all([loadMarketplaceData(), loadInstagram()]); // sonra bağlantılar
     renderAll();
   }
 
@@ -843,6 +989,10 @@
   document.addEventListener('hs:langchange', onLangChange);
   document.getElementById('connectModalOverlay').addEventListener('click', e => {
     if (e.target.id === 'connectModalOverlay') closeConnectModal();
+  });
+  // Instagram'dan geri gelip "geri" tuşuyla dönülürse düğme takılı kalmasın
+  window.addEventListener('pageshow', e => {
+    if (e.persisted && igRedirecting) { igRedirecting = false; renderInstagram(); }
   });
 
   init();
