@@ -61,6 +61,14 @@
   .conn-date { color: #6b7385; font-size: 11px; }
   .conn-handle { color: #fff; font-weight: 600; }
 
+  .ig-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #c3c9d4; cursor: pointer; user-select: none; }
+  .ig-switch input { display: none; }
+  .ig-switch .track { width: 30px; height: 17px; border-radius: 10px; background: #2a3040; position: relative; transition: .2s; flex-shrink: 0; }
+  .ig-switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #9aa3b2; transition: .2s; }
+  .ig-switch input:checked + .track { background: #1D9E75; }
+  .ig-switch input:checked + .track::after { left: 15px; background: #fff; }
+  .ig-switch input:disabled + .track { opacity: .5; }
+
   .acc-status { font-size: 11px; padding: 3px 10px; border-radius: 10px; white-space: nowrap; }
   .acc-status.connected { background: #123222; color: #6ee7b7; }
   .acc-status.pending { background: #2e2712; color: #f2d16b; }
@@ -106,6 +114,9 @@
   .env-help { font-size: 11px; color: #6b7385; margin-bottom: 14px; line-height: 1.5; }
   .modal-error { font-size: 12px; color: #f87171; margin-bottom: 10px; min-height: 16px; white-space: pre-wrap; }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .guide-steps { margin: 4px 0 14px 18px; font-size: 13px; color: #c3c9d4; line-height: 1.7; }
+  .guide-steps li { margin-bottom: 6px; }
+  .guide-note { font-size: 12px; color: #9aa3b2; margin-bottom: 14px; line-height: 1.5; }
 
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
@@ -182,6 +193,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="igGuideOverlay">
+  <div class="modal-box">
+    <div class="modal-title" data-t="igGuideTitle"></div>
+    <div class="modal-sub" data-t="igGuideSub"></div>
+    <ol class="guide-steps">
+      <li data-t="igGuide1"></li>
+      <li data-t="igGuide2"></li>
+      <li data-t="igGuide3"></li>
+    </ol>
+    <div class="guide-note" data-t="igGuideNote"></div>
+    <div class="modal-actions">
+      <button class="acc-btn secondary" onclick="closeIgGuide()" data-t="btnClose"></button>
+      <button class="acc-btn" onclick="closeIgGuide(); connectInstagram();" data-t="igGuideRetry"></button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -249,6 +277,7 @@
       btnAddAnother: '+ Bağlantı Ekle',
       btnSave: 'Bağla',
       btnCancel: 'Vazgeç',
+      btnClose: 'Kapat',
       btnRemove: 'Kaldır',
       btnOpenAccount: 'Hesap Aç',
       btnGoSite: 'Siteye Git',
@@ -268,6 +297,17 @@
       okRemoved: 'Bağlantı kaldırıldı.',
       confirmRemove: '{name} bağlantısını ({env}) kaldırmak istediğine emin misin? Kayıtlı anahtarlar da silinir.',
       igConfirmRemove: '@{name} Instagram bağlantısını kaldırmak istediğine emin misin? Bu hesaba otomatik paylaşım durur, kayıtlı erişim anahtarı da silinir.',
+      igAutoPost: 'Yeni ürünleri otomatik paylaş',
+      igAutoOn: '@{name}: yeni ürünler artık otomatik paylaşılacak ✓',
+      igAutoOff: '@{name}: otomatik paylaşım kapatıldı.',
+      igGuideLink: "Hesabın kişisel mi? 30 sn'de profesyonele çevir",
+      igGuideTitle: 'Instagram hesabını profesyonele çevir',
+      igGuideSub: 'Instagram, otomatik paylaşıma sadece İşletme veya İçerik üreticisi hesaplarında izin veriyor. Çevirmek ücretsiz; takipçilerin ve gönderilerin aynen kalır.',
+      igGuide1: 'Instagram uygulamasında profiline git, sağ üstteki ☰ menüye dokun.',
+      igGuide2: 'Hesap türü ve araçlar → Profesyonel hesaba geç seçeneğine dokun.',
+      igGuide3: 'Bir kategori seç ve İşletme seçeneğini işaretle. İletişim bilgisi ve Facebook adımlarını atlayabilirsin.',
+      igGuideNote: 'Bitirince aşağıdaki düğmeyle tekrar bağlan. İstersen daha sonra hesabını kişisele geri çevirebilirsin.',
+      igGuideRetry: 'Tekrar Bağlan',
       errNotAuth: 'Oturumun sona ermiş. Tekrar giriş yap.',
       errUnsupported: 'Bu pazaryeri henüz desteklenmiyor.',
       errMissing: 'Eksik alan var: ',
@@ -309,6 +349,7 @@
       etsyConfirmRemove: 'Etsy bağlantını kaldırmak istediğine emin misin?',
       failConnect: 'Bağlama başarısız: ',
       failRemove: 'Kaldırma başarısız: ',
+      failSave: 'Kaydedilemedi: ',
     },
     en: {
       pageTitle: 'HızlıSatıcı AI - My Accounts',
@@ -358,6 +399,7 @@
       btnAddAnother: '+ Add Connection',
       btnSave: 'Connect',
       btnCancel: 'Cancel',
+      btnClose: 'Close',
       btnRemove: 'Remove',
       btnOpenAccount: 'Open Account',
       btnGoSite: 'Visit Site',
@@ -377,6 +419,17 @@
       okRemoved: 'Connection removed.',
       confirmRemove: 'Remove your {name} connection ({env})? Stored keys will be deleted too.',
       igConfirmRemove: 'Remove the @{name} Instagram connection? Automatic posting to this account will stop and the stored access key will be deleted.',
+      igAutoPost: 'Auto-post new products',
+      igAutoOn: '@{name}: new products will now be posted automatically ✓',
+      igAutoOff: '@{name}: auto-posting turned off.',
+      igGuideLink: 'Personal account? Switch to professional in 30 sec',
+      igGuideTitle: 'Switch your Instagram to a professional account',
+      igGuideSub: 'Instagram only allows automatic posting for Business or Creator accounts. Switching is free; your followers and posts stay the same.',
+      igGuide1: 'In the Instagram app, go to your profile and tap the ☰ menu at the top right.',
+      igGuide2: 'Tap Account type and tools → Switch to professional account.',
+      igGuide3: 'Pick a category and choose Business. You can skip the contact info and Facebook steps.',
+      igGuideNote: 'When done, connect again with the button below. You can switch back to a personal account later if you want.',
+      igGuideRetry: 'Connect Again',
       errNotAuth: 'Your session has expired. Please sign in again.',
       errUnsupported: 'This marketplace is not supported yet.',
       errMissing: 'Missing field(s): ',
@@ -416,6 +469,7 @@
       etsyConfirmRemove: 'Remove your Etsy connection?',
       failConnect: 'Connection failed: ',
       failRemove: 'Removal failed: ',
+      failSave: 'Could not save: ',
     }
   };
 
@@ -554,7 +608,7 @@
       const session = await getSession();
       if (!session) { igChannels = null; return; }
       const { data, error } = await db.from('social_channels')
-        .select('id, account_id, account_name, active, token_expires_at, connected_at, created_at')
+        .select('id, account_id, account_name, active, token_expires_at, connected_at, created_at, extra')
         .eq('user_id', session.user.id)
         .eq('platform', 'instagram')
         .order('created_at', { ascending: true });
@@ -572,8 +626,14 @@
     return { cls: 'connected', text: t('stConnected'), expired: false };
   }
 
+  function igAutoOn(c) {
+    const v = c && c.extra ? c.extra.auto_post : false;
+    return v === true || v === 'true';
+  }
+
   function instagramRowHtml() {
     const signup = ' · <a href="https://www.instagram.com/accounts/emailsignup/" target="_blank" rel="noopener" class="inline-link">' + t('openIfNone') + '</a>';
+    const guide = ' · <a href="#" onclick="openIgGuide(); return false;" class="inline-link">' + t('igGuideLink') + '</a>';
     const connectLabel = igRedirecting ? t('redirecting') : t('btnConnectInstagram');
     const dis = igRedirecting ? ' disabled' : '';
     let connHtml = '';
@@ -592,12 +652,18 @@
         const s = igStatus(c);
         const handle = c.account_name ? '@' + c.account_name : (c.account_id || '');
         const when = c.connected_at || c.created_at;
+        const id = esc(c.id);
         return '<div class="conn-item">' +
           '<span class="acc-status ' + s.cls + '">' + s.text + '</span>' +
           '<span class="conn-handle">' + esc(handle) + '</span>' +
           (when ? '<span class="conn-date">' + t('since') + fmtDate(when) + '</span>' : '') +
           (s.expired ? '<button class="conn-remove" style="color:#6ee7b7" onclick="connectInstagram()"' + dis + '>' + t('btnReconnect') + '</button>' : '') +
-          '<button class="conn-remove" onclick="disconnectInstagram(\'' + esc(c.id) + '\')">' + t('btnRemove') + '</button>' +
+          '<button class="conn-remove" onclick="disconnectInstagram(\'' + id + '\')">' + t('btnRemove') + '</button>' +
+          '</div>' +
+          '<div class="conn-item">' +
+          '<label class="ig-switch"><input type="checkbox"' + (igAutoOn(c) ? ' checked' : '') +
+          ' onchange="toggleIgAutoPost(\'' + id + '\', this.checked, this)"><span class="track"></span>' +
+          t('igAutoPost') + '</label>' +
           '</div>';
       }).join('') + '</div>';
       right = '<button class="acc-btn secondary" onclick="connectInstagram()"' + dis + '>' +
@@ -605,7 +671,7 @@
     }
 
     return '<div class="acc-row"><div class="acc-info"><div class="acc-name">Instagram</div>' +
-      '<div class="acc-desc">' + t('d_instagram') + signup + '</div>' + connHtml + '</div>' +
+      '<div class="acc-desc">' + t('d_instagram') + signup + guide + '</div>' + connHtml + '</div>' +
       '<div class="acc-right">' + right + '</div></div>';
   }
 
@@ -639,6 +705,36 @@
       renderInstagram();
       toast(t('failConnect') + e.message, true);
     }
+  }
+
+  async function toggleIgAutoPost(channelId, on, el) {
+    const c = (igChannels || []).find(x => String(x.id) === String(channelId));
+    if (!c) return;
+    const session = await getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    const extra = Object.assign({}, c.extra || {}, { auto_post: !!on });
+    if (el) el.disabled = true;
+    try {
+      const { error } = await db.from('social_channels')
+        .update({ extra: extra, updated_at: new Date().toISOString() })
+        .eq('id', channelId)
+        .eq('user_id', session.user.id);
+      if (error) throw new Error(error.message);
+      c.extra = extra;
+      const name = c.account_name || c.account_id || 'instagram';
+      toast(on ? t('igAutoOn', { name: name }) : t('igAutoOff', { name: name }));
+    } catch (e) {
+      if (el) el.checked = !on;
+      toast(t('failSave') + e.message, true);
+    }
+    if (el) el.disabled = false;
+  }
+
+  function openIgGuide() {
+    document.getElementById('igGuideOverlay').style.display = 'flex';
+  }
+  function closeIgGuide() {
+    document.getElementById('igGuideOverlay').style.display = 'none';
   }
 
   async function disconnectInstagram(channelId) {
@@ -989,6 +1085,9 @@
   document.addEventListener('hs:langchange', onLangChange);
   document.getElementById('connectModalOverlay').addEventListener('click', e => {
     if (e.target.id === 'connectModalOverlay') closeConnectModal();
+  });
+  document.getElementById('igGuideOverlay').addEventListener('click', e => {
+    if (e.target.id === 'igGuideOverlay') closeIgGuide();
   });
   // Instagram'dan geri gelip "geri" tuşuyla dönülürse düğme takılı kalmasın
   window.addEventListener('pageshow', e => {
