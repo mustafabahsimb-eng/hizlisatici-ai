@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instagram Bağlantısı · Seltigo</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #111a2e;
+      --border: #1f2a44;
+      --text: #e6ecf5;
+      --muted: #8a97b0;
+      --green: #1D9E75;
+      --red: #e5484d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 28px;
+      text-align: center;
+    }
+    .icon {
+      width: 64px; height: 64px;
+      margin: 0 auto 18px;
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(45deg, #f9ce34, #ee2a7b, #6228d7);
+    }
+    .icon svg { width: 34px; height: 34px; }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    p { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0; }
+    .spinner {
+      width: 28px; height: 28px;
+      margin: 22px auto 0;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ok h1 { color: var(--green); }
+    .err h1 { color: var(--red); }
+    .detail {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-word;
+      background: #0d1526;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: left;
+      display: none;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 22px;
+      padding: 11px 22px;
+      border-radius: 10px;
+      background: var(--green);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="5"/>
+        <circle cx="12" cy="12" r="4"/>
+        <circle cx="17.5" cy="6.5" r="1" fill="#fff"/>
+      </svg>
+    </div>
+    <h1 id="title"></h1>
+    <p id="message"></p>
+    <div class="spinner" id="spinner"></div>
+    <div class="detail" id="detail"></div>
+    <a class="btn" id="backBtn" href="accounts.html" style="display:none"></a>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const lang = (localStorage.getItem("lang") || navigator.language || "tr").toLowerCase().startsWith("en") ? "en" : "tr";
+    const T = {
+      tr: {
+        connecting: "Instagram bağlanıyor…",
+        wait: "Hesabın güvenli şekilde bağlanıyor, lütfen bekle.",
+        success: "Instagram bağlandı",
+        successMsg: (name) => `@${name} hesabın Seltigo'ya bağlandı. Hesaplarım sayfasına yönlendiriliyorsun…`,
+        failed: "Bağlantı tamamlanamadı",
+        denied: "Instagram'da izin verilmedi. Tekrar denemek için Hesaplarım sayfasına dön.",
+        noCode: "Instagram'dan geçerli bir dönüş bilgisi gelmedi. Lütfen tekrar dene.",
+        noSession: "Oturumun bulunamadı. Lütfen Seltigo'ya giriş yapıp tekrar dene.",
+        back: "Hesaplarım'a dön"
+      },
+      en: {
+        connecting: "Connecting Instagram…",
+        wait: "Your account is being connected securely, please wait.",
+        success: "Instagram connected",
+        successMsg: (name) => `@${name} is now connected to Seltigo. Redirecting to My Accounts…`,
+        failed: "Connection failed",
+        denied: "Permission was not granted on Instagram. Go back to My Accounts to try again.",
+        noCode: "No valid response came back from Instagram. Please try again.",
+        noSession: "Your session was not found. Please sign in to Seltigo and try again.",
+        back: "Back to My Accounts"
+      }
+    }[lang];
+
+    const $ = (id) => document.getElementById(id);
+
+    function showLoading() {
+      $("title").textContent = T.connecting;
+      $("message").textContent = T.wait;
+    }
+
+    function showSuccess(name) {
+      $("card").classList.add("ok");
+      $("spinner").style.display = "none";
+      $("title").textContent = T.success;
+      $("message").textContent = T.successMsg(name || "instagram");
+      $("backBtn").textContent = T.back;
+      $("backBtn").style.display = "inline-block";
+      setTimeout(() => { window.location.href = "accounts.html"; }, 3000);
+    }
+
+    function showError(msg, detail) {
+      $("card").classList.add("err");
+      $("spinner").style.display = "none";
+      $("title").textContent = T.failed;
+      $("message").textContent = msg;
+      if (detail) {
+        $("detail").textContent = typeof detail === "string" ? detail : JSON.stringify(detail);
+        $("detail").style.display = "block";
+      }
+      $("backBtn").textContent = T.back;
+      $("backBtn").style.display = "inline-block";
+    }
+
+    async function run() {
+      showLoading();
+
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get("error");
+      const code = params.get("code");
+      const state = params.get("state");
+
+      // Adres çubuğundan kodu temizle (yenilemede tekrar gönderilmesin)
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      if (error) {
+        showError(T.denied, params.get("error_description") || error);
+        return;
+      }
+      if (!code || !state) {
+        showError(T.noCode);
+        return;
+      }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        showError(T.noSession);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/instagram-token-exchange`, {
+          method: "POST",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_KEY}`,
+            "apikey": SUPABASE_KEY
+          },
+          body: JSON.stringify({
+            code,
+            state,
+            userAccessToken: session.access_token
+          })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          showError(data.error || T.noCode, data.detail);
+          return;
+        }
+
+        showSuccess(data.account_name);
+      } catch (e) {
+        showError(T.noCode, String(e));
+      }
+    }
+
+    run();
+  </script>
+</body>
+</html>
