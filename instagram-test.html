@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instagram Paylaşım Testi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; min-height: 100vh; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 20px; color: #fff; margin-bottom: 6px; }
+  .sub { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  label { display: block; font-size: 12px; color: #9aa3b2; margin-bottom: 6px; }
+  select, textarea { width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 8px; padding: 10px 12px; color: #e6e8ee; font-size: 13px; margin-bottom: 14px; font-family: inherit; }
+  textarea { min-height: 110px; resize: vertical; }
+  .preview { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .preview img { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; background: #0d0f16; }
+  .preview .info { font-size: 12px; color: #9aa3b2; line-height: 1.5; }
+  .btn { background: #1D9E75; color: #fff; border: none; padding: 11px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+  .btn:disabled { opacity: .6; cursor: not-allowed; }
+  .result { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; display: none; }
+  .ok { color: #6ee7b7; } .err { color: #f87171; }
+  a { color: #6ee7b7; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Instagram Paylaşım Testi</h1>
+  <div class="sub">Geçici test ekranı. Ürünü seç, açıklamayı boş bırakırsan AI yazar.</div>
+
+  <div class="card">
+    <label>Instagram hesabı</label>
+    <select id="channel"></select>
+
+    <label>Ürün</label>
+    <select id="product"></select>
+
+    <div class="preview" id="preview"></div>
+
+    <label>Açıklama (isteğe bağlı, boşsa AI yazar)</label>
+    <textarea id="caption" placeholder="Boş bırak, AI yazsın"></textarea>
+
+    <button class="btn" id="sendBtn" onclick="send()">Instagram'da Paylaş</button>
+  </div>
+
+  <div class="card result" id="result"></div>
+</main>
+
+<script>
+  const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let products = [];
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function showResult(html, cls) {
+    const r = $('result');
+    r.innerHTML = html;
+    r.className = 'card result ' + (cls || '');
+    r.style.display = 'block';
+  }
+
+  function renderPreview() {
+    const p = products.find(x => String(x.id) === $('product').value);
+    if (!p) { $('preview').innerHTML = ''; return; }
+    $('preview').innerHTML =
+      (p.image_url ? '<img src="' + esc(p.image_url) + '">' : '<img>') +
+      '<div class="info"><b style="color:#fff">' + esc(p.generated_title || p.name) + '</b><br>' +
+      (p.sale_price ? 'Fiyat: ' + esc(p.sale_price) + '<br>' : '') +
+      (p.image_url ? '' : '<span class="err">Bu ürünün görseli yok</span>') + '</div>';
+  }
+
+  async function init() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+
+    const { data: ch } = await db.from('social_channels')
+      .select('id, account_name, active')
+      .eq('user_id', session.user.id).eq('platform', 'instagram');
+    const channels = (ch || []).filter(c => c.active !== false);
+    $('channel').innerHTML = channels.length
+      ? channels.map(c => '<option value="' + esc(c.id) + '">@' + esc(c.account_name) + '</option>').join('')
+      : '<option value="">Bağlı Instagram hesabı yok</option>';
+
+    const { data: pr } = await db.from('products')
+      .select('id, name, generated_title, sale_price, image_url')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    products = (pr || []).filter(p => !p.deleted_at);
+    $('product').innerHTML = products.map(p =>
+      '<option value="' + esc(p.id) + '">' + esc(p.generated_title || p.name) + (p.image_url ? '' : ' (görsel yok)') + '</option>'
+    ).join('');
+    $('product').addEventListener('change', renderPreview);
+    renderPreview();
+  }
+
+  async function send() {
+    const channelId = $('channel').value;
+    const productId = $('product').value;
+    if (!channelId || !productId) { showResult('Hesap ve ürün seç.', 'err'); return; }
+
+    const btn = $('sendBtn');
+    btn.disabled = true;
+    btn.textContent = 'Paylaşılıyor... (30 sn sürebilir)';
+    showResult('Gönderiliyor...', '');
+
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const res = await fetch(SUPABASE_URL + '/functions/v1/instagram-publish', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({
+          userAccessToken: session.access_token,
+          channelId,
+          productId,
+          caption: $('caption').value.trim() || null
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showResult('Hata: ' + esc(data.error || ('HTTP ' + res.status)) +
+          (data.detail ? '\n\nDetay: ' + esc(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : ''), 'err');
+      } else {
+        showResult('<span class="ok">Paylaşıldı ✓ @' + esc(data.account_name) + '</span>' +
+          (data.permalink ? '\n\n<a href="' + esc(data.permalink) + '" target="_blank" rel="noopener">Gönderiyi Instagram\'da aç</a>' : '') +
+          '\n\nKullanılan açıklama:\n' + esc(data.caption), '');
+      }
+    } catch (e) {
+      showResult('Bağlantı hatası: ' + esc(e.message), 'err');
+    }
+    btn.disabled = false;
+    btn.textContent = "Instagram'da Paylaş";
+  }
+
+  init();
+</script>
+</body>
+</html>
