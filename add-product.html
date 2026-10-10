@@ -247,6 +247,8 @@
     <div class="form-row">
       <label for="salePrice"><span data-i18n="ap.salePrice">Satış fiyatı</span> (<span id="saleCurrency">₺</span>) — <span data-i18n="ap.forProfit">kâr hesabı için</span></label>
       <input type="number" id="salePrice" placeholder="299">
+      <div id="totalCostNote" class="hint" style="display:none;"></div>
+      <div id="lossWarn" class="hint" style="display:none;color:#f28b8b;font-weight:600;"></div>
     </div>
   </div>
 
@@ -609,6 +611,9 @@
       'ap.shipCost': 'Kargo maliyeti',
       'ap.commCost': 'Komisyon tutarı',
       'ap.netProfit': 'Net kâr',
+      'ap.totalCost': 'CJ toplam maliyet (Türkiye\'ye en ucuz kargo dahil): {v}',
+      'ap.lossWarn': 'Bu fiyatla zarar edersin.',
+      'ap.minPrice': 'Önerilen minimum fiyat: {v}',
       'ap.shipCurNote': '⚠️ Kargo maliyeti tahmini Türkiye kargo fiyat tablosundan (₺) geliyor, uluslararası gönderim için gerçek kargo ücretini ayrıca sağlayıcından kontrol et.',
       'ap.save': 'Ürünü kaydet',
       'ap.nameRequired': 'Ürün adı gerekli.',
@@ -778,6 +783,9 @@
       'ap.shipCost': 'Shipping cost',
       'ap.commCost': 'Commission',
       'ap.netProfit': 'Net profit',
+      'ap.totalCost': 'CJ total cost (cheapest shipping to Turkey included): {v}',
+      'ap.lossWarn': 'You will make a loss at this price.',
+      'ap.minPrice': 'Suggested minimum price: {v}',
       'ap.shipCurNote': '⚠️ The shipping cost estimate comes from the Türkiye shipping price table (₺). For international shipping, check the real cost with your provider.',
       'ap.save': 'Save product',
       'ap.nameRequired': 'Product name is required.',
@@ -1051,7 +1059,11 @@
     const commissionRate = parseFloat(document.getElementById('commissionRate').value) || 0;
     const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
     let shippingCost = 0;
-    if (weightKg > 0) {
+    // CJ ürününde kargo: CJ'nin Türkiye'ye en ucuz kargo ücreti (kura göre çevrilir)
+    const cjShipUsd = window._supplierShippingUsd;
+    if (cjShipUsd != null && cur === 'TRY') {
+      shippingCost = (await HS.convert(cjShipUsd, 'USD', cur)) || 0;
+    } else if (weightKg > 0) {
       const { data: rates } = await db
         .from('shipping_rates')
         .select('*')
@@ -1068,6 +1080,36 @@
     const profitEl = document.getElementById('netProfit');
     profitEl.textContent = HS.money(netProfit, cur);
     profitEl.style.color = netProfit >= 0 ? '#5DCAA5' : '#f28b8b';
+
+    // Kargo dahil toplam maliyet ve zarar uyarısı
+    const totalCost = supplierPrice + shippingCost;
+    const costNote = document.getElementById('totalCostNote');
+    if (cjShipUsd != null && cur === 'TRY') {
+      costNote.textContent = t('ap.totalCost', { v: HS.money(totalCost, cur) });
+      costNote.style.display = 'block';
+    } else {
+      costNote.style.display = 'none';
+    }
+    const lossEl = document.getElementById('lossWarn');
+    if (salePrice > 0 && totalCost > 0 && netProfit < 0) {
+      const minPrice = commissionRate < 100 ? Math.ceil((totalCost / (1 - commissionRate / 100)) * 100) / 100 : null;
+      lossEl.textContent = t('ap.lossWarn') + (minPrice ? ' ' + t('ap.minPrice', { v: HS.money(minPrice, cur) }) : '');
+      lossEl.style.display = 'block';
+    } else {
+      lossEl.style.display = 'none';
+    }
+  }
+
+  // CJ ürünü seçilince Türkiye'ye en ucuz kargo ücretini sor (kargo dahil maliyet için)
+  async function loadCjShipping(pid, vid) {
+    window._supplierShippingUsd = null;
+    if (!pid) { updateProfitCalc(); return; }
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const d = await callFn('cj-search', { action: 'freight', pid: pid, vid: vid || null, country: 'TR', userAccessToken: session ? session.access_token : null });
+      if (d.shipping && Number.isFinite(Number(d.shipping.price))) window._supplierShippingUsd = Number(d.shipping.price);
+    } catch (e) { /* kargo alınamazsa tablo tahmini kullanılır */ }
+    updateProfitCalc();
   }
 
   // ============================================================
@@ -1184,6 +1226,8 @@
     window._supplierCostUsd = p.priceUsd != null && !isNaN(p.priceUsd) ? Number(p.priceUsd) : null;
     autoSupplierPrice = null;
     applySupplierCost();
+    if (supplier === 'cj') loadCjShipping(itemId, variantId);
+    else { window._supplierShippingUsd = null; updateProfitCalc(); }
     if (p.name) {
       document.getElementById('productName').value = p.name;
       lastGeneratedName = p.name;

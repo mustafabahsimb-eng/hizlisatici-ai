@@ -45,8 +45,11 @@ const hsHandler = (async (req: Request) => {
   }
 
   try {
-    const { keyword, userAccessToken } = await req.json().catch(() => ({ keyword: "", userAccessToken: undefined }));
-    if (!keyword) {
+    const body = await req.json().catch(() => ({}));
+    const { keyword, userAccessToken } = body;
+    // action: "freight" -> ürünün seçilen ülkeye en ucuz kargo ücreti (Ürün Ekle'de kargo dahil maliyet)
+    const isFreight = body?.action === "freight";
+    if (!isFreight && !keyword) {
       return new Response(JSON.stringify({ error: "Arama kelimesi gerekli" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -78,6 +81,47 @@ const hsHandler = (async (req: Request) => {
         JSON.stringify({ error: prefix + JSON.stringify(authData).slice(0, 400) }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (isFreight) {
+      const pid = String(body?.pid || "");
+      let vid = String(body?.vid || "");
+      const country = String(body?.country || "TR").toUpperCase().slice(0, 2);
+      const quantity = Math.max(1, Math.min(99, parseInt(body?.quantity, 10) || 1));
+      let productUsd: number | null = null;
+      if (pid) {
+        const pr = await fetch(`https://developers.cjdropshipping.com/api2.0/v1/product/query?pid=${encodeURIComponent(pid)}`, {
+          headers: { "CJ-Access-Token": accessToken },
+        });
+        const pd = await pr.json().catch(() => ({}));
+        const variants = pd?.data?.variants || [];
+        const v = (vid && variants.find((x: any) => x.vid === vid)) || variants[0];
+        if (v) {
+          vid = vid || v.vid;
+          productUsd = parseFloat(v.variantSellPrice ?? v.sellPrice) || null;
+        }
+      }
+      if (!vid) {
+        return new Response(JSON.stringify({ error: "CJ ürün seçeneği bulunamadı" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const fr = await fetch("https://developers.cjdropshipping.com/api2.0/v1/logistic/freightCalculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CJ-Access-Token": accessToken },
+        body: JSON.stringify({ startCountryCode: "CN", endCountryCode: country, products: [{ quantity, vid }] }),
+      });
+      const fd = await fr.json().catch(() => ({}));
+      const options = (Array.isArray(fd?.data) ? fd.data : [])
+        .map((x: any) => ({ name: x.logisticName, price: Number(x.totalPostageFee ?? x.logisticPrice), days: x.logisticAging || null }))
+        .filter((x: any) => x.name && Number.isFinite(x.price) && x.price >= 0)
+        .sort((a: any, b: any) => a.price - b.price);
+      return new Response(JSON.stringify({
+        vid,
+        productUsd,
+        shipping: options[0] || null,
+        error: options.length ? undefined : (fd?.message ? "Kargo seçeneği yok: " + String(fd.message).slice(0, 160) : "Bu ülkeye kargo seçeneği yok"),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const searchRes = await fetch(

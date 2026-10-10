@@ -374,6 +374,17 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Sistem işlemi (gizli anahtarla, tek sipariş): ör. test siparişlerini CJ'den silmek
+  if (body?.action && body?.orderId) {
+    try {
+      const { data: o } = await db.from("orders").select("user_id").eq("id", String(body.orderId)).maybeSingle();
+      if (!o) return json({ error: "Sipariş bulunamadı" }, 404);
+      return await sellerAction(o.user_id, String(body.action), String(body.orderId));
+    } catch (e) {
+      return json({ error: String((e as Error)?.message || e) }, 500);
+    }
+  }
+
   // Zamanlanmış çalışma: sırası gelen siparişler
   const started = Date.now();
   const results: Outcome[] = [];
