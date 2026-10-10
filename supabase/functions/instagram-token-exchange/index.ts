@@ -109,6 +109,12 @@ Deno.serve(async (req) => {
 
     // 6) Kanalı kaydet / güncelle
     const nowIso = new Date().toISOString();
+    // Yeniden bağlanmada satıcının ayarları (ör. otomatik paylaşım) korunur
+    const { data: prev } = await supabase
+      .from("social_channels")
+      .select("extra")
+      .eq("user_id", userId).eq("platform", "instagram").eq("account_id", accountId)
+      .maybeSingle();
     const { data: channel, error: upErr } = await supabase
       .from("social_channels")
       .upsert(
@@ -119,7 +125,11 @@ Deno.serve(async (req) => {
           account_name: me?.username ?? null,
           active: true,
           token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+          // Yeni anahtar geçerli: anahtar yenileyicinin eski "geçersiz" işaretini temizle
+          token_status: "ok",
+          token_error: null,
           extra: {
+            ...(prev?.extra || {}),
             account_type: me?.account_type ?? null,
             profile_picture_url: me?.profile_picture_url ?? null,
             permissions: shortData?.permissions ?? null,

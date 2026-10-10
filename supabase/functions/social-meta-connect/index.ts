@@ -142,6 +142,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Yeniden bağlanmada: satıcının ayarları (extra'daki ör. otomatik paylaşım) korunur,
+    // anahtar yenileyicinin eski "geçersiz" işareti temizlenir, bitiş tarihi yeniden öğrenilir
+    const { data: prevRows } = await supabase
+      .from("social_channels")
+      .select("platform, account_id, extra")
+      .eq("user_id", userId)
+      .in("platform", ["facebook", "instagram", "whatsapp"]);
+    const prevExtra = new Map((prevRows || []).map((r: any) => [r.platform + ":" + r.account_id, r.extra || {}]));
+    for (const r of rows) {
+      r.extra = { ...(prevExtra.get(r.platform + ":" + r.account_id) || {}), ...(r.extra || {}) };
+      r.token_status = "ok";
+      r.token_error = null;
+      r.token_expires_at = null;
+    }
+
     const { error } = await supabase
       .from("social_channels")
       .upsert(rows, { onConflict: "user_id,platform,account_id" });
