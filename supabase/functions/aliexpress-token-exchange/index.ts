@@ -179,6 +179,9 @@ Deno.serve(async (req: Request) => {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_at: expiresAt,
+        refresh_expires_at: refreshExpiresAt,
+        status: "ok",
+        last_error: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "platform" });
       platformUpdated = !pErr;
