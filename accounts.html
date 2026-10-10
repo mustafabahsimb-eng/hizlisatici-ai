@@ -650,7 +650,8 @@
     } else {
       connHtml = '<div class="conn-list">' + igChannels.map(c => {
         const s = igStatus(c);
-        const handle = c.account_name ? '@' + c.account_name : (c.account_id || '');
+        // Meta bağlantısı adı "@" ile kaydeder, Instagram bağlantısı "@" olmadan: tek "@" göster
+        const handle = c.account_name ? '@' + String(c.account_name).replace(/^@+/, '') : (c.account_id || '');
         const when = c.connected_at || c.created_at;
         const id = esc(c.id);
         return '<div class="conn-item">' +
