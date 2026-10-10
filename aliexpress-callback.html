@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AliExpress Yetkilendirme</title>
+<title>AliExpress Bağlantısı · Seltigo</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   body {
@@ -18,7 +18,7 @@
     padding: 20px;
   }
   .box {
-    max-width: 520px;
+    max-width: 480px;
     width: 100%;
     background: #171a23;
     border: 1px solid #2a2f3d;
@@ -28,119 +28,96 @@
   }
   #langSwitcherHost { display: flex; justify-content: flex-end; margin-bottom: 8px; }
   #langSwitcherHost .hs-lang { margin-left: 0; }
-  h1 { font-size: 20px; margin-bottom: 8px; }
-  p { color: #9aa1b2; font-size: 14px; line-height: 1.5; }
-  .code-box {
-    margin: 20px 0;
-    padding: 14px;
-    background: #0f1117;
-    border: 1px solid #2a2f3d;
-    border-radius: 10px;
-    word-break: break-all;
-    font-family: monospace;
-    font-size: 14px;
-    color: #4ade80;
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .msg { color: #9aa1b2; font-size: 15px; line-height: 1.6; }
+  .msg.success { color: #5DCAA5; }
+  .msg.error { color: #f28b8b; }
+  .spinner {
+    width: 36px; height: 36px; margin: 18px auto 0;
+    border: 3px solid #2a2f3d; border-top-color: #1D9E75; border-radius: 50%;
+    animation: spin 0.9s linear infinite;
   }
-  button.copy-btn {
-    background: #22c55e;
-    color: #06280f;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a.btn {
+    display: inline-block; margin-top: 18px; padding: 11px 20px; border-radius: 10px;
+    background: #1D9E75; color: #fff; font-weight: 600; text-decoration: none;
   }
-  button.copy-btn:hover { background: #16a34a; }
-  .warn { color: #f59e0b; margin-top: 16px; font-size: 13px; }
 </style>
 </head>
 <body>
   <div class="box">
     <div id="langSwitcherHost"></div>
     <h1 data-i18n="ae.title"></h1>
-    <p data-i18n="ae.sub"></p>
-    <div class="code-box" id="codeBox"></div>
-    <button class="copy-btn" id="copyBtn" data-i18n="ae.copy"></button>
-    <p class="warn" id="warnMsg" style="display:none;" data-i18n="ae.noCode"></p>
+    <p class="msg" id="msg"></p>
+    <div class="spinner" id="spinner"></div>
+    <a class="btn" id="backBtn" href="accounts.html" style="display:none;" data-i18n="ae.back"></a>
   </div>
 
   <script src="app.js"></script>
   <script>
     HS.i18n.add({
       tr: {
-        'ae.pageTitle': 'AliExpress Yetkilendirme',
-        'ae.title': 'AliExpress Yetkilendirme Kodu',
-        'ae.sub': 'Bu sayfa hiçbir yere otomatik yönlendirme yapmaz. Aşağıdaki kodu kopyala.',
-        'ae.copy': 'Kodu Kopyala',
-        'ae.copied': 'Kopyalandı!',
-        'ae.none': '(kod yok)',
-        'ae.noCode': 'URL\'de "code" parametresi bulunamadı. AliExpress yetkilendirme adımını tekrar dene.',
-        'ae.saving': 'AliExpress hesabı kaydediliyor...',
-        'ae.saved': '✓ AliExpress hesabı bağlandı.',
-        'ae.failed': 'Kaydedilemedi: {e}'
+        'ae.pageTitle': 'AliExpress Bağlantısı · Seltigo',
+        'ae.title': 'AliExpress hesabı bağlanıyor',
+        'ae.connecting': 'AliExpress hesabın bağlanıyor, lütfen bekle...',
+        'ae.success': '✓ AliExpress hesabın bağlandı{a}. Hesaplarım sayfasına dönülüyor...',
+        'ae.noCode': 'AliExpress izin vermedi ya da bağlantı yarıda kaldı. Hesaplarım sayfasından tekrar bağlanmayı dene.',
+        'ae.noSession': 'Önce Seltigo hesabına giriş yapmalısın, sonra Hesaplarım sayfasından tekrar bağlan.',
+        'ae.failed': 'Bağlanamadı: {e}',
+        'ae.back': 'Hesaplarım\'a dön'
       },
       en: {
-        'ae.pageTitle': 'AliExpress Authorization',
-        'ae.title': 'AliExpress Authorization Code',
-        'ae.sub': 'This page does not redirect anywhere. Copy the code below.',
-        'ae.copy': 'Copy Code',
-        'ae.copied': 'Copied!',
-        'ae.none': '(no code)',
-        'ae.noCode': 'No "code" parameter was found in the URL. Please repeat the AliExpress authorization step.',
-        'ae.saving': 'Saving AliExpress account...',
-        'ae.saved': '✓ AliExpress account connected.',
-        'ae.failed': 'Could not save: {e}'
+        'ae.pageTitle': 'AliExpress Connection · Seltigo',
+        'ae.title': 'Connecting AliExpress account',
+        'ae.connecting': 'Connecting your AliExpress account, please wait...',
+        'ae.success': '✓ Your AliExpress account is connected{a}. Returning to My Accounts...',
+        'ae.noCode': 'AliExpress did not grant access or the connection was interrupted. Try connecting again from My Accounts.',
+        'ae.noSession': 'Please log in to Seltigo first, then connect again from My Accounts.',
+        'ae.failed': 'Could not connect: {e}',
+        'ae.back': 'Back to My Accounts'
       }
     });
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    const codeBox = document.getElementById('codeBox');
-    const warnMsg = document.getElementById('warnMsg');
+    const state = params.get('state');
+    let msgKey = 'ae.connecting', msgVars = null, msgCls = '';
 
     function render() {
       document.title = HS.t('ae.pageTitle');
-      codeBox.textContent = code || HS.t('ae.none');
-      warnMsg.style.display = code ? 'none' : 'block';
+      const el = document.getElementById('msg');
+      el.textContent = HS.t(msgKey, msgVars);
+      el.className = 'msg ' + msgCls;
+    }
+    function finish(key, cls, vars, redirect) {
+      msgKey = key; msgCls = cls; msgVars = vars || null;
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('backBtn').style.display = redirect ? 'none' : 'inline-block';
+      render();
+      if (redirect) setTimeout(() => { window.location.href = 'accounts.html'; }, 2000);
     }
 
-    document.getElementById('copyBtn').addEventListener('click', function () {
-      if (!code) return;
-      navigator.clipboard.writeText(code).then(function () {
-        alert(HS.t('ae.copied'));
-      });
-    });
-
-    // Site sahibi giriş yapmışsa kodu otomatik kaydet (app.js oturum anahtarını ekler)
-    let saveState = null, saveError = '';
-    function renderSave() {
-      if (!saveState) return;
-      warnMsg.style.display = 'block';
-      warnMsg.textContent = saveState === 'failed' ? HS.t('ae.failed', { e: saveError }) : HS.t('ae.' + saveState);
-    }
-    async function autoSave() {
-      if (!code) return;
+    async function connect() {
+      render();
+      if (!code || !state) return finish('ae.noCode', 'error');
       const res = await HS.db.auth.getSession();
-      if (!res || !res.data || !res.data.session) return;
-      saveState = 'saving'; renderSave();
+      if (!res || !res.data || !res.data.session) return finish('ae.noSession', 'error');
       try {
         const r = await fetch(HS.SUPABASE_URL + '/functions/v1/aliexpress-token-exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
-          body: JSON.stringify({ code: code })
+          body: JSON.stringify({ action: 'exchange', code: code, state: state })
         });
         const d = await r.json().catch(function () { return {}; });
-        if (r.ok && d.success) { saveState = 'saved'; }
-        else { saveState = 'failed'; saveError = d.error || ('HTTP ' + r.status); }
+        if (r.ok && d.success) finish('ae.success', 'success', { a: d.account ? ' (' + d.account + ')' : '' }, true);
+        else finish('ae.failed', 'error', { e: d.error || ('HTTP ' + r.status) });
       } catch (e) {
-        saveState = 'failed'; saveError = e.message;
+        finish('ae.failed', 'error', { e: e.message });
       }
-      renderSave();
     }
 
-    window.addEventListener('hs:langchange', function () { render(); renderSave(); });
-    HS.init({ auth: false }).then(function () { render(); autoSave(); });
+    window.addEventListener('hs:langchange', render);
+    HS.init({ auth: false }).then(connect);
   </script>
 </body>
 </html>

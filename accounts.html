@@ -331,7 +331,8 @@
       d_etsy: 'El yapımı, vintage ve özel ürünlere odaklı global pazaryeri',
       d_instagram: 'Ürünlerin Instagram hesabında otomatik paylaşılır. Hesabın İşletme veya İçerik üreticisi türünde olmalı; birden fazla hesap bağlayabilirsin.',
       d_cj: 'Ürün arama ve tedarik için kullandığımız ana kaynak. İstersen kendi CJ hesabını bağlayıp aramaları kendi hesabınla yapabilirsin.',
-      d_aliexpress: 'Ek ürün kaynağı ve komisyonlu bağlantı programı',
+      d_aliexpress: 'Ek ürün kaynağı. Siparişlerin otomatik verilmesi için kendi AliExpress hesabını bağla; siparişler hesabındaki kayıtlı kartla ödenir.',
+      aeConfirmRemove: 'AliExpress bağlantını kaldırmak istediğine emin misin? AliExpress siparişleri otomatik verilemeyecek.',
       d_printify: 'Tişört, kupa gibi ürünlere kendi tasarımını bas, sipariş gelince Printify üretip gönderir. Bağlantı ve ürün oluşturma Print on Demand sayfasından yapılır.',
       d_temu: 'Resmi bir açık API\'si var ama ortaklık onayı gerekiyor, şimdilik entegrasyon planlanmıyor',
       // panel ipuçları
@@ -452,7 +453,8 @@
       d_etsy: 'Global marketplace for handmade, vintage and unique items',
       d_instagram: 'Your products are posted to your Instagram account automatically. The account must be a Business or Creator account; you can connect more than one.',
       d_cj: 'Our main source for product search and sourcing. You can connect your own CJ account to search with it.',
-      d_aliexpress: 'Additional product source and affiliate program',
+      d_aliexpress: 'Additional product source. Connect your own AliExpress account so orders are placed automatically; they are paid with the card saved on your account.',
+      aeConfirmRemove: 'Remove your AliExpress connection? AliExpress orders can no longer be placed automatically.',
       d_printify: 'Print your designs on t-shirts, mugs and more; Printify produces and ships when an order comes in. Connection and product creation are on the Print on Demand page.',
       d_temu: 'Has an official open API but requires partnership approval; no integration planned for now',
       h_trendyol: 'Enter the Seller ID, API Key and API Secret from the Trendyol panel (My Account > Integration Info).',
@@ -784,13 +786,14 @@
     // Tedarikçiler
     let sup = '';
     sup += staticRow('CJ Dropshipping', 'd_cj', loading, 'cj');
-    sup += staticRow('AliExpress Affiliate', 'd_aliexpress', '<span class="acc-status connected">' + t('stConnected') + '</span>');
+    sup += staticRow('AliExpress', 'd_aliexpress', loading, 'aliexpress');
     sup += staticRow('Printify (Print on Demand)', 'd_printify', loading, 'printify');
     sup += staticRow('Temu', 'd_temu',
       '<span class="acc-status none">' + t('stPlanned') + '</span><a class="acc-btn secondary" href="https://www.temu.com" target="_blank" rel="noopener">' + t('btnGoSite') + '</a>');
     document.getElementById('listSup').innerHTML = sup;
 
     renderCJ();
+    renderAliExpress();
     renderEtsy();
     renderPrintify();
   }
@@ -934,6 +937,58 @@
     } catch (e) {
       toast(t('errNetwork') + e.message, true);
     }
+  }
+
+  // ---------- AliExpress (supplier_connections + Vault, AliExpress girişi ile OAuth) ----------
+  async function renderAliExpress() {
+    const el = document.getElementById('right-aliexpress');
+    if (!el) return;
+    try {
+      const { data, error } = await db.from('supplier_connections')
+        .select('account_name, status').eq('supplier', 'aliexpress').maybeSingle();
+      if (error) throw error;
+      if (data && data.status === 'connected') {
+        el.innerHTML = '<span class="acc-status connected">' + t('stOwn') + (data.account_name ? ' · ' + esc(data.account_name) : '') + '</span>' +
+          '<button class="acc-btn secondary" onclick="disconnectAliExpress()">' + t('btnRemove') + '</button>';
+      } else if (data) {
+        el.innerHTML = '<span class="acc-status error">' + t('stExpired') + '</span>' +
+          '<button class="acc-btn" onclick="connectAliExpress()">' + t('btnReconnect') + '</button>';
+      } else {
+        el.innerHTML = '<span class="acc-status connected">' + t('stShared') + '</span>' +
+          '<button class="acc-btn secondary" onclick="connectAliExpress()">' + t('btnConnectOwn') + '</button>';
+      }
+    } catch (e) {
+      el.innerHTML = '<span class="acc-status none">' + t('stCheckFail') + '</span>' +
+        '<button class="acc-btn" onclick="connectAliExpress()">' + t('btnConnectOwn') + '</button>';
+    }
+  }
+  async function callAliExpress(payload) {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/aliexpress-token-exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify(payload),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+    return d;
+  }
+  async function connectAliExpress() {
+    try {
+      const d = await callAliExpress({ action: 'authorize_url' });
+      window.location.href = d.url;
+    } catch (e) {
+      toast(t('failConnect') + e.message, true);
+    }
+  }
+  async function disconnectAliExpress() {
+    if (!confirm(t('aeConfirmRemove'))) return;
+    try {
+      await callAliExpress({ action: 'disconnect' });
+    } catch (e) {
+      toast(t('failRemove') + e.message, true);
+      return;
+    }
+    await renderAliExpress();
   }
 
   // ---------- CJ (user_integrations - mevcut akış korunuyor) ----------
