@@ -10,7 +10,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
   - Öneri: Hetzner'de küçük sunucu (~€6,5–12,5/ay) ya da QuotaGuard ($19+/ay). Şirket kurulunca.
 - [ ] **E-posta gönderen adı** — Supabase'in kendi e-posta servisi "Supabase Auth" adıyla ve saatte birkaç e-postayla sınırlı gönderiyor; alan adıyla özel SMTP gerekli (şablonlar Seltigo'ya çevrildi).
 - [ ] **CJ gerçek ödeme adımı** — Bakiyeden otomatik ödeme (payBalanceV2) para harcamamak için denenmedi; ilk gerçek siparişte izlenmeli.
-- [ ] **AliExpress uygulamasını yayın (online) aşamasına geçir** — test aşamasında anahtar 24 saat, izin 48 saat; yayında 30/60 gün. Adımlar ve başvuru metinleri: `docs/aliexpress-yayin-basvurusu.md` (geliştirici türü sonradan değiştirilemez; şirket kurulunca Corporation önerilir).
+- [ ] **AliExpress uygulamasını yayın (online) aşamasına geçir** — test aşamasında anahtar 24 saat, izin 48 saat; yayında 30/60 gün. Adımlar ve başvuru metinleri: `docs/aliexpress-yayin-basvurusu.md` (KARAR: şirket kurulunca "Corporation" olarak başvurulacak; tür sonradan değiştirilemez).
 - [ ] **AliExpress otomatik ödeme (API Pay)** — her alıcı hesabı için AliExpress onayı (beyaz liste, PayPal) gerekiyor; desteklenen ülkelerde Türkiye yok. Onay yoksa sipariş "Ödeme bekliyor"a düşer, satıcı AliExpress'te öder. Başvuru e-postası: `docs/aliexpress-yayin-basvurusu.md` (Metin D).
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
