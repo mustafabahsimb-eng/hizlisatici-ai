@@ -317,6 +317,10 @@
     </div>
   </div>
 
+  <div class="alarm-banner" id="orderBanner" style="display:none;">
+    <div class="alarm-summary" id="orderSummary" onclick="go('orders.html')"></div>
+  </div>
+
   <div class="alarm-banner" id="alarmBanner" style="display:none;">
     <div class="alarm-summary" id="alarmSummary" onclick="toggleAlarmDetail()"></div>
     <div id="alarmDetail" style="display:none;"></div>
@@ -460,6 +464,8 @@
       'main.storeCopy': '📋 Linki kopyala',
       'main.copied': '✓ Kopyalandı',
       'main.noStore': '🧭 Henüz mağazan yok: Mağazanı kur',
+      'ord.balance': '⚠️ {n} sipariş CJ bakiyesi bekliyor',
+      'ord.approval': '⚠️ {n} sipariş onayını bekliyor',
       'main.storeLoading': 'Yükleniyor...',
 
       'score.calc': '🏆 Skor Hesapla',
@@ -608,6 +614,8 @@
       'main.storeCopy': '📋 Copy link',
       'main.copied': '✓ Copied',
       'main.noStore': '🧭 No store yet: Build your store',
+      'ord.balance': '⚠️ {n} orders waiting for CJ balance',
+      'ord.approval': '⚠️ {n} orders awaiting your approval',
       'main.storeLoading': 'Loading...',
 
       'score.calc': '🏆 Calculate Score',
@@ -781,11 +789,34 @@
   // ============================================================
   // Başlangıç
   // ============================================================
+  // Tedarikçi siparişi uyarısı: bakiye bekleyen ve onay bekleyen CJ siparişleri
+  let orderCounts = { balance: 0, approval: 0 };
+  async function loadOrderBanner() {
+    try {
+      const { data } = await HS.db.from('orders').select('status')
+        .eq('supplier', 'cj').in('status', ['bakiye_bekliyor', 'onay_bekliyor']);
+      orderCounts = { balance: 0, approval: 0 };
+      (data || []).forEach(o => {
+        if (o.status === 'bakiye_bekliyor') orderCounts.balance++;
+        else orderCounts.approval++;
+      });
+    } catch (e) { /* uyarı gösterilemezse panel yine çalışır */ }
+    renderOrderBanner();
+  }
+  function renderOrderBanner() {
+    const parts = [];
+    if (orderCounts.balance) parts.push(t('ord.balance', { n: orderCounts.balance }));
+    if (orderCounts.approval) parts.push(t('ord.approval', { n: orderCounts.approval }));
+    document.getElementById('orderSummary').textContent = parts.join(' · ');
+    document.getElementById('orderBanner').style.display = parts.length ? '' : 'none';
+  }
+
   async function init() {
     const ctx = await HS.init();
     if (!ctx) return;
     document.getElementById('userEmail').textContent = ctx.user.email;
-    window.addEventListener('hs:langchange', () => renderAll());
+    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); });
+    loadOrderBanner();
     // Admin menü linki sadece yöneticilere görünür
     HS.db.rpc('hs_is_admin').then(r => {
       if (r && r.data === true) document.getElementById('adminBtn').style.display = '';
