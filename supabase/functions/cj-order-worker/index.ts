@@ -456,10 +456,18 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
   const qty = o.quantity || 1;
 
   // 2) Seçenek (SKU) ve güncel fiyat
-  const pd = await aeCall("aliexpress.ds.product.get", token, {
+  // Türkiye için ürün bilgisi boş dönebiliyor; o durumda seçenek/fiyat "US" ile alınır
+  // (kargo yine hedef ülke + seçenek numarasıyla hesaplanır)
+  let pd = await aeCall("aliexpress.ds.product.get", token, {
     product_id: productId, ship_to_country: country, target_currency: "USD", target_language: "en",
   });
-  const pr = pd?.aliexpress_ds_product_get_response?.result;
+  let pr = pd?.aliexpress_ds_product_get_response?.result;
+  if (pr && !pr.ae_item_sku_info_dtos && country !== "US") {
+    pd = await aeCall("aliexpress.ds.product.get", token, {
+      product_id: productId, ship_to_country: "US", target_currency: "USD", target_language: "en",
+    });
+    pr = pd?.aliexpress_ds_product_get_response?.result;
+  }
   if (!pr) return await failOrRetry(o, "AliExpress ürün bilgisi alınamadı: " + aeError(pd));
   const skus = aeList(pr.ae_item_sku_info_dtos).map((s: any) => ({
     sku_id: String(s.sku_id || s.id || ""),
@@ -491,12 +499,34 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
     }),
   });
   const frRes = fr?.aliexpress_logistics_buyer_freight_calculate_response?.result;
-  const options = aeList(frRes?.aeop_freight_calculate_result_for_buyer_d_t_o_list)
+  const usable = (x: any) => x.name && String(x.name).toUpperCase() !== "VIRTUAL" && Number.isFinite(x.price) && x.price >= 0 && x.cur === "USD";
+  let options = aeList(frRes?.aeop_freight_calculate_result_for_buyer_d_t_o_list)
     .map((x: any) => ({ name: x.service_name, price: Number(x.freight?.amount ?? (x.freight?.cent != null ? x.freight.cent / 100 : NaN)), cur: x.freight?.currency_code || "USD" }))
-    .filter((x: any) => x.name && Number.isFinite(x.price) && x.price >= 0 && x.cur === "USD")
+    .filter(usable)
     .sort((a: any, b: any) => a.price - b.price);
+  // Yedek: AliExpress'in yeni kargo servisi
+  let notAllowed = false;
   if (!options.length) {
-    if (!frRes) return await failOrRetry(o, "AliExpress kargo ücreti alınamadı: " + aeError(fr));
+    const fr2 = await aeCall("aliexpress.ds.freight.query", token, {
+      queryDeliveryReq: JSON.stringify({
+        quantity: qty, shipToCountry: country, productId: String(productId), selectedSkuId: sku.sku_id,
+        language: "en_US", currency: "USD", locale: "en_US",
+      }),
+    });
+    const r2 = fr2?.aliexpress_ds_freight_query_response?.result;
+    notAllowed = Number(r2?.code) === 602;
+    options = aeList(r2?.delivery_options)
+      .map((x: any) => ({
+        name: x.code || x.company,
+        price: x.free_shipping === true || x.free_shipping === "true" ? 0
+          : Number(x.shipping_fee_cent != null ? Number(x.shipping_fee_cent) / 100 : String(x.shipping_fee_format || "").replace(/[^\d.]/g, "")),
+        cur: x.shipping_fee_currency || "USD",
+      }))
+      .filter(usable)
+      .sort((a: any, b: any) => a.price - b.price);
+  }
+  if (!options.length) {
+    if (!frRes && !notAllowed) return await failOrRetry(o, "AliExpress kargo ücreti alınamadı: " + aeError(fr));
     await update(o.id, {
       status: "onay_bekliyor", hold_reason: "kargo_yok",
       error_message: `AliExpress bu ürün için ${country === "TR" ? "Türkiye'ye" : country + " ülkesine"} kargo seçeneği sunmuyor. Siparişi iptal edebilir ya da tedarikçiyi değiştirebilirsin.`,

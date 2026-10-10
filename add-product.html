@@ -1284,7 +1284,7 @@
     translateEl.style.display = 'none';
     translateEl.style.color = '#6ee7b7';
     try {
-      const data = await callFn('aliexpress-search', { keyword });
+      const data = await callFn('aliexpress-search', { keyword, country: currencyCodeFor(document.getElementById('platform').value) === 'TRY' ? 'TR' : 'US' });
       if (data.searchedAs && data.searchedAs.toLowerCase() !== keyword.toLowerCase()) {
         translateEl.textContent = t('ap.searchedAs', { q: data.searchedAs });
         translateEl.style.display = 'block';

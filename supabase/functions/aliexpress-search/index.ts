@@ -197,14 +197,20 @@ function list(v: any): any[] {
 }
 
 // Ürün fiyatı + varsayılan seçenek (SKU) + Türkiye'ye en ucuz kargo (USD)
-async function quote(accessToken: string, productId: string, skuId: string | null, quantity: number, country: string) {
-  const pd = await aeCall("aliexpress.ds.product.get", accessToken, {
-    product_id: productId,
-    ship_to_country: country,
-    target_currency: "USD",
-    target_language: "en",
-  });
-  const result = pd?.aliexpress_ds_product_get_response?.result;
+async function quote(accessToken: string, productId: string, skuId: string | null, quantity: number, country: string, debug = false) {
+  // Not: Türkiye için ürün bilgisi boş dönebiliyor ({has_whole_sale:false}); o durumda ülke zorunlu
+  // olduğu için "US" ile sorulur (seçenek/fiyat). Kargo yine hedef ülke + seçenek numarasıyla hesaplanır.
+  const productFor = async (shipTo: string | null) => {
+    const r = await aeCall("aliexpress.ds.product.get", accessToken, {
+      product_id: productId,
+      ...(shipTo ? { ship_to_country: shipTo } : {}),
+      target_currency: "USD",
+      target_language: "en",
+    });
+    return { raw: r, result: r?.aliexpress_ds_product_get_response?.result };
+  };
+  let { raw: pd, result } = await productFor(country);
+  if (result && !result.ae_item_sku_info_dtos) ({ raw: pd, result } = await productFor("US"));
   if (!result) return { error: "AliExpress ürün bilgisi alınamadı: " + JSON.stringify(pd).slice(0, 300) };
   const skus = list(result.ae_item_sku_info_dtos).map((s: any) => ({
     sku_id: String(s.sku_id || s.id || ""),
@@ -239,11 +245,36 @@ async function quote(accessToken: string, productId: string, skuId: string | nul
       currency: o.freight?.currency_code || "USD",
       days: o.estimated_delivery_time || null,
     }))
-    .filter((o: any) => o.name && Number.isFinite(o.price) && o.price >= 0 && o.currency === "USD")
+    .filter((o: any) => o.name && String(o.name).toUpperCase() !== "VIRTUAL" && Number.isFinite(o.price) && o.price >= 0 && o.currency === "USD")
     .sort((a: any, b: any) => a.price - b.price);
+
+  // Yedek: AliExpress'in yeni kargo servisi (aliexpress.ds.freight.query)
+  let fr2: any = null;
+  if (!options.length && sku?.sku_id) {
+    fr2 = await aeCall("aliexpress.ds.freight.query", accessToken, {
+      queryDeliveryReq: JSON.stringify({
+        quantity, shipToCountry: country, productId: String(productId), selectedSkuId: sku.sku_id,
+        language: "en_US", currency: "USD", locale: "en_US",
+      }),
+    });
+    const r2 = fr2?.aliexpress_ds_freight_query_response?.result;
+    options = list(r2?.delivery_options)
+      .map((o: any) => ({
+        name: o.code || o.company,
+        price: o.free_shipping === true || o.free_shipping === "true" ? 0
+          : Number(o.shipping_fee_cent != null ? Number(o.shipping_fee_cent) / 100 : String(o.shipping_fee_format || "").replace(/[^\d.]/g, "")),
+        currency: o.shipping_fee_currency || "USD",
+        days: o.delivery_date_desc || (o.max_delivery_days ? o.max_delivery_days + " gün" : null),
+      }))
+      .filter((o: any) => o.name && String(o.name).toUpperCase() !== "VIRTUAL" && Number.isFinite(o.price) && o.price >= 0 && o.currency === "USD")
+      .sort((a: any, b: any) => a.price - b.price);
+  }
 
   return {
     productId,
+    ...(debug && fr2 ? { debugFreight2: JSON.stringify(fr2).slice(0, 1500) } : {}),
+    // Teşhis: ürün yanıtının yapısı (ürün verisi gizli değil; anahtar içermez)
+    ...(debug ? { debugProduct: JSON.stringify(result).slice(0, 3000), debugFreight: JSON.stringify(fr).slice(0, 1500) } : {}),
     sku,
     skus: skus.slice(0, 50),
     productUsd: sku?.price ?? null,
@@ -301,7 +332,7 @@ const hsHandler = (async (req: Request, userId: string | null = null) => {
         });
       }
       const q = await quote(tok.accessToken as string, productId, reqBody?.skuId ? String(reqBody.skuId) : null,
-        Math.max(1, Math.min(99, parseInt(reqBody?.quantity, 10) || 1)), String(reqBody?.country || "TR").toUpperCase().slice(0, 2));
+        Math.max(1, Math.min(99, parseInt(reqBody?.quantity, 10) || 1)), String(reqBody?.country || "TR").toUpperCase().slice(0, 2), reqBody?.debug === true);
       return new Response(JSON.stringify(q), {
         status: (q as any).error ? 502 : 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -326,7 +357,7 @@ const hsHandler = (async (req: Request, userId: string | null = null) => {
       keyWord: searchKeyword,
       pageIndex: "1",
       pageSize: "40",
-      countryCode: "US",
+      countryCode: String(reqBody?.country || "US").toUpperCase().slice(0, 2),
       currency: "USD",
       local: "en_US",
     };
