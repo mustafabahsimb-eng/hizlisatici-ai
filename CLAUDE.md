@@ -9,6 +9,7 @@
   - Kurulum bu bilgisayarda: %LOCALAPPDATA%\seltigo-e2e\venv (Python, playwright==1.63.0 + Chromium). Testler depoda tests/e2e/ altında; ortak yardımcılar tests/e2e/ortak.py.
   - Giriş gereken sayfalarda kullanıcının hesabını DEĞİL, test kullanıcısını kullan: e2e-test@seltigo.test. Şifresi sadece %LOCALAPPDATA%\seltigo-e2e\test-user.env dosyasında durur; depoya, commit'e, mesaja yazma.
   - Ekran görüntülerini depoya değil geçici klasöre kaydet.
+- Edge Function yayınlamadan ÖNCE kodu yerelde denetle (açılış hatası canlıyı bozar): %LOCALAPPDATA%\seltigo-e2e\venv\Scripts\deno.exe check --config %LOCALAPPDATA%\seltigo-e2e\deno-check.json supabase/functions/<ad>/index.ts (deno 2.9.7). Hata varsa yayınlama. Yayından sonra fonksiyonu bir istekle çağırıp açıldığını doğrula; açılmıyorsa hemen eski sürümü (git HEAD) geri yayınla.
 
 ## Karar kuralları
 - Teknik kararları sen ver. AMA arayüzde kullanıcıya görünen isimleri (menü, düğme, bölüm, sekme adları) ve ürün kararlarını ASLA kendin seçme; seçenek sun ve kullanıcıya sor.

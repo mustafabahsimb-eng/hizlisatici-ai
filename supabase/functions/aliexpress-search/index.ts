@@ -136,14 +136,101 @@ async function refreshAccessToken(supabase: any, refreshToken: string): Promise<
   return data.access_token;
 }
 
+// AliExpress iş API'si çağrısı (/sync, imza öneki boş)
+async function aeCall(method: string, accessToken: string, extra: Record<string, string>) {
+  const params: Record<string, string> = {
+    app_key: APP_KEY,
+    sign_method: "sha256",
+    timestamp: Date.now().toString(),
+    access_token: accessToken,
+    method,
+    ...extra,
+  };
+  const sign = await signParams("", params);
+  const res = await fetch(SYNC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  return await res.json().catch(() => ({}));
+}
+
+// AliExpress yanıtlarındaki iç içe liste sarmalayıcılarını aç ({x: {y: [...]}} -> [...])
+function list(v: any): any[] {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === "object") {
+    for (const k of Object.keys(v)) if (Array.isArray(v[k])) return v[k];
+  }
+  return [];
+}
+
+// Ürün fiyatı + varsayılan seçenek (SKU) + Türkiye'ye en ucuz kargo (USD)
+async function quote(accessToken: string, productId: string, skuId: string | null, quantity: number, country: string) {
+  const pd = await aeCall("aliexpress.ds.product.get", accessToken, {
+    product_id: productId,
+    ship_to_country: country,
+    target_currency: "USD",
+    target_language: "en",
+  });
+  const result = pd?.aliexpress_ds_product_get_response?.result;
+  if (!result) return { error: "AliExpress ürün bilgisi alınamadı: " + JSON.stringify(pd).slice(0, 300) };
+  const skus = list(result.ae_item_sku_info_dtos).map((s: any) => ({
+    sku_id: String(s.sku_id || s.id || ""),
+    sku_attr: s.sku_attr || list(s.ae_sku_property_dtos || s.aeop_s_k_u_propertys)
+      .map((p: any) => `${p.sku_property_id}:${p.property_value_id_long || p.property_value_id}`).join(";") || null,
+    price: parseFloat(s.offer_sale_price || s.sku_price) || null,
+    stock: Number(s.sku_available_stock ?? s.s_k_u_available_stock ?? s.ipm_sku_stock ?? 0),
+    label: list(s.ae_sku_property_dtos || s.aeop_s_k_u_propertys)
+      .map((p: any) => p.property_value_definition_name || p.sku_property_value).filter(Boolean).join(" / ") || null,
+  }));
+  // Seçili SKU yoksa: stoğu olan en ucuz seçenek
+  const sku = (skuId && skus.find((s) => s.sku_id === skuId))
+    || skus.filter((s) => s.stock > 0 && s.price).sort((a, b) => a.price! - b.price!)[0]
+    || skus[0] || null;
+
+  let options: any[] = [];
+  const fr = await aeCall("aliexpress.logistics.buyer.freight.calculate", accessToken, {
+    param_aeop_freight_calculate_for_buyer_d_t_o: JSON.stringify({
+      country_code: country,
+      product_id: Number(productId),
+      product_num: quantity,
+      send_goods_country_code: "CN",
+      ...(sku?.sku_id ? { sku_id: sku.sku_id } : {}),
+      ...(sku?.price ? { price: String(sku.price), price_currency: "USD" } : {}),
+    }),
+  });
+  const frRes = fr?.aliexpress_logistics_buyer_freight_calculate_response?.result;
+  options = list(frRes?.aeop_freight_calculate_result_for_buyer_d_t_o_list)
+    .map((o: any) => ({
+      name: o.service_name,
+      price: Number(o.freight?.amount ?? (o.freight?.cent != null ? o.freight.cent / 100 : NaN)),
+      currency: o.freight?.currency_code || "USD",
+      days: o.estimated_delivery_time || null,
+    }))
+    .filter((o: any) => o.name && Number.isFinite(o.price) && o.price >= 0 && o.currency === "USD")
+    .sort((a: any, b: any) => a.price - b.price);
+
+  return {
+    productId,
+    sku,
+    skus: skus.slice(0, 50),
+    productUsd: sku?.price ?? null,
+    shipping: options[0] || null,
+    shippingError: options.length ? undefined : (frRes?.error_desc || "Bu ülkeye kargo seçeneği bulunamadı"),
+  };
+}
+
 const hsHandler = (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { keyword } = await req.json().catch(() => ({ keyword: "" }));
-    if (!keyword) {
+    const reqBody = await req.json().catch(() => ({}));
+    const keyword = reqBody?.keyword || "";
+    // action: "quote" -> fiyat, seçenek ve kargo (Ürün Ekle'de kargo dahil maliyet)
+    const isQuote = reqBody?.action === "quote";
+    if (!isQuote && !keyword) {
       return new Response(JSON.stringify({ error: "Arama kelimesi gerekli" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -167,6 +254,21 @@ const hsHandler = (async (req: Request) => {
     ) {
       const newToken = await refreshAccessToken(supabase, tok.refreshToken);
       if (newToken) tok.accessToken = newToken;
+    }
+
+    if (isQuote) {
+      const productId = String(reqBody?.productId || "").replace(/\D/g, "");
+      if (!productId) {
+        return new Response(JSON.stringify({ error: "Ürün numarası gerekli" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const q = await quote(tok.accessToken as string, productId, reqBody?.skuId ? String(reqBody.skuId) : null,
+        Math.max(1, Math.min(99, parseInt(reqBody?.quantity, 10) || 1)), String(reqBody?.country || "TR").toUpperCase().slice(0, 2));
+      return new Response(JSON.stringify(q), {
+        status: (q as any).error ? 502 : 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const hasNonAscii = /[^\x00-\x7F]/.test(keyword);
