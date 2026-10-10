@@ -13,7 +13,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Sıradaki işler
-- [ ] AliExpress sipariş ve kargo takibi
+- [~] AliExpress sipariş ve kargo takibi — kod ve arayüz hazır; gerçek sipariş testi site sahibinin AliExpress hesabı bağlanınca
 - [ ] Siteden toplu ürün çekmeyi tamamlama (Excel indir)
 - [ ] Müşteri Hizmetleri Otomatik Pilotu (WhatsApp / Instagram mesajları)
 - [ ] WhatsApp ürün linki ("satıcıya yaz")
