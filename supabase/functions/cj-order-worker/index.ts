@@ -604,7 +604,10 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
   if (ostatus === "PLACE_ORDER_SUCCESS" || ostatus === "") {
     await update(o.id, {
       status: "odeme_bekliyor", hold_reason: "odeme_alinamadi",
-      error_message: "AliExpress siparişi verildi ama ödeme alınamadı. AliExpress hesabındaki kayıtlı kartı kontrol et; AliExpress'te ödeyince sipariş kendiliğinden takip edilir.",
+      // AliExpress API ile ödeme, alıcı hesabının AliExpress otomatik ödeme onayına (PayPal) bağlı
+      error_message: /autopay|apipay/i.test(String(cr?.error_msg || ""))
+        ? "AliExpress siparişi verildi ama otomatik ödeme yapılamadı: AliExpress hesabında otomatik ödeme (API Pay) açık değil. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir."
+        : "AliExpress siparişi verildi ama ödeme alınamadı. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir.",
     });
     return { id: o.id, status: "odeme_bekliyor", note: "odeme_alinamadi" };
   }
