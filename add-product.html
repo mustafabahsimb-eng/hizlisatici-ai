@@ -611,7 +611,7 @@
       'ap.shipCost': 'Kargo maliyeti',
       'ap.commCost': 'Komisyon tutarı',
       'ap.netProfit': 'Net kâr',
-      'ap.totalCost': 'CJ toplam maliyet (Türkiye\'ye en ucuz kargo dahil): {v}',
+      'ap.totalCost': '{s} toplam maliyet (Türkiye\'ye en ucuz kargo dahil): {v}',
       'ap.lossWarn': 'Bu fiyatla zarar edersin.',
       'ap.minPrice': 'Önerilen minimum fiyat: {v}',
       'ap.shipCurNote': '⚠️ Kargo maliyeti tahmini Türkiye kargo fiyat tablosundan (₺) geliyor, uluslararası gönderim için gerçek kargo ücretini ayrıca sağlayıcından kontrol et.',
@@ -783,7 +783,7 @@
       'ap.shipCost': 'Shipping cost',
       'ap.commCost': 'Commission',
       'ap.netProfit': 'Net profit',
-      'ap.totalCost': 'CJ total cost (cheapest shipping to Turkey included): {v}',
+      'ap.totalCost': '{s} total cost (cheapest shipping to Turkey included): {v}',
       'ap.lossWarn': 'You will make a loss at this price.',
       'ap.minPrice': 'Suggested minimum price: {v}',
       'ap.shipCurNote': '⚠️ The shipping cost estimate comes from the Türkiye shipping price table (₺). For international shipping, check the real cost with your provider.',
@@ -1085,7 +1085,7 @@
     const totalCost = supplierPrice + shippingCost;
     const costNote = document.getElementById('totalCostNote');
     if (cjShipUsd != null && cur === 'TRY') {
-      costNote.textContent = t('ap.totalCost', { v: HS.money(totalCost, cur) });
+      costNote.textContent = t('ap.totalCost', { s: window._selectedSupplier === 'aliexpress' ? 'AliExpress' : 'CJ', v: HS.money(totalCost, cur) });
       costNote.style.display = 'block';
     } else {
       costNote.style.display = 'none';
@@ -1098,6 +1098,26 @@
     } else {
       lossEl.style.display = 'none';
     }
+  }
+
+  // AliExpress ürünü seçilince güncel fiyat, satılabilir seçenek ve Türkiye'ye en ucuz kargo
+  async function loadAeQuote(productId) {
+    window._supplierShippingUsd = null;
+    if (!productId) { updateProfitCalc(); return; }
+    try {
+      const d = await callFn('aliexpress-search', { action: 'quote', productId: productId, country: 'TR' });
+      if (d.sku) {
+        window._selectedSupplierVariantId = d.sku.sku_id || null;
+        window._selectedSupplierSkuAttr = d.sku.sku_attr || null;
+      }
+      if (d.productUsd != null && Number.isFinite(Number(d.productUsd))) {
+        window._supplierCostUsd = Number(d.productUsd);
+        autoSupplierPrice = null;
+        await applySupplierCost();
+      }
+      if (d.shipping && Number.isFinite(Number(d.shipping.price))) window._supplierShippingUsd = Number(d.shipping.price);
+    } catch (e) { /* fiyat/kargo alınamazsa arama fiyatı ve tablo tahmini kullanılır */ }
+    updateProfitCalc();
   }
 
   // CJ ürünü seçilince Türkiye'ye en ucuz kargo ücretini sor (kargo dahil maliyet için)
@@ -1226,7 +1246,9 @@
     window._supplierCostUsd = p.priceUsd != null && !isNaN(p.priceUsd) ? Number(p.priceUsd) : null;
     autoSupplierPrice = null;
     applySupplierCost();
+    window._selectedSupplierSkuAttr = null;
     if (supplier === 'cj') loadCjShipping(itemId, variantId);
+    else if (supplier === 'aliexpress') loadAeQuote(itemId);
     else { window._supplierShippingUsd = null; updateProfitCalc(); }
     if (p.name) {
       document.getElementById('productName').value = p.name;
@@ -2053,6 +2075,7 @@
         supplier: window._selectedSupplier || null,
         supplier_item_id: window._selectedSupplierItemId || null,
         supplier_variant_id: window._selectedSupplierVariantId || null,
+        supplier_sku_attr: window._selectedSupplierSkuAttr || null,
         // Tedarikçinin dolar fiyatı (stok/fiyat takibi de bu alanı USD olarak günceller)
         supplier_cost: window._supplierCostUsd != null ? window._supplierCostUsd : null,
         image_url: imageUrl,

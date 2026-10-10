@@ -794,7 +794,7 @@
   async function loadOrderBanner() {
     try {
       const { data } = await HS.db.from('orders').select('status')
-        .eq('supplier', 'cj').in('status', ['bakiye_bekliyor', 'onay_bekliyor']);
+        .in('supplier', ['cj', 'aliexpress']).in('status', ['bakiye_bekliyor', 'onay_bekliyor']);
       orderCounts = { balance: 0, approval: 0 };
       (data || []).forEach(o => {
         if (o.status === 'bakiye_bekliyor') orderCounts.balance++;

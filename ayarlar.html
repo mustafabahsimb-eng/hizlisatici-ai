@@ -309,6 +309,13 @@
         </div>
       </div>
       <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="ae_auto_pay">
+        <div>
+          <label for="ae_auto_pay" data-t="lAeAutoPay"></label>
+          <div class="hint" data-t="hAeAutoPay"></div>
+        </div>
+      </div>
+      <div class="check-row" style="margin-top: 12px;">
         <input type="checkbox" id="wa_tracking_notify">
         <div>
           <label for="wa_tracking_notify" data-t="lWaNotify"></label>
@@ -396,7 +403,9 @@ const T = {
     epr_IT: 'İtalya – kayıt numarası', epr_NL: 'Hollanda – kayıt numarası', epr_IE: 'İrlanda – kayıt numarası', epr_DK: 'Danimarka – kayıt numarası',
     secReturn: '📦 İade Adresi',
     secAutoOrder: '🤖 Otomatik sipariş',
-    dAutoOrder: 'Mağazana gelen tedarikçili (CJ) siparişler kendiliğinden tedarikçiye gönderilir. Zararlı siparişler her zaman ödenmeden onayına düşer.',
+    dAutoOrder: 'Mağazana gelen tedarikçili (CJ, AliExpress) siparişler kendiliğinden tedarikçiye gönderilir. Zararlı siparişler (ürün + kargo + komisyon) her zaman ödenmeden onayına düşer.',
+    lAeAutoPay: 'AliExpress siparişlerini kayıtlı kartımla otomatik öde',
+    hAeAutoPay: 'Kapalıysa sipariş AliExpress\'te verilir, ödemesini AliExpress hesabından sen yaparsın. Kart reddedilirse sipariş "Ödeme bekliyor" durumuna düşer ve Siparişler sayfasında uyarı çıkar.',
     lCjAutoPay: 'CJ siparişlerini bakiyemden otomatik öde',
     hCjAutoPay: 'Kapalıysa sipariş CJ\'de oluşturulur, ödemesini CJ panelinden sen yaparsın. Bakiye yetmezse sipariş bekler ve Siparişler sayfasında uyarı çıkar.',
     lWaNotify: 'Kargo çıkınca müşteriye WhatsApp mesajı gönder',
@@ -489,7 +498,9 @@ const T = {
     epr_IT: 'Italy – registration number', epr_NL: 'Netherlands – registration number', epr_IE: 'Ireland – registration number', epr_DK: 'Denmark – registration number',
     secReturn: '📦 Return Address',
     secAutoOrder: '🤖 Automatic orders',
-    dAutoOrder: 'Supplier (CJ) orders from your store are sent to the supplier automatically. Loss-making orders always wait for your approval unpaid.',
+    dAutoOrder: 'Supplier (CJ, AliExpress) orders from your store are sent to the supplier automatically. Loss-making orders (product + shipping + commission) always wait for your approval unpaid.',
+    lAeAutoPay: 'Pay AliExpress orders with my saved card automatically',
+    hAeAutoPay: 'If off, the order is placed on AliExpress and you pay it from your AliExpress account. If the card is declined, the order moves to "Awaiting payment" and a warning appears on the Orders page.',
     lCjAutoPay: 'Pay CJ orders from my balance automatically',
     hCjAutoPay: 'If off, the order is created at CJ and you pay it in the CJ panel. If your balance is too low, the order waits and a warning appears on the Orders page.',
     lWaNotify: 'Send the customer a WhatsApp message when the order ships',
@@ -728,6 +739,7 @@ function fillForm(p) {
   $('oss_registered').checked = !!p.oss_registered;
   // Otomatik sipariş: varsayılan açık
   $('cj_auto_pay').checked = p.cj_auto_pay !== false;
+  $('ae_auto_pay').checked = p.ae_auto_pay !== false;
   $('wa_tracking_notify').checked = p.wa_tracking_notify !== false;
   $('ioss_number').value = p.ioss_number || '';
   $('eori_number').value = p.eori_number || '';
@@ -841,6 +853,7 @@ async function saveProfile() {
     vat_number: vatRegistered ? valOrNull('vat_number') : null,
     oss_registered: $('oss_registered').checked,
     cj_auto_pay: $('cj_auto_pay').checked,
+    ae_auto_pay: $('ae_auto_pay').checked,
     wa_tracking_notify: $('wa_tracking_notify').checked,
     ioss_number: valOrNull('ioss_number'),
     eori_number: valOrNull('eori_number'),

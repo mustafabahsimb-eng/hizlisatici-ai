@@ -371,8 +371,8 @@
       approvePay: 'Onayla ve öde',
       cancelOrder: 'İptal et',
       retry: 'Tekrar dene',
-      approveConfirm: 'Sipariş CJ bakiyenden ödenecek (otomatik ödeme kapalıysa CJ panelinden ödersin). Onaylıyor musun?',
-      cancelConfirm: "Sipariş iptal edilsin mi? CJ'deki ödenmemiş sipariş de silinecek.",
+      approveConfirm: 'Sipariş tedarikçiye verilip ödenecek (CJ: bakiyenden, AliExpress: kayıtlı kartınla; otomatik ödeme kapalıysa tedarikçi hesabından ödersin). Onaylıyor musun?',
+      cancelConfirm: 'Sipariş iptal edilsin mi? Tedarikçideki ödenmemiş sipariş de iptal edilecek.',
       working: 'İşleniyor...',
       actionFail: 'İşlem yapılamadı: ',
       checking: 'Kontrol ediliyor...',
@@ -484,8 +484,8 @@
       approvePay: 'Approve and pay',
       cancelOrder: 'Cancel',
       retry: 'Retry',
-      approveConfirm: 'The order will be paid from your CJ balance (if auto-pay is off, you pay in the CJ panel). Approve?',
-      cancelConfirm: 'Cancel this order? The unpaid order at CJ will also be deleted.',
+      approveConfirm: 'The order will be placed and paid at the supplier (CJ: from your balance, AliExpress: with your saved card; if auto-pay is off, you pay in the supplier account). Approve?',
+      cancelConfirm: 'Cancel this order? The unpaid order at the supplier will also be cancelled.',
       working: 'Working...',
       actionFail: 'Could not complete: ',
       checking: 'Checking...',
@@ -881,11 +881,11 @@
         '<option value="' + s + '"' + (s === o.status ? ' selected' : '') + '>' + tt('st_' + s) + '</option>').join('');
 
       // CJ siparişleri kendiliğinden gönderilir; satıcı sadece bekleyenlerde karar verir
-      const isCj = o.supplier === 'cj';
+      const isCj = o.supplier === 'cj' || o.supplier === 'aliexpress'; // otomatik siparişli tedarikçiler
       const canApprove = isCj && o.status === 'onay_bekliyor';
       const canRetry = isCj && (o.status === 'hata' || o.status === 'bakiye_bekliyor');
       const canCancel = isCj && ['beklemede', 'onay_bekliyor', 'bakiye_bekliyor', 'odeme_bekliyor', 'hata'].includes(o.status);
-      const canSyncTracking = isCj && ['odeme_bekliyor', 'tedarikciye_verildi', 'kargoya_verildi'].includes(o.status);
+      const canSyncTracking = isCj && !!o.supplier_order_id && ['odeme_bekliyor', 'tedarikciye_verildi', 'kargoya_verildi'].includes(o.status);
       const cjBtn = (action, key) => '<button class="btn-secondary cj-action-btn" onclick="cjAction(\'' + escapeAttr(o.id) + '\', \'' + action + '\', this)">' + tt(key) + '</button>';
       const actions = (canApprove ? cjBtn('approve', 'approvePay') : '') +
         (canRetry ? cjBtn('retry', 'retry') : '') +
