@@ -362,6 +362,7 @@
       unnamed: 'İsimsiz ürün',
       deletedProduct: 'Silinmiş ürün',
       supplierLbl: 'Tedarikçi: ',
+      aeViaCj: 'AliExpress (CJ eşdeğerinden verildi)',
       supEmptyTitle: 'Henüz tedarikçi siparişi yok',
       supEmptyText: 'Bir pazaryerinde satış olduğunda buraya kaydet, tedarikçi ve kargo durumunu buradan takip et.',
       supCount: '{n} sipariş',
@@ -475,6 +476,7 @@
       unnamed: 'Unnamed product',
       deletedProduct: 'Deleted product',
       supplierLbl: 'Supplier: ',
+      aeViaCj: 'AliExpress (placed via CJ equivalent)',
       supEmptyTitle: 'No supplier orders yet',
       supEmptyText: 'When you make a sale, record it here and track supplier and shipping status.',
       supCount: '{n} orders',
@@ -880,7 +882,7 @@
       if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
       if (o.customer_city) metaParts.push(escapeHtml(o.customer_city));
       if (o.created_at) metaParts.push(fmtDate(o.created_at));
-      if (o.supplier) metaParts.push(tt('supplierLbl') + (o.supplier === 'cj' ? 'CJ Dropshipping' : o.supplier === 'aliexpress' ? 'AliExpress' : escapeHtml(o.supplier)));
+      if (o.supplier) metaParts.push(tt('supplierLbl') + (o.supplier === 'cj' ? 'CJ Dropshipping' : o.supplier === 'aliexpress' ? (o.fulfilled_via === 'cj' ? tt('aeViaCj') : 'AliExpress') : escapeHtml(o.supplier)));
 
       const statusOptions = STATUS_KEYS.map(s =>
         '<option value="' + s + '"' + (s === o.status ? ' selected' : '') + '>' + tt('st_' + s) + '</option>').join('');

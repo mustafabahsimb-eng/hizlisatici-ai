@@ -2179,6 +2179,12 @@
         });
       }
 
+      // AliExpress ürünü: CJ eşdeğerini arka planda aramaya başla (AliExpress'te otomatik ödeme
+      // yapılamayan satıcılarda sipariş CJ'den verilip CJ bakiyesinden ödenir). Satıcıyı bekletmez.
+      if (window._selectedSupplier === 'aliexpress') {
+        callFn('cj-alt-match', { productId: product.id }).catch(() => { /* saatlik görev tekrar dener */ });
+      }
+
       const box = document.getElementById('msgBox');
       const text = listingRows.length > 1 ? t('ap.savedMany', { n: listingRows.length }) : t('ap.savedOne');
       box.innerHTML = escapeHtml(text) + ' <a href="dashboard.html">' + escapeHtml(t('ap.clickHere')) + '</a>';
