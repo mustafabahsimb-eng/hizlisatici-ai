@@ -1,12 +1,12 @@
 // =========================================================
-// Seltigo - cj-tracking-sync (otomatik kargo takibi + müşteriye WhatsApp)
+// Seltigo - cj-tracking-sync (otomatik kargo takibi + müşteriye WhatsApp; CJ ve AliExpress)
 // CJ'ye gönderilmiş siparişlerin kargo numarasını ve durumunu
 // zamanlanmış görevle (cron) kendiliğinden günceller:
 //   - Satıcının CJ panelinden elle ödediği siparişleri yakalar
 //   - Takip numarasını mağaza siparişine yazar (müşteri takip sayfası)
 //   - Satıcının WhatsApp'ı bağlı, şablonu onaylı ve bildirimi açıksa
 //     müşteriye takip linkli WhatsApp mesajı gönderir
-// CJ'de sipariş oluşturmaz, ödeme yapmaz. Sadece satıcının KENDİ CJ hesabı.
+// Sipariş oluşturmaz, ödeme yapmaz. Sadece satıcının KENDİ tedarikçi hesabı (CJ / AliExpress).
 // Güvenlik: CRON_SECRET (sync-worker ile aynı şifre).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -178,22 +178,130 @@ async function notifyWhatsApp(userId: string, so: any, trackNumber: string): Pro
   return true;
 }
 
-// Tek siparişin CJ durumunu çek, siparişe ve mağaza siparişine işle
-async function syncOne(o: any, token: string, summary: any) {
+// ---------------------------------------------------------
+// AliExpress (satıcının kendi hesabı; sipariş-worker ile aynı anahtar yönetimi)
+// ---------------------------------------------------------
+const AE_APP_KEY = Deno.env.get("ALIEXPRESS_APP_KEY") || "";
+const AE_APP_SECRET = Deno.env.get("ALIEXPRESS_APP_SECRET") || "";
+
+async function aeSign(pathname: string, params: Record<string, string>): Promise<string> {
+  const base = pathname + Object.keys(params).sort().map((k) => k + params[k]).join("");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(AE_APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(base));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+async function aeCall(method: string, accessToken: string, extra: Record<string, string>): Promise<any> {
+  const params: Record<string, string> = {
+    app_key: AE_APP_KEY, sign_method: "sha256", timestamp: Date.now().toString(),
+    access_token: accessToken, method, ...extra,
+  };
+  const sign = await aeSign("", params);
+  const r = await fetch("https://api-sg.aliexpress.com/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  return await r.json().catch(() => ({}));
+}
+
+function aeList(v: any): any[] {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === "object") for (const k of Object.keys(v)) if (Array.isArray(v[k])) return v[k];
+  return [];
+}
+
+async function aeToken(userId: string): Promise<string | null> {
+  const { data: conn } = await db.from("supplier_connections")
+    .select("id, status").eq("user_id", userId).eq("supplier", "aliexpress").maybeSingle();
+  if (!conn || conn.status !== "connected") return null;
+  const { data: cred } = await db.rpc("supplier_connection_get_credentials", { p_connection_id: conn.id });
+  if (!cred?.access_token) return null;
+  const exp = cred.expires_at ? new Date(cred.expires_at).getTime() : 0;
+  if (!exp || exp > Date.now() + 10 * 60000 || !cred.refresh_token) return cred.access_token;
+  const params: Record<string, string> = {
+    app_key: AE_APP_KEY, refresh_token: cred.refresh_token, sign_method: "sha256", timestamp: Date.now().toString(),
+  };
+  const sign = await aeSign("/auth/token/refresh", params);
+  const r = await fetch("https://api-sg.aliexpress.com/rest/auth/token/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!d.access_token) {
+    await db.from("supplier_connections").update({ status: "expired", last_error: String(d.message || d.code || "yenilenemedi").slice(0, 200), updated_at: new Date().toISOString() }).eq("id", conn.id);
+    return null;
+  }
+  const expiresAt = new Date(Date.now() + (Number(d.expires_in) || 86400) * 1000).toISOString();
+  await db.rpc("supplier_connection_set_credentials", {
+    p_connection_id: conn.id,
+    p_credentials: { ...cred, access_token: d.access_token, refresh_token: d.refresh_token || cred.refresh_token, expires_at: expiresAt },
+  });
+  await db.from("supplier_connections").update({ token_expires_at: expiresAt, updated_at: new Date().toISOString() }).eq("id", conn.id);
+  return d.access_token;
+}
+
+// AliExpress sipariş durumunu bizim durumlarımıza çevir
+function mapAeStatus(current: string, orderStatus: string, logisticsStatus: string, endReason: string, trackNumber: string | null): string {
+  const os = orderStatus.toUpperCase();
+  const ls = logisticsStatus.toUpperCase();
+  if (os === "IN_CANCEL" || (os === "FINISH" && /cancel|close|timeout/i.test(endReason))) return "iptal";
+  if (ls === "BUYER_ACCEPT_GOODS" || os === "FINISH") return "teslim_edildi";
+  if (trackNumber || ls === "SELLER_SEND_GOODS" || os === "WAIT_BUYER_ACCEPT_GOODS") return "kargoya_verildi";
+  if (current === "odeme_bekliyor" && os && os !== "PLACE_ORDER_SUCCESS") return "tedarikciye_verildi";
+  return current;
+}
+
+// Tedarikçiden sipariş durumu: { trackNumber, carrier, supplierStatus, newStatus } ya da { error }
+async function cjDetail(o: any, token: string) {
   const r = await fetch(`${ORDER_DETAIL_URL}?orderId=${encodeURIComponent(o.supplier_order_id)}`, {
     headers: { "CJ-Access-Token": token },
   });
-  const d = await r.json();
-  if (!d?.result) {
-    const m = String(d?.message || "CJ yanıtı yok").slice(0, 120);
-    summary.errors.push(`${o.id}: ${m}`);
-    return { error: "CJ sipariş bilgisi alınamadı: " + m };
-  }
-
+  const d = await r.json().catch(() => ({}));
+  if (!d?.result) return { error: "CJ sipariş bilgisi alınamadı: " + String(d?.message || "CJ yanıtı yok").slice(0, 120) };
   const trackNumber = d?.data?.trackNumber || null;
-  const carrier = d?.data?.trackingProvider || d?.data?.logisticName || null;
-  const cjStatus = d?.data?.orderStatus || null;
-  const newStatus = mapStatus(o.status, cjStatus, trackNumber);
+  const supplierStatus = d?.data?.orderStatus || null;
+  return {
+    trackNumber,
+    carrier: d?.data?.trackingProvider || d?.data?.logisticName || null,
+    supplierStatus,
+    newStatus: mapStatus(o.status, supplierStatus, trackNumber),
+  };
+}
+
+async function aeDetail(o: any, token: string) {
+  const d = await aeCall("aliexpress.trade.ds.order.get", token, {
+    order_id: String(o.supplier_order_id),
+    single_order_query: JSON.stringify({ order_id: Number(o.supplier_order_id) }),
+  });
+  const res = d?.aliexpress_trade_ds_order_get_response?.result || d?.aliexpress_ds_trade_order_get_response?.result;
+  if (!res) {
+    const e = d?.error_response || d;
+    return { error: "AliExpress sipariş bilgisi alınamadı: " + String(e?.msg || e?.sub_msg || e?.message || "yanıt yok").slice(0, 120) };
+  }
+  const logi = aeList(res.logistics_info_list)[0] || null;
+  const trackNumber = logi?.logistics_no ? String(logi.logistics_no) : null;
+  const supplierStatus = String(res.order_status || "");
+  return {
+    trackNumber,
+    carrier: logi?.logistics_service || null,
+    supplierStatus,
+    newStatus: mapAeStatus(o.status, supplierStatus, String(res.logistics_status || ""), String(res.end_reason || ""), trackNumber),
+  };
+}
+
+// Tek siparişin tedarikçi durumunu çek, siparişe ve mağaza siparişine işle
+async function syncOne(o: any, token: string, summary: any) {
+  const det: any = o.supplier === "aliexpress" ? await aeDetail(o, token) : await cjDetail(o, token);
+  if (det.error) {
+    summary.errors.push(`${o.id}: ${det.error}`);
+    return { error: det.error };
+  }
+  const trackNumber = det.trackNumber;
+  const carrier = det.carrier;
+  const cjStatus = det.supplierStatus;
+  const newStatus = det.newStatus;
 
   if (newStatus !== o.status || (trackNumber && trackNumber !== o.tracking_number)) {
     const patch: Record<string, unknown> = { status: newStatus };
@@ -238,6 +346,13 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .maybeSingle();
       if (!o) return json({ error: "Sipariş bulunamadı" }, 404);
+      if (o.supplier === "aliexpress") {
+        if (!o.supplier_order_id) return json({ error: "Bu sipariş henüz AliExpress'e verilmemiş" }, 400);
+        const aeTok = await aeToken(userId);
+        if (!aeTok) return json({ error: "AliExpress hesabın bağlı değil ya da süresi doldu. Hesaplarım sayfasından bağla." }, 400);
+        const res = await syncOne(o, aeTok, summary);
+        return json(res, res.error ? 500 : 200);
+      }
       if (o.supplier !== "cj" || !o.supplier_order_id) return json({ error: "Bu sipariş henüz CJ'ye iletilmemiş" }, 400);
       const { data: integ } = await db.from("user_integrations").select("api_key").eq("user_id", userId).eq("platform", "cj").maybeSingle();
       if (!integ?.api_key) return json({ error: "CJ hesabın bağlı değil. Hesaplarım sayfasından CJ'yi bağla." }, 400);
@@ -255,8 +370,8 @@ Deno.serve(async (req) => {
   try {
     const { data: orders, error } = await db
       .from("orders")
-      .select("id, user_id, status, supplier_order_id, tracking_number, store_order_id")
-      .eq("supplier", "cj")
+      .select("id, user_id, status, supplier, supplier_order_id, tracking_number, store_order_id")
+      .in("supplier", ["cj", "aliexpress"])
       .not("supplier_order_id", "is", null)
       .in("status", ["odeme_bekliyor", "tedarikciye_verildi", "kargoya_verildi"])
       .order("created_at", { ascending: true })
@@ -275,10 +390,20 @@ Deno.serve(async (req) => {
     (integ || []).forEach((r: any) => { if (r.api_key) keyByUser.set(String(r.user_id), r.api_key); });
 
     const tokenByKey = new Map<string, string | null>();
+    const aeTokenByUser = new Map<string, string | null>();
 
     for (const o of orders) {
       if (Date.now() - started > TIME_BUDGET_MS) break;
       summary.checked++;
+
+      if (o.supplier === "aliexpress") {
+        const uid = String(o.user_id);
+        if (!aeTokenByUser.has(uid)) aeTokenByUser.set(uid, await aeToken(uid));
+        const aeTok = aeTokenByUser.get(uid);
+        if (!aeTok) { summary.errors.push(`${o.id}: AliExpress hesabı bağlı değil`); continue; }
+        try { await syncOne(o, aeTok, summary); } catch (e) { summary.errors.push(`${o.id}: ${String(e).slice(0, 120)}`); }
+        continue;
+      }
 
       const apiKey = keyByUser.get(String(o.user_id));
       if (!apiKey) { summary.errors.push(`${o.id}: CJ hesabı bağlı değil`); continue; }
