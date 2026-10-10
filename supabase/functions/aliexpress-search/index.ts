@@ -86,6 +86,38 @@ async function translateToEnglish(keyword: string): Promise<{ text: string; debu
   }
 }
 
+// Satıcının kendi AliExpress anahtarı (kasadan; süresi dolmak üzereyse yenilenir)
+async function sellerToken(supabase: any, userId: string): Promise<string | null> {
+  const { data: conn } = await supabase.from("supplier_connections")
+    .select("id, status").eq("user_id", userId).eq("supplier", "aliexpress").maybeSingle();
+  if (!conn || conn.status !== "connected") return null;
+  const { data: cred } = await supabase.rpc("supplier_connection_get_credentials", { p_connection_id: conn.id });
+  if (!cred?.access_token) return null;
+  const exp = cred.expires_at ? new Date(cred.expires_at).getTime() : 0;
+  if (!exp || exp > Date.now() + 10 * 60000 || !cred.refresh_token) return cred.access_token;
+  const params: Record<string, string> = {
+    app_key: APP_KEY, refresh_token: cred.refresh_token, sign_method: "sha256", timestamp: Date.now().toString(),
+  };
+  const sign = await signParams("/auth/token/refresh", params);
+  const r = await fetch(REFRESH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!d.access_token) {
+    await supabase.from("supplier_connections").update({ status: "expired", last_error: String(d.message || d.code || "yenilenemedi").slice(0, 200), updated_at: new Date().toISOString() }).eq("id", conn.id);
+    return null;
+  }
+  const expiresAt = new Date(Date.now() + (Number(d.expires_in) || 86400) * 1000).toISOString();
+  await supabase.rpc("supplier_connection_set_credentials", {
+    p_connection_id: conn.id,
+    p_credentials: { ...cred, access_token: d.access_token, refresh_token: d.refresh_token || cred.refresh_token, expires_at: expiresAt },
+  });
+  await supabase.from("supplier_connections").update({ token_expires_at: expiresAt, updated_at: new Date().toISOString() }).eq("id", conn.id);
+  return d.access_token;
+}
+
 async function getStoredToken(
   supabase: any
 ): Promise<{ accessToken: string | null; refreshToken: string | null; expiresAt: string | null }> {
@@ -220,7 +252,7 @@ async function quote(accessToken: string, productId: string, skuId: string | nul
   };
 }
 
-const hsHandler = (async (req: Request) => {
+const hsHandler = (async (req: Request, userId: string | null = null) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -238,7 +270,11 @@ const hsHandler = (async (req: Request) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    let tok = await getStoredToken(supabase);
+    // Satıcı kendi AliExpress hesabını bağladıysa onunla, yoksa sitenin hesabıyla
+    const own = userId ? await sellerToken(supabase, userId) : null;
+    let tok = own
+      ? { accessToken: own, refreshToken: null, expiresAt: null }
+      : await getStoredToken(supabase);
 
     if (!tok.accessToken) {
       return new Response(
@@ -248,6 +284,7 @@ const hsHandler = (async (req: Request) => {
     }
 
     if (
+      !own &&
       tok.expiresAt &&
       new Date(tok.expiresAt).getTime() < Date.now() + 5 * 60 * 1000 &&
       tok.refreshToken
@@ -345,28 +382,29 @@ const hsHandler = (async (req: Request) => {
 // GÜVENLİK: sadece giriş yapmış kullanıcılar bu fonksiyonu çalıştırabilir
 // (sayfalar app.js sayesinde kullanıcının oturum anahtarını gönderir)
 // =========================================================
-async function hsIsLoggedIn(req: Request): Promise<boolean> {
+async function hsIsLoggedIn(req: Request): Promise<string | null> {
   const auth = req.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  if (!token || token.split(".").length !== 3) return false;
+  if (!token || token.split(".").length !== 3) return null;
   try {
     const r = await fetch((Deno.env.get("SUPABASE_URL") ?? "") + "/auth/v1/user", {
       headers: { Authorization: "Bearer " + token, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
     });
-    if (!r.ok) return false;
+    if (!r.ok) return null;
     const u = await r.json();
-    return !!(u && u.id);
+    return u && u.id ? String(u.id) : null;
   } catch (_e) {
-    return false;
+    return null;
   }
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== "OPTIONS" && !(await hsIsLoggedIn(req))) {
+  const userId = req.method === "OPTIONS" ? null : await hsIsLoggedIn(req);
+  if (req.method !== "OPTIONS" && !userId) {
     return new Response(JSON.stringify({ error: "Bu işlem için giriş yapmalısın. / Please log in." }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  return hsHandler(req);
+  return hsHandler(req, userId);
 });
