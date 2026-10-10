@@ -1,15 +1,17 @@
 // =========================================================
-// Seltigo - cj-order-worker (CJ otomatik sipariş + ödeme)
+// Seltigo - cj-order-worker (tedarikçi otomatik sipariş + ödeme: CJ ve AliExpress)
 // Zamanlanmış görevle birkaç dakikada bir çalışır:
-//   1) "beklemede" tedarikçi siparişlerini CJ'de ödemesiz oluşturur
-//   2) Zarar kontrolü (HER ZAMAN): CJ toplamı (ürün + kargo) satıştan fazlaysa
-//      ödemez, satıcının onayına bırakır ("onay_bekliyor")
-//   3) Satıcı otomatik ödemeyi kapattıysa "odeme_bekliyor" (CJ panelinden ödenir)
-//   4) Bakiye yetmezse "bakiye_bekliyor"; bakiye gelince kendiliğinden öder
-//   5) Ödeyince "tedarikciye_verildi" (kargo takibini cj-tracking-sync yapar)
+//   CJ: sipariş ödemesiz oluşturulur -> zarar kontrolü -> bakiye kontrolü -> bakiyeden ödeme
+//       ("bakiye_bekliyor": bakiye gelince kendiliğinden öder)
+//   AliExpress: ürün + en ucuz kargo sorgulanır -> zarar kontrolü (sipariş AÇILMADAN)
+//       -> sipariş + kayıtlı kartla ödeme ("odeme_bekliyor": kart reddedilirse)
+//   Zarar kontrolü (HER ZAMAN, kapatılamaz): maliyet (ürün + kargo) > satış - komisyon ise
+//   ödenmez, satıcının onayına düşer ("onay_bekliyor").
+//   Satıcı otomatik ödemeyi kapattıysa "odeme_bekliyor" (tedarikçi panelinden ödenir).
+//   Ödeyince "tedarikciye_verildi" (kargo takibini cj-tracking-sync yapar).
 // Satıcı da çağırabilir: { action: "approve" | "cancel" | "retry", orderId }
 // Güvenlik: zamanlanmış görev CRON_SECRET ile, satıcı oturum anahtarıyla.
-// Sadece satıcının KENDİ CJ hesabı kullanılır.
+// Sadece satıcının KENDİ tedarikçi hesabı kullanılır.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -116,7 +118,55 @@ async function failOrRetry(o: any, message: string): Promise<Outcome> {
   return { id: o.id, status: o.status, note: "tekrar denenecek: " + message };
 }
 
+// Satıştan düşülecek komisyon oranı: ilanın komisyonu, yoksa ürünün komisyonu (kendi mağazada 0)
+async function commissionPct(o: any): Promise<number> {
+  if (o.store_order_id) {
+    const { data: so } = await db.from("store_orders").select("listing_id").eq("id", o.store_order_id).maybeSingle();
+    if (so?.listing_id) {
+      const { data: l } = await db.from("listings").select("commission_pct").eq("id", so.listing_id).maybeSingle();
+      if (l && l.commission_pct != null) return Number(l.commission_pct) || 0;
+    }
+    return 0;
+  }
+  const { data: p } = await db.from("products").select("commission_rate").eq("id", o.product_id).maybeSingle();
+  return Number(p?.commission_rate) || 0;
+}
+
+// Zarar kontrolü (kapatılamaz): tedarikçi maliyeti (ürün + kargo) > satış - komisyon ise
+// sipariş ödenmeden satıcının onayına düşer. Döner: bekletildiyse sonuç, değilse null.
+async function lossHold(o: any, costUsd: number | null, supplierName: string): Promise<Outcome | null> {
+  const currency = o.currency || "TRY";
+  const rate = await usdTo(currency);
+  const gross = o.unit_price != null ? Number(o.unit_price) * (o.quantity || 1) : null;
+  const pct = await commissionPct(o);
+  const net = gross != null ? Math.round(gross * (1 - pct / 100) * 100) / 100 : null;
+  const costLocal = costUsd != null && rate ? Math.round(Number(costUsd) * rate * 100) / 100 : null;
+  if (costLocal != null) await update(o.id, { cost_local: costLocal, cost_usd: costUsd });
+
+  let reason: string | null = null;
+  let msg = "";
+  if (costUsd == null || rate == null) {
+    reason = "maliyet_bilinmiyor";
+    msg = `${supplierName} maliyeti hesaplanamadı; kontrol edip onaylarsan ödenecek.`;
+  } else if (net == null) {
+    reason = "fiyat_bilinmiyor";
+    msg = `Satış fiyatı bilinmiyor; ${supplierName} maliyeti ${costLocal} ${currency}. Onaylarsan ödenecek.`;
+  } else if (costLocal! > net) {
+    reason = "zarar";
+    msg = `Zararlı sipariş: ${supplierName} maliyeti (ürün + kargo) ${costLocal} ${currency}, satış ${gross!.toFixed(2)} ${currency}` +
+      (pct > 0 ? ` (komisyon %${pct} sonrası ${net.toFixed(2)} ${currency})` : "") + ". Onaylarsan ödenecek.";
+  }
+  if (!reason) return null;
+  await update(o.id, { status: "onay_bekliyor", hold_reason: reason, error_message: msg });
+  return { id: o.id, status: "onay_bekliyor", note: reason };
+}
+
 async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
+  if (o.supplier === "aliexpress") return await processAe(o, opts);
+  return await processCj(o, opts);
+}
+
+async function processCj(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
   // 1) Satıcının KENDİ CJ hesabı
   const { data: integ } = await db
     .from("user_integrations")
@@ -226,6 +276,7 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
     await update(o.id, {
       supplier_order_id: o.supplier_order_id,
       supplier_shipment_id: o.supplier_shipment_id,
+      supplier_logistics: shipping.name,
       cost_usd: o.cost_usd,
       error_message: null,
     });
@@ -233,28 +284,8 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
 
   // 3) Zarar kontrolü (her zaman; satıcı onayladıysa atlanır)
   if (!opts.approved) {
-    const currency = o.currency || "TRY";
-    const rate = await usdTo(currency);
-    const revenue = o.unit_price != null ? Number(o.unit_price) * (o.quantity || 1) : null;
-    const costLocal = o.cost_usd != null && rate ? Math.round(Number(o.cost_usd) * rate * 100) / 100 : null;
-    if (costLocal != null) await update(o.id, { cost_local: costLocal });
-
-    let reason: string | null = null;
-    let msg = "";
-    if (o.cost_usd == null || rate == null) {
-      reason = "maliyet_bilinmiyor";
-      msg = "CJ maliyeti hesaplanamadı; kontrol edip onaylarsan ödenecek.";
-    } else if (revenue == null) {
-      reason = "fiyat_bilinmiyor";
-      msg = `Satış fiyatı bilinmiyor; CJ maliyeti ${costLocal} ${currency}. Onaylarsan ödenecek.`;
-    } else if (costLocal! > revenue) {
-      reason = "zarar";
-      msg = `Zararlı sipariş: CJ maliyeti (ürün + kargo) ${costLocal} ${currency}, satış ${revenue.toFixed(2)} ${currency}. Onaylarsan ödenecek.`;
-    }
-    if (reason) {
-      await update(o.id, { status: "onay_bekliyor", hold_reason: reason, error_message: msg });
-      return { id: o.id, status: "onay_bekliyor", note: reason };
-    }
+    const held = await lossHold(o, o.cost_usd, "CJ");
+    if (held) return held;
   }
 
   // 4) Otomatik ödeme kapalıysa satıcı CJ panelinden öder
@@ -311,13 +342,244 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
 }
 
 // ---------------------------------------------------------
+// AliExpress (satıcının kendi hesabı; ödeme hesaptaki kayıtlı kartla)
+// AliExpress'te ödenmemiş sipariş API ile silinemediği için zarar kontrolü
+// sipariş AÇILMADAN önce, ürün + kargo fiyatı sorgulanarak yapılır.
+// ---------------------------------------------------------
+const AE_APP_KEY = Deno.env.get("ALIEXPRESS_APP_KEY") || "";
+const AE_APP_SECRET = Deno.env.get("ALIEXPRESS_APP_SECRET") || "";
+const AE_SYNC = "https://api-sg.aliexpress.com/sync";
+const AE_REFRESH = "https://api-sg.aliexpress.com/rest/auth/token/refresh";
+
+async function aeSign(pathname: string, params: Record<string, string>): Promise<string> {
+  const base = pathname + Object.keys(params).sort().map((k) => k + params[k]).join("");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(AE_APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(base));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+async function aeCall(method: string, accessToken: string, extra: Record<string, string>): Promise<any> {
+  const params: Record<string, string> = {
+    app_key: AE_APP_KEY, sign_method: "sha256", timestamp: Date.now().toString(),
+    access_token: accessToken, method, ...extra,
+  };
+  const sign = await aeSign("", params);
+  const r = await fetch(AE_SYNC, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  return await r.json().catch(() => ({}));
+}
+
+// AliExpress yanıtlarındaki iç içe liste sarmalayıcılarını aç
+function aeList(v: any): any[] {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === "object") for (const k of Object.keys(v)) if (Array.isArray(v[k])) return v[k];
+  return [];
+}
+
+function aeError(d: any): string {
+  const e = d?.error_response || d;
+  return String(e?.msg || e?.sub_msg || e?.message || e?.error_msg || JSON.stringify(d).slice(0, 200));
+}
+
+// Satıcının AliExpress anahtarı (kasadan); süresi dolmak üzereyse yeniler
+async function aeToken(userId: string): Promise<{ token: string | null; reason?: string }> {
+  const { data: conn } = await db.from("supplier_connections")
+    .select("id, status").eq("user_id", userId).eq("supplier", "aliexpress").maybeSingle();
+  if (!conn || conn.status !== "connected") return { token: null, reason: conn ? "expired" : "none" };
+  const { data: cred } = await db.rpc("supplier_connection_get_credentials", { p_connection_id: conn.id });
+  if (!cred?.access_token) return { token: null, reason: "none" };
+  const exp = cred.expires_at ? new Date(cred.expires_at).getTime() : 0;
+  if (exp && exp > Date.now() + 10 * 60000) return { token: cred.access_token };
+
+  // Yenile
+  if (!cred.refresh_token) return { token: cred.access_token };
+  const params: Record<string, string> = {
+    app_key: AE_APP_KEY, refresh_token: cred.refresh_token, sign_method: "sha256", timestamp: Date.now().toString(),
+  };
+  const sign = await aeSign("/auth/token/refresh", params);
+  const r = await fetch(AE_REFRESH, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ ...params, sign }).toString(),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!d.access_token) {
+    await db.from("supplier_connections").update({
+      status: "expired", last_error: aeError(d), updated_at: new Date().toISOString(),
+    }).eq("id", conn.id);
+    return { token: null, reason: "expired" };
+  }
+  const expiresAt = new Date(Date.now() + (Number(d.expires_in) || 86400) * 1000).toISOString();
+  await db.rpc("supplier_connection_set_credentials", {
+    p_connection_id: conn.id,
+    p_credentials: { ...cred, access_token: d.access_token, refresh_token: d.refresh_token || cred.refresh_token, expires_at: expiresAt },
+  });
+  await db.from("supplier_connections").update({ token_expires_at: expiresAt, updated_at: new Date().toISOString() }).eq("id", conn.id);
+  return { token: d.access_token };
+}
+
+async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
+  // 1) Satıcının KENDİ AliExpress hesabı
+  const t = await aeToken(o.user_id);
+  if (!t.token) {
+    await update(o.id, {
+      hold_reason: "ae_hesap_yok",
+      error_message: t.reason === "expired"
+        ? "AliExpress bağlantının süresi doldu. Hesaplarım sayfasından yeniden bağlayınca sipariş kendiliğinden verilecek."
+        : "AliExpress hesabın bağlı değil. Hesaplarım sayfasından bağlayınca sipariş kendiliğinden verilecek.",
+      next_attempt_at: minutesFromNow(30),
+    });
+    return { id: o.id, status: o.status, note: "ae_hesap_yok" };
+  }
+  const token = t.token;
+
+  // Daha önce verildiyse (ödeme bekliyor vb.) burada yapılacak bir şey yok; takip işi izler
+  if (o.supplier_order_id) return { id: o.id, status: o.status, note: "zaten_verildi" };
+
+  const { data: product } = await db.from("products")
+    .select("id, supplier_item_id, supplier_variant_id, supplier_sku_attr").eq("id", o.product_id).maybeSingle();
+  const productId = String(product?.supplier_item_id || "").replace(/\D/g, "");
+  if (!productId) return await failOrRetry(o, "Üründe AliExpress ürün numarası yok.");
+
+  const city = (o.customer_city || "").trim();
+  if (!city) {
+    await update(o.id, {
+      status: "onay_bekliyor", hold_reason: "adres_eksik",
+      error_message: "Siparişte il bilgisi yok. Adresi düzeltip onaylayınca verilecek.",
+    });
+    return { id: o.id, status: "onay_bekliyor", note: "adres_eksik" };
+  }
+  const country = (o.customer_country || "TR").toUpperCase();
+  const qty = o.quantity || 1;
+
+  // 2) Seçenek (SKU) ve güncel fiyat
+  const pd = await aeCall("aliexpress.ds.product.get", token, {
+    product_id: productId, ship_to_country: country, target_currency: "USD", target_language: "en",
+  });
+  const pr = pd?.aliexpress_ds_product_get_response?.result;
+  if (!pr) return await failOrRetry(o, "AliExpress ürün bilgisi alınamadı: " + aeError(pd));
+  const skus = aeList(pr.ae_item_sku_info_dtos).map((s: any) => ({
+    sku_id: String(s.sku_id || s.id || ""),
+    sku_attr: s.sku_attr || aeList(s.ae_sku_property_dtos || s.aeop_s_k_u_propertys)
+      .map((p: any) => `${p.sku_property_id}:${p.property_value_id_long || p.property_value_id}`).join(";") || "",
+    price: parseFloat(s.offer_sale_price || s.sku_price) || null,
+    stock: Number(s.sku_available_stock ?? s.s_k_u_available_stock ?? s.ipm_sku_stock ?? 0),
+  }));
+  const sku = (product?.supplier_variant_id && skus.find((s) => s.sku_id === String(product.supplier_variant_id)))
+    || (product?.supplier_sku_attr && skus.find((s) => s.sku_attr === product.supplier_sku_attr))
+    || skus.filter((s) => s.stock > 0 && s.price).sort((a, b) => a.price! - b.price!)[0];
+  if (!sku || !sku.price) return await failOrRetry(o, "AliExpress'te bu ürünün satılabilir seçeneği bulunamadı.");
+  if (sku.stock <= 0) {
+    await update(o.id, {
+      status: "onay_bekliyor", hold_reason: "stok_yok",
+      error_message: "AliExpress'te bu ürünün seçeneği tükenmiş. Siparişi iptal edebilir ya da tedarikçiyi değiştirebilirsin.",
+    });
+    return { id: o.id, status: "onay_bekliyor", note: "stok_yok" };
+  }
+  if (product && (product.supplier_variant_id !== sku.sku_id || product.supplier_sku_attr !== sku.sku_attr)) {
+    await db.from("products").update({ supplier_variant_id: sku.sku_id, supplier_sku_attr: sku.sku_attr || null }).eq("id", product.id);
+  }
+
+  // 3) En ucuz kargo
+  const fr = await aeCall("aliexpress.logistics.buyer.freight.calculate", token, {
+    param_aeop_freight_calculate_for_buyer_d_t_o: JSON.stringify({
+      country_code: country, product_id: Number(productId), product_num: qty, send_goods_country_code: "CN",
+      sku_id: sku.sku_id, price: String(sku.price), price_currency: "USD",
+    }),
+  });
+  const frRes = fr?.aliexpress_logistics_buyer_freight_calculate_response?.result;
+  const options = aeList(frRes?.aeop_freight_calculate_result_for_buyer_d_t_o_list)
+    .map((x: any) => ({ name: x.service_name, price: Number(x.freight?.amount ?? (x.freight?.cent != null ? x.freight.cent / 100 : NaN)), cur: x.freight?.currency_code || "USD" }))
+    .filter((x: any) => x.name && Number.isFinite(x.price) && x.price >= 0 && x.cur === "USD")
+    .sort((a: any, b: any) => a.price - b.price);
+  if (!options.length) {
+    if (!frRes) return await failOrRetry(o, "AliExpress kargo ücreti alınamadı: " + aeError(fr));
+    await update(o.id, {
+      status: "onay_bekliyor", hold_reason: "kargo_yok",
+      error_message: `AliExpress bu ürün için ${country === "TR" ? "Türkiye'ye" : country + " ülkesine"} kargo seçeneği sunmuyor. Siparişi iptal edebilir ya da tedarikçiyi değiştirebilirsin.`,
+    });
+    return { id: o.id, status: "onay_bekliyor", note: "kargo_yok" };
+  }
+  const shipping = options[0];
+  const costUsd = Math.round((sku.price * qty + shipping.price) * 100) / 100;
+  await update(o.id, { cost_usd: costUsd, supplier_logistics: shipping.name });
+
+  // 4) Zarar kontrolü (her zaman; satıcı onayladıysa atlanır) - sipariş açılmadan
+  if (!opts.approved) {
+    const held = await lossHold(o, costUsd, "AliExpress");
+    if (held) return held;
+  }
+
+  // 5) Sipariş (otomatik ödeme ayarına göre kayıtlı kartla öde)
+  const { data: prof } = await db.from("user_profiles").select("ae_auto_pay").eq("user_id", o.user_id).maybeSingle();
+  const autoPay = !(prof && prof.ae_auto_pay === false);
+  const phone = String(o.customer_phone || "").replace(/\D/g, "").replace(/^(90|0)/, "");
+  const created = await aeCall("aliexpress.ds.order.create", token, {
+    ds_extend_request: JSON.stringify({
+      payment: { pay_currency: "USD", try_to_pay: autoPay ? "true" : "false" },
+      trade_extra_param: { business_model: "retail" },
+    }),
+    param_place_order_request4_open_api_d_t_o: JSON.stringify({
+      out_order_id: "SG-" + o.id,
+      logistics_address: {
+        full_name: o.customer_name || "Müşteri",
+        contact_person: o.customer_name || "Müşteri",
+        address: o.customer_address || "",
+        city: (o.customer_district || city),
+        province: city,
+        country,
+        zip: o.customer_zip || "",
+        mobile_no: phone,
+        phone_country: country === "TR" ? "+90" : "",
+        locale: "tr_TR",
+      },
+      product_items: [{
+        product_id: Number(productId),
+        product_count: qty,
+        sku_attr: sku.sku_attr || undefined,
+        logistics_service_name: shipping.name,
+        order_memo: "Seltigo SG-" + o.id,
+      }],
+    }),
+  });
+  const cr = created?.aliexpress_ds_order_create_response?.result || created?.aliexpress_trade_buy_placeorder_response?.result;
+  const numbers = aeList(cr?.order_list).map(String);
+  if (!cr?.is_success || !numbers.length) {
+    return await failOrRetry(o, "AliExpress siparişi verilemedi: " + String(cr?.error_msg || cr?.error_code || aeError(created)).slice(0, 200));
+  }
+  const aeOrderId = numbers[0];
+  await update(o.id, { supplier_order_id: aeOrderId, error_message: null, attempts: 0 });
+
+  if (!autoPay) {
+    await update(o.id, { status: "odeme_bekliyor", hold_reason: "elle_odeme" });
+    return { id: o.id, status: "odeme_bekliyor" };
+  }
+
+  // 6) Ödeme oldu mu? (kart reddedilirse sipariş AliExpress'te ödeme bekler)
+  const od = await aeCall("aliexpress.trade.ds.order.get", token, { order_id: aeOrderId, single_order_query: JSON.stringify({ order_id: Number(aeOrderId) }) });
+  const ostatus = String(od?.aliexpress_trade_ds_order_get_response?.result?.order_status || "");
+  if (ostatus === "PLACE_ORDER_SUCCESS" || ostatus === "") {
+    await update(o.id, {
+      status: "odeme_bekliyor", hold_reason: "odeme_alinamadi",
+      error_message: "AliExpress siparişi verildi ama ödeme alınamadı. AliExpress hesabındaki kayıtlı kartı kontrol et; AliExpress'te ödeyince sipariş kendiliğinden takip edilir.",
+    });
+    return { id: o.id, status: "odeme_bekliyor", note: "odeme_alinamadi" };
+  }
+  await update(o.id, { status: "tedarikciye_verildi", hold_reason: null, error_message: null, paid_at: new Date().toISOString() });
+  return { id: o.id, status: "tedarikciye_verildi" };
+}
+
+// ---------------------------------------------------------
 // Satıcı işlemleri
 // ---------------------------------------------------------
 async function sellerAction(userId: string, action: string, orderId: string) {
   const { data: o, error } = await db.from("orders").select("*").eq("id", orderId).eq("user_id", userId).maybeSingle();
   if (error) throw error;
   if (!o) return json({ error: "Sipariş bulunamadı" }, 404);
-  if (o.supplier !== "cj") return json({ error: "Bu sipariş CJ siparişi değil" }, 400);
+  if (o.supplier !== "cj" && o.supplier !== "aliexpress") return json({ error: "Bu siparişin tedarikçisi otomatik siparişi desteklemiyor" }, 400);
 
   if (action === "approve") {
     if (!["onay_bekliyor", "beklemede", "bakiye_bekliyor"].includes(o.status)) {
@@ -337,8 +599,17 @@ async function sellerAction(userId: string, action: string, orderId: string) {
   }
 
   if (action === "cancel") {
+    const supplierName = o.supplier === "aliexpress" ? "AliExpress" : "CJ";
     if (!["onay_bekliyor", "beklemede", "bakiye_bekliyor", "odeme_bekliyor", "hata"].includes(o.status)) {
-      return json({ error: "Ödenmiş sipariş buradan iptal edilemez; CJ panelinden iptal et." }, 400);
+      return json({ error: `Ödenmiş sipariş buradan iptal edilemez; ${supplierName} hesabından iptal et.` }, 400);
+    }
+    if (o.supplier === "aliexpress") {
+      // AliExpress ödenmemiş siparişi API ile silmeye izin vermiyor; birkaç gün içinde kendiliğinden kapanır
+      await update(o.id, {
+        status: "iptal", hold_reason: null,
+        error_message: o.supplier_order_id ? "AliExpress'teki ödenmemiş sipariş birkaç gün içinde kendiliğinden kapanır." : null,
+      });
+      return json({ ok: true, id: o.id, status: "iptal" });
     }
     if (o.supplier_order_id) {
       const { data: integ } = await db.from("user_integrations").select("api_key").eq("user_id", userId).eq("platform", "cj").maybeSingle();
@@ -392,7 +663,7 @@ Deno.serve(async (req) => {
     const { data: orders, error } = await db
       .from("orders")
       .select("*")
-      .eq("supplier", "cj")
+      .in("supplier", ["cj", "aliexpress"])
       .in("status", ["beklemede", "bakiye_bekliyor"])
       .lte("next_attempt_at", new Date().toISOString())
       .order("created_at", { ascending: true })
