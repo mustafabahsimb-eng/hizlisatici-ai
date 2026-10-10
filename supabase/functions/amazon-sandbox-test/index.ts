@@ -10,7 +10,7 @@ const json = (b: unknown, s = 200) =>
     headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
   });
 
-Deno.serve(async () => {
+const hsHandler = (async () => {
   const clientId = Deno.env.get("AMAZON_LWA_CLIENT_ID");
   const clientSecret = Deno.env.get("AMAZON_LWA_CLIENT_SECRET");
   const refreshToken = Deno.env.get("AMAZON_SANDBOX_REFRESH_TOKEN");
@@ -58,4 +58,30 @@ Deno.serve(async () => {
 
   const anyOk = Object.values(results).some((x: any) => x?.status === 200);
   return json({ ok: anyOk, step: "sandbox_call", results });
+});
+// =========================================================
+// GÜVENLİK: sadece giriş yapmış kullanıcılar bu fonksiyonu çalıştırabilir
+// (sayfalar app.js sayesinde kullanıcının oturum anahtarını gönderir)
+// =========================================================
+async function hsIsLoggedIn(req: Request): Promise<boolean> {
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token || token.split(".").length !== 3) return false;
+  try {
+    const r = await fetch((Deno.env.get("SUPABASE_URL") ?? "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (_e) {
+    return false;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (!(await hsIsLoggedIn(req))) {
+    return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  }
+  return hsHandler();
 });

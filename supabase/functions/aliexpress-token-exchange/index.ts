@@ -45,23 +45,30 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const url = new URL(req.url);
-
-    if (url.searchParams.get("debug") === "1") {
-      const mask = (s: string) =>
-        s.length === 0
-          ? "(BOS - env var okunamiyor!)"
-          : `uzunluk=${s.length}, baslangic="${s.slice(0, 2)}", bitis="${s.slice(-2)}", basinda/sonunda bosluk var mi=${s !== s.trim()}`;
-      return new Response(
-        JSON.stringify({
-          app_key: mask(APP_KEY),
-          app_secret: mask(APP_SECRET),
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // GÜVENLİK: bu hesap tüm sitenin AliExpress hesabıdır; sadece site sahibi bağlayabilir.
+    // Sayfalar app.js sayesinde kullanıcının oturum anahtarını Authorization başlığında gönderir.
+    const userToken = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!userToken || userToken.split(".").length !== 3) {
+      return new Response(JSON.stringify({ error: "Bu işlem için giriş yapmalısın. / Please log in." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userDb = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: "Bearer " + userToken } },
+      auth: { persistSession: false },
+    });
+    const { data: isOwner, error: ownerError } = await userDb.rpc("hs_is_owner");
+    if (ownerError || isOwner !== true) {
+      return new Response(JSON.stringify({ error: "Bu işlemi sadece site sahibi yapabilir. / Owner only." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const code = url.searchParams.get("code");
+    const url = new URL(req.url);
+    const reqBody = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const code = String(reqBody?.code || url.searchParams.get("code") || "");
     if (!code) {
       return new Response(JSON.stringify({ error: "code parametresi gerekli (?code=...)" }), {
         status: 400,

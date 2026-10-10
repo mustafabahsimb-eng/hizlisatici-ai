@@ -75,7 +75,10 @@
         'ae.copy': 'Kodu Kopyala',
         'ae.copied': 'Kopyalandı!',
         'ae.none': '(kod yok)',
-        'ae.noCode': 'URL\'de "code" parametresi bulunamadı. AliExpress yetkilendirme adımını tekrar dene.'
+        'ae.noCode': 'URL\'de "code" parametresi bulunamadı. AliExpress yetkilendirme adımını tekrar dene.',
+        'ae.saving': 'AliExpress hesabı kaydediliyor...',
+        'ae.saved': '✓ AliExpress hesabı bağlandı.',
+        'ae.failed': 'Kaydedilemedi: {e}'
       },
       en: {
         'ae.pageTitle': 'AliExpress Authorization',
@@ -84,7 +87,10 @@
         'ae.copy': 'Copy Code',
         'ae.copied': 'Copied!',
         'ae.none': '(no code)',
-        'ae.noCode': 'No "code" parameter was found in the URL. Please repeat the AliExpress authorization step.'
+        'ae.noCode': 'No "code" parameter was found in the URL. Please repeat the AliExpress authorization step.',
+        'ae.saving': 'Saving AliExpress account...',
+        'ae.saved': '✓ AliExpress account connected.',
+        'ae.failed': 'Could not save: {e}'
       }
     });
 
@@ -106,8 +112,35 @@
       });
     });
 
-    window.addEventListener('hs:langchange', render);
-    HS.init({ auth: false }).then(render);
+    // Site sahibi giriş yapmışsa kodu otomatik kaydet (app.js oturum anahtarını ekler)
+    let saveState = null, saveError = '';
+    function renderSave() {
+      if (!saveState) return;
+      warnMsg.style.display = 'block';
+      warnMsg.textContent = saveState === 'failed' ? HS.t('ae.failed', { e: saveError }) : HS.t('ae.' + saveState);
+    }
+    async function autoSave() {
+      if (!code) return;
+      const res = await HS.db.auth.getSession();
+      if (!res || !res.data || !res.data.session) return;
+      saveState = 'saving'; renderSave();
+      try {
+        const r = await fetch(HS.SUPABASE_URL + '/functions/v1/aliexpress-token-exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ code: code })
+        });
+        const d = await r.json().catch(function () { return {}; });
+        if (r.ok && d.success) { saveState = 'saved'; }
+        else { saveState = 'failed'; saveError = d.error || ('HTTP ' + r.status); }
+      } catch (e) {
+        saveState = 'failed'; saveError = e.message;
+      }
+      renderSave();
+    }
+
+    window.addEventListener('hs:langchange', function () { render(); renderSave(); });
+    HS.init({ auth: false }).then(function () { render(); autoSave(); });
   </script>
 </body>
 </html>

@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + ANON_KEY,
+            // Doğrulama fonksiyonları sadece giriş yapmış kullanıcıyı kabul eder
+            'Authorization': 'Bearer ' + body.userAccessToken,
             'apikey': ANON_KEY,
           },
           body: JSON.stringify({ sellerId, apiKey, apiSecret }),
