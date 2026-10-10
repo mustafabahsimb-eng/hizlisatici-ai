@@ -2,8 +2,10 @@
 // Seltigo - cj-alt-match (AliExpress ürününün CJ eşdeğerini arka planda bulur)
 // Neden: AliExpress API ile ödeme (API Pay) her satıcıda açık değil (Türkiye desteklenmiyor).
 // Eşdeğer bulunursa sipariş işçisi siparişi CJ'den verip CJ bakiyesinden öder.
-// Yol: 1) CJ görselle arama (anında; ad benzerliği yeterliyse kabul)
-//      2) olmazsa CJ sourcing talebi (CJ ekibi eşdeğeri bulur) -> zamanlanmış görev sonucu izler
+// Yol: 1) CJ görselle arama (anında; CJ hesap seviyesi 3 ister, altında 401 döner ve atlanır)
+//      2) CJ anahtar kelime araması (AliExpress adındaki kelimeler; sıkı ad benzerliği + Türkiye kargosu)
+//      3) olmazsa CJ sourcing talebi (CJ ekibi eşdeğeri bulur) -> zamanlanmış görev sonucu izler;
+//         talep sürerken anahtar kelime araması saatlik tekrarlanır
 // Durum: products.cj_alt_status = searching | sourcing | found | not_found | error
 // Çağıranlar: zamanlanmış görev (CRON_SECRET), Ürün Ekle (satıcı oturumu, { productId }),
 // sistem ({ cronSecret, productId, debug }).
@@ -85,7 +87,9 @@ async function cj(token: string, path: string, init: RequestInit = {}): Promise<
 // Ad benzerliği (kelime örtüşmesi, 0..1)
 const STOP = new Set(["for", "and", "with", "the", "a", "of", "to", "in", "new", "2024", "2025", "2026", "hot", "sale"]);
 function words(s: string): Set<string> {
-  return new Set(String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
+  // basit tekilleştirme: headphones -> headphone, holders -> holder (glass/case gibi kelimeler bozulmaz)
+  const stem = (w: string) => (w.length > 4 && w.endsWith("s") && !/(ss|us|is)$/.test(w) ? w.slice(0, -1) : w);
+  return new Set(String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)).map(stem));
 }
 function titleScore(a: string, b: string): number {
   const A = words(a), B = words(b);
@@ -130,6 +134,62 @@ async function sibling(p: any): Promise<any | null> {
     .order("cj_alt_checked_at", { ascending: false })
     .limit(1).maybeSingle();
   return data || null;
+}
+
+// Anahtar kelimeyle eşleştirme (CJ seviye 3 olmadan da çalışır): AliExpress adının ilk anlamlı
+// kelimeleriyle CJ'de ara. Görsel doğrulama olmadığı için iki yönlü sıkı kontrol:
+// - arama kelimelerinin (AliExpress adının özü) en az %60'ı CJ adında geçmeli (marka/model dahil)
+// - CJ adının kelimelerinin en az %50'si AliExpress adında geçmeli (başka ürün olmasın)
+// ve Türkiye'ye kargosu olmalı.
+const KW_COUNT = 6;
+const MIN_QUERY_COVER = 0.6;
+const MIN_CAND_COVER = 0.5;
+async function keywordMatch(token: string, p: any, trace: any) {
+  const all = words(p.name);
+  const ws = [...all].slice(0, KW_COUNT);
+  if (ws.length < 3) return null;
+  const tried = new Set<string>();
+  // CJ araması tüm kelimeleri birlikte arıyor; uzun sorgu çoğu zaman boş döner -> kısalarak dene
+  // (baştaki kelime çoğu zaman marka olduğundan onsuz da dene). En fazla 4 arama.
+  const queries = [ws.slice(0, 4), ws.slice(1, 4), ws.slice(0, 3), ws.slice(1, 3)].map((q) => q.join(" "));
+  for (const kw of queries) {
+    if (tried.has(kw) || tried.size >= 4) continue;
+    tried.add(kw);
+    if (tried.size > 1) await new Promise((res) => setTimeout(res, 1100)); // CJ: saniyede 1 arama
+    // Aynı CJ hesabını başka işler de kullanıyor olabilir -> sınır hatasında artan beklemeyle 3 kez dene
+    let r: any = null;
+    for (let i = 0; i < 4; i++) {
+      r = await cj(token, `/product/listV2?keyWord=${encodeURIComponent(kw)}&page=1&size=20`, { method: "GET" });
+      if (!(r?._http === 429 || /too many|qps|frequen/i.test(String(r?.message || "")))) break;
+      await new Promise((res) => setTimeout(res, 1200 * (i + 1) + Math.floor(Math.random() * 500)));
+    }
+    const list = r?.data?.content?.[0]?.productList || [];
+    const all3 = (Array.isArray(list) ? list : [])
+      .map((c: any) => {
+        const name = c.nameEn || c.productNameEn || "";
+        const B = words(name);
+        const qHit = ws.filter((w) => B.has(w)).length;
+        let cHit = 0;
+        B.forEach((w) => { if (all.has(w)) cHit++; });
+        const qCover = qHit / ws.length, cCover = B.size ? cHit / B.size : 0;
+        return { pid: String(c.id || c.pid || ""), name, qCover, cCover, score: (qCover + cCover) / 2 };
+      })
+      .sort((a: any, b: any) => b.score - a.score);
+    const scored = all3.filter((c: any) => c.pid && c.qCover >= MIN_QUERY_COVER && c.cCover >= MIN_CAND_COVER);
+    if (trace) trace.keyword = (trace.keyword || []).concat([{ kw, results: list.length, accepted: scored.length, top: all3.slice(0, 3), msg: list.length ? undefined : short(r?.message, 120) }]);
+    for (const c of scored.slice(0, 3)) {
+      const v = await pickVariantAndCost(token, c.pid, null);
+      if (!(v as any).error && !(v as any).noShipping) return { pid: c.pid, score: c.score, v };
+    }
+  }
+  return null;
+}
+
+async function saveKeywordMatch(p: any, m: any) {
+  await save(p.id, {
+    cj_alt_status: "found", cj_alt_source: "keyword", cj_alt_pid: m.pid, cj_alt_vid: m.v.vid, cj_alt_cost_usd: m.v.cost,
+    cj_alt_note: `CJ'de adıyla bulundu (benzerlik %${Math.round(m.score * 100)})` + (m.v.label ? `, seçenek: ${m.v.label}` : ""),
+  });
 }
 
 async function save(id: number, patch: Record<string, unknown>) {
@@ -190,6 +250,14 @@ async function processProduct(p: any, debug = false): Promise<any> {
       await save(p.id, { cj_alt_status: "not_found", cj_alt_note: "CJ bu ürünün eşdeğerini bulamadı" + (s?.failReasonStr ? `: ${short(s.failReasonStr, 150)}` : "") });
       return { id: p.id, status: "not_found", ...trace };
     }
+    // Talep sürerken anahtar kelimeyle de dene (CJ kataloğuna yeni ürün eklenmiş olabilir).
+    // Kontrol saatlik; ad araması her ürün için günde bir kez (saatlere yayılmış) yeterli.
+    const kwToday = debug || (Number(p.id) + new Date().getUTCHours()) % 24 === 0;
+    const km = kwToday ? await keywordMatch(token, p, debug ? trace : null) : null;
+    if (km) {
+      await saveKeywordMatch(p, km);
+      return { id: p.id, status: "found", source: "keyword", ...trace };
+    }
     await save(p.id, { cj_alt_note: "CJ ekibi eşdeğerini arıyor" + (s?.sourceStatusStr ? ` (${short(s.sourceStatusStr, 60)})` : "") });
     return { id: p.id, status: "sourcing", ...trace };
   }
@@ -220,7 +288,14 @@ async function processProduct(p: any, debug = false): Promise<any> {
     }
   }
 
-  // ---- 3) Sourcing talebi aç (CJ ekibi bulur)
+  // ---- 3) Anahtar kelimeyle arama (seviye 3 gerekmez)
+  const km = await keywordMatch(token, p, debug ? trace : null);
+  if (km) {
+    await saveKeywordMatch(p, km);
+    return { id: p.id, status: "found", source: "keyword", ...trace };
+  }
+
+  // ---- 4) Sourcing talebi aç (CJ ekibi bulur)
   if (!image) {
     await save(p.id, { cj_alt_status: "not_found", cj_alt_note: "Üründe görsel yok; CJ'de eşdeğeri aranamadı" });
     return { id: p.id, status: "not_found", ...trace };
@@ -265,6 +340,16 @@ Deno.serve(async (req) => {
   const isCron = !!CRON_SECRET && String(body?.cronSecret || "").trim() === CRON_SECRET.trim();
 
   try {
+    // Ayar denemesi (yalnız sistem): verilen adla anahtar kelime eşleştirmesi, kayıt yapmaz
+    if (isCron && typeof body?.testName === "string") {
+      const key = CJ_API_KEY_SITE;
+      const token = key ? await cjToken(key) : null;
+      if (!token) return json({ error: "CJ token yok" }, 500);
+      const trace: any = {};
+      const m = await keywordMatch(token, { name: body.testName }, trace);
+      return json({ ok: true, match: m ? { pid: m.pid, score: m.score, vid: m.v.vid, cost: m.v.cost, label: m.v.label } : null, ...trace });
+    }
+
     // Tek ürün: satıcı (kendi ürünü) ya da sistem
     if (body?.productId != null) {
       let q = db.from("products").select("*").eq("id", Number(body.productId)).eq("supplier", "aliexpress").is("deleted_at", null);
@@ -289,6 +374,7 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("supplier", "aliexpress").is("deleted_at", null)
       .or(`cj_alt_status.is.null,and(cj_alt_status.in.(searching,sourcing,error),cj_alt_checked_at.lt.${recheckBefore})`)
+      .order("cj_alt_status", { ascending: true, nullsFirst: true }) // yeni ürünler önce
       .order("created_at", { ascending: true })
       .limit(MAX_PRODUCTS);
     if (error) throw error;
