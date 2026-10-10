@@ -297,6 +297,26 @@
       </div>
     </div>
 
+    <!-- ========== OTOMATİK SİPARİŞ ========== -->
+    <div class="section-title" id="otomatik-siparis" data-t="secAutoOrder"></div>
+    <div class="card">
+      <div class="card-desc" data-t="dAutoOrder"></div>
+      <div class="check-row">
+        <input type="checkbox" id="cj_auto_pay">
+        <div>
+          <label for="cj_auto_pay" data-t="lCjAutoPay"></label>
+          <div class="hint" data-t="hCjAutoPay"></div>
+        </div>
+      </div>
+      <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="wa_tracking_notify">
+        <div>
+          <label for="wa_tracking_notify" data-t="lWaNotify"></label>
+          <div class="hint" id="waTemplateStatus"></div>
+        </div>
+      </div>
+    </div>
+
   </form>
 </main>
 
@@ -375,6 +395,18 @@ const T = {
     epr_DE: 'Almanya – LUCID numarası', epr_FR: 'Fransa – UIN numarası', epr_PL: 'Polonya – BDO numarası',
     epr_IT: 'İtalya – kayıt numarası', epr_NL: 'Hollanda – kayıt numarası', epr_IE: 'İrlanda – kayıt numarası', epr_DK: 'Danimarka – kayıt numarası',
     secReturn: '📦 İade Adresi',
+    secAutoOrder: '🤖 Otomatik sipariş',
+    dAutoOrder: 'Mağazana gelen tedarikçili (CJ) siparişler kendiliğinden tedarikçiye gönderilir. Zararlı siparişler her zaman ödenmeden onayına düşer.',
+    lCjAutoPay: 'CJ siparişlerini bakiyemden otomatik öde',
+    hCjAutoPay: 'Kapalıysa sipariş CJ\'de oluşturulur, ödemesini CJ panelinden sen yaparsın. Bakiye yetmezse sipariş bekler ve Siparişler sayfasında uyarı çıkar.',
+    lWaNotify: 'Kargo çıkınca müşteriye WhatsApp mesajı gönder',
+    waTplLabel: 'WhatsApp mesaj şablonu: {s}',
+    waTplNone: 'WhatsApp hesabın bağlı değil; müşterin kargosunu takip sayfasından izler.',
+    waTpl_PENDING: 'Onay bekliyor',
+    waTpl_NOT_SUBMITTED: 'Onay bekliyor',
+    waTpl_APPROVED: 'Onaylandı',
+    waTpl_REJECTED: 'Reddedildi',
+    waTpl_ERROR: 'Onaya gönderilemedi, tekrar denenecek',
     dReturn: 'Müşteri iadelerinin gönderileceği adres. AB\'de 14 gün cayma hakkı olduğu için pazaryerleri bu bilgiyi istiyor.',
     lRetName: 'Alıcı adı',
     lAddress: 'Adres',
@@ -456,6 +488,18 @@ const T = {
     epr_DE: 'Germany – LUCID number', epr_FR: 'France – UIN number', epr_PL: 'Poland – BDO number',
     epr_IT: 'Italy – registration number', epr_NL: 'Netherlands – registration number', epr_IE: 'Ireland – registration number', epr_DK: 'Denmark – registration number',
     secReturn: '📦 Return Address',
+    secAutoOrder: '🤖 Automatic orders',
+    dAutoOrder: 'Supplier (CJ) orders from your store are sent to the supplier automatically. Loss-making orders always wait for your approval unpaid.',
+    lCjAutoPay: 'Pay CJ orders from my balance automatically',
+    hCjAutoPay: 'If off, the order is created at CJ and you pay it in the CJ panel. If your balance is too low, the order waits and a warning appears on the Orders page.',
+    lWaNotify: 'Send the customer a WhatsApp message when the order ships',
+    waTplLabel: 'WhatsApp message template: {s}',
+    waTplNone: 'Your WhatsApp is not connected; customers follow their package on the tracking page.',
+    waTpl_PENDING: 'Awaiting approval',
+    waTpl_NOT_SUBMITTED: 'Awaiting approval',
+    waTpl_APPROVED: 'Approved',
+    waTpl_REJECTED: 'Rejected',
+    waTpl_ERROR: 'Could not submit, will retry',
     dReturn: 'Where customer returns are sent. Marketplaces require this because of the 14-day withdrawal right in the EU.',
     lRetName: 'Recipient name',
     lAddress: 'Address',
@@ -586,6 +630,28 @@ async function loadCountries() {
   buildCountrySelects();
 }
 
+// WhatsApp kargo şablonunun Meta onay durumu (wa-template-worker günceller)
+let waTplState = null;
+async function loadWaTemplate() {
+  try {
+    const { data: ch } = await db.from('social_channels').select('id').eq('platform', 'whatsapp').eq('active', true).limit(1);
+    if (!ch || !ch.length) { waTplState = 'none'; }
+    else {
+      const { data: tpl } = await db.from('whatsapp_templates').select('status').order('updated_at', { ascending: false }).limit(1);
+      waTplState = (tpl && tpl.length && tpl[0].status) || 'PENDING';
+    }
+  } catch (e) { waTplState = null; }
+  renderWaTemplate();
+}
+function renderWaTemplate() {
+  const el = $('waTemplateStatus');
+  if (!el || !waTplState) return;
+  if (waTplState === 'none') { el.textContent = t('waTplNone'); return; }
+  const k = 'waTpl_' + waTplState;
+  const s = T[lang()][k] !== undefined || T.tr[k] !== undefined ? t(k) : t('waTpl_PENDING');
+  el.textContent = t('waTplLabel').replace('{s}', s);
+}
+
 async function loadProfile() {
   let { data: profile, error } = await db.from('user_profiles').select('*').eq('user_id', currentUserId).maybeSingle();
   if (error) throw error;
@@ -660,6 +726,9 @@ function fillForm(p) {
   $('vat_number').value = p.vat_number || '';
   toggleVatNumber();
   $('oss_registered').checked = !!p.oss_registered;
+  // Otomatik sipariş: varsayılan açık
+  $('cj_auto_pay').checked = p.cj_auto_pay !== false;
+  $('wa_tracking_notify').checked = p.wa_tracking_notify !== false;
   $('ioss_number').value = p.ioss_number || '';
   $('eori_number').value = p.eori_number || '';
 
@@ -771,6 +840,8 @@ async function saveProfile() {
     vat_registered: vatRegistered,
     vat_number: vatRegistered ? valOrNull('vat_number') : null,
     oss_registered: $('oss_registered').checked,
+    cj_auto_pay: $('cj_auto_pay').checked,
+    wa_tracking_notify: $('wa_tracking_notify').checked,
     ioss_number: valOrNull('ioss_number'),
     eori_number: valOrNull('eori_number'),
     gpsr_responsible_person: buildJson({
@@ -827,6 +898,7 @@ async function init() {
     await loadCountries();
     await loadProfile();
     await loadBrand();
+    loadWaTemplate();
     applyTexts();
     $('loading').classList.add('hidden');
     $('settingsForm').classList.remove('hidden');
@@ -852,6 +924,7 @@ $('settingsForm').addEventListener('input', () => setStatus(null));
 function onLangChange() {
   if ($('ui_language').value !== lang() && (lang() === 'tr' || lang() === 'en')) $('ui_language').value = lang();
   applyTexts();
+  renderWaTemplate();
 }
 window.addEventListener('hs:langchange', onLangChange);
 document.addEventListener('hs:langchange', onLangChange);
