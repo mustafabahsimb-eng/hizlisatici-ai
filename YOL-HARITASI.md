@@ -10,10 +10,12 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
   - Öneri: Hetzner'de küçük sunucu (~€6,5–12,5/ay) ya da QuotaGuard ($19+/ay). Şirket kurulunca.
 - [ ] **E-posta gönderen adı** — Supabase'in kendi e-posta servisi "Supabase Auth" adıyla ve saatte birkaç e-postayla sınırlı gönderiyor; alan adıyla özel SMTP gerekli (şablonlar Seltigo'ya çevrildi).
 - [ ] **CJ gerçek ödeme adımı** — Bakiyeden otomatik ödeme (payBalanceV2) para harcamamak için denenmedi; ilk gerçek siparişte izlenmeli.
+- [ ] **AliExpress uygulamasını yayın (online) aşamasına geçir** — test aşamasında anahtar 24 saat, izin 48 saat geçerli; satıcıların her 2 günde yeniden bağlanmaması için şart (otomatik yenileme ve uyarı hazır).
+- [ ] **AliExpress gerçek ödeme adımı** — kayıtlı kartla otomatik ödeme (try_to_pay) para harcamamak için denenmedi; ilk gerçek siparişte izlenmeli.
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Sıradaki işler
-- [~] AliExpress sipariş ve kargo takibi — kod ve arayüz hazır; gerçek sipariş testi site sahibinin AliExpress hesabı bağlanınca
+- [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
 - [ ] Siteden toplu ürün çekmeyi tamamlama (Excel indir)
 - [ ] Müşteri Hizmetleri Otomatik Pilotu (WhatsApp / Instagram mesajları)
 - [ ] WhatsApp ürün linki ("satıcıya yaz")

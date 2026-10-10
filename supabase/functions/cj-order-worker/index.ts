@@ -379,6 +379,16 @@ function aeList(v: any): any[] {
   return [];
 }
 
+// AliExpress adres alanlarında sadece İngilizce (ASCII) karakter kabul ediyor
+const TR_MAP: Record<string, string> = { "ı": "i", "İ": "I", "ş": "s", "Ş": "S", "ğ": "g", "Ğ": "G", "ü": "u", "Ü": "U", "ö": "o", "Ö": "O", "ç": "c", "Ç": "C" };
+function ascii(v: unknown): string {
+  return String(v ?? "")
+    .replace(/[ıİşŞğĞüÜöÖçÇ]/g, (ch) => TR_MAP[ch] || ch)
+    .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ").trim();
+}
+
 function aeError(d: any): string {
   const e = d?.error_response || d;
   return String(e?.msg || e?.sub_msg || e?.message || e?.error_msg || JSON.stringify(d).slice(0, 200));
@@ -555,11 +565,11 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
     param_place_order_request4_open_api_d_t_o: JSON.stringify({
       out_order_id: "SG-" + o.id,
       logistics_address: {
-        full_name: o.customer_name || "Müşteri",
-        contact_person: o.customer_name || "Müşteri",
-        address: o.customer_address || "",
-        city: (o.customer_district || city),
-        province: city,
+        full_name: ascii(o.customer_name) || "Customer",
+        contact_person: ascii(o.customer_name) || "Customer",
+        address: ascii(o.customer_address),
+        city: ascii(o.customer_district || city),
+        province: ascii(city),
         country,
         zip: o.customer_zip || "",
         mobile_no: phone,
