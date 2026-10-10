@@ -1,5 +1,5 @@
 // =========================================================
-// HızlıSatıcı AI - Sosyal medyada paylaş (share.js)
+// Seltigo - Sosyal medyada paylaş (share.js)
 // Kullanım: HSShare.open([ürün id, ...])
 // Kanallar: WhatsApp, Instagram, Facebook, Telegram (kullanıcı kullandıklarını işaretler, seçim hatırlanır)
 // Telefonda: telefonun paylaşım menüsü resimler + yazıyla açılır.

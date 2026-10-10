@@ -86,7 +86,7 @@ const hsHandler = (async (req: Request) => {
       ? productList.map((p: any) => `- ${p.name} (id: ${p.id}, platform: ${p.platform || "-"})`).join("\n")
       : "(henüz hiç ürün yok)";
 
-    const systemPrompt = `Sen HızlıSatıcı AI adlı bir e-ticaret uygulamasının sohbet asistanısın. Kullanıcı sana doğal dille (Türkçe) komut veriyor, sen bu komutun ne anlama geldiğini anlayıp yapılacak işlemi JSON olarak döneceksin. Veritabanı işlemini SEN yapmıyorsun, sadece hangi işlemin yapılacağını belirliyorsun - gerçek işlemi uygulama yapacak.
+    const systemPrompt = `Sen Seltigo adlı bir e-ticaret uygulamasının sohbet asistanısın. Kullanıcı sana doğal dille (Türkçe) komut veriyor, sen bu komutun ne anlama geldiğini anlayıp yapılacak işlemi JSON olarak döneceksin. Veritabanı işlemini SEN yapmıyorsun, sadece hangi işlemin yapılacağını belirliyorsun - gerçek işlemi uygulama yapacak.
 
 Kullanıcının şu anki ürün listesi:
 ${productListText}

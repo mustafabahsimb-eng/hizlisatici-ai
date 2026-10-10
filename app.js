@@ -1,5 +1,5 @@
 /* ============================================================
-   HızlıSatıcı AI - Ortak yardımcı dosya (app.js)
+   Seltigo - Ortak yardımcı dosya (app.js)
    Kullanım (her sayfada, supabase-js'ten SONRA):
      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
      <script src="app.js"></script>
