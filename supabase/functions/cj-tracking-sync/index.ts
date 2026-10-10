@@ -268,11 +268,19 @@ async function aeToken(userId: string): Promise<string | null> {
   return d.access_token;
 }
 
+// Kapanış sebebi: end_reason ya da extend_map (JSON metin) içindeki endReason
+function aeEndReason(res: any): string {
+  if (res?.end_reason) return String(res.end_reason);
+  try { return String(JSON.parse(res?.extend_map || "{}")?.endReason || ""); } catch (_) { return ""; }
+}
+
 // AliExpress sipariş durumunu bizim durumlarımıza çevir
 function mapAeStatus(current: string, orderStatus: string, logisticsStatus: string, endReason: string, trackNumber: string | null): string {
   const os = orderStatus.toUpperCase();
   const ls = logisticsStatus.toUpperCase();
-  if (os === "IN_CANCEL" || (os === "FINISH" && /cancel|close|timeout/i.test(endReason))) return "iptal";
+  // Kapanan sipariş de FINISH döner; sebep endReason'da (ödeme süresi doldu, iptal, risk...). Hiç ödenmemiş
+  // (bizde "Ödeme bekliyor") bir siparişin FINISH olması da kapandığı anlamına gelir.
+  if (os === "IN_CANCEL" || (os === "FINISH" && (current === "odeme_bekliyor" || /cancel|close|timeout|reject|risk|security|refuse|chargeback/i.test(endReason)))) return "iptal";
   if (ls === "BUYER_ACCEPT_GOODS" || os === "FINISH") return "teslim_edildi";
   if (trackNumber || ls === "SELLER_SEND_GOODS" || os === "WAIT_BUYER_ACCEPT_GOODS") return "kargoya_verildi";
   if (current === "odeme_bekliyor" && os && os !== "PLACE_ORDER_SUCCESS") return "tedarikciye_verildi";
@@ -313,7 +321,7 @@ async function aeDetail(o: any, token: string) {
     trackNumber,
     carrier: logi?.logistics_service || null,
     supplierStatus,
-    newStatus: mapAeStatus(o.status, supplierStatus, String(res.logistics_status || ""), String(res.end_reason || ""), trackNumber),
+    newStatus: mapAeStatus(o.status, supplierStatus, String(res.logistics_status || ""), aeEndReason(res), trackNumber),
   };
 }
 
