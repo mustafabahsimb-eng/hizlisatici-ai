@@ -19,7 +19,7 @@ AliExpress'te onaylanan geliştirici türü **sonradan değiştirilemiyor**.
 - **Dropshipping Developer (Individual)**: Şirket gerekmez; kimlik belgesiyle yapılır.
 - **Dropshipping Developer (Corporation)**: Şirket belgeleri gerekir.
 
-Öneri: Şirket kurulacağı için başvuruyu **şirket kurulduktan sonra Corporation** olarak yapmak.
+**Karar (11 Ekim 2026): Başvuru şirket kurulduktan sonra Corporation olarak yapılacak.**
 Bireysel profil zaten onaylanmışsa değiştirilemez; o durumda şirket için yeni bir geliştirici hesabı gerekebilir.
 
 ## Adımlar
