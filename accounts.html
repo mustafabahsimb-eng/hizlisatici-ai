@@ -333,6 +333,7 @@
       d_cj: 'Ürün arama ve tedarik için kullandığımız ana kaynak. İstersen kendi CJ hesabını bağlayıp aramaları kendi hesabınla yapabilirsin.',
       d_aliexpress: 'Ek ürün kaynağı. Siparişlerin otomatik verilmesi için kendi AliExpress hesabını bağla; siparişler hesabındaki kayıtlı kartla ödenir.',
       aeConfirmRemove: 'AliExpress bağlantını kaldırmak istediğine emin misin? AliExpress siparişleri otomatik verilemeyecek.',
+      aeSince: '{d} tarihinden beri',
       d_printify: 'Tişört, kupa gibi ürünlere kendi tasarımını bas, sipariş gelince Printify üretip gönderir. Bağlantı ve ürün oluşturma Print on Demand sayfasından yapılır.',
       d_temu: 'Resmi bir açık API\'si var ama ortaklık onayı gerekiyor, şimdilik entegrasyon planlanmıyor',
       // panel ipuçları
@@ -455,6 +456,7 @@
       d_cj: 'Our main source for product search and sourcing. You can connect your own CJ account to search with it.',
       d_aliexpress: 'Additional product source. Connect your own AliExpress account so orders are placed automatically; they are paid with the card saved on your account.',
       aeConfirmRemove: 'Remove your AliExpress connection? AliExpress orders can no longer be placed automatically.',
+      aeSince: 'since {d}',
       d_printify: 'Print your designs on t-shirts, mugs and more; Printify produces and ships when an order comes in. Connection and product creation are on the Print on Demand page.',
       d_temu: 'Has an official open API but requires partnership approval; no integration planned for now',
       h_trendyol: 'Enter the Seller ID, API Key and API Secret from the Trendyol panel (My Account > Integration Info).',
@@ -945,10 +947,11 @@
     if (!el) return;
     try {
       const { data, error } = await db.from('supplier_connections')
-        .select('account_name, status').eq('supplier', 'aliexpress').maybeSingle();
+        .select('status, connected_at').eq('supplier', 'aliexpress').maybeSingle();
       if (error) throw error;
       if (data && data.status === 'connected') {
-        el.innerHTML = '<span class="acc-status connected">' + t('stOwn') + (data.account_name ? ' · ' + esc(data.account_name) : '') + '</span>' +
+        // AliExpress'in verdiği hesap adı teknik bir kod (ör. tr15...); yerine bağlanma tarihi gösterilir
+        el.innerHTML = '<span class="acc-status connected">' + t('stOwn') + (data.connected_at ? ' · ' + esc(t('aeSince', { d: HS.date(data.connected_at) })) : '') + '</span>' +
           '<button class="acc-btn secondary" onclick="disconnectAliExpress()">' + t('btnRemove') + '</button>';
       } else if (data) {
         el.innerHTML = '<span class="acc-status error">' + t('stExpired') + '</span>' +
