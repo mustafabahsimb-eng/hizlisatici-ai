@@ -5,6 +5,10 @@
 - Kullanıcıdan bir şey yapmasını istediğinde (sayfayı test et, panelden bir ayara bak vb.) mesajın EN ÜSTÜNE tıklanabilir adresi koy. Canlı sayfa: https://mustafabahsimb-eng.github.io/hizlisatici-ai/<sayfa>.html — Supabase paneli: https://supabase.com/dashboard/project/ytucdrrgxsjhrqmaxckt
 - Kullanıcıya iş verirken tek seferde, eksiksiz ver (adres + ne yapacağı). Tek bir işi tıklama tıklama mikro adımlara bölme.
 - Senin yapabileceğin bir şeyi (tablo şemasını bulmak, dosya okumak, sorgu çalıştırmak) kullanıcıdan isteme; kendin bul.
+- Tarayıcı testlerini SEN yaparsın (Playwright ile sayfayı aç, tıkla, ekran görüntüsü al ve kendin bak). Kullanıcıdan sadece onun hesabını, ödemesini veya kararını gerektiren şeyleri iste.
+  - Kurulum bu bilgisayarda: %LOCALAPPDATA%\seltigo-e2e\venv (Python, playwright==1.63.0 + Chromium). Testler depoda tests/e2e/ altında; ortak yardımcılar tests/e2e/ortak.py.
+  - Giriş gereken sayfalarda kullanıcının hesabını DEĞİL, test kullanıcısını kullan: e2e-test@seltigo.test. Şifresi sadece %LOCALAPPDATA%\seltigo-e2e\test-user.env dosyasında durur; depoya, commit'e, mesaja yazma.
+  - Ekran görüntülerini depoya değil geçici klasöre kaydet.
 
 ## Karar kuralları
 - Teknik kararları sen ver. AMA arayüzde kullanıcıya görünen isimleri (menü, düğme, bölüm, sekme adları) ve ürün kararlarını ASLA kendin seçme; seçenek sun ve kullanıcıya sor.
