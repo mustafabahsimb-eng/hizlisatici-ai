@@ -39,6 +39,43 @@ async function getUserCjApiKey(userAccessToken: string | undefined): Promise<str
   }
 }
 
+// CJ giriş anahtarı: 180 gün geçerli, getAccessToken saniyede en fazla 1 çağrı kabul ediyor.
+// Bu yüzden anahtar veritabanında (cj_tokens, sadece sunucu) saklanıp tüm fonksiyonlarca paylaşılır.
+const cjTokenMemo = new Map<string, string>();
+async function cjAccessToken(apiKey: string): Promise<string | null> {
+  if (!apiKey) return null;
+  if (cjTokenMemo.has(apiKey)) return cjTokenMemo.get(apiKey)!;
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(apiKey))))
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
+  const { data: row } = await admin.from("cj_tokens").select("access_token, expires_at").eq("key_hash", hash).maybeSingle();
+  if (row?.access_token && new Date(row.expires_at).getTime() > Date.now() + 86400000) {
+    cjTokenMemo.set(apiKey, row.access_token);
+    return row.access_token;
+  }
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch("https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey }),
+      });
+      const d = await r.json().catch(() => ({}));
+      const t = d?.data?.accessToken;
+      if (t) {
+        const exp = new Date(d.data.accessTokenExpiryDate || "");
+        await admin.from("cj_tokens").upsert({
+          key_hash: hash, access_token: t,
+          expires_at: (isNaN(exp.getTime()) ? new Date(Date.now() + 14 * 86400000) : exp).toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        cjTokenMemo.set(apiKey, t);
+        return t;
+      }
+    } catch (_) { /* tekrar dene */ }
+    await new Promise((res) => setTimeout(res, 1100 * (i + 1))); // saniyede 1 çağrı sınırı
+  }
+  return null;
+}
+
 const hsHandler = (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -67,13 +104,8 @@ const hsHandler = (async (req: Request) => {
       });
     }
 
-    const authRes = await fetch(AUTH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: CJ_API_KEY }),
-    });
-    const authData = await authRes.json();
-    const accessToken = authData?.data?.accessToken;
+    const accessToken = await cjAccessToken(CJ_API_KEY);
+    const authData = { message: "CJ giriş anahtarı alınamadı (sınır ya da geçersiz API anahtarı)" };
 
     if (!accessToken) {
       const prefix = usingOwnAccount ? "Kendi CJ hesabınla giriş başarısız: " : "CJ girişi başarısız: ";
