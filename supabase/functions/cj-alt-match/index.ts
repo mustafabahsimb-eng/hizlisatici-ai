@@ -120,6 +120,18 @@ async function pickVariantAndCost(token: string, pid: string, sku: string | null
   };
 }
 
+// Aynı AliExpress ürününün (supplier_item_id) daha önce eşleştirilmiş başka bir kaydı
+async function sibling(p: any): Promise<any | null> {
+  if (!p.supplier_item_id) return null;
+  const { data } = await db.from("products")
+    .select("cj_alt_status, cj_alt_source, cj_alt_pid, cj_alt_vid, cj_alt_sourcing_id, cj_alt_cost_usd, cj_alt_note")
+    .eq("supplier", "aliexpress").eq("supplier_item_id", p.supplier_item_id).neq("id", p.id)
+    .in("cj_alt_status", ["found", "sourcing", "not_found"])
+    .order("cj_alt_checked_at", { ascending: false })
+    .limit(1).maybeSingle();
+  return data || null;
+}
+
 async function save(id: number, patch: Record<string, unknown>) {
   await db.from("products").update({ ...patch, cj_alt_checked_at: new Date().toISOString() }).eq("id", id);
 }
@@ -140,6 +152,19 @@ async function processProduct(p: any, debug = false): Promise<any> {
   if (!image) {
     const { data: img } = await db.from("product_images").select("url").eq("product_id", p.id).order("position").limit(1).maybeSingle();
     image = img?.url || null;
+  }
+
+  // ---- 0) Aynı AliExpress ürünü için daha önce bulunmuş/aranan eşdeğer varsa onu kullan
+  //         (farklı satıcılar aynı ürünü ekleyebilir; CJ aynı ürün için ikinci talebi reddediyor)
+  if (!p.cj_alt_status || p.cj_alt_status === "searching" || p.cj_alt_status === "error") {
+    const sib = await sibling(p);
+    if (sib) {
+      await save(p.id, {
+        cj_alt_status: sib.cj_alt_status, cj_alt_source: sib.cj_alt_source, cj_alt_pid: sib.cj_alt_pid, cj_alt_vid: sib.cj_alt_vid,
+        cj_alt_sourcing_id: sib.cj_alt_sourcing_id, cj_alt_cost_usd: sib.cj_alt_cost_usd, cj_alt_note: sib.cj_alt_note,
+      });
+      return { id: p.id, status: sib.cj_alt_status, source: "aynı ürün" };
+    }
   }
 
   // ---- 1) Sourcing talebi zaten açıksa: sonucu sor
@@ -216,6 +241,17 @@ async function processProduct(p: any, debug = false): Promise<any> {
   if (debug) trace.sourcingCreate = JSON.stringify(created).slice(0, 800);
   const sid = created?.data?.cjSourcingId || created?.data?.sourceId || created?.data;
   if (!created?.result || !sid || typeof sid === "object") {
+    // CJ'de bu ürün için talep zaten varsa (başka kayıttan) ona bağlan
+    if (/already exist/i.test(String(created?.message || ""))) {
+      const sib = await sibling(p);
+      if (sib) {
+        await save(p.id, {
+          cj_alt_status: sib.cj_alt_status, cj_alt_source: sib.cj_alt_source, cj_alt_pid: sib.cj_alt_pid, cj_alt_vid: sib.cj_alt_vid,
+          cj_alt_sourcing_id: sib.cj_alt_sourcing_id, cj_alt_cost_usd: sib.cj_alt_cost_usd, cj_alt_note: sib.cj_alt_note,
+        });
+        return { id: p.id, status: sib.cj_alt_status, source: "aynı ürün", ...trace };
+      }
+    }
     await save(p.id, { cj_alt_status: "error", cj_alt_note: "CJ eşdeğer talebi açılamadı: " + short(created?.message, 150) });
     return { id: p.id, status: "error", ...trace };
   }
@@ -252,7 +288,7 @@ Deno.serve(async (req) => {
     const { data: list, error } = await db.from("products")
       .select("*")
       .eq("supplier", "aliexpress").is("deleted_at", null)
-      .or(`cj_alt_status.is.null,and(cj_alt_status.in.(searching,sourcing),cj_alt_checked_at.lt.${recheckBefore})`)
+      .or(`cj_alt_status.is.null,and(cj_alt_status.in.(searching,sourcing,error),cj_alt_checked_at.lt.${recheckBefore})`)
       .order("created_at", { ascending: true })
       .limit(MAX_PRODUCTS);
     if (error) throw error;
