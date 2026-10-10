@@ -1,9 +1,10 @@
 // =========================================================
 // HızlıSatıcı AI - create-store-order (mağaza vitrininden sipariş)
 // Yeni yapı: sipariş "🏪 Kendi Mağazam" (own_store) ilanına göre doğrulanır,
-// fiyat ilandan alınır. Dışarıya sadece sipariş no ve durum döner.
+// fiyat ilandan alınır. Dışarıya sipariş no, durum ve müşterinin takip anahtarı döner.
 // POST { store_slug, product_id, listing_id, customer_name, customer_phone,
-//        customer_address, quantity, language }
+//        customer_address, customer_city, customer_district, customer_zip,
+//        quantity, language }
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -44,12 +45,15 @@ Deno.serve(async (req) => {
     const name = clean(body.customer_name, 120);
     const phone = clean(body.customer_phone, 30);
     const address = clean(body.customer_address, 500);
+    const city = clean(body.customer_city, 60);
+    const district = clean(body.customer_district, 60);
+    const zip = clean(body.customer_zip, 12);
     let qty = parseInt(body.quantity, 10);
     if (!Number.isFinite(qty) || qty < 1) qty = 1;
     if (qty > 99) qty = 99;
 
-    if (!storeSlug || !productId || !name || !phone || !address) {
-      return json({ error: msg("Eksik bilgi: ad, telefon ve adres zorunlu", "Missing info: name, phone and address are required") }, 400);
+    if (!storeSlug || !productId || !name || !phone || !address || !city || !district) {
+      return json({ error: msg("Eksik bilgi: ad, telefon, adres, il ve ilçe zorunlu", "Missing info: name, phone, address, province and district are required") }, 400);
     }
     if (phone.replace(/\D/g, "").length < 7) {
       return json({ error: msg("Telefon numarası geçersiz", "Invalid phone number") }, 400);
@@ -93,32 +97,33 @@ Deno.serve(async (req) => {
       return json({ error: msg("Bu ürün tükendi", "This product is sold out") }, 409);
     }
 
-    // 4) Sipariş notu: adet + ilandaki fiyat (fiyat her zaman sunucudan)
+    // 4) Adet, fiyat (her zaman sunucudan, ilandaki fiyat) ve adres ayrı alanlarda
     const price = Number(listing.price);
     const cur = listing.currency || "TRY";
-    const parts = [];
-    if (qty > 1) parts.push(`Adet: ${qty}`);
-    if (Number.isFinite(price) && price > 0) {
-      parts.push(`Birim fiyat: ${price.toFixed(2)} ${cur}`);
-      if (qty > 1) parts.push(`Toplam: ${(price * qty).toFixed(2)} ${cur}`);
-    }
-    const fullAddress = parts.length ? `${address} (${parts.join(" · ")})` : address;
 
     const { data: order, error: iErr } = await db
       .from("store_orders")
       .insert({
         user_id: store.user_id,
         product_id: listing.product_id,
+        listing_id: listing.id,
         customer_name: name,
         customer_phone: phone,
-        customer_address: fullAddress,
+        customer_address: address,
+        customer_city: city || null,
+        customer_district: district || null,
+        customer_zip: zip || null,
+        customer_country: "TR",
+        quantity: qty,
+        unit_price: Number.isFinite(price) && price > 0 ? price : null,
+        currency: cur,
         status: "pending",
       })
-      .select("id, status")
+      .select("id, status, tracking_token")
       .single();
     if (iErr) throw iErr;
 
-    return json({ success: true, order: { id: order.id, status: order.status } });
+    return json({ success: true, order: { id: order.id, status: order.status, tracking_token: order.tracking_token } });
   } catch (err) {
     console.error(err);
     return json({ error: "Sunucu hatası" }, 500);

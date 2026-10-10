@@ -4,7 +4,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const CJ_API_KEY_DEFAULT = Deno.env.get("CJ_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -71,9 +70,9 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Bu sipariş henüz CJ'ye iletilmemiş" }, 400);
     }
 
-    const userApiKey = await getUserCjApiKey(supabase);
-    const CJ_API_KEY = userApiKey || CJ_API_KEY_DEFAULT;
-    if (!CJ_API_KEY) return json({ error: "CJ Dropshipping API anahtarı bulunamadı" }, 500);
+    // Sadece satıcının KENDİ CJ hesabı (sitenin ortak hesabına düşmez)
+    const CJ_API_KEY = await getUserCjApiKey(supabase);
+    if (!CJ_API_KEY) return json({ error: "CJ hesabın bağlı değil. Hesaplarım sayfasından CJ'yi bağla." }, 400);
 
     const { token: accessToken, raw: authRaw } = await getCjAccessToken(CJ_API_KEY);
     if (!accessToken) {

@@ -147,6 +147,18 @@ Deno.serve(async (req: Request) => {
       .upsert(rows, { onConflict: "user_id,platform,account_id" });
     if (error) throw error;
 
+    // WhatsApp bağlandıysa kargo bildirimi şablonunu hemen Meta onayına gönder (beklemeden)
+    if (waRows.length) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/wa-template-worker`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cronSecret: Deno.env.get("CRON_SECRET") ?? "", userId }),
+          signal: AbortSignal.timeout(20000),
+        });
+      } catch { /* olmazsa zamanlanmış görev 30 dakika içinde gönderir */ }
+    }
+
     return json({
       ok: true,
       facebook: rows.filter((r) => r.platform === "facebook").map((r) => r.account_name),
