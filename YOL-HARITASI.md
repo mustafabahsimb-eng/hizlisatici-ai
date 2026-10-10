@@ -6,14 +6,15 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **Sabit IP (çıkış proxy'si)** — Supabase Edge Function'larının sabit IP'si yok. Gerekli olduğu yerler:
   - Trendyol test ortamı (IP izni ister)
   - eMAG (canlı ortamda da her satıcı IP'mizi hesabına ekler)
-  - CJ: aynı IP'den en fazla 3 kullanıcı hesabı ("one ip limit 3 users"); satıcı sayısı artınca şart
-  - Öneri: Hetzner'de küçük sunucu (~€6,5–12,5/ay) ya da QuotaGuard ($19+/ay). Şirket kurulunca.
+  - CJ: aynı IP'den en fazla 3 kullanıcı hesabı ("one ip limit 3 users"); testlerde birkaç kez yaşandı, işçiler tekrar deneyerek geçiyor; satıcı sayısı artınca şart
+  - Seçim: Hetzner Almanya, CX23 (€5,49 + IPv4 €0,50 = €5,99/ay, sık stok dışı) ya da CPX02 (IPv4 dahil €6,49/ay). Alternatif: AWS Lightsail ($5/ay), QuotaGuard ($19+/ay).
+  - KARAR (2026-10-11): ödeme sonraya; altyapı şimdiden hazırlanır, varsayılan kapalı. Kurulum: `docs/sabit-ip-kurulumu.md`.
 - [ ] **E-posta gönderen adı** — Supabase'in kendi e-posta servisi "Supabase Auth" adıyla ve saatte birkaç e-postayla sınırlı gönderiyor; alan adıyla özel SMTP gerekli (şablonlar Seltigo'ya çevrildi).
 - [ ] **CJ gerçek ödeme adımı** — Bakiyeden otomatik ödeme (payBalanceV2) para harcamamak için denenmedi; ilk gerçek siparişte izlenmeli.
 - [ ] **AliExpress uygulamasını yayın (online) aşamasına geçir** — test aşamasında anahtar 24 saat, izin 48 saat; yayında 30/60 gün. Adımlar ve başvuru metinleri: `docs/aliexpress-yayin-basvurusu.md` (KARAR: şirket kurulunca "Corporation" olarak başvurulacak; tür sonradan değiştirilemez).
 - [x] **AliExpress otomatik ödeme yolu** — API Pay her alıcı için AliExpress onayı (PayPal) istiyor ve Türkiye desteklenmiyor. Kuruldu: AliExpress ürünlerinin CJ eşdeğeri arka planda bulunuyor (görselle arama / CJ sourcing talebi); AliExpress'te ödeme yapılamayan satıcıda sipariş CJ'den verilip CJ bakiyesinden ödeniyor. Desteklenen ülkelerde AliExpress'in kendi API Pay'i kullanılıyor (başvuru e-postası: `docs/aliexpress-yayin-basvurusu.md`, Metin D).
 - [ ] **CJ sourcing sonuçlarını gözle** — CJ ekibinin eşdeğer bulma süresi/başarısı belgede yok; açılan ilk test talepleri izleniyor.
-- [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor; şu an her ürün CJ sourcing talebiyle (insan eliyle, daha yavaş) eşleşiyor.
+- [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor. Şart: CJ'ye toplam 2.000 $ sipariş (LV1 0 $, LV2 500 $, LV3 2.000 $, LV4 100.000 $, LV5 500.000 $; satın alınamaz, sıfırlanmaz, anlaşmazlıklı siparişler sayılmaz). O zamana kadar: anahtar kelimeyle eşleştirme + sourcing talebi.
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Sıradaki işler
@@ -26,3 +27,25 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] Chrome eklentisi
 - [ ] Shopify / Wix / eBay: ürün gönderme + Hesaplarım'a "Bağla" düğmeleri (bağlantı kaydı hazır)
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
+
+## Durum notları (11 Ekim 2026)
+**Çözüldü**
+- Instagram "süresi doldu": Meta anahtarı iptal etmişti (şifre/güvenlik); Mustafa yeniden bağladı. Yeniden bağlanınca eski "geçersiz" işaretinin silinmemesi hatası düzeltildi (instagram-token-exchange, social-meta-connect); ayarlar (otomatik paylaşım) artık korunuyor. Kayıt geçerli, bitiş 9 Aralık 2026. Not: hata yüzünden otomatik paylaşım ayarı sıfırlanmış olabilir.
+- AliExpress kapanan siparişleri "teslim edildi" sayma hatası düzeltildi (extend_map.endReason).
+- Sitenin AliExpress arama anahtarı 2 Eylül'de dolmuştu; Mustafa bağlanınca yenilendi; token-refresher artık 3 saatte bir yeniliyor.
+
+**Test siparişleri (para harcanmadı)**
+- 4 CJ test siparişi: bizde iptal, CJ'den silindi.
+- 1 AliExpress test siparişi (e9d6008d…): bizde iptal; AliExpress'te ödenmemiş olarak açık, ödeme süresi dolunca AliExpress kendisi kapatır (API ile iptal yok). İstenirse AliExpress uygulamasından elle iptal edilebilir.
+- Test ürünleri (81 dışında) kaldırıldı. Ürün 81 "Silicone phone case" mağazada 279,90 TL (kargo dahil maliyet ~210 TL).
+
+**İzlenecek / yarım**
+- CJ sourcing talepleri: test kullanıcısının 84, 85, 86, 88 ürünleri (CJSPU…). Sonuç gelince süre/başarı Mustafa'ya bildirilecek, test ürünleri kaldırılacak.
+- WhatsApp kargo şablonu: Meta onayı bekliyor (wa-template-worker izliyor).
+- İlk gerçek CJ bakiyeden ödeme ve AliExpress'in API Pay'i hiç denenmedi (para harcamamak için).
+- Sabit IP altyapısı: hazırlandı, kapalı (bkz. docs/sabit-ip-kurulumu.md).
+
+**Öğrenilenler**
+- AliExpress test uygulaması: anahtar 24 sa, izin 48 sa (yayında 30/60 gün); yenileme izni uzatmaz → en geç 60 günde bir yeniden bağlanma; panel 1 gün önce uyarır.
+- AliExpress araması Türkiye için countryCode=TR ile yapılmalı (yoksa ürünlerin çoğu Türkiye'ye gönderilemiyor); adres İngilizce karakter olmalı.
+- CJ getAccessToken saniyede 1 çağrı; anahtar 180 gün → cj_tokens'ta paylaşılıyor. CJ görselle arama seviye 3 istiyor.

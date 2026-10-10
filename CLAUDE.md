@@ -16,7 +16,14 @@
 - Her özellik OTOMASYON olarak tasarlanır. Satıcının elle yapacağı ara çözümler önerme ("elle paylaş", "linki koy gerisi senin" gibi). Engel varsa otomatiğe giden yolu söyle.
 - "Olmaz" deyip erteleme. Önce nasıl yapılabileceğini söyle (gerçek satıcı hesabı yoksa sandbox/test ortamı gibi).
 - Kalite çıtası yüksek: tam ve profesyonel. İşi küçültüp yarım bırakma.
-- Yeni fikirler yol haritasına eklenir, hemen yapılacak demek değildir.
+- Yeni fikirler yol haritasına eklenir (YOL-HARITASI.md), hemen yapılacak demek değildir.
+- Ödeme gerektiren işlerde (sunucu, ücretli servis, abonelik): altyapıyı ve kodu şimdiden eksiksiz hazırla, varsayılan KAPALI bir anahtarla bekleyecek şekilde kur; ödemeyi kullanıcı sonra yapar. Ödeme günü sadece gerekli değeri (IP, anahtar vb.) girip açmak yetmeli.
+- Kalıcı kararlar (2026-10-11):
+  - Şirket kurulana kadar ücretli altyapı yok. Sabit IP ve Trendyol test ortamı ertelendi.
+  - AliExpress Open Platform yayın başvurusu şirket kurulunca "Dropshipping Developer (Corporation)" olarak yapılacak (tür sonradan değiştirilemez). Rehber: docs/aliexpress-yayin-basvurusu.md
+  - CJ ödemesi varsayılan OTOMATİK (bakiyeden). Zarar kontrolü (ürün + kargo + komisyon) HER ZAMAN açık, kapatılamaz; zararlı sipariş ödenmeden satıcı onayına düşer. Bakiye yetmezse sipariş bekler + Türkçe uyarı.
+  - Müşteri takip sayfası her zaman var; satıcının WhatsApp'ı bağlı ve şablon onaylıysa kargo çıkınca otomatik WhatsApp (varsayılan açık).
+  - AliExpress'te API ile ödeme (API Pay) her alıcı için AliExpress onayı + PayPal istiyor, Türkiye desteklenmiyor → AliExpress ürünleri CJ eşdeğerinden verilip CJ bakiyesinden ödenir.
 
 ## Güvenli çalışma
 - Canlı sistemi değiştiren işlerden önce (SQL migration, Edge Function deploy, fonksiyon/tablo/veri silme) ne yapacağını Türkçe kısaca anlat ve onay al. Dosya okuma, inceleme ve yerel düzenleme için onay gerekmez.
@@ -33,3 +40,15 @@
 - Edge Function kodları depoda supabase/functions/<ad>/index.ts altında; haftalık GitHub Actions yedeklemesi var (.github/workflows/yedek-edge-functions.yml). Fonksiyon adları pazaryeri-verify düzeninde (ör. trendyol-verify).
 - Veri modeli 3 katmanlı: products (ürün, tek kayıt) → listings + listing_variants (her pazaryeri için ayrı ilan) → store_connections (pazaryeri hesap bağlantısı, kimlik bilgileri Vault'ta). Ayrıca product_variants, product_images, sync_jobs (kuyruk, sync-worker işler), audit_log, marketplace_orders, countries, vat_rates, trade_routes, marketplaces, exchange_rates (fx-rates-daily), user_profiles. Şemadan emin değilsen veritabanından kendin kontrol et.
 - Araçlar: Supabase CLI %LOCALAPPDATA%\supabase-cli klasöründe kurulu ve giriş yapılmış. Git ve GitHub girişi bu bilgisayarda kayıtlı.
+- Canlı veritabanına SQL: `supabase db query --linked --project-ref ytucdrrgxsjhrqmaxckt -f dosya.sql` (dosya `--` ile başlıyorsa -f şart). Zamanlanmış işler gizli anahtarı cron komutunun içinde taşır; yeni cron'u mevcut bir işin komutunu SQL içinde kopyalayarak kur (anahtar dışarı çıkmasın).
+
+## Otomasyon altyapısı (özet; ayrıntı kodda)
+- Tedarikçi siparişi: cj-order-worker (5 dk; CJ + AliExpress, zarar/bakiye kontrolü, AliExpress→CJ eşdeğeri yönlendirmesi, orders.fulfilled_via), cj-tracking-sync (2 sa; CJ + AliExpress takip, mağaza siparişi + müşteriye WhatsApp), wa-template-worker (30 dk; WhatsApp şablonu her satıcıda Meta onayına), cj-alt-match (1 sa; AliExpress ürününün CJ eşdeğeri), token-refresher (3 sa; AliExpress/Instagram/Meta/Etsy/eBay/Wix anahtarları; yenilenemezse panelde uyarı).
+- CJ giriş anahtarı cj_tokens tablosunda paylaşılır (getAccessToken saniyede 1 çağrı). CJ "aynı IP'den 3 kullanıcı" sınırı var; işçiler tekrar dener, kalıcı çözüm sabit IP.
+- AliExpress: test uygulaması (anahtar 24 sa, izin 48 sa, yenileme izni uzatmaz). Satıcı hesapları supplier_connections (Vault). Arama TR için countryCode=TR; ds.product.get TR'de boş dönerse "US" ile; adres ASCII olmalı; kapanan sipariş FINISH + extend_map.endReason.
+- Müşteri takip sayfası: takip.html?t=<tracking_token> (get_order_tracking RPC).
+
+## Açık işler ve bulgular (güncel durum: YOL-HARITASI.md "Durum notları")
+- Sabit IP: altyapı hazırlanıyor/hazır, varsayılan KAPALI; sunucu alınınca sadece IP girilip açılacak (ödeme bekliyor).
+- AliExpress yayın başvurusu: şirket kurulunca (Corporation). CJ seviye 3 (toplam 2.000 $ sipariş) gelene kadar CJ eşleştirme anahtar kelimeyle + sourcing.
+- İzlenecek: CJ sourcing talepleri (test kullanıcısının 84, 85, 86, 88 ürünleri), WhatsApp kargo şablonu Meta onayı, ilk gerçek CJ/AliExpress ödemesi.
