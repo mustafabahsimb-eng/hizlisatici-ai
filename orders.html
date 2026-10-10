@@ -299,7 +299,7 @@
       subtitle: 'Müşteriden gelen satışlar, tedarikçiye verdiğin siparişler ve Printify tek ekranda.',
       back: '← Panele dön',
       tabSales: '🛒 Gelen Siparişler',
-      tabSupplier: '📦 Tedarikçi (CJ)',
+      tabSupplier: '📦 Tedarikçi',
       tabPrintify: 'Printify',
       loading: 'Yükleniyor...',
       refresh: '🔄 Yenile',
@@ -338,7 +338,7 @@
       st_iptal: 'İptal',
       st_hata: 'Hata',
       stShipping: 'Kargoda',
-      supplierInfo: 'Bir satışı tedarikçiye iletmek için buraya kaydet; CJ ürünlerinde tek tıkla CJ\'ye sipariş verebilirsin.',
+      supplierInfo: 'Tedarikçili (CJ, AliExpress) mağaza siparişlerin buraya kendiliğinden düşer ve otomatik verilir. Diğer satışları tedarikçiye iletmek için buraya kaydedebilirsin.',
       newOrder: '+ Yeni sipariş kaydet',
       newOrderTitle: 'Yeni sipariş kaydet',
       fProduct: 'Hangi ürün satıldı?',
@@ -414,7 +414,7 @@
       subtitle: 'Customer sales, supplier orders and Printify in one place.',
       back: '← Back to dashboard',
       tabSales: '🛒 Incoming Orders',
-      tabSupplier: '📦 Supplier (CJ)',
+      tabSupplier: '📦 Supplier',
       tabPrintify: 'Printify',
       loading: 'Loading...',
       refresh: '🔄 Refresh',
@@ -451,7 +451,7 @@
       st_iptal: 'Cancelled',
       st_hata: 'Error',
       stShipping: 'Shipped',
-      supplierInfo: 'Record a sale here to forward it to a supplier; for CJ products you can place the CJ order in one click.',
+      supplierInfo: 'Supplier (CJ, AliExpress) orders from your store appear here and are placed automatically. You can also record other sales here to forward them to a supplier.',
       newOrder: '+ Record new order',
       newOrderTitle: 'Record new order',
       fProduct: 'Which product was sold?',
@@ -854,7 +854,12 @@
     document.getElementById('countSupplier').textContent = orders.length;
 
     const counts = { beklemede: 0, tedarikciye_verildi: 0, kargoya_verildi: 0, teslim_edildi: 0 };
-    orders.forEach(o => { if (counts[o.status] !== undefined) counts[o.status]++; });
+    // "Beklemede" sayacı tüm bekleme durumlarını sayar (onay, bakiye, ödeme)
+    const WAITING = ['beklemede', 'onay_bekliyor', 'bakiye_bekliyor', 'odeme_bekliyor'];
+    orders.forEach(o => {
+      if (WAITING.includes(o.status)) counts.beklemede++;
+      else if (counts[o.status] !== undefined) counts[o.status]++;
+    });
     document.getElementById('statBeklemede').textContent = counts.beklemede;
     document.getElementById('statTedarikci').textContent = counts.tedarikciye_verildi;
     document.getElementById('statKargo').textContent = counts.kargoya_verildi;
@@ -869,7 +874,7 @@
     listEl.innerHTML = orders.map(o => {
       const productName = o.products ? o.products.name : tt('deletedProduct');
       const metaParts = [];
-      if (o.platform) metaParts.push(escapeHtml(o.platform));
+      if (o.platform) metaParts.push(escapeHtml(o.platform === 'own_store' ? marketplaceName('own_store') : o.platform));
       if (o.marketplace_order_no) metaParts.push(tt('orderNo') + ': ' + escapeHtml(o.marketplace_order_no));
       metaParts.push(tt('qty', { n: o.quantity }));
       if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
