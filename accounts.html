@@ -1014,10 +1014,11 @@
     try {
       const session = await getSession();
       if (!session) return;
-      const { data, error } = await db.from('platform_tokens').select('access_token')
-        .eq('user_id', session.user.id).eq('platform', 'etsy').maybeSingle();
-      if (!error && data) {
-        el.innerHTML = '<span class="acc-status connected">' + t('stConnected') + '</span><button class="acc-btn secondary" onclick="disconnectEtsy()">' + t('btnRemove') + '</button>';
+      const { data, error } = await db.from('store_connections').select('id')
+        .eq('marketplace_code', 'etsy').is('deleted_at', null)
+        .order('created_at', { ascending: false }).limit(1);
+      if (!error && data && data.length) {
+        el.innerHTML = '<span class="acc-status connected">' + t('stConnected') + '</span><button class="acc-btn secondary" onclick="disconnectEtsy(\'' + data[0].id + '\')">' + t('btnRemove') + '</button>';
       } else {
         el.innerHTML = '<span class="acc-status none">' + t('stNone') + '</span><button class="acc-btn" onclick="connectEtsy()">' + t('btnConnect') + '</button>';
       }
@@ -1025,12 +1026,17 @@
       el.innerHTML = '<span class="acc-status none">' + t('stCheckFail') + '</span><button class="acc-btn" onclick="connectEtsy()">' + t('btnConnect') + '</button>';
     }
   }
-  async function disconnectEtsy() {
+  async function disconnectEtsy(connectionId) {
     if (!confirm(t('etsyConfirmRemove'))) return;
-    const session = await getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
-    const { error } = await db.from('platform_tokens').delete().eq('user_id', session.user.id).eq('platform', 'etsy');
-    if (error) { toast(t('failRemove') + error.message, true); return; }
+    try {
+      // Kasadaki anahtarla birlikte silinir (store-connect)
+      const result = await callStoreConnect({ action: 'disconnect', connectionId: connectionId });
+      if (!result) return;
+      if (!result.ok) { toast(t('failRemove') + errorText(result), true); return; }
+    } catch (e) {
+      toast(t('errNetwork') + e.message, true);
+      return;
+    }
     await renderEtsy();
   }
 

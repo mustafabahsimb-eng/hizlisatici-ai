@@ -12,6 +12,45 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Bağlantıyı store_connections'a yaz (aynısı varsa güncelle), anahtarları şifreli kasaya (Vault) koy
+async function saveConnection(admin: any, c: {
+  userId: string; marketplaceCode: string; externalSellerId: string | null;
+  expiresAt: string | null; credentials: Record<string, unknown>;
+}) {
+  const { data: mk } = await admin.from('marketplaces').select('name').eq('code', c.marketplaceCode).maybeSingle();
+  let q = admin.from('store_connections').select('id')
+    .eq('user_id', c.userId).eq('marketplace_code', c.marketplaceCode)
+    .eq('environment', 'live').is('deleted_at', null);
+  q = c.externalSellerId ? q.eq('external_seller_id', c.externalSellerId) : q.is('external_seller_id', null);
+  const { data: existing } = await q.maybeSingle();
+
+  const fields = {
+    label: mk?.name || c.marketplaceCode,
+    status: 'connected',
+    token_expires_at: c.expiresAt,
+    last_verified_at: new Date().toISOString(),
+    last_error: null,
+  };
+  let connectionId: string;
+  if (existing) {
+    const { error } = await admin.from('store_connections').update(fields).eq('id', existing.id);
+    if (error) throw error;
+    connectionId = existing.id;
+  } else {
+    const { data: created, error } = await admin.from('store_connections')
+      .insert({ user_id: c.userId, marketplace_code: c.marketplaceCode, environment: 'live', external_seller_id: c.externalSellerId, ...fields })
+      .select('id').single();
+    if (error) throw error;
+    connectionId = created.id;
+  }
+  const { error: vaultError } = await admin.rpc('store_connection_set_credentials', {
+    p_connection_id: connectionId,
+    p_credentials: c.credentials,
+  });
+  if (vaultError) throw vaultError;
+  return connectionId;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -75,17 +114,21 @@ Deno.serve(async (req) => {
       return json({ connected: false, error: `Shopify: ${msg}` });
     }
 
-    const { error: dbError } = await supabaseAdmin
-      .from('platform_tokens')
-      .upsert({
-        user_id: userId,
-        platform: 'shopify',
-        access_token: tokenData.access_token,
-        shop_domain: shop,
-      }, { onConflict: 'user_id,platform' });
-
-    if (dbError) {
-      return json({ connected: false, error: `Veritabanı hatası: ${dbError.message}` });
+    // Shopify'ın kalıcı (offline) anahtarının süresi dolmaz
+    try {
+      await saveConnection(supabaseAdmin, {
+        userId,
+        marketplaceCode: 'shopify',
+        externalSellerId: shop,
+        expiresAt: null,
+        credentials: {
+          access_token: tokenData.access_token,
+          scope: tokenData.scope || null,
+          shop_domain: shop,
+        },
+      });
+    } catch (e) {
+      return json({ connected: false, error: `Veritabanı hatası: ${(e as Error).message}` });
     }
 
     return json({ connected: true });
