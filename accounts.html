@@ -612,7 +612,7 @@
       const session = await getSession();
       if (!session) { igChannels = null; return; }
       const { data, error } = await db.from('social_channels')
-        .select('id, account_id, account_name, active, token_expires_at, connected_at, created_at, extra')
+        .select('id, account_id, account_name, active, token_expires_at, token_status, connected_at, created_at, extra')
         .eq('user_id', session.user.id)
         .eq('platform', 'instagram')
         .order('created_at', { ascending: true });
@@ -624,7 +624,8 @@
 
   function igStatus(c) {
     if (c.active === false) return { cls: 'none', text: t('stPassive'), expired: false };
-    if (c.token_expires_at && new Date(c.token_expires_at).getTime() < Date.now()) {
+    // Süresi dolduysa ya da Meta anahtarı iptal ettiyse (token-refresher işaretler)
+    if (c.token_status === 'expired' || (c.token_expires_at && new Date(c.token_expires_at).getTime() < Date.now())) {
       return { cls: 'error', text: t('stExpired'), expired: true };
     }
     return { cls: 'connected', text: t('stConnected'), expired: false };

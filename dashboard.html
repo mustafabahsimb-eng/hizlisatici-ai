@@ -317,6 +317,8 @@
     </div>
   </div>
 
+  <div class="alarm-banner" id="connBanner" style="display:none;"></div>
+
   <div class="alarm-banner" id="orderBanner" style="display:none;">
     <div class="alarm-summary" id="orderSummary" onclick="go('orders.html')"></div>
   </div>
@@ -466,6 +468,11 @@
       'main.noStore': '🧭 Henüz mağazan yok: Mağazanı kur',
       'ord.balance': '⚠️ {n} sipariş CJ bakiyesi bekliyor',
       'ord.approval': '⚠️ {n} sipariş onayını bekliyor',
+      'conn.expired': '⚠️ {p} bağlantının süresi doldu — yeniden bağla',
+      'conn.expiring': '⚠️ {p} bağlantın {d} tarihinde sona eriyor — yeniden bağla',
+      'conn.error': '⚠️ {p} bağlantında sorun var — yeniden bağla',
+      'conn.siteEnding': '⚠️ Sitenin AliExpress arama izni {d} tarihinde bitiyor — Hesaplarım\'dan AliExpress\'i yeniden bağla',
+      'conn.siteDown': '⚠️ Sitenin AliExpress arama izni bitti — Hesaplarım\'dan AliExpress\'i yeniden bağla',
       'main.storeLoading': 'Yükleniyor...',
 
       'score.calc': '🏆 Skor Hesapla',
@@ -616,6 +623,11 @@
       'main.noStore': '🧭 No store yet: Build your store',
       'ord.balance': '⚠️ {n} orders waiting for CJ balance',
       'ord.approval': '⚠️ {n} orders awaiting your approval',
+      'conn.expired': '⚠️ Your {p} connection has expired — reconnect',
+      'conn.expiring': '⚠️ Your {p} connection ends on {d} — reconnect',
+      'conn.error': '⚠️ There is a problem with your {p} connection — reconnect',
+      'conn.siteEnding': '⚠️ The site AliExpress search permission ends on {d} — reconnect AliExpress on My Accounts',
+      'conn.siteDown': '⚠️ The site AliExpress search permission has ended — reconnect AliExpress on My Accounts',
       'main.storeLoading': 'Loading...',
 
       'score.calc': '🏆 Calculate Score',
@@ -789,6 +801,53 @@
   // ============================================================
   // Başlangıç
   // ============================================================
+  // Bağlantı sağlığı uyarısı: süresi dolan / dolmak üzere olan / yenilenemeyen hesaplar
+  // (token-refresher 3 saatte bir yeniler ve yenileyemediklerini işaretler)
+  let connIssues = [];
+  async function loadConnBanner() {
+    const issues = [];
+    const DAY = 24 * 3600 * 1000;
+    const soon = (iso, ms) => iso && new Date(iso).getTime() - Date.now() < ms;
+    try {
+      const { data: sup } = await HS.db.from('supplier_connections').select('supplier, status, refresh_expires_at');
+      (sup || []).forEach(c => {
+        const p = c.supplier === 'aliexpress' ? 'AliExpress' : c.supplier;
+        if (c.status !== 'connected') issues.push({ key: 'conn.expired', p, href: 'accounts.html' });
+        else if (soon(c.refresh_expires_at, DAY)) issues.push({ key: 'conn.expiring', p, d: c.refresh_expires_at, href: 'accounts.html' });
+      });
+      const { data: stores } = await HS.db.from('store_connections').select('label, marketplace_code, status').is('deleted_at', null).in('status', ['expired', 'error']);
+      (stores || []).forEach(c => issues.push({ key: c.status === 'expired' ? 'conn.expired' : 'conn.error', p: c.label || c.marketplace_code, href: 'accounts.html' }));
+      const { data: social } = await HS.db.from('social_channels').select('platform, token_status, token_expires_at').eq('active', true);
+      const names = { instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp' };
+      (social || []).forEach(c => {
+        const p = names[c.platform] || c.platform;
+        // Instagram girişiyle bağlanan hesap Hesaplarım'da, Meta (Facebook/WhatsApp) Seltigo Social'da
+        const href = c.platform === 'instagram' ? 'accounts.html' : 'social.html';
+        if (c.token_status === 'expired' || (c.token_expires_at && new Date(c.token_expires_at).getTime() < Date.now())) issues.push({ key: 'conn.expired', p, href });
+        else if (c.token_status === 'expiring' || soon(c.token_expires_at, 7 * DAY)) issues.push({ key: 'conn.expiring', p, d: c.token_expires_at, href });
+      });
+      // Site sahibine: sitenin kendi hesapları (sadece sahipte veri döner)
+      const { data: site } = await HS.db.rpc('platform_token_health');
+      (site || []).forEach(s => {
+        if (s.platform !== 'aliexpress') return;
+        if (s.status === 'error' || (s.refresh_expires_at && new Date(s.refresh_expires_at).getTime() < Date.now())) issues.push({ key: 'conn.siteDown', href: 'accounts.html' });
+        else if (s.status === 'expiring' || soon(s.refresh_expires_at, DAY)) issues.push({ key: 'conn.siteEnding', d: s.refresh_expires_at, href: 'accounts.html' });
+      });
+    } catch (e) { /* uyarı gösterilemezse panel yine çalışır */ }
+    // Aynı uyarıyı tekrarlama (ör. sahip hem satıcı hem site olarak AliExpress'e bağlı)
+    const seen = new Set();
+    connIssues = issues.filter(i => { const k = i.key + '|' + (i.p || ''); if (seen.has(k)) return false; seen.add(k); return true; });
+    renderConnBanner();
+  }
+  function renderConnBanner() {
+    const el = document.getElementById('connBanner');
+    el.innerHTML = connIssues.map((i, n) =>
+      '<div class="alarm-summary" data-conn="' + n + '">' +
+      esc(t(i.key, { p: i.p || '', d: i.d ? HS.date(i.d, true) : '' })) + '</div>').join('');
+    el.querySelectorAll('[data-conn]').forEach(d => d.addEventListener('click', () => go(connIssues[Number(d.dataset.conn)].href)));
+    el.style.display = connIssues.length ? '' : 'none';
+  }
+
   // Tedarikçi siparişi uyarısı: bakiye bekleyen ve onay bekleyen CJ siparişleri
   let orderCounts = { balance: 0, approval: 0 };
   async function loadOrderBanner() {
@@ -815,8 +874,9 @@
     const ctx = await HS.init();
     if (!ctx) return;
     document.getElementById('userEmail').textContent = ctx.user.email;
-    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); });
+    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); renderConnBanner(); });
     loadOrderBanner();
+    loadConnBanner();
     // Admin menü linki sadece yöneticilere görünür
     HS.db.rpc('hs_is_admin').then(r => {
       if (r && r.data === true) document.getElementById('adminBtn').style.display = '';
