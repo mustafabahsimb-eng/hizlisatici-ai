@@ -163,6 +163,32 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
       return { id: o.id, status: "onay_bekliyor", note: "adres_eksik" };
     }
 
+    // Kargo: bu ülkeye gönderilebilen en ucuz CJ kargo seçeneği (ücreti zarar kontrolüne girer)
+    const country = (o.customer_country || "TR").toUpperCase();
+    const fr = await cj(token, "/logistic/freightCalculate", {
+      method: "POST",
+      body: JSON.stringify({
+        startCountryCode: "CN",
+        endCountryCode: country,
+        zip: o.customer_zip || undefined,
+        products: [{ quantity: o.quantity || 1, vid }],
+      }),
+    });
+    const options = (Array.isArray(fr?.data) ? fr.data : [])
+      .map((x: any) => ({ name: x.logisticName, price: Number(x.totalPostageFee ?? x.logisticPrice) }))
+      .filter((x: any) => x.name && Number.isFinite(x.price) && x.price >= 0)
+      .sort((a: any, b: any) => a.price - b.price);
+    if (!options.length) {
+      if (!fr?.result) return await failOrRetry(o, "CJ kargo ücreti alınamadı: " + String(fr?.message || "bilinmeyen hata").slice(0, 200));
+      await update(o.id, {
+        status: "onay_bekliyor",
+        hold_reason: "kargo_yok",
+        error_message: `CJ bu ürün için ${country === "TR" ? "Türkiye'ye" : country + " ülkesine"} kargo seçeneği sunmuyor. Siparişi iptal edebilir ya da tedarikçiyi değiştirebilirsin.`,
+      });
+      return { id: o.id, status: "onay_bekliyor", note: "kargo_yok" };
+    }
+    const shipping = options[0];
+
     const created = await cj(token, "/shopping/order/createOrderV2", {
       method: "POST",
       body: JSON.stringify({
@@ -177,7 +203,7 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
         shippingAddress: o.customer_address || "",
         shippingPhone: o.customer_phone || "",
         fromCountryCode: "CN",
-        logisticName: "CJPacket Ordinary",
+        logisticName: shipping.name,
         payType: 3, // sadece oluştur; ödeme aşağıda kontrollerden sonra
         products: [{ vid, quantity: o.quantity || 1 }],
       }),
@@ -186,7 +212,14 @@ async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<
     if (!created?.result || !cd?.orderId) {
       return await failOrRetry(o, "CJ siparişi oluşturulamadı: " + String(created?.message || "bilinmeyen hata").slice(0, 200));
     }
-    const costUsd = Number(cd.orderAmount ?? cd.actualPayment ?? (Number(cd.productAmount || 0) + Number(cd.postageAmount || 0)));
+    // Maliyet: CJ'nin sipariş toplamı ile (ürün + seçilen kargo) hangisi büyükse
+    // (CJ toplamı kargoyu içermeyebiliyor; zarar kontrolü kargo dahil yapılmalı)
+    const productUsd = Number(cd.productAmount ?? 0);
+    const cjTotal = Number(cd.orderAmount ?? cd.actualPayment ?? 0);
+    const costUsd = Math.max(
+      Number.isFinite(cjTotal) ? cjTotal : 0,
+      (Number.isFinite(productUsd) && productUsd > 0 ? productUsd : (Number.isFinite(cjTotal) ? cjTotal : 0)) + shipping.price,
+    );
     o.supplier_order_id = String(cd.orderId);
     o.supplier_shipment_id = cd.shipmentOrderId ? String(cd.shipmentOrderId) : null;
     o.cost_usd = Number.isFinite(costUsd) && costUsd > 0 ? costUsd : null;
