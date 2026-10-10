@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title id="pageTitle">Sipariş Takibi</title>
+<style>
+  :root{
+    --bg-dark:#0b1220;
+    --bg-panel:#111a2e;
+    --bg-panel-2:#16213a;
+    --border:#233150;
+    --text:#e7ecf5;
+    --text-dim:#9aa7c2;
+    --accent:#1D9E75;
+    --accent-hover:#178a65;
+    --danger:#e0554f;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg-dark); color:var(--text); font-family:'Segoe UI',Arial,sans-serif; min-height:100vh;}
+  .wrap{max-width:560px; margin:0 auto; padding:32px 16px 48px;}
+  .store{color:var(--text-dim); font-size:14px; margin-bottom:6px;}
+  .store a{color:var(--accent); text-decoration:none;}
+  h1{font-size:22px; margin:0 0 20px;}
+  .card{background:var(--bg-panel); border:1px solid var(--border); border-radius:14px; padding:22px;}
+  .product{font-weight:600; font-size:16px; margin-bottom:4px;}
+  .meta{color:var(--text-dim); font-size:13px; margin-bottom:22px;}
+  .steps{list-style:none; margin:0 0 22px; padding:0;}
+  .steps li{position:relative; padding:0 0 18px 34px; color:var(--text-dim); font-size:15px;}
+  .steps li:last-child{padding-bottom:0;}
+  .steps li::before{content:''; position:absolute; left:0; top:1px; width:20px; height:20px; border-radius:50%; border:2px solid var(--border); background:var(--bg-panel-2);}
+  .steps li::after{content:''; position:absolute; left:10px; top:23px; bottom:-1px; width:2px; background:var(--border);}
+  .steps li:last-child::after{display:none;}
+  .steps li.done{color:var(--text);}
+  .steps li.done::before{background:var(--accent); border-color:var(--accent);}
+  .steps li.done::after{background:var(--accent);}
+  .steps li.current{color:var(--text); font-weight:600;}
+  .info{border-top:1px solid var(--border); padding-top:16px; display:grid; gap:10px;}
+  .row{display:flex; justify-content:space-between; gap:12px; font-size:14px;}
+  .row span:first-child{color:var(--text-dim);}
+  .row span:last-child{text-align:right; word-break:break-all;}
+  .btn{display:inline-block; margin-top:18px; padding:12px 20px; border-radius:10px; background:var(--accent); color:#04150f; font-weight:600; text-decoration:none;}
+  .btn:hover{background:var(--accent-hover);}
+  .cancelled{color:var(--danger); font-weight:600; margin-bottom:16px;}
+  .msg{color:var(--text-dim); text-align:center; padding:40px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="content" class="msg"></div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD";
+
+const T = {
+  tr: {
+    pageTitle: 'Sipariş Takibi',
+    title: 'Siparişinin durumu',
+    loading: 'Yükleniyor...',
+    notFound: 'Sipariş bulunamadı. Bağlantıyı kontrol et.',
+    loadFail: 'Sipariş bilgisi yüklenemedi. Biraz sonra tekrar dene.',
+    s1: 'Sipariş alındı',
+    s2: 'Hazırlanıyor',
+    s3: 'Kargoya verildi',
+    s4: 'Teslim edildi',
+    cancelled: 'Sipariş iptal edildi',
+    trackNo: 'Takip numarası',
+    carrier: 'Kargo firması',
+    track: 'Kargomu takip et',
+    qty: '{n} adet',
+    orderedAt: 'Sipariş tarihi: {d}',
+  },
+  en: {
+    pageTitle: 'Order Tracking',
+    title: 'Your order status',
+    loading: 'Loading...',
+    notFound: 'Order not found. Please check the link.',
+    loadFail: 'Could not load the order. Please try again later.',
+    s1: 'Order received',
+    s2: 'Preparing',
+    s3: 'Shipped',
+    s4: 'Delivered',
+    cancelled: 'Order cancelled',
+    trackNo: 'Tracking number',
+    carrier: 'Carrier',
+    track: 'Track my package',
+    qty: '{n} pcs',
+    orderedAt: 'Ordered on: {d}',
+  }
+};
+const params = new URLSearchParams(location.search);
+const LANG = params.get('lang') === 'en' ? 'en' : 'tr';
+document.documentElement.lang = LANG;
+function t(k, v){ let s = T[LANG][k] || T.tr[k] || k; if (v) s = s.replace(/\{(\w+)\}/g, (m, x) => v[x] != null ? v[x] : m); return s; }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Durum -> kaçıncı adım (0: alındı, 1: hazırlanıyor, 2: kargoda, 3: teslim)
+function stepOf(d){
+  const s = String(d.status || '').toLowerCase();
+  if (s === 'teslim_edildi' || s === 'delivered' || d.delivered_at) return 3;
+  if (s === 'kargoya_verildi' || s === 'shipped' || d.tracking_number || d.shipped_at) return 2;
+  if (s === 'tedarikciye_verildi') return 1;
+  return 0;
+}
+
+async function load(){
+  document.title = t('pageTitle');
+  const box = document.getElementById('content');
+  box.textContent = t('loading');
+  const token = params.get('t') || '';
+  if (token.length < 20) { box.textContent = t('notFound'); return; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_order_tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ p_token: token })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (!d) { box.textContent = t('notFound'); return; }
+    render(d);
+  } catch (e) {
+    console.error(e);
+    box.textContent = t('loadFail');
+  }
+}
+
+function render(d){
+  const box = document.getElementById('content');
+  box.className = '';
+  const cancelled = ['iptal', 'cancelled'].includes(String(d.status || '').toLowerCase());
+  const step = stepOf(d);
+  const date = d.created_at ? new Date(d.created_at).toLocaleDateString(LANG === 'en' ? 'en-GB' : 'tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const steps = ['s1', 's2', 's3', 's4'].map((k, i) =>
+    '<li class="' + (cancelled ? '' : (i < step ? 'done' : (i === step ? 'done current' : ''))) + '">' + esc(t(k)) + '</li>'
+  ).join('');
+  const store = d.store_name
+    ? '<div class="store">' + (d.store_slug ? '<a href="magaza.html?slug=' + encodeURIComponent(d.store_slug) + '">' + esc(d.store_name) + '</a>' : esc(d.store_name)) + '</div>'
+    : '';
+  let info = '';
+  if (d.tracking_number) {
+    info = '<div class="info">' +
+      '<div class="row"><span>' + esc(t('trackNo')) + '</span><span>' + esc(d.tracking_number) + '</span></div>' +
+      (d.tracking_carrier ? '<div class="row"><span>' + esc(t('carrier')) + '</span><span>' + esc(d.tracking_carrier) + '</span></div>' : '') +
+      '</div>' +
+      '<a class="btn" target="_blank" rel="noopener" href="https://t.17track.net/' + (LANG === 'en' ? 'en' : 'tr') + '#nums=' + encodeURIComponent(d.tracking_number) + '">' + esc(t('track')) + '</a>';
+  }
+  box.innerHTML = store +
+    '<h1>' + esc(t('title')) + '</h1>' +
+    '<div class="card">' +
+      '<div class="product">' + esc(d.product_name || '') + '</div>' +
+      '<div class="meta">' + esc(t('qty', { n: d.quantity || 1 })) + (date ? ' · ' + esc(t('orderedAt', { d: date })) : '') + '</div>' +
+      (cancelled ? '<div class="cancelled">' + esc(t('cancelled')) + '</div>' : '<ul class="steps">' + steps + '</ul>') +
+      info +
+    '</div>';
+}
+
+load();
+</script>
+</body>
+</html>
