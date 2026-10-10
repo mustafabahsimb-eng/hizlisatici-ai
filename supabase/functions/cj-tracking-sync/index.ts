@@ -319,7 +319,8 @@ async function aeDetail(o: any, token: string) {
 
 // Tek siparişin tedarikçi durumunu çek, siparişe ve mağaza siparişine işle
 async function syncOne(o: any, token: string, summary: any) {
-  const det: any = o.supplier === "aliexpress" ? await aeDetail(o, token) : await cjDetail(o, token);
+  // Siparişin fiilen verildiği tedarikçi (AliExpress ürünü CJ eşdeğerinden verilmiş olabilir)
+  const det: any = (o.fulfilled_via || o.supplier) === "aliexpress" ? await aeDetail(o, token) : await cjDetail(o, token);
   if (det.error) {
     summary.errors.push(`${o.id}: ${det.error}`);
     return { error: det.error };
@@ -367,19 +368,19 @@ Deno.serve(async (req) => {
     try {
       const { data: o } = await db
         .from("orders")
-        .select("id, user_id, status, supplier, supplier_order_id, tracking_number, store_order_id")
+        .select("id, user_id, status, supplier, fulfilled_via, supplier_order_id, tracking_number, store_order_id")
         .eq("id", String(body?.orderId || ""))
         .eq("user_id", userId)
         .maybeSingle();
       if (!o) return json({ error: "Sipariş bulunamadı" }, 404);
-      if (o.supplier === "aliexpress") {
+      if ((o.fulfilled_via || o.supplier) === "aliexpress") {
         if (!o.supplier_order_id) return json({ error: "Bu sipariş henüz AliExpress'e verilmemiş" }, 400);
         const aeTok = await aeToken(userId);
         if (!aeTok) return json({ error: "AliExpress hesabın bağlı değil ya da süresi doldu. Hesaplarım sayfasından bağla." }, 400);
         const res = await syncOne(o, aeTok, summary);
         return json(res, res.error ? 500 : 200);
       }
-      if (o.supplier !== "cj" || !o.supplier_order_id) return json({ error: "Bu sipariş henüz CJ'ye iletilmemiş" }, 400);
+      if ((o.fulfilled_via || o.supplier) !== "cj" || !o.supplier_order_id) return json({ error: "Bu sipariş henüz CJ'ye iletilmemiş" }, 400);
       const { data: integ } = await db.from("user_integrations").select("api_key").eq("user_id", userId).eq("platform", "cj").maybeSingle();
       if (!integ?.api_key) return json({ error: "CJ hesabın bağlı değil. Hesaplarım sayfasından CJ'yi bağla." }, 400);
       const token = await getCjToken(integ.api_key);
@@ -396,7 +397,7 @@ Deno.serve(async (req) => {
   try {
     const { data: orders, error } = await db
       .from("orders")
-      .select("id, user_id, status, supplier, supplier_order_id, tracking_number, store_order_id")
+      .select("id, user_id, status, supplier, fulfilled_via, supplier_order_id, tracking_number, store_order_id")
       .in("supplier", ["cj", "aliexpress"])
       .not("supplier_order_id", "is", null)
       .in("status", ["odeme_bekliyor", "tedarikciye_verildi", "kargoya_verildi"])
@@ -422,7 +423,7 @@ Deno.serve(async (req) => {
       if (Date.now() - started > TIME_BUDGET_MS) break;
       summary.checked++;
 
-      if (o.supplier === "aliexpress") {
+      if ((o.fulfilled_via || o.supplier) === "aliexpress") {
         const uid = String(o.user_id);
         if (!aeTokenByUser.has(uid)) aeTokenByUser.set(uid, await aeToken(uid));
         const aeTok = aeTokenByUser.get(uid);

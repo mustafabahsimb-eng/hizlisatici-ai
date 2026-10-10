@@ -186,8 +186,31 @@ async function lossHold(o: any, costUsd: number | null, supplierName: string): P
 }
 
 async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
+  if (o.fulfilled_via === "cj") return await processCj(o, opts);   // AliExpress ürünü, CJ eşdeğerinden
   if (o.supplier === "aliexpress") return await processAe(o, opts);
   return await processCj(o, opts);
+}
+
+// AliExpress ürünü için CJ eşdeğeri hazır mı? (eşdeğer bulunmuş + satıcının CJ hesabı bağlı + CJ otomatik ödeme açık)
+async function cjAltReady(o: any): Promise<{ ready: boolean; note: string }> {
+  const { data: p } = await db.from("products").select("cj_alt_status, cj_alt_vid").eq("id", o.product_id).maybeSingle();
+  const { data: integ } = await db.from("user_integrations").select("api_key").eq("user_id", o.user_id).eq("platform", "cj").maybeSingle();
+  const { data: prof } = await db.from("user_profiles").select("cj_auto_pay").eq("user_id", o.user_id).maybeSingle();
+  if (p?.cj_alt_status === "found" && p.cj_alt_vid) {
+    if (!integ?.api_key) return { ready: false, note: "Ürünün CJ eşdeğeri bulundu; CJ hesabını bağlarsan bu tür siparişler CJ bakiyesinden otomatik ödenir." };
+    if (prof && prof.cj_auto_pay === false) return { ready: false, note: "Ürünün CJ eşdeğeri var ama CJ otomatik ödemen kapalı." };
+    return { ready: true, note: "" };
+  }
+  if (p?.cj_alt_status === "sourcing" || p?.cj_alt_status === "searching" || !p?.cj_alt_status) {
+    return { ready: false, note: "Ürünün CJ eşdeğeri aranıyor; bulununca bu tür siparişler CJ bakiyesinden otomatik ödenecek." };
+  }
+  return { ready: false, note: "Ürünün CJ'de eşdeğeri bulunamadı." };
+}
+
+// Siparişi CJ eşdeğerine yönlendir
+async function routeToCj(o: any, opts: { approved?: boolean }, reason: string): Promise<Outcome> {
+  await update(o.id, { fulfilled_via: "cj", supplier_order_id: null, supplier_shipment_id: null, note: (o.note ? o.note + " · " : "") + reason });
+  return await processCj({ ...o, fulfilled_via: "cj", supplier_order_id: null, supplier_shipment_id: null }, opts);
 }
 
 async function processCj(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
@@ -211,15 +234,20 @@ async function processCj(o: any, opts: { approved?: boolean } = {}): Promise<Out
 
   // 2) CJ'de siparişi oluştur (ödemesiz) - daha önce oluşturulduysa atla
   if (!o.supplier_order_id) {
-    const { data: product } = await db
+    const { data: raw } = await db
       .from("products")
-      .select("id, supplier_item_id, supplier_variant_id")
+      .select("id, supplier, supplier_item_id, supplier_variant_id, cj_alt_pid, cj_alt_vid")
       .eq("id", o.product_id)
       .maybeSingle();
-    if (!product?.supplier_item_id) return await failOrRetry(o, "Üründe CJ ürün numarası yok.");
+    // AliExpress ürünü CJ eşdeğerinden veriliyorsa CJ kodları eşdeğerden gelir
+    const viaAlt = raw?.supplier === "aliexpress";
+    const product = raw && viaAlt
+      ? { id: raw.id, supplier_item_id: raw.cj_alt_pid, supplier_variant_id: raw.cj_alt_vid }
+      : raw;
+    if (!product?.supplier_item_id) return await failOrRetry(o, viaAlt ? "Ürünün CJ eşdeğeri yok." : "Üründe CJ ürün numarası yok.");
 
     let vid = product.supplier_variant_id;
-    if (!vid) {
+    if (!vid && !viaAlt) {
       const pd = await cj(token, `/product/query?pid=${encodeURIComponent(product.supplier_item_id)}`, { method: "GET" });
       vid = pd?.data?.variants?.[0]?.vid || null;
       if (!vid) return await failOrRetry(o, "CJ'de bu ürünün seçeneği bulunamadı.");
@@ -403,6 +431,11 @@ function aeList(v: any): any[] {
   return [];
 }
 
+const AE_API_PAY_COUNTRIES = new Set([
+  "NO", "DE", "BE", "PT", "JP", "DK", "LT", "LU", "LV", "FR", "NZ", "HU", "BR", "SE", "UK", "IE", "CA", "US",
+  "EE", "IL", "AE", "CH", "IS", "IT", "MX", "ES", "AT", "AU", "NL", "GB",
+]);
+
 // AliExpress adres alanlarında sadece İngilizce (ASCII) karakter kabul ediyor
 const TR_MAP: Record<string, string> = { "ı": "i", "İ": "I", "ş": "s", "Ş": "S", "ğ": "g", "Ğ": "G", "ü": "u", "Ü": "U", "ö": "o", "Ö": "O", "ç": "c", "Ç": "C" };
 function ascii(v: unknown): string {
@@ -456,14 +489,30 @@ async function aeToken(userId: string): Promise<{ token: string | null; reason?:
 }
 
 async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
+  // 0) Yönlendirme: satıcı otomatik ödeme istiyor ama AliExpress'te ödeme mümkün değilse
+  //    (hesap bağlı değil ya da API Pay kapalı) CJ eşdeğerinden ver, CJ bakiyesinden öde
+  const { data: prof0 } = await db.from("user_profiles").select("ae_auto_pay, home_country").eq("user_id", o.user_id).maybeSingle();
+  const wantsAutoPay = !(prof0 && prof0.ae_auto_pay === false);
+  const { data: conn0 } = await db.from("supplier_connections").select("api_pay").eq("user_id", o.user_id).eq("supplier", "aliexpress").maybeSingle();
+  // AliExpress API Pay'in desteklediği ülkeler (AliExpress belgesi, "How to use API Pay"); listede
+  // olmayan ülkelerde ilk siparişte boşuna denenip ödenmemiş sipariş bırakılmasın
+  const country0 = String(prof0?.home_country || "TR").trim().toUpperCase();
+  const apiPayNo = conn0?.api_pay === "no" || (conn0?.api_pay !== "yes" && !AE_API_PAY_COUNTRIES.has(country0));
+
   // 1) Satıcının KENDİ AliExpress hesabı
   const t = await aeToken(o.user_id);
+  if (!o.supplier_order_id && wantsAutoPay && (!t.token || apiPayNo)) {
+    const alt = await cjAltReady(o);
+    if (alt.ready) return await routeToCj(o, opts, "AliExpress'te otomatik ödeme yapılamadığı için CJ eşdeğerinden verildi");
+    o._altNote = alt.note;
+  }
   if (!t.token) {
     await update(o.id, {
       hold_reason: "ae_hesap_yok",
-      error_message: t.reason === "expired"
+      error_message: (t.reason === "expired"
         ? "AliExpress bağlantının süresi doldu. Hesaplarım sayfasından yeniden bağlayınca sipariş kendiliğinden verilecek."
-        : "AliExpress hesabın bağlı değil. Hesaplarım sayfasından bağlayınca sipariş kendiliğinden verilecek.",
+        : "AliExpress hesabın bağlı değil. Hesaplarım sayfasından bağlayınca sipariş kendiliğinden verilecek.")
+        + (o._altNote ? " " + o._altNote : ""),
       next_attempt_at: minutesFromNow(30),
     });
     return { id: o.id, status: o.status, note: "ae_hesap_yok" };
@@ -579,7 +628,8 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
 
   // 5) Sipariş (otomatik ödeme ayarına göre kayıtlı kartla öde)
   const { data: prof } = await db.from("user_profiles").select("ae_auto_pay").eq("user_id", o.user_id).maybeSingle();
-  const autoPay = !(prof && prof.ae_auto_pay === false);
+  // Ödeme mümkün değilse (API Pay yok) AliExpress'te boşuna denenmez
+  const autoPay = !(prof && prof.ae_auto_pay === false) && !apiPayNo;
   const phone = String(o.customer_phone || "").replace(/\D/g, "").replace(/^(90|0)/, "");
   const created = await aeCall("aliexpress.ds.order.create", token, {
     ds_extend_request: JSON.stringify({
@@ -618,7 +668,12 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
   await update(o.id, { supplier_order_id: aeOrderId, error_message: null, attempts: 0 });
 
   if (!autoPay) {
-    await update(o.id, { status: "odeme_bekliyor", hold_reason: "elle_odeme" });
+    await update(o.id, {
+      status: "odeme_bekliyor", hold_reason: "elle_odeme",
+      error_message: wantsAutoPay
+        ? "AliExpress siparişi verildi; AliExpress otomatik ödemesi (API Pay) bu hesapta/ülkede kullanılamıyor. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir." + (o._altNote ? " " + o._altNote : "")
+        : null,
+    });
     return { id: o.id, status: "odeme_bekliyor" };
   }
 
@@ -626,15 +681,28 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
   const od = await aeCall("aliexpress.trade.ds.order.get", token, { order_id: aeOrderId, single_order_query: JSON.stringify({ order_id: Number(aeOrderId) }) });
   const ostatus = String(od?.aliexpress_trade_ds_order_get_response?.result?.order_status || "");
   if (ostatus === "PLACE_ORDER_SUCCESS" || ostatus === "") {
+    // AliExpress API ile ödeme, alıcı hesabının AliExpress otomatik ödeme onayına (PayPal) bağlı
+    const apiPayOff = /autopay|apipay/i.test(String(cr?.error_msg || ""));
+    if (apiPayOff) {
+      // Öğren: bu satıcıda AliExpress otomatik ödemesi yok; sonraki siparişler doğrudan CJ eşdeğerine
+      await db.from("supplier_connections").update({ api_pay: "no" }).eq("user_id", o.user_id).eq("supplier", "aliexpress");
+      const alt = await cjAltReady(o);
+      if (alt.ready) {
+        return await routeToCj(o, opts,
+          `AliExpress otomatik ödemesi kapalı; ödenmemiş AliExpress siparişi ${aeOrderId} kendiliğinden kapanır, sipariş CJ eşdeğerinden verildi`);
+      }
+      o._altNote = alt.note;
+    }
     await update(o.id, {
       status: "odeme_bekliyor", hold_reason: "odeme_alinamadi",
-      // AliExpress API ile ödeme, alıcı hesabının AliExpress otomatik ödeme onayına (PayPal) bağlı
-      error_message: /autopay|apipay/i.test(String(cr?.error_msg || ""))
+      error_message: (apiPayOff
         ? "AliExpress siparişi verildi ama otomatik ödeme yapılamadı: AliExpress hesabında otomatik ödeme (API Pay) açık değil. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir."
-        : "AliExpress siparişi verildi ama ödeme alınamadı. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir.",
+        : "AliExpress siparişi verildi ama ödeme alınamadı. Siparişi AliExpress'te öde; sipariş kendiliğinden takip edilir.")
+        + (o._altNote ? " " + o._altNote : ""),
     });
     return { id: o.id, status: "odeme_bekliyor", note: "odeme_alinamadi" };
   }
+  await db.from("supplier_connections").update({ api_pay: "yes" }).eq("user_id", o.user_id).eq("supplier", "aliexpress");
   await update(o.id, { status: "tedarikciye_verildi", hold_reason: null, error_message: null, paid_at: new Date().toISOString() });
   return { id: o.id, status: "tedarikciye_verildi" };
 }
@@ -666,11 +734,12 @@ async function sellerAction(userId: string, action: string, orderId: string) {
   }
 
   if (action === "cancel") {
-    const supplierName = o.supplier === "aliexpress" ? "AliExpress" : "CJ";
+    const via = o.fulfilled_via || o.supplier; // siparişin fiilen verildiği tedarikçi
+    const supplierName = via === "aliexpress" ? "AliExpress" : "CJ";
     if (!["onay_bekliyor", "beklemede", "bakiye_bekliyor", "odeme_bekliyor", "hata"].includes(o.status)) {
       return json({ error: `Ödenmiş sipariş buradan iptal edilemez; ${supplierName} hesabından iptal et.` }, 400);
     }
-    if (o.supplier === "aliexpress") {
+    if (via === "aliexpress") {
       // AliExpress ödenmemiş siparişi API ile silmeye izin vermiyor; birkaç gün içinde kendiliğinden kapanır
       await update(o.id, {
         status: "iptal", hold_reason: null,
