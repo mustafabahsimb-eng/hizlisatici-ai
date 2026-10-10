@@ -185,7 +185,8 @@
     <div class="two-col">
       <div class="form-row">
         <label for="supplierPrice"><span data-i18n="ap.supplierPrice">Tedarikçi/alış fiyatı</span> (<span id="supplierCurrency">₺</span>)</label>
-        <input type="number" id="supplierPrice" placeholder="150">
+        <input type="number" id="supplierPrice" placeholder="150" step="0.01">
+        <div id="supplierFxNote" class="hint" style="display:none;"></div>
       </div>
       <div class="form-row">
         <label for="weightKg" data-i18n="ap.weight">Ağırlık (kg)</label>
@@ -198,6 +199,7 @@
         <label for="platform" data-i18n="ap.platform">Ana satış kanalı</label>
         <select id="platform" onchange="onPlatformChange()">
           <option value="" data-i18n="ap.choose">Seç...</option>
+          <option value="Kendi Mağazam" data-i18n="ap.ownStoreChannel">🏪 Kendi Mağazam</option>
           <optgroup id="ogTr" label="Türkiye">
             <option value="Trendyol">Trendyol</option>
             <option value="Hepsiburada">Hepsiburada</option>
@@ -219,6 +221,7 @@
           </optgroup>
           <option value="Diğer" data-i18n="ap.other">Diğer</option>
         </select>
+        <div id="platformWarn" class="hint" style="display:none;color:#f5b041;"></div>
       </div>
       <div class="form-row">
         <label for="commissionRate" data-i18n="ap.commission">Komisyon oranı (%)</label>
@@ -490,6 +493,10 @@
       'ap.namePh': 'Örn: Kablosuz Bluetooth Kulaklık',
       'ap.supplierPrice': 'Tedarikçi/alış fiyatı',
       'ap.weight': 'Ağırlık (kg)',
+      'ap.ownStoreChannel': '🏪 Kendi Mağazam',
+      'ap.notConnected': '⚠️ {p} hesabın bağlı değil. İlan taslak olarak kaydedilir; Hesaplarım sayfasından bağlayınca gönderilir.',
+      'ap.notConnectedTag': '(bağlı değil)',
+      'ap.fxNote': '{s} fiyatı {from} → {to} (güncel kur)',
       'ap.weightNote': '⚠️ Bu tahmini bir ağırlıktır. Gerçek paket ağırlığını kontrol et.',
       'ap.platform': 'Ana satış kanalı',
       'ap.choose': 'Seç...',
@@ -658,6 +665,10 @@
       'ap.weightNote': '⚠️ This is an estimated weight. Check the real package weight.',
       'ap.platform': 'Main sales channel',
       'ap.choose': 'Select...',
+      'ap.ownStoreChannel': '🏪 My Store',
+      'ap.notConnected': '⚠️ Your {p} account is not connected. The listing is saved as a draft and sent once you connect it on My Accounts.',
+      'ap.notConnectedTag': '(not connected)',
+      'ap.fxNote': '{s} price {from} → {to} (current rate)',
       'ap.groupTr': 'Türkiye',
       'ap.groupIntl': 'International',
       'ap.other': 'Other',
@@ -881,7 +892,8 @@
     const ctx = await HS.init();
     if (!ctx) return;
     applyDynamicTexts();
-    window.addEventListener('hs:langchange', applyDynamicTexts);
+    window.addEventListener('hs:langchange', () => { applyDynamicTexts(); renderAdditionalPlatformCheckboxes(); renderPlatformWarning(); });
+    loadConnections();
 
     const params = new URLSearchParams(window.location.search);
     const prefillName = params.get('name');
@@ -913,10 +925,46 @@
   // Kanal seçimi
   // ============================================================
   function onPlatformChange() {
-    fillCommissionRate();
+    if (document.getElementById('platform').value === OWN_STORE) {
+      // Kendi mağazasında komisyon yok
+      document.getElementById('commissionRate').value = 0;
+      updateProfitCalc();
+    } else {
+      fillCommissionRate();
+    }
     updateCurrencyDisplay();
     renderAdditionalPlatformCheckboxes();
+    renderPlatformWarning();
     tyUpdateVisibility();
+  }
+
+  // ---------- Bağlı pazaryerleri (bağlı olmayan seçilirse uyarı) ----------
+  const OWN_STORE = 'Kendi Mağazam';
+  let connectedCodes = null; // null: henüz yüklenmedi
+  async function loadConnections() {
+    try {
+      const { data } = await db.from('store_connections').select('marketplace_code, status').is('deleted_at', null);
+      connectedCodes = new Set((data || []).filter(c => c.status === 'connected' || c.status === 'pending').map(c => c.marketplace_code));
+    } catch (e) { connectedCodes = null; }
+    renderAdditionalPlatformCheckboxes();
+    renderPlatformWarning();
+  }
+  function isConnected(p) {
+    if (connectedCodes === null || !PLATFORM_CODES[p]) return true;
+    const code = PLATFORM_CODES[p];
+    // eBay hesabı kayıtlı olduğu siteye bağlanır (ebay_us, ebay_de...)
+    if (code.startsWith('ebay_')) return [...connectedCodes].some(c => c.startsWith('ebay_'));
+    return connectedCodes.has(code);
+  }
+  function renderPlatformWarning() {
+    const p = document.getElementById('platform').value;
+    const el = document.getElementById('platformWarn');
+    if (p && PLATFORM_CODES[p] && !isConnected(p)) {
+      el.textContent = t('ap.notConnected', { p: p });
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
   }
 
   function renderAdditionalPlatformCheckboxes() {
@@ -926,8 +974,9 @@
     const ownStoreSection = document.getElementById('ownStoreSection');
     const previouslyChecked = Array.from(document.querySelectorAll('.extraPlatformCheck:checked')).map(cb => cb.value);
 
-    // Kendi Mağazam: lira bazlı ürünlerde (TR kanalı, "Diğer" ya da boş)
-    ownStoreSection.style.display = currencyCodeFor(primary) === 'TRY' ? 'block' : 'none';
+    // Kendi Mağazam: lira bazlı ürünlerde (TR kanalı, "Diğer" ya da boş).
+    // Ana kanal zaten Kendi Mağazam ise kutuya gerek yok, kayıtta mağaza ilanı her zaman açılır.
+    ownStoreSection.style.display = currencyCodeFor(primary) === 'TRY' && primary !== OWN_STORE ? 'block' : 'none';
     if (currencyCodeFor(primary) !== 'TRY') document.getElementById('ownStoreCheck').checked = false;
 
     if (!primary || primary === 'Diğer') {
@@ -945,7 +994,7 @@
     listEl.innerHTML = others.map(p => `
       <label class="platform-check-item">
         <input type="checkbox" value="${escapeHtml(p)}" class="extraPlatformCheck" ${previouslyChecked.includes(p) ? 'checked' : ''}>
-        <span>${escapeHtml(p)}</span>
+        <span>${escapeHtml(p)}${isConnected(p) ? '' : ' <span style="color:#f5b041;">' + escapeHtml(t('ap.notConnectedTag')) + '</span>'}</span>
       </label>
     `).join('');
     sectionEl.style.display = 'block';
@@ -956,6 +1005,7 @@
     const symbol = CURRENCY_SYMBOLS[currencyCodeFor(platform)];
     document.getElementById('supplierCurrency').textContent = symbol;
     document.getElementById('saleCurrency').textContent = symbol;
+    applySupplierCost();
     document.getElementById('shippingCurrencyNote').style.display =
       INTERNATIONAL_PLATFORMS.includes(platform) ? 'block' : 'none';
     updateProfitCalc();
@@ -1097,12 +1147,43 @@
     }
   }
 
+  // Tedarikçi (CJ/AliExpress) fiyatı dolardır: satış para birimine kurla çevirip yaz,
+  // dolar karşılığını ayrıca sakla (supplier_cost, USD)
+  let autoSupplierPrice = null;
+  async function applySupplierCost() {
+    const usd = window._supplierCostUsd;
+    const input = document.getElementById('supplierPrice');
+    const note = document.getElementById('supplierFxNote');
+    if (usd == null) { note.style.display = 'none'; return; }
+    // Kullanıcı fiyatı elle değiştirdiyse dokunma
+    if (autoSupplierPrice !== null && input.value !== String(autoSupplierPrice)) return;
+    const cur = currencyCodeFor(document.getElementById('platform').value);
+    let value = Number(usd);
+    if (cur !== 'USD') {
+      const converted = await HS.convert(usd, 'USD', cur);
+      if (converted == null) { note.style.display = 'none'; return; }
+      value = Math.round(converted * 100) / 100;
+      note.textContent = t('ap.fxNote', {
+        s: window._selectedSupplier === 'aliexpress' ? 'AliExpress' : 'CJ',
+        from: HS.money(usd, 'USD'),
+        to: HS.money(value, cur)
+      });
+      note.style.display = 'block';
+    } else {
+      note.style.display = 'none';
+    }
+    autoSupplierPrice = value;
+    input.value = String(value);
+    updateProfitCalc();
+  }
+
   function applySupplierProduct(p, supplier, itemId, variantId) {
     window._selectedSupplier = supplier;
     window._selectedSupplierItemId = itemId;
     window._selectedSupplierVariantId = variantId;
-    document.getElementById('supplierPrice').value = p.priceUsd;
-    updateProfitCalc();
+    window._supplierCostUsd = p.priceUsd != null && !isNaN(p.priceUsd) ? Number(p.priceUsd) : null;
+    autoSupplierPrice = null;
+    applySupplierCost();
     if (p.name) {
       document.getElementById('productName').value = p.name;
       lastGeneratedName = p.name;
@@ -1887,7 +1968,8 @@
     const titleEn = document.getElementById('titleEnOut').value.trim() || null;
     const descEn = document.getElementById('descEnOut').value.trim() || null;
     const tagsEn = tagsToArray(document.getElementById('tagsEnOut').value);
-    const ownStore = document.getElementById('ownStoreCheck').checked;
+    // Ana kanal Kendi Mağazam ise mağaza ilanı her zaman açılır
+    const ownStore = platform === OWN_STORE || document.getElementById('ownStoreCheck').checked;
 
     if (!productName) {
       showMsg(t('ap.nameRequired'), 'error');
@@ -1927,6 +2009,8 @@
         supplier: window._selectedSupplier || null,
         supplier_item_id: window._selectedSupplierItemId || null,
         supplier_variant_id: window._selectedSupplierVariantId || null,
+        // Tedarikçinin dolar fiyatı (stok/fiyat takibi de bu alanı USD olarak günceller)
+        supplier_cost: window._supplierCostUsd != null ? window._supplierCostUsd : null,
         image_url: imageUrl,
         cost_currency: currency,
         content_language: 'tr',
