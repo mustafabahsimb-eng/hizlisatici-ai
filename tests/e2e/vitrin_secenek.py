@@ -72,6 +72,13 @@ def main():
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         login(page)
+        page.wait_for_function("() => window.HS && HS.db", timeout=30000)
+        # Önceki çalıştırmalardan kalan aynı linkli ürünler ("Zaten var") temizlenir
+        CLEAN = """async (urls) => { const r = await HS.db.from('products').select('id, source_url').is('deleted_at', null);
+            const ids = (r.data || []).filter(x => urls.some(u => (x.source_url || '').split('?')[0].replace(/\/$/, '') === u.split('?')[0].replace(/\/$/, ''))).map(x => x.id);
+            if (ids.length) await HS.db.from('products').update({ deleted_at: new Date().toISOString() }).in('id', ids);
+            return ids.length; }"""
+        page.evaluate(CLEAN, [WOO, AE])
 
         woo = import_link(page, WOO)
         ae = import_link(page, AE)
@@ -130,6 +137,7 @@ def main():
         c.check("Seçenek AliExpress SKU numarasını taşıyor", bool(o) and bool((o.get("v") or {}).get("supplier_variant_id")), str(o and o.get("v")))
 
         c.check("Sayfalarda JavaScript hatası yok", not errors, "; ".join(errors)[:300])
+        page.evaluate(CLEAN, [WOO, AE])
         browser.close()
     c.finish()
 

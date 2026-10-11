@@ -15,7 +15,7 @@ const SITE_URL = "https://mustafabahsimb-eng.github.io/hizlisatici-ai";
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
 const BATCH_SIZE = 10;        // tek seferde alınan iş sayısı
-const MAX_ROUNDS = 5;         // bir çalışmada en fazla kaç tur
+const MAX_ROUNDS = 40;        // bir çalışmada en fazla kaç tur (asıl sınır süre bütçesi)
 const TIME_BUDGET_MS = 45000; // Edge Function süresini aşmamak için
 
 const corsHeaders = {
@@ -580,6 +580,17 @@ Deno.serve(async (req) => {
     }
 
     if (jobs.length < BATCH_SIZE) break;
+  }
+
+  // Süre bitti ama kuyrukta iş kaldıysa beklemeden yeni bir çalışma başlat (HIZ: 2 dk'lık görevi bekleme)
+  if (Date.now() - started > TIME_BUDGET_MS || claimed >= MAX_ROUNDS * BATCH_SIZE) {
+    const next = fetch(SUPABASE_URL + "/functions/v1/sync-worker", {
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (Deno.env.get("SUPABASE_ANON_KEY") ?? "") },
+      body: JSON.stringify({ cronSecret: CRON_SECRET, chained: true }),
+    }).then((r) => r.body?.cancel()).catch(() => {});
+    // deno-lint-ignore no-explicit-any
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(next);
   }
 
   const summary = {
