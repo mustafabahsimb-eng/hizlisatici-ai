@@ -15,6 +15,9 @@
 .emag.bg
 .emag.hu
 
+# Yurtiçi Kargo (canlı web servisi IP izni ister)
+ws.yurticikargo.com
+
 # Sağlık kontrolü (çıkış IP'sini doğrulamak için)
 api64.ipify.org
 api.ipify.org
