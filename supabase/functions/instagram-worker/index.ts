@@ -93,10 +93,11 @@ Deno.serve(async (req) => {
     }
   } catch { /* yenileme hatası kuyruğu durdurmasın */ }
 
-  // ---------- B) Takılı kalan işleri geri al (10 dk'dan eski 'processing') ----------
+  // ---------- B) Takılı kalan işleri geri al (10 dk'dan eski 'posting') ----------
+  // Not: social_posts.status yalnız pending | posting | posted | error kabul eder (tablo kuralı)
   await supabase.from("social_posts")
     .update({ status: "pending", updated_at: new Date().toISOString() })
-    .eq("platform", "instagram").eq("status", "processing")
+    .eq("platform", "instagram").eq("status", "posting")
     .lt("updated_at", new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
   // ---------- C) Kuyruğu işle ----------
@@ -113,7 +114,7 @@ Deno.serve(async (req) => {
   for (const job of jobs || []) {
     // Sahiplen (aynı işi iki kez almasın)
     const { data: claimed } = await supabase.from("social_posts")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .update({ status: "posting", updated_at: new Date().toISOString() })
       .eq("id", job.id).eq("status", "pending")
       .select("id").maybeSingle();
     if (!claimed) continue;
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
         .eq("id", job.product_id).maybeSingle();
       if (!p || p.deleted_at) {
         await supabase.from("social_posts").update({
-          status: "canceled", error: "Ürün silinmiş", updated_at: new Date().toISOString(),
+          status: "error", error: "İptal: ürün silinmiş", updated_at: new Date().toISOString(),
         }).eq("id", job.id);
         continue;
       }
@@ -172,7 +173,7 @@ Deno.serve(async (req) => {
       } catch { /* link şart değil */ }
 
       await supabase.from("social_posts").update({
-        status: "published",
+        status: "posted",
         post_id: pub.id,
         post_url: permalink,
         caption,
@@ -186,7 +187,7 @@ Deno.serve(async (req) => {
       const attempts = (job.attempts || 0) + 1;
       const giveUp = attempts >= MAX_ATTEMPTS;
       await supabase.from("social_posts").update({
-        status: giveUp ? "failed" : "pending",
+        status: giveUp ? "error" : "pending",
         attempts,
         error: String((e as Error)?.message || e).slice(0, 500),
         scheduled_at: new Date(Date.now() + attempts * 5 * 60 * 1000).toISOString(),
