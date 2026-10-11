@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Seltigo</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header><div class="logo">S</div><div class="brand">Seltigo</div><button id="logoutBtn" class="link" style="display:none"></button></header>
+
+  <!-- Giriş -->
+  <section id="loginView" style="display:none">
+    <p class="muted" id="loginHint"></p>
+    <input type="email" id="email" autocomplete="username">
+    <input type="password" id="password" autocomplete="current-password">
+    <button id="loginBtn" class="primary"></button>
+    <div class="err" id="loginErr"></div>
+  </section>
+
+  <!-- Ürün -->
+  <section id="mainView" style="display:none">
+    <div id="status" class="muted"></div>
+    <div id="preview" style="display:none">
+      <div class="prod">
+        <img id="pImg" alt="">
+        <div>
+          <div id="pName" class="pname"></div>
+          <div id="pPrice" class="pprice"></div>
+          <div id="pMeta" class="muted small"></div>
+        </div>
+      </div>
+      <div id="aeBox" style="display:none" class="box">
+        <div class="small" id="aeQ"></div>
+        <label><input type="radio" name="aeSrc" value="aliexpress"> <span id="aeA"></span></label>
+        <label><input type="radio" name="aeSrc" value="own"> <span id="aeO"></span></label>
+      </div>
+      <div id="consentBox" style="display:none" class="box small">
+        <label id="consentRow"><input type="checkbox" id="consent"> <span id="consentTxt"></span></label>
+        <label id="imgTermsRow"><input type="checkbox" id="imgTerms"> <span id="imgTermsTxt"></span></label>
+      </div>
+      <button id="addBtn" class="primary"></button>
+    </div>
+    <div id="done" style="display:none" class="box ok">
+      <div id="doneTxt"></div>
+      <a id="editLink" target="_blank" rel="noopener"></a>
+    </div>
+    <div class="err" id="err"></div>
+  </section>
+
+  <script src="extract.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

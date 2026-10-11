@@ -717,7 +717,8 @@ function trendyolFromHtml(html: string, base: URL) {
         price: parsePrice(v.price?.value),
         stock: v.inStock === false ? 0 : null, image: null,
       })).filter((v) => v.supplier_variant_id && Object.values(v.attributes)[0]);
-      const prices = variants.map((v) => v.price).filter((n): n is number => !!n);
+      // Fiyat seçeneklerin içinde (tek seçenekli üründe seçeneğin adı boş olabilir; fiyatı yine oradan)
+      const prices = vs.map((v: any) => parsePrice(v.price?.value)).filter((n): n is number => !!n);
       const brand = clean(p.brand?.name || p.webBrand?.name, 80);
       return {
         url: base.toString(), name: clean((brand && !String(p.name).startsWith(brand) ? brand + " " : "") + p.name, 300),

@@ -1,0 +1,20 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 340px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; padding: 14px; font-size: 13px; }
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.logo { width: 26px; height: 26px; border-radius: 7px; background: #1D9E75; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.brand { font-weight: 600; color: #fff; flex: 1; }
+input[type=email], input[type=password] { width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid #2a3040; background: #141821; color: #e6e8ee; margin-bottom: 8px; font-size: 13px; }
+button.primary { width: 100%; background: #1D9E75; color: #fff; border: none; padding: 10px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+button.primary:disabled { opacity: .5; cursor: not-allowed; }
+button.link { background: none; border: none; color: #9aa3b2; cursor: pointer; font-size: 12px; }
+.muted { color: #9aa3b2; }
+.small { font-size: 12px; }
+.err { color: #f28b8b; margin-top: 8px; font-size: 12px; }
+.prod { display: flex; gap: 10px; align-items: flex-start; }
+.prod img { width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 8px; flex: none; }
+.pname { font-weight: 600; color: #fff; line-height: 1.35; max-height: 54px; overflow: hidden; }
+.pprice { color: #6ee7b7; font-weight: 700; margin-top: 4px; }
+.box { background: #141821; border: 1px solid #232838; border-radius: 10px; padding: 10px; margin-top: 10px; }
+.box label { display: block; margin-top: 6px; cursor: pointer; line-height: 1.4; }
+.box.ok { border-color: #1D9E75; color: #6ee7b7; }
+.box.ok a { display: inline-block; margin-top: 6px; color: #fff; }
