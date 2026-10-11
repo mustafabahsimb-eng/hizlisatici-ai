@@ -21,12 +21,23 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 ## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
 Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları onaylandı (aşağıdaki tablo).
 
-- [ ] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
+- [~] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
   - Tek ürün linki (AliExpress, Trendyol, satıcının kendi sitesi, toptancı sayfası) → ad, açıklama, fiyat, görseller, varyantlar otomatik.
   - AI içeriği seçilen kanala göre yeniden yazar (Trendyol / Instagram / kendi mağaza üslubu ve kuralları).
   - Mağaza / kategori / site adresi → tüm ürünler toplu çekilir. API varsa API (AliExpress DS, Shopify/WooCommerce açık uçları, XML besleme), yoksa sayfa okuma (kazıma); satıcı farkı görmez.
   - Çekilen ürünlerde kaynak adresi saklanır; fiyat/stok değişiklikleri belirli aralıklarla otomatik güncellenir (stock-price-monitor benzeri zamanlanmış görev, zarar kontrolüyle).
   - Eski madde "Siteden toplu ürün çekmeyi tamamlama (Excel indir)" buraya katıldı.
+  - DURUM (11 Ekim 2026): çoğu yapıldı ve denendi.
+    - Okuyucular: AliExpress (DS API, satıcının hesabıyla), Shopify (ürün / koleksiyon / tüm mağaza, sayfa sayfa; ana para birimi), WooCommerce (Store API, seçenekleriyle), Trendyol (sayfa içi veri), JSON-LD seçenekleri, site ana sayfası → site haritası.
+    - Seçenekler (beden/renk) product_variants'a kaydediliyor; kaynak platform/numara saklanıyor.
+    - "Fiyat ve stoğu otomatik güncel tut" + source-sync (30 dk): fiyat değişince satış fiyatı aynı oranda (kâr korunur), stok bitince gizle / gelince aç, kaldırılan sayfa = tükendi.
+    - "✨ Metni kanala göre yaz" (channel-copy): 8 kanal kuralı.
+    - Test: tests/e2e/linkten_yukleme.py 10/10.
+  - Kalanlar / bilinen sınırlar:
+    - [ ] Trendyol Türkiye dışındaki sunuculara uluslararası vitrini veriyor (Euro, Almanca): görsel/seçenek/özellik doğru, fiyat Euro. Türkiye fiyatı için Türkiye'den okuma gerekir → Chrome eklentisi (satıcının tarayıcısından) ya da Türkiye çıkışlı okuma servisi.
+    - [ ] Bazı siteler sunucudan okumayı engelliyor (ör. Cloudflare korumalı): Shopify/WooCommerce ise veri adreslerine düşülüyor; değilse ücretli okuma servisi gerekir. Altyapı hazır, varsayılan KAPALI: Edge secret SCRAPER_ENABLED=true + SCRAPER_URL_TEMPLATE (ör. ScrapingBee/ZenRows, "{url}" yer tutuculu). Ödeme günü sadece bu iki değer girilir.
+    - [ ] Mağaza sayfasında (magaza.html) müşterinin beden/renk seçebilmesi: seçenekler kayıtlı, vitrinde seçim ve sepette seçenek henüz yok.
+    - [ ] Kendi mağaza dışındaki kanallardaki ilan fiyatları (Trendyol vb.) source-sync ile henüz güncellenmiyor (o kanalların gönderimi açılınca sync-worker kuyruğuna bağlanacak).
 - [ ] **2. PDF'den ürün yükleme** (şirket gerekmez; temel var: price-list-parse resimsiz fiyat listesini okuyor)
   - Üç tür: (a) resimli katalog — ad, kod, fiyat ve fotoğraf ayıklanıp eşleştirilir; (b) resimsiz fiyat listesi/tablo; (c) taranmış/fotoğraf PDF — OCR ile okunur.
   - Resimsiz ürünlerde görsel ve bilgi otomatik tamamlanır, sırayla: 1) markanın resmi sitesi (marka + model/kod ile ürün sayfası; resmi görseller + teknik özellikler, açıklama bunlarla zenginleşir), 2) toptancının sitesi, 3) CJ/AliExpress eşleşmesi. Hiçbirinde yoksa "Görsel eksik" etiketiyle eklenir; satıcı telefonla çekip ekler, arka plan otomatik temizlenir (remove-background). Rastgele/telifli görsel alınmaz.
