@@ -124,9 +124,11 @@ function parseBox(v: unknown): number[] | null {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
-
   const body = await req.json().catch(() => ({}));
+  // Sistem çağrısı (Seltigo Asistan): CRON_SECRET
+  const CRON = Deno.env.get("CRON_SECRET") ?? "";
+  const sysCall = !!CRON && typeof body?.cronSecret === "string" && body.cronSecret.trim() === CRON.trim();
+  if (!sysCall && !(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
   const en = String(body?.language || "").toLowerCase().startsWith("en");
   const E = (tr: string, eng: string) => (en ? eng : tr);
 

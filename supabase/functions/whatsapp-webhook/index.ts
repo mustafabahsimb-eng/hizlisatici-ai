@@ -4,12 +4,17 @@
 // "siparişin alındı" mesajı gönderir.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { handleIncoming, type Incoming } from "../_shared/assistant-core.ts";
+import { sendReply, whatsappMedia } from "../_shared/assistant-channels.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_SECRET = Deno.env.get("FACEBOOK_CLIENT_SECRET") || "";
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "";
 const GRAPH = "https://graph.facebook.com/v21.0";
+// Seltigo Asistan: Seltigo'nun kendi WhatsApp numarası (Meta test numarası ya da şirketle gerçek numara)
+const ASSISTANT_PHONE_ID = Deno.env.get("ASSISTANT_WA_PHONE_ID") || "";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -118,6 +123,30 @@ async function handleOrder(phoneNumberId: string, msg: any, contacts: any[]) {
   if (ch.access_token) await sendText(phoneNumberId, ch.access_token, from, reply);
 }
 
+// ---------- Seltigo Asistan (satıcı, Seltigo'nun numarasına yazıyor) ----------
+function toAssistantIncoming(msg: any, contacts: any[]): Incoming {
+  const name = contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name;
+  const inc: Incoming = { channel: "whatsapp", externalId: String(msg.from), name, text: "" };
+  if (msg.type === "text") inc.text = msg.text?.body || "";
+  else if (msg.type === "interactive") inc.callback = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || "";
+  else if (msg.type === "button") inc.callback = msg.button?.payload || "";
+  else if (msg.type === "image") { inc.text = msg.image?.caption || ""; inc.file = { kind: "image", mime: msg.image?.mime_type || "image/jpeg", filename: "foto.jpg", bytes: async () => (await whatsappMedia(msg.image.id)).bytes }; }
+  else if (msg.type === "document") {
+    const d = msg.document || {};
+    inc.text = d.caption || "";
+    inc.file = { kind: String(d.mime_type || "").startsWith("image/") ? "image" : "document", mime: d.mime_type, filename: d.filename, bytes: async () => (await whatsappMedia(d.id)).bytes };
+  } else if (msg.type === "audio") inc.file = { kind: "audio", mime: msg.audio?.mime_type || "audio/ogg", filename: "ses.ogg", bytes: async () => (await whatsappMedia(msg.audio.id)).bytes };
+  return inc;
+}
+async function handleAssistant(msg: any, contacts: any[]) {
+  const inc = toAssistantIncoming(msg, contacts);
+  const { link, replies } = await handleIncoming(inc);
+  const target = link || { channel: "whatsapp", external_id: inc.externalId, last_inbound_at: new Date().toISOString() };
+  const out = [];
+  for (const r of replies) out.push(await sendReply(db, target as any, r));
+  return out;
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
@@ -132,6 +161,13 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("OK");
 
   const raw = await req.text();
+  // Test (sistem): Meta imzası yerine CRON_SECRET; asistan mesajını eşzamanlı işler, gönderilecekleri döndürür
+  let sysTest: any = null;
+  try { const j = JSON.parse(raw || "{}"); if (CRON_SECRET && j?.cronSecret === CRON_SECRET && j?.assistantTest) sysTest = j; } catch (_) { /* yok */ }
+  if (sysTest) {
+    const out = await handleAssistant(sysTest.message, sysTest.contacts || []);
+    return new Response(JSON.stringify({ ok: true, sent: out }), { headers: { "Content-Type": "application/json" } });
+  }
   if (!(await validSignature(raw, req.headers.get("x-hub-signature-256")))) {
     return new Response("Bad signature", { status: 401 });
   }
@@ -143,6 +179,14 @@ Deno.serve(async (req: Request) => {
         const v = change.value || {};
         const phoneNumberId = String(v.metadata?.phone_number_id || "");
         for (const msg of v.messages || []) {
+          if (ASSISTANT_PHONE_ID && phoneNumberId === ASSISTANT_PHONE_ID) {
+            // Asistan: Meta'ya hemen 200 dön, iş arkada
+            const task = handleAssistant(msg, v.contacts || []).catch((e) => console.error("assistant", String(e)));
+            // deno-lint-ignore no-explicit-any
+            const rt = (globalThis as any).EdgeRuntime;
+            if (rt?.waitUntil) rt.waitUntil(task); else await task;
+            continue;
+          }
           if (msg.type === "order") await handleOrder(phoneNumberId, msg, v.contacts || []);
         }
       }
