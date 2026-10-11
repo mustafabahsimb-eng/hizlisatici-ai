@@ -12,6 +12,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   AMAZON_MARKETS, amazonConfigured, amazonLive, CONNECT_REGIONS, consentUrl, exchangeCode, marketById, sp, type Ctx,
 } from "../_shared/amazon.ts";
+import { buyAmazonLabel, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -85,6 +86,7 @@ async function selftest() {
   if (!amazonConfigured() || !rt) return { ok: false, notReady: true, need: ["AMAZON_APP_ID", "AMAZON_LWA_CLIENT_ID", "AMAZON_LWA_CLIENT_SECRET", "AMAZON_SANDBOX_REFRESH_TOKEN"] };
   const ctx: Ctx = { region: "na", refreshToken: rt, sandbox: true };
   const steps: Record<string, unknown> = {};
+  const t0 = Date.now();
   const run = async (name: string, f: () => Promise<any>, ok: (d: any) => boolean) => {
     try { const d = await f(); steps[name] = ok(d) ? "geçti" : "beklenmeyen cevap: " + short(JSON.stringify(d), 200); } catch (e) { steps[name] = "hata: " + short((e as Error).message); }
   };
@@ -96,7 +98,14 @@ async function selftest() {
     body: { productType: "PRODUCT", requirements: "LISTING", attributes: {} } }), (d) => d?.status === "VALID" || d?.status === "ACCEPTED");
   await run("siparişler", () => sp(ctx, "GET", "/orders/v0/orders", { query: { CreatedAfter: "TEST_CASE_200", MarketplaceIds: ["ATVPDKIKX0DER"] } }), (d) => Array.isArray(d?.payload?.Orders));
   await run("sipariş kalemleri", () => sp(ctx, "GET", "/orders/v0/orders/TEST_CASE_200/orderItems"), (d) => Array.isArray(d?.payload?.OrderItems));
-  return { ok: Object.values(steps).every((s) => s === "geçti"), steps };
+  await run("etiket (Buy Shipping)", async () => {
+    const us = marketById("ATVPDKIKX0DER")!;
+    const from = shipFromAddress({ DefaultShipFromLocationAddress: { Name: "John Doe", AddressLine1: "300 Turnbull Ave", City: "Detroit", StateOrRegion: "MI", PostalCode: "48123", CountryCode: "US", Phone: "7132341234" } }, { email: "jdoeasdfllkj@yahoo.com" })!;
+    return await buyAmazonLabel(ctx, shipmentRequest({ amazonOrderId: "903-5563053-5647845", orderItemId: "52986411826454", quantity: 1, shipFrom: from, market: us,
+      dims: { length: 10.25, width: 10.25, height: 10.25 }, weight: 10.25 }));
+  }, (d) => !!d?.trackingId);
+  const ms = Date.now() - t0;
+  return { ok: Object.values(steps).every((s) => s === "geçti"), steps, ms };
 }
 
 Deno.serve(async (req) => {

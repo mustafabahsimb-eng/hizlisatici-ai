@@ -441,6 +441,8 @@ async function amazonAdapter(action, listing) {
     ok: r.ok, dry_run: preview, action: "publish", marketplace: listing.marketplace_code, errors: r.errors, warnings: r.warnings,
     amazon: r.amazon, checked_at: now,
   };
+  // Amazon kataloğunda eşleşen ürünün barkodu: üründe yoksa yazılır (diğer pazaryerleri de kullanır)
+  if (r.amazon.foundGtin && !product.gtin) await db.from("products").update({ gtin: r.amazon.foundGtin }).eq("id", product.id).is("gtin", null);
   const amzSkus: any[] = Array.isArray(r.amazon.skus) ? r.amazon.skus : [];
   const main = amzSkus.find((x) => x.parent) || amzSkus[0];
   return {

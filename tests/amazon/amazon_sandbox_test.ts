@@ -12,6 +12,7 @@ const MODELS = {
   defs: "product-type-definitions-api-model/definitionsProductTypes_2020-09-01.json",
   orders: "orders-api-model/ordersV0.json",
   sellers: "sellers-api-model/sellers.json",
+  mfn: "merchant-fulfillment-api-model/merchantFulfillmentV0.json",
 };
 
 Deno.env.set("AMAZON_APP_ID", "amzn1.sp.solution.test");
@@ -39,9 +40,16 @@ for (const f of Object.values(MODELS)) {
 }
 
 const calls: { method: string; url: URL; body: any }[] = [];
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || !a || !b) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a as object), kb = Object.keys(b as object);
+  return ka.length === kb.length && ka.every((k) => deepEqual((a as any)[k], (b as any)[k]));
+}
 function matchExample(op: Op, url: URL, pathVals: Record<string, string>, body: any) {
   const ok = (e: any) => Object.entries<any>(e.request?.parameters || {}).every(([k, v]) => {
-    if (k === "body") return true;
+    if (k === "body") return v?.value === undefined || deepEqual(v.value, body);
     const want = v.value;
     const got = pathVals[k] ?? url.searchParams.get(k);
     if (got == null) return false;
@@ -81,8 +89,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
       const m = op.re.exec(url.pathname);
       if (!m) continue;
       const pv = Object.fromEntries(op.names.map((n, i) => [n, decodeURIComponent(m[i + 1])]));
-      // Statik sandbox'ta barkodla katalog araması örneği yok; Amazon'un katalog arama örnek cevabı (aynı biçim) kullanılır
-      if (url.pathname === "/catalog/2022-04-01/items" && url.searchParams.get("identifiers")) {
+      // Statik sandbox'ta barkodla / marka+modelle katalog araması örneği yok; Amazon'un katalog arama örnek cevabı (aynı biçim) kullanılır
+      if (url.pathname === "/catalog/2022-04-01/items" && (url.searchParams.get("identifiers") || url.searchParams.get("keywords") === "Samsung,QN82Q60RAFXZA")) {
         return res(op.examples.find((x) => x.code === 200)!.response);
       }
       const e = matchExample(op, url, pv, body);
@@ -97,6 +105,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 const A = await import("../../supabase/functions/_shared/amazon.ts");
 const L = await import("../../supabase/functions/_shared/amazon-listing.ts");
 const O = await import("../../supabase/functions/_shared/amazon-orders.ts");
+const S = await import("../../supabase/functions/_shared/amazon-shipping.ts");
 
 // Basit veritabanı taklidi (ürün türü önbelleği ve "önceki benzer ürün" sorgusu)
 function fakeDb() {
@@ -250,4 +259,55 @@ Deno.test("Barkod doğrulama ve SKU", () => {
   assert(!A.validGtin("8806090193973"));
   assertEquals(A.gtinType("012345678905"), "upc");
   assertEquals(A.makeSku(12, "3"), "SLT-12-3");
+});
+
+Deno.test("İlan: barkodsuz ürün -> Amazon kataloğunda marka + modelle bulunur, yalnız teklif, barkod ürüne yazılır", async () => {
+  calls.length = 0;
+  const r = await L.submitListing({
+    db: fakeDb(), ctx, market: US, sellerId: "AXXXXXXXXXXXXX", preview: true, stockQty: 2,
+    listing: { id: "l4", user_id: "u", marketplace_code: "amazon_us", title: "Samsung 82 inç QLED 4K Smart TV", description: "TV", price: 1500, validation: null },
+    product: { id: 9, brand: "Samsung", model_code: "QN82Q60RAFXZA", stock_qty: 2 }, variants: [], images: ["https://example.com/tv.jpg"],
+  });
+  const put = calls.find((c) => c.method === "PUT")!;
+  assertEquals(put.body.requirements, "LISTING_OFFER_ONLY");
+  assertEquals(put.body.productType, "TELEVISION");
+  assertEquals((r.amazon as any).asin, "B07N4M94X4");
+  assertEquals((r.amazon as any).foundGtin, "0887276302195");
+  assert(!calls.some((c) => c.url.pathname.startsWith("/definitions")), "katalog eşleşince şema ve AI gerekmez");
+});
+
+Deno.test("Katalog eşleme güvenliği: marka farklıysa ya da model tutmuyorsa eşleme yok (AI yokken)", () => {
+  const item = { summaries: [{ brand: "SAMSUNG", itemName: "Samsung QN82Q60RAFXZA Flat 82-Inch QLED 4K", modelNumber: "QN82Q60RAFXZA" }] };
+  assertEquals(L.catalogScore({ brand: "Samsung", model_code: "QN82Q60RAFXZA" }, "", item), 1);
+  assertEquals(L.catalogScore({ brand: "LG", model_code: "QN82Q60RAFXZA" }, "", item), 0);
+  assert(L.catalogScore({ brand: "Samsung" }, "Samsung buzdolabı No Frost", item) < 0.5);
+});
+
+Deno.test("Etiket (Amazon Buy Shipping): istek Amazon örneğiyle birebir; uygun hizmet -> en ucuz -> etiket + takip no", async () => {
+  calls.length = 0;
+  // Amazon siparişindeki satıcı gönderim adresi (Orders API DefaultShipFromLocationAddress) -> ShipFromAddress
+  const from = S.shipFromAddress({ DefaultShipFromLocationAddress: { Name: "John Doe", AddressLine1: "300 Turnbull Ave", City: "Detroit", StateOrRegion: "MI", PostalCode: "48123", CountryCode: "US", Phone: "7132341234" } },
+    { email: "jdoeasdfllkj@yahoo.com" })!;
+  const details = S.shipmentRequest({ amazonOrderId: "903-5563053-5647845", orderItemId: "52986411826454", quantity: 1, shipFrom: from, market: US,
+    dims: { length: 10.25, width: 10.25, height: 10.25 }, weight: 10.25 });
+  const label = await S.buyAmazonLabel(ctx, details);
+  assertEquals(calls.map((c) => c.url.pathname).filter((x) => x.startsWith("/mfn")), ["/mfn/v0/eligibleShippingServices", "/mfn/v0/shipments"]);
+  assertEquals(calls.find((c) => c.url.pathname === "/mfn/v0/shipments")!.body.ShippingServiceId, "UPS_PTP_2ND_DAY_AIR", "en ucuz hizmet");
+  assertEquals(label.trackingId, "1Z17E2100217295733");
+  assertEquals(label.carrier, "UPS");
+  assertEquals(label.cost, 34.73);
+  assertEquals(label.fileType, "image/png");
+});
+
+Deno.test("Etiket dosyası: Base64 + GZip PNG -> yazdırılabilir PDF; ölçü birimleri pazara göre", async () => {
+  const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+  const gz = new Uint8Array(await new Response(new Blob([png]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+  const b64 = btoa(String.fromCharCode(...gz));
+  const pdf = await S.labelToPdf({ fileType: "image/png", contents: b64 });
+  assertEquals(new TextDecoder().decode(pdf.slice(0, 5)), "%PDF-");
+  assertEquals(S.units(US).len, "inches");
+  assertEquals(S.units(A.marketByCode("amazon_de")!).weight, "g");
+  const p = S.parcelFor(US, { weight_kg: 1, length_cm: 25.4, width_cm: 25.4, height_cm: 25.4 }, 1);
+  assertEquals(p.dims.length, 10);
+  assertEquals(p.weight, 35.27);
 });

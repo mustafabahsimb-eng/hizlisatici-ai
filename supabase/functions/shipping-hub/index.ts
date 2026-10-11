@@ -9,12 +9,17 @@
 //
 // Satıcı (oturum): { action: "connect", provider, mode, credentials, settings, makeDefault }
 //                  { action: "disconnect", accountId } | { action: "create", storeOrderId } | { action: "label", shipmentId }
+//                  { action: "create", marketplaceOrderId } -> pazaryeri (ör. Amazon) siparişine gönderi
+// Pazaryeri siparişleri: satıcının kendi stoğundaki ürünün Amazon siparişi -> varsayılan kargo hesabı; hesap yoksa ve pazar
+//   destekliyorsa Amazon "Buy Shipping" etiketi (provider "amazon"; tetikleyici marketplace_order_to_shipment).
 // Sistem (CRON_SECRET): {} -> bekleyen gönderileri oluştur + açık gönderilerin takibini güncelle
 //                       { shipmentId } -> tek gönderi
 // Kimlik bilgileri Vault'ta (shipping_account_*_credentials); depoda ve tarayıcıda görünmez.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { installEgress } from "../_shared/egress.ts";
+import { marketByCode } from "../_shared/amazon.ts";
+import { buyAmazonLabel, labelToPdf, parcelFor, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
 installEgress(); // sabit IP çıkışı (Yurtiçi canlı ortamı IP izni ister; bkz. docs/sabit-ip-kurulumu.md)
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -291,12 +296,61 @@ async function creds(accountId: string): Promise<any> {
   return data || {};
 }
 
+// Pazaryeri siparişini (marketplace_orders) kargo sağlayıcılarının beklediği sipariş biçimine çevirir
+function mpOrderShape(mo: any) {
+  const a = mo.buyer_address || {};
+  return {
+    id: mo.id, product_id: mo.product_id, quantity: mo.quantity, status: mo.status, customer_name: mo.buyer_name, customer_phone: mo.buyer_phone,
+    customer_address: [a.line1, a.line2, a.line3].filter(Boolean).join(" ") || a.text || "", customer_city: a.city || "", customer_district: a.district || a.state || "",
+    customer_zip: a.zip || "", customer_country: a.country || mo.buyer_country || "TR", _mp: mo,
+  };
+}
+async function saveLabel(sh: any, pdf: Uint8Array) {
+  const path = `${sh.user_id}/${sh.id}.pdf`;
+  const up = await db.storage.from("shipping-labels").upload(path, pdf, { contentType: "application/pdf", upsert: true });
+  if (up.error) throw new Error("Etiket kaydı: " + up.error.message);
+  return path;
+}
+
+// Amazon "Buy Shipping": etiket Amazon'dan, ücret satıcının Amazon hesabından; gönderim Amazon'da kendiliğinden işlenir
+async function createAmazonShipment(sh: any, mo: any) {
+  const market = marketByCode(mo.marketplace_code);
+  if (!market) throw new Error("Amazon pazarı bilinmiyor");
+  const { data: cred } = await db.rpc("store_connection_get_credentials", { p_connection_id: mo.connection_id });
+  if (!cred?.refresh_token) throw new Error("Amazon bağlantısı yok");
+  const { data: conn } = await db.from("store_connections").select("environment").eq("id", mo.connection_id).maybeSingle();
+  const { data: product } = await db.from("products").select("name, weight_kg, length_cm, width_cm, height_cm").eq("id", mo.product_id).maybeSingle();
+  const { data: acc } = await db.from("shipping_accounts").select("settings").eq("user_id", sh.user_id).eq("is_default", true).maybeSingle();
+  const from = shipFromAddress(mo.raw?.order, acc?.settings?.sender || {});
+  if (!from) throw new Error("Gönderen adresi yok (Amazon gönderim adresi ya da kargo ayarlarında gönderen adresi gerekli)");
+  const parcel = parcelFor(market, product, mo.quantity || 1);
+  const label = await buyAmazonLabel({ region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn?.environment === "sandbox" },
+    shipmentRequest({ amazonOrderId: mo.raw?.amazonOrderId || String(mo.external_order_id).split("/")[0], orderItemId: mo.raw?.orderItemId, quantity: mo.quantity || 1,
+      shipFrom: from, market, ...parcel }));
+  const path = await saveLabel(sh, await labelToPdf(label));
+  const now = new Date().toISOString();
+  await db.from("shipments").update({
+    status: "shipped", provider_ref: label.shipmentId, tracking_number: label.trackingId, carrier: label.carrier, label_path: path, cost: label.cost, currency: label.currency,
+    raw: { service: label.service }, last_error: null, next_attempt_at: new Date(Date.now() + 365 * 86400_000).toISOString(), updated_at: now,
+  }).eq("id", sh.id);
+  await db.from("marketplace_orders").update({ tracking_number: label.trackingId, carrier: label.carrier, tracking_pushed_at: now, status: "shipped", shipped_at: now }).eq("id", mo.id);
+  return { created: true, ref: label.shipmentId, amazon: true };
+}
+
 async function createShipment(sh: any) {
+  let mo: any = null;
+  if (sh.marketplace_order_id) {
+    const r = await db.from("marketplace_orders").select("*").eq("id", sh.marketplace_order_id).maybeSingle();
+    mo = r.data;
+    if (!mo) throw new Error("Sipariş bulunamadı");
+    if (mo.status === "cancelled") { await db.from("shipments").update({ status: "cancelled" }).eq("id", sh.id); return { cancelled: true }; }
+    if (sh.provider === "amazon") return await createAmazonShipment(sh, mo);
+  }
   const { data: account } = await db.from("shipping_accounts").select("*").eq("id", sh.account_id).maybeSingle();
   if (!account) throw new Error("Kargo hesabı bulunamadı");
   const provider = PROVIDERS[account.provider];
   if (!provider) throw new Error("Desteklenmeyen kargo: " + account.provider);
-  const { data: order } = await db.from("store_orders").select("*").eq("id", sh.store_order_id).maybeSingle();
+  const order: any = mo ? mpOrderShape(mo) : (await db.from("store_orders").select("*").eq("id", sh.store_order_id).maybeSingle()).data;
   if (!order) throw new Error("Sipariş bulunamadı");
   if (order.status === "cancelled") { await db.from("shipments").update({ status: "cancelled" }).eq("id", sh.id); return { cancelled: true }; }
   const { data: product } = await db.from("products").select("name, weight_kg").eq("id", order.product_id).maybeSingle();
@@ -313,9 +367,7 @@ async function createShipment(sh: any) {
     recvName: order.customer_name, recvAddr: [order.customer_address, order.customer_district, order.customer_city, order.customer_zip].filter(Boolean).join(", "),
     recvPhone: order.customer_phone, product: product?.name || "", qty: order.quantity || 1, test: account.mode === "test",
   });
-  const path = `${sh.user_id}/${sh.id}.pdf`;
-  const up = await db.storage.from("shipping-labels").upload(path, pdf, { contentType: "application/pdf", upsert: true });
-  if (up.error) throw new Error("Etiket kaydı: " + up.error.message);
+  const path = await saveLabel(sh, pdf);
 
   await db.from("shipments").update({
     status: "created", provider_ref: r.ref, tracking_number: r.tracking || null, tracking_url: r.trackingUrl || null,
@@ -325,11 +377,18 @@ async function createShipment(sh: any) {
   // Siparişe ve müşteri takip sayfasına
   const patch: Record<string, unknown> = { tracking_carrier: r.carrier || CARRIER_NAMES[account.provider] };
   if (r.tracking) patch.tracking_number = r.tracking;
-  await db.from("store_orders").update(patch).eq("id", order.id);
+  if (mo) {
+    // Pazaryeri siparişi: takip numarası gelince amazon-orders Amazon'a "gönderildi" bildirir
+    if (r.tracking) await db.from("marketplace_orders").update({ tracking_number: r.tracking, carrier: patch.tracking_carrier }).eq("id", mo.id);
+  } else await db.from("store_orders").update(patch).eq("id", order.id);
   return { created: true, ref: r.ref };
 }
 
 async function trackShipment(sh: any) {
+  if (sh.provider === "amazon") { // Amazon etiketi: takip Amazon siparişinde
+    await db.from("shipments").update({ next_attempt_at: new Date(Date.now() + 365 * 86400_000).toISOString() }).eq("id", sh.id);
+    return { skipped: "amazon" };
+  }
   const { data: account } = await db.from("shipping_accounts").select("*").eq("id", sh.account_id).maybeSingle();
   if (!account) return { skipped: "no_account" };
   const t: Tracked = await PROVIDERS[account.provider].track({ shipment: sh, account, creds: await creds(account.id) });
@@ -340,6 +399,16 @@ async function trackShipment(sh: any) {
   if (t.carrier) upd.carrier = t.carrier;
   if (t.status !== "created") upd.status = t.status;
   await db.from("shipments").update(upd).eq("id", sh.id);
+  if (sh.marketplace_order_id) {
+    const { data: mo } = await db.from("marketplace_orders").select("id, status, tracking_number, shipped_at, delivered_at").eq("id", sh.marketplace_order_id).maybeSingle();
+    if (mo) {
+      const p: Record<string, unknown> = {};
+      if (t.tracking && t.tracking !== mo.tracking_number) p.tracking_number = t.tracking;
+      if (t.carrier) p.carrier = t.carrier;
+      if (t.status === "delivered" && !mo.delivered_at) { p.delivered_at = now; p.status = "delivered"; }
+      if (Object.keys(p).length) await db.from("marketplace_orders").update(p).eq("id", mo.id);
+    }
+  }
   if (sh.store_order_id) {
     const { data: so } = await db.from("store_orders").select("id, status, shipped_at, delivered_at, tracking_number").eq("id", sh.store_order_id).maybeSingle();
     if (so) {
@@ -389,6 +458,7 @@ Deno.serve(async (req) => {
     // Sistem
     if (CRON_SECRET && String(body?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (body?.action === "connect" && body?.userId) return json(await connect(String(body.userId), body));
+      if (body?.action === "create" && body?.userId && body?.marketplaceOrderId) return json(await enqueueMp(String(body.userId), String(body.marketplaceOrderId), body?.accountId));
       if (body?.action === "create" && body?.userId && body?.storeOrderId) return json(await enqueue(String(body.userId), String(body.storeOrderId), body?.accountId));
       const results = await runQueue(body?.shipmentId ? String(body.shipmentId) : undefined);
       return json({ ok: true, processed: results.length, results });
@@ -405,6 +475,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return json({ ok: true });
     }
+    if (body?.action === "create" && body?.marketplaceOrderId) return json(await enqueueMp(userId, String(body.marketplaceOrderId), body?.accountId));
     if (body?.action === "create") return json(await enqueue(userId, String(body.storeOrderId || ""), body?.accountId));
     if (body?.action === "label") {
       const { data: sh } = await db.from("shipments").select("label_path").eq("id", String(body.shipmentId || "")).eq("user_id", userId).maybeSingle();
@@ -455,6 +526,27 @@ async function enqueue(userId: string, storeOrderId: string, accountId?: string)
   let { data: sh } = await db.from("shipments").select("*").eq("store_order_id", storeOrderId).neq("status", "cancelled").maybeSingle();
   if (!sh) {
     const ins = await db.from("shipments").insert({ user_id: userId, store_order_id: storeOrderId, account_id: a.id, provider: a.provider, test: a.mode === "test" }).select("*").single();
+    if (ins.error) throw ins.error;
+    sh = ins.data;
+  }
+  const results = await runQueue(sh.id);
+  return { ok: true, shipmentId: sh.id, result: results[0] ?? null };
+}
+
+// Pazaryeri siparişine gönderi aç (kargo hesabı yoksa Amazon pazarında Amazon etiketi) ve hemen oluştur
+async function enqueueMp(userId: string, moId: string, accountId?: string) {
+  const { data: mo } = await db.from("marketplace_orders").select("id, marketplace_code").eq("id", moId).eq("user_id", userId).maybeSingle();
+  if (!mo) return { ok: false, error: "Sipariş bulunamadı" };
+  let acc = accountId ? String(accountId) : "";
+  if (!acc) {
+    const { data: d } = await db.from("shipping_accounts").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+    acc = d?.id || "";
+  }
+  const { data: a } = acc ? await db.from("shipping_accounts").select("id, provider, mode").eq("id", acc).eq("user_id", userId).maybeSingle() : { data: null };
+  if (!a && !String(mo.marketplace_code).startsWith("amazon_")) return { ok: false, error: "Kargo hesabı bağlı değil" };
+  let { data: sh } = await db.from("shipments").select("*").eq("marketplace_order_id", moId).neq("status", "cancelled").maybeSingle();
+  if (!sh) {
+    const ins = await db.from("shipments").insert({ user_id: userId, marketplace_order_id: moId, account_id: a?.id || null, provider: a?.provider || "amazon", test: a ? a.mode === "test" : false }).select("*").single();
     if (ins.error) throw ins.error;
     sh = ins.data;
   }

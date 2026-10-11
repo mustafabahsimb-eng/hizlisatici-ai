@@ -313,14 +313,29 @@ export async function weeklySummary(userId: string): Promise<Reply> {
 async function shipmentsReply(link: Link): Promise<Reply> {
   const { data: so } = await db.from("store_orders").select("id, product_id, quantity, customer_name, customer_city, variant_label, created_at")
     .eq("user_id", link.user_id).is("shipped_at", null).neq("status", "cancelled").order("created_at").limit(50);
-  if (!so?.length) return { text: "📦 Bugün gönderilecek sipariş yok." };
-  const ids = [...new Set(so.map((o: any) => o.product_id))];
+  // Pazaryeri (ör. Amazon) siparişleri: satıcının kendi gönderdiği ürünler (AliExpress / CJ'yi tedarikçi gönderir)
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data: mos } = await db.from("marketplace_orders").select("id, marketplace_code, product_id, quantity, buyer_name, buyer_address, status, created_at")
+    .eq("user_id", link.user_id).neq("marketplace_code", "own_store").or(`status.eq.new,shipped_at.gte.${since}`).order("created_at").limit(50);
+  const mpIds = (mos || []).map((m: any) => m.product_id).filter(Boolean);
+  const { data: sup } = mpIds.length ? await db.from("products").select("id, supplier").in("id", mpIds) : { data: [] as any[] };
+  const dropship = new Set((sup || []).filter((p: any) => ["aliexpress", "cj", "printify"].includes(p.supplier)).map((p: any) => p.id));
+  const mp = (mos || []).filter((m: any) => !dropship.has(m.product_id));
+  const rows = [
+    ...(so || []).map((o: any) => ({ key: "s:" + o.id, product_id: o.product_id, qty: o.quantity, name: o.customer_name, city: o.customer_city, variant: o.variant_label, ch: "" })),
+    ...mp.map((m: any) => ({ key: "m:" + m.id, product_id: m.product_id, qty: m.quantity, name: m.buyer_name, city: m.buyer_address?.city, variant: null,
+      ch: String(m.marketplace_code).replace(/^amazon_(\w+)$/, (_: string, c: string) => "Amazon " + c.toUpperCase()) })),
+  ];
+  if (!rows.length) return { text: "📦 Bugün gönderilecek sipariş yok." };
+  const ids = [...new Set(rows.map((o) => o.product_id).filter(Boolean))];
   const { data: ps } = await db.from("products").select("id, name, generated_title").in("id", ids);
   const pm = new Map((ps || []).map((p: any) => [p.id, p.generated_title || p.name]));
-  const { data: shs } = await db.from("shipments").select("store_order_id, label_path").in("store_order_id", so.map((o: any) => o.id)).not("label_path", "is", null);
-  const lines = so.map((o: any, i: number) => `${i + 1}. ${short(pm.get(o.product_id), 45)}${o.variant_label ? " (" + o.variant_label + ")" : ""} ×${o.quantity || 1} — ${o.customer_name}, ${o.customer_city || ""}`);
+  const shs: any[] = [];
+  if (so?.length) shs.push(...((await db.from("shipments").select("label_path").in("store_order_id", so.map((o: any) => o.id)).not("label_path", "is", null)).data || []));
+  if (mp.length) shs.push(...((await db.from("shipments").select("label_path").in("marketplace_order_id", mp.map((m: any) => m.id)).not("label_path", "is", null)).data || []));
+  const lines = rows.map((o, i) => `${i + 1}. ${o.ch ? "[" + o.ch + "] " : ""}${short(pm.get(o.product_id) || "—", 45)}${o.variant ? " (" + o.variant + ")" : ""} ×${o.qty || 1} — ${o.name || ""}, ${o.city || ""}`);
   let document: Reply["document"];
-  if (shs?.length) {
+  if (shs.length) {
     const { PDFDocument } = await import("npm:pdf-lib@1.17.1");
     const merged = await PDFDocument.create();
     for (const s of shs) {
@@ -331,7 +346,7 @@ async function shipmentsReply(link: Link): Promise<Reply> {
     }
     if (merged.getPageCount()) document = { bytes: await merged.save(), filename: `kargo-etiketleri-${new Date().toISOString().slice(0, 10)}.pdf` };
   }
-  return { text: `📦 Gönderilecekler (${so.length}):\n${lines.join("\n")}` + (document ? `\n\n🏷️ ${shs!.length} kargo etiketi ekte.` : "\n\nKargo hesabı bağlanınca etiketler otomatik hazırlanır."), document };
+  return { text: `📦 Gönderilecekler (${rows.length}):\n${lines.join("\n")}` + (document ? `\n\n🏷️ ${shs.length} kargo etiketi ekte.` : "\n\nKargo hesabı bağlanınca etiketler otomatik hazırlanır."), document };
 }
 async function questionsReply(link: Link): Promise<Reply> {
   const { data: qs } = await db.from("support_questions").select("id, product_title, question, ai_answer, created_at")

@@ -139,8 +139,16 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 | Toplu Ürün Yükleme (12 Ekim) | soru "AliExpress ürünleri için kaynak" (AliExpress / Kendi stoğum) |
 | Panel "Ürün ekle" kartı alt yazısı (12 Ekim) | "Tek ürün, link, katalog ya da fotoğraf" |
 
-## Amazon (TR + Global, SP-API) — sırada 3.
-- Sandbox'ta tam altyapı: mağaza bağlama (OAuth), ilan yükleme, sipariş çekme, stok/fiyat senkronu, etiket. Hedef: bir ürünü Amazon'a 1 dakikanın altında yüklemek; GTIN/barkod muafiyeti, kategori şablonu ve zorunlu nitelikler AI ile otomatik. Geliştirici kaydı için gerekenler Mustafa'ya tek mesajda.
+## Amazon (TR + Global, SP-API) — kod bitti (13 Ekim 2026), anahtar bekliyor
+- [x] Kod tamam, varsayılan SANDBOX: mağaza bağlama (Amazon onay sayfası; TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (barkodla ya da marka+modelle katalog eşleme -> yalnız teklif + bulunan barkod ürüne yazılır; yoksa ürün türü + şema + AI nitelikler; GTIN muafiyeti; seçenekler paralel; prova), ilan kuyruğu beklemeden çalışır (1 dk hedefi), sipariş (15 dk), tedarikçiye yönlendirme, stok/fiyat hızlı PATCH, etiket (satıcının kargo hesabı ya da Amazon Buy Shipping), kargo bildirimi, asistan bildirim + gönderilecekler. Ayrıntı docs/amazon-sp-api.md.
+- [x] Testler: Amazon'un resmi örnek cevaplarıyla taklit testler (tests/amazon/amazon_sandbox_test.ts 13/13), veritabanı tetikleyicileri (tests/amazon/amazon_db_test.sql 7/7, iz bırakmaz), Hesaplarım (tests/e2e/amazon_baglanti.py 8/8).
+- Arayüz adları onaylandı (13 Ekim): "Amazon mağazanı bağla", "Avrupa", "Kuzey Amerika", "Uzak Doğu".
+- **Şirket sonrası (Mustafa karar verdi, 13 Ekim: şimdi para harcanmayacak)**:
+  1. Solution Provider Portal'da (solutionproviderportal.amazon.com) şirket adına "public developer" kaydı: şirket bilgileri, web sitesi (Amazon'un web sitesi kurallarına uygun), güvenlik soruları, geliştirici profili (500 kelime altı).
+  2. Seltigo uygulamasını oluştur: roller Ürün Listeleme, Fiyatlandırma, Envanter ve Sipariş Takibi, Doğrudan-Satıcı Kargo (Buy Shipping); OAuth yönlendirme adresi https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html.
+  3. Alıcı adresi için kısıtlı rol (PII) başvurusu + Amazon güvenlik incelemesi (adres yoksa tedarikçi siparişi onaya düşer).
+  4. Secrets: AMAZON_APP_ID, AMAZON_LWA_CLIENT_ID, AMAZON_LWA_CLIENT_SECRET (+ deneme için AMAZON_SANDBOX_REFRESH_TOKEN) -> amazon-connect selftest -> Hesaplarım'dan bağlanma testi (Claude).
+  5. Amazon Appstore listesi ve yayın onayı -> AMAZON_APP_DRAFT=false; canlıya geçiş AMAZON_LIVE=true.
 
 ## Ertelenenler (şimdi yapılmaz)
 - Görsel tamamlama hızlandırma
@@ -150,6 +158,7 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - Trendyol Buybox fiyat otomatı: satıcının alt sınırına kadar rakibe göre otomatik fiyat (canlı Trendyol bağlantısı gerekir)
 - Sabit IP sunucusunun açılması (ödemeyi Mustafa yapar)
 - AliExpress yayın başvurusu (şirket sonrası, Corporation)
+- Amazon geliştirici kaydı ve uygulama yayını (şirket sonrası; adımlar yukarıda "Amazon" bölümünde)
 
 ## Sıradaki işler
 - [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
@@ -163,8 +172,8 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 
 ## Durum notları (11 Ekim 2026)
 **Amazon SP-API (13 Ekim 2026)** — altyapı bitti, varsayılan SANDBOX; ayrıntı docs/amazon-sp-api.md
-- Hesaplarım'dan Amazon onayıyla bağlanma (TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (ASIN eşleme / AI'lı tam ilan / seçenekler / prova), sipariş çekme + tedarikçiye yönlendirme + kargo bildirimi (amazon-orders 15 dk). Testler: Amazon'un sandbox örnekleriyle 9/9, Hesaplarım 8/8.
-- Bekleyen (Mustafa): Amazon geliştirici uygulaması (Profesyonel satıcı hesabı ya da şirketle Solution Provider Portal) -> secrets -> gerçek sandbox testi. Bölge adları (Avrupa / Kuzey Amerika / Uzak Doğu) onay bekliyor.
+- Hesaplarım'dan Amazon onayıyla bağlanma (TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (ASIN eşleme / AI'lı tam ilan / seçenekler / prova), sipariş çekme + tedarikçiye yönlendirme + kargo bildirimi (amazon-orders 15 dk). Testler: Amazon'un sandbox örnekleriyle 13/13, veritabanı 7/7, Hesaplarım 8/8. Etiket (Buy Shipping) ve barkodsuz katalog eşleme eklendi.
+- Bekleyen (Mustafa): Amazon geliştirici uygulaması (Profesyonel satıcı hesabı ya da şirketle Solution Provider Portal) -> secrets -> gerçek sandbox testi. Bölge adları onaylandı. Mustafa'nın kararı: geliştirici kaydı şirket sonrası (public developer).
 
 **Seltigo Asistan (13 Ekim 2026)**
 - Kod ve altyapı bitti, canlıda: ortak çekirdek (_shared/assistant-core.ts), kanal göndericileri (_shared/assistant-channels.ts), assistant (kod, durum, bildirim kuyruğu 1 dk, sabah raporu / haftalık özet, bağlantı uyarıları, WhatsApp şablonu onaya gönderme), telegram-bot, whatsapp-webhook (Seltigo numarası -> asistan), meta-dm-webhook (Instagram DM / Messenger, varsayılan KAPALI). Panel: asistan.html (🤖 Asistan). Testler: asistan_cekirdek.py 21/21, asistan_panel.py 11/11.

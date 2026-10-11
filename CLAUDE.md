@@ -25,6 +25,7 @@
   - CJ ödemesi varsayılan OTOMATİK (bakiyeden). Zarar kontrolü (ürün + kargo + komisyon) HER ZAMAN açık, kapatılamaz; zararlı sipariş ödenmeden satıcı onayına düşer. Bakiye yetmezse sipariş bekler + Türkçe uyarı.
   - Müşteri takip sayfası her zaman var; satıcının WhatsApp'ı bağlı ve şablon onaylıysa kargo çıkınca otomatik WhatsApp (varsayılan açık).
   - Ürün kaynağı (2026-10-12): products.supplier = 'aliexpress' | 'cj' ise sipariş tedarikçiye otomatik gider; 'wholesaler' (Toptancı) ve boş (Kendi stoğum) ürünleri satıcı kendisi gönderir ('printify' ayrı akış). Linkten / dosyadan gelen her ürün varsayılan "Kendi stoğum"; AliExpress linkinde kaynak satıcıya sorulur (AliExpress / Kendi stoğum). Kaynak adları: Kendi stoğum / Toptancı / AliExpress / CJ.
+  - Amazon (2026-10-13): kod tamam, varsayılan SANDBOX; geliştirici kaydı şirket kurulunca Solution Provider Portal'da "public developer" olarak (şimdi para harcanmaz). Adımlar YOL-HARITASI.md "Amazon".
   - AliExpress'te API ile ödeme (API Pay) her alıcı için AliExpress onayı + PayPal istiyor, Türkiye desteklenmiyor → AliExpress ürünleri CJ eşdeğerinden verilip CJ bakiyesinden ödenir.
 
 ## HIZ KURALI (2026-10-12; tüm ürün ekleme / yayınlama işlerinde geçerli)

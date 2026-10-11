@@ -119,6 +119,56 @@ async function aiAttributes(input: BuildInput, productType: string, names: strin
   return {};
 }
 
+// ---------- Barkodsuz ürün: Amazon kataloğunda aynı ürünü bul (marka + model; gerekirse AI onayı) ----------
+// Bulunursa yalnız teklif açılır (en hızlı yol) ve katalogdaki barkod (EAN/UPC) ürüne yazılır.
+const norm = (s: unknown) => String(s ?? "").toLocaleLowerCase("tr").normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, "");
+const tokens = (s: unknown) => new Set(String(s ?? "").toLocaleLowerCase("tr").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1));
+export function catalogScore(product: any, title: string, item: any): number {
+  const sum = item?.summaries?.[0] || {};
+  const brandOk = !!product?.brand && norm(sum.brand || sum.brandName) === norm(product.brand);
+  if (!brandOk) return 0;
+  const model = norm(product?.model_code);
+  if (model.length >= 4 && (norm(sum.itemName).includes(model) || norm(sum.modelNumber) === model || norm(sum.partNumber) === model)) return 1;
+  const a = tokens(title), b = tokens(sum.itemName);
+  const inter = [...a].filter((w) => b.has(w)).length;
+  return inter / Math.max(1, Math.min(a.size, b.size));
+}
+async function aiSameProduct(title: string, product: any, item: any): Promise<boolean> {
+  if (!ANTHROPIC_API_KEY) return false;
+  const sum = item?.summaries?.[0] || {};
+  const q = `Our product: ${JSON.stringify({ title, brand: product?.brand, model: product?.model_code, specs: product?.specs })}\nAmazon item: ${JSON.stringify({ name: sum.itemName, brand: sum.brand, model: sum.modelNumber, color: sum.color, size: sum.size })}\nIs this exactly the same product (same model, same size/variant)? Answer only YES or NO.`;
+  for (const model of AI_MODELS) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: q }] }), signal: AbortSignal.timeout(20000),
+      });
+      const d = await r.json();
+      if (!r.ok) continue;
+      return /^\s*yes/i.test((d?.content || []).map((c: any) => c.text || "").join(""));
+    } catch (_) { /* sonraki model */ }
+  }
+  return false;
+}
+export async function matchCatalog(input: BuildInput): Promise<{ asin: string; productType: string; gtin: string | null } | null> {
+  const { ctx, market, product, listing } = input;
+  if (!product?.brand) return null;
+  const title = String(listing.title || product?.generated_title || product?.name || "");
+  const kw = [product.brand, product.model_code || title.split(/\s+/).slice(0, 5).join(" ")].filter(Boolean).map(String);
+  const d = await sp(ctx, "GET", "/catalog/2022-04-01/items", {
+    query: { keywords: kw, marketplaceIds: market.id, includedData: ["summaries", "identifiers", "productTypes"], pageSize: "5", locale: market.locale },
+  }).catch(() => null);
+  const items: any[] = d?.items || [];
+  let best: any = null, bestScore = 0;
+  for (const it of items) { const sc = catalogScore(product, title, it); if (sc > bestScore) { best = it; bestScore = sc; } }
+  if (!best || bestScore < 0.5) return null;
+  if (bestScore < 1 && !(await aiSameProduct(title, product, best))) return null; // emin değilse AI onayı; yoksa eşleme yapılmaz
+  const ids = (best.identifiers || []).find((x: any) => x.marketplaceId === market.id)?.identifiers || best.identifiers?.[0]?.identifiers || [];
+  const g = ids.find((x: any) => ["EAN", "UPC", "GTIN"].includes(String(x.identifierType).toUpperCase()))?.identifier || null;
+  const pt = (best.productTypes || []).find((p: any) => p.marketplaceId === market.id)?.productType || best.productTypes?.[0]?.productType || "PRODUCT";
+  return { asin: best.asin, productType: pt, gtin: g && validGtin(g) ? String(g) : null };
+}
+
 // ---------- Ortak nitelikler (kesin bilgiler; AI'ya bırakılmaz) ----------
 function offerAttrs(m: AmazonMarket, price: number, qty: number, listPrice?: number | null) {
   const a: Record<string, unknown> = {
@@ -235,12 +285,18 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
       productType = (item.productTypes || []).find((p: any) => p.marketplaceId === market.id)?.productType || item.productTypes?.[0]?.productType || "PRODUCT";
     }
   } else if (gtin && !validGtin(gtin)) warnings.push({ code: "gtin_invalid", field: "barcode", msg: "Barkod geçersiz (kontrol hanesi tutmuyor); barkodsuz gönderildi." });
+  let foundGtin: string | null = null;
+  if (!asin && !multi && !(gtin && validGtin(gtin))) {
+    const m = await matchCatalog(input);
+    if (m) { asin = m.asin; productType = m.productType; foundGtin = m.gtin; }
+  }
 
   if (asin) {
     const sku = makeSku(product.id);
     const body = { productType, requirements: "LISTING_OFFER_ONLY", attributes: { merchant_suggested_asin: [{ value: asin, marketplace_id: market.id }], ...offerAttrs(market, price, qty, listing.compare_at_price) } };
     collect(sku, await sp(ctx, "PUT", `/listings/2021-08-01/items/${encodeURIComponent(sellerId)}/${encodeURIComponent(sku)}`, { query: query(mode), body }));
-    const amazon = { productType, asin, offerOnly: true, hash: contentHash, accepted: !preview && !errors.length, skus: [{ sku }], url: `https://${market.domain}/dp/${asin}` };
+    const amazon = { productType, asin, offerOnly: true, hash: contentHash, accepted: !preview && !errors.length, skus: [{ sku }], url: `https://${market.domain}/dp/${asin}`,
+      ...(foundGtin ? { foundGtin } : {}) };
     return { ok: !errors.length, preview, skus, amazon, errors, warnings };
   }
 
