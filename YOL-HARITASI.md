@@ -19,7 +19,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
-Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları Mustafa'nın onayını bekliyor (aşağıdaki "Önerilen adlar").
+Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları onaylandı (aşağıdaki tablo).
 
 - [ ] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
   - Tek ürün linki (AliExpress, Trendyol, satıcının kendi sitesi, toptancı sayfası) → ad, açıklama, fiyat, görseller, varyantlar otomatik.
@@ -46,7 +46,28 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
   - WhatsApp'tan tek ürün ve çoklu ürün mesajları otomatik gönderilebilir.
   - Altyapı Meta test numarasıyla sandbox modunda kurulur (varsayılan kapalı anahtar kuralı); şirket kurulunca (Meta işletme doğrulaması) canlıya geçilir.
 
-**Önerilen adlar (onay bekliyor):** sohbette Mustafa'ya sunuldu; onaylananlar buraya yazılacak.
+**Onaylı arayüz adları (Mustafa, 11 Ekim 2026):**
+| Yer | Ad |
+|---|---|
+| Toplu Yükleme, link sekmesi | "🔗 Link yapıştır" (mevcut) |
+| Fiyat/stok takibi | "Fiyat ve stoğu otomatik güncel tut" + aralık "6 saatte bir" / "Günde bir" |
+| AI metin düğmesi | "✨ Metni kanala göre yaz" |
+| PDF sekmesi (eski "Fiyat listesi yükle (PDF/Excel)") | "📄 PDF / Katalog / Excel yükle" |
+| Görseli olmayan ürün etiketi | "Görsel eksik" |
+| Görsel eksik üründe düğme | "📷 Fotoğraf çek / yükle" |
+| Görsel değiştirme | "Kendi fotoğrafımla değiştir" |
+| Görsel kaynağı | "Görsel kaynağı: ..." |
+| İlk kullanım onayı | "Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir" |
+| Önizlemede ekleme | "Seçilenleri ekle ({n})" |
+| Mağazanı Kur, site adresi | alan "Web sitenin adresi" + düğme "Ürünlerimi getir" |
+| Akış sonu | "Bu ürünleri diğer kanallara da gönder" (Trendyol, Instagram, WhatsApp kataloğu… işaret kutuları) |
+| Ayarlar | "Web sitem" |
+| Mağaza ürün kartı | "Satıcının sitesinde gör" |
+| Ayar anahtarı | "Satın Al düğmesi kendi siteme gitsin" |
+| Sosyal sayfası, katalog bölümü | "WhatsApp ve Instagram kataloğu" |
+| Katalog anahtarı | "Ürünleri kataloğa otomatik gönder" |
+| WhatsApp düğmeleri | "Ürünü gönder" / "Seçili ürünleri gönder" |
+| Test modu etiketi | "Test modu (Meta test numarası)" |
 
 ## Sıradaki işler
 - [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
