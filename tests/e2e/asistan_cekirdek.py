@@ -21,8 +21,9 @@ from ortak import SITE, login, shots_dir, Checks
 import katalog_dosyalari as K
 
 SLUG = "e2e-test-magaza"
-CALL = """async (p) => { const res = await fetch(HS.SUPABASE_URL + '/functions/v1/assistant', { method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY }, body: JSON.stringify(p) });
+CALL = """async (p) => { const tok = (await HS.db.auth.getSession()).data.session.access_token;
+  const res = await fetch(HS.SUPABASE_URL + '/functions/v1/assistant', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY }, body: JSON.stringify({ ...p, userAccessToken: tok }) });
   return await res.json().catch(() => ({})); }"""
 
 

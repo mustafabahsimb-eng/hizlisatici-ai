@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo - Asistan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 8px; background: #1D9E75; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn { background: transparent; border: 1px solid #2a3040; color: #9aa3b2; padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .lead { color: #9aa3b2; font-size: 14px; margin-bottom: 18px; line-height: 1.55; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 12px; }
+  label.f { display: block; font-size: 12px; color: #9aa3b2; margin: 14px 0 6px; }
+  input[type=number], input[type=time], select { padding: 9px 11px; border-radius: 9px; border: 1px solid #2a3040; background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: #1D9E75; }
+  .note { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.55; }
+  .note.warn { color: #e6c96a; }
+  .btn { background: #1D9E75; color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn2 { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 8px 14px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .btn2:hover { border-color: #3a4258; color: #fff; }
+  .btn2:disabled { opacity: .5; cursor: not-allowed; }
+  .channels { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .ch { background: #0d0f16; border: 1px solid #232838; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .ch-name { font-weight: 600; color: #fff; font-size: 14px; }
+  .ch-state { font-size: 12px; color: #9aa3b2; line-height: 1.45; flex: 1; }
+  .ch-state.on { color: #6ee7b7; }
+  .code-box { margin-top: 14px; background: #0d0f16; border: 1px solid #1D9E75; border-radius: 12px; padding: 14px 16px; display: none; }
+  .code-box .code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; letter-spacing: 4px; color: #fff; margin: 6px 0; user-select: all; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0d0f16; border: 1px solid #232838; border-radius: 10px; padding: 10px 12px; font-size: 13px; flex-wrap: wrap; }
+  .item small { color: #9aa3b2; }
+  .empty { color: #8b93a3; font-size: 13px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 4px 0; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; accent-color: #1D9E75; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: flex; align-items: center; gap: 6px; border: 1px solid #2a3040; border-radius: 9px; padding: 7px 11px; font-size: 13px; cursor: pointer; }
+  .chip input { accent-color: #1D9E75; }
+  .save-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; }
+  .save-msg { font-size: 13px; color: #9aa3b2; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #123222; color: #6ee7b7; border: 1px solid #1D9E75; padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; z-index: 99; max-width: 90vw; }
+  .toast.err { background: #2a1416; color: #f28b8b; border-color: #6b2a2f; }
+  .loading { color: #9aa3b2; padding: 40px 0; text-align: center; }
+  @media (max-width: 640px) { main { padding: 20px 16px 80px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div class="logo-text">Seltigo</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+
+<main>
+  <div class="top-row">
+    <h1 data-t="title"></h1>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+  <p class="lead" data-t="lead"></p>
+  <div id="content"><div class="loading" data-t="loading"></div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'Seltigo - Asistan',
+      logout: 'Çıkış yap',
+      title: '🤖 Asistan',
+      back: '← Panele dön',
+      lead: 'Seltigo Asistan: mağazanı Telegram ya da WhatsApp\'tan yönet. PDF, fotoğraf veya link gönder, ürünlerin eklensin; siparişler, stok ve kâr bildirimleri sana gelsin.',
+      loading: 'Yükleniyor…',
+      connect: 'Bağlan',
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      instagram: 'Instagram DM',
+      messenger: 'Messenger',
+      connectTelegram: 'Telegram\'a bağla',
+      connectWhatsapp: 'WhatsApp\'a bağla',
+      chLive: 'Açık',
+      chSoon: 'Yakında açılacak',
+      chTest: 'Test aşamasında',
+      waPlan: 'Ayrı ücretli paket (aylık mesaj sınırlı).',
+      metaNote: 'Meta kuralı gereği yalnız sen yazdıktan sonraki 24 saat içinde cevap verebilir; bildirimler Telegram / WhatsApp\'tan gider.',
+      codeTitle: 'Bağlama kodun',
+      codeHelpTg: 'Aşağıdaki düğmeyle Telegram\'ı aç ve "Başlat"a bas; bağlantı kendiliğinden kurulur. Düğme çalışmazsa bu kodu bota gönder.',
+      codeHelpTgOff: 'Telegram botu kısa süre içinde açılacak. Açıldığında bu kodu bota göndermen yeterli.',
+      codeHelpWa: 'Aşağıdaki düğmeyle WhatsApp\'ı aç ve hazır mesajı gönder.',
+      codeHelpOther: 'Bu kodu asistana mesaj olarak gönder.',
+      codeExpires: 'Kod 30 dakika geçerli, tek kullanımlık.',
+      openTelegram: 'Telegram\'ı aç',
+      openWhatsapp: 'WhatsApp\'ı aç',
+      linked: 'Bağlı hesaplar',
+      noLinks: 'Henüz bağlı hesap yok.',
+      owner: 'Sen',
+      employee: 'Çalışan',
+      unlink: 'Bağlantıyı kaldır',
+      unlinkConfirm: 'Bu hesabın asistan bağlantısı kaldırılsın mı?',
+      unlinked: 'Bağlantı kaldırıldı.',
+      settings: '🤖 Asistan ayarları',
+      profitRule: 'Kâr kuralı',
+      profitRuleHelp: 'Fiyat yazmadan eklediğin ürünlerde satış fiyatı = alış fiyatı + bu oran. Mesajda "%50 kârla ekle" yazarsan o seferlik değişir.',
+      channels: 'Varsayılan kanallar',
+      channelsHelp: 'Asistandan eklenen ürünler bu kanallara gönderilir.',
+      own_store: 'Kendi Mağazam', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', n11: 'n11', amazon: 'Amazon', ig_shop: 'Instagram', wa_catalog: 'WhatsApp kataloğu',
+      publish: 'Yayınlama',
+      direct: 'Direkt yayınla',
+      approve: 'Yayından önce onay iste',
+      reports: 'Raporlar',
+      morning: 'Sabah raporu (her gün 08:00)',
+      weekly: 'Haftalık özet (pazartesi)',
+      quiet: 'Sessiz saatler',
+      quietHelp: 'Bu saatlerde bildirim gelmez (zarar onayı gibi acil olanlar hariç); sabah toplu gelir.',
+      quietTo: '-',
+      save: 'Kaydet',
+      saved: 'Kaydedildi.',
+      unsaved: 'Kaydedilmemiş değişiklik var',
+      employees: 'Çalışanlar',
+      employeesHelp: 'Çalışanın kendi Telegram ya da WhatsApp hesabı için kod al; çalışan bu kodu asistana gönderince bağlanır.',
+      role: 'Yetki',
+      role_orders: 'Sadece siparişler',
+      role_products: 'Ürün ekleyebilir',
+      role_full: 'Tam yetki',
+      channel: 'Kanal',
+      addEmployee: 'Çalışan ekle',
+      errGeneric: 'Bir sorun oldu, tekrar dene.',
+    },
+    en: {
+      pageTitle: 'Seltigo - Assistant',
+      logout: 'Log out',
+      title: '🤖 Assistant',
+      back: '← Back to dashboard',
+      lead: 'Seltigo Assistant: run your store from Telegram or WhatsApp. Send a PDF, photo or link and your products are added; orders, stock and profit alerts come to you.',
+      loading: 'Loading…',
+      connect: 'Connect',
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      instagram: 'Instagram DM',
+      messenger: 'Messenger',
+      connectTelegram: 'Connect Telegram',
+      connectWhatsapp: 'Connect WhatsApp',
+      chLive: 'On',
+      chSoon: 'Coming soon',
+      chTest: 'In testing',
+      waPlan: 'Separate paid plan (monthly message limit).',
+      metaNote: 'Meta rules allow replies only within 24 hours after you write; alerts go via Telegram / WhatsApp.',
+      codeTitle: 'Your link code',
+      codeHelpTg: 'Open Telegram with the button below and press "Start"; you are linked automatically. If it does not work, send this code to the bot.',
+      codeHelpTgOff: 'The Telegram bot opens shortly. Then just send this code to the bot.',
+      codeHelpWa: 'Open WhatsApp with the button below and send the prepared message.',
+      codeHelpOther: 'Send this code to the assistant as a message.',
+      codeExpires: 'Valid for 30 minutes, single use.',
+      openTelegram: 'Open Telegram',
+      openWhatsapp: 'Open WhatsApp',
+      linked: 'Linked accounts',
+      noLinks: 'No linked accounts yet.',
+      owner: 'You',
+      employee: 'Employee',
+      unlink: 'Remove link',
+      unlinkConfirm: 'Remove the assistant link for this account?',
+      unlinked: 'Link removed.',
+      settings: '🤖 Assistant settings',
+      profitRule: 'Profit rule',
+      profitRuleHelp: 'For products added without a price: sale price = cost + this rate. Writing "add with 50% profit" overrides it once.',
+      channels: 'Default channels',
+      channelsHelp: 'Products added from the assistant are sent to these channels.',
+      own_store: 'My Store', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', n11: 'n11', amazon: 'Amazon', ig_shop: 'Instagram', wa_catalog: 'WhatsApp catalog',
+      publish: 'Publishing',
+      direct: 'Publish directly',
+      approve: 'Ask before publishing',
+      reports: 'Reports',
+      morning: 'Morning report (daily 08:00)',
+      weekly: 'Weekly summary (Monday)',
+      quiet: 'Quiet hours',
+      quietHelp: 'No alerts during these hours (except urgent ones like loss approval); they arrive in the morning.',
+      quietTo: '-',
+      save: 'Save',
+      saved: 'Saved.',
+      unsaved: 'Unsaved changes',
+      employees: 'Employees',
+      employeesHelp: 'Get a code for your employee\'s own Telegram or WhatsApp; they are linked once they send it to the assistant.',
+      role: 'Permission',
+      role_orders: 'Orders only',
+      role_products: 'Can add products',
+      role_full: 'Full access',
+      channel: 'Channel',
+      addEmployee: 'Add employee',
+      errGeneric: 'Something went wrong, please try again.',
+    },
+  });
+  const t = HS.t;
+  // Asistan kanalları (kod adı -> çekirdekteki kanal adı); instagram/whatsapp kataloğu ürün kanalları
+  const PRODUCT_CHANNELS = [['own_store', 'own_store'], ['trendyol', 'trendyol'], ['hepsiburada', 'hepsiburada'], ['n11', 'n11'], ['amazon', 'amazon'], ['instagram', 'ig_shop'], ['whatsapp', 'wa_catalog']];
+  let userId = null, status = null, links = [], settings = null, rules = {}, dirty = false;
+
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'toast' + (isErr ? ' err' : ''); el.style.display = 'block';
+    clearTimeout(toast._t); toast._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+  function applyStatic() {
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  }
+  async function callFn(body) {
+    const { data: { session } } = await HS.db.auth.getSession();
+    const res = await fetch(HS.SUPABASE_URL + '/functions/v1/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ ...body, userAccessToken: session.access_token }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.ok === false) throw new Error(d.error || t('errGeneric'));
+    return d;
+  }
+
+  async function load() {
+    const [st, ln, se, ru] = await Promise.all([
+      callFn({ action: 'status' }).catch(() => ({})),
+      HS.db.from('assistant_links').select('id, channel, external_id, display_name, role, is_owner, created_at').eq('user_id', userId).neq('channel', 'test').order('created_at'),
+      HS.db.from('assistant_settings').select('*').eq('user_id', userId).maybeSingle(),
+      HS.db.from('import_rules').select('rules').eq('user_id', userId).maybeSingle(),
+    ]);
+    status = st || {};
+    links = ln.data || [];
+    settings = se.data || { approval_mode: 'direct', default_channels: ['own_store'], quiet_start: '22:00', quiet_end: '08:00', morning_report: true, weekly_summary: true };
+    rules = (ru.data && ru.data.rules) || {};
+    render();
+  }
+
+  function chState(key) {
+    const s = status[key] || {};
+    if (key === 'whatsapp') return s.live ? `<span class="ch-state on">${t('chLive')}${s.test ? ' · ' + t('chTest') : ''}</span><span class="ch-state">${t('waPlan')}</span>` : `<span class="ch-state">${t('chSoon')} · ${t('waPlan')}</span>`;
+    if (key === 'instagram' || key === 'messenger') return `<span class="ch-state">${s.live ? t('chTest') : t('chSoon')}</span><span class="ch-state">${t('metaNote')}</span>`;
+    return `<span class="ch-state ${s.live ? 'on' : ''}">${s.live ? t('chLive') : t('chSoon')}</span>`;
+  }
+
+  function render() {
+    const roleOpts = sel => ['orders', 'products', 'full'].map(r => `<option value="${r}" ${r === sel ? 'selected' : ''}>${t('role_' + r)}</option>`).join('');
+    const linkList = links.length ? links.map(l => `
+      <div class="item" data-link="${l.id}">
+        <span><b>${esc(t(l.channel))}</b> · ${esc(l.display_name || l.external_id)} <small>· ${l.is_owner ? t('owner') : t('employee')} · ${t('role_' + l.role)}</small></span>
+        <button class="btn2" onclick="unlink('${l.id}')">${t('unlink')}</button>
+      </div>`).join('') : `<div class="empty">${t('noLinks')}</div>`;
+    const margin = rules.margin ?? 30;
+    const chans = settings.default_channels || ['own_store'];
+    document.getElementById('content').innerHTML = `
+      <div class="card">
+        <div class="channels">
+          <div class="ch"><span class="ch-name">✈️ ${t('telegram')}</span>${chState('telegram')}<button class="btn" id="tgBtn" onclick="getCode('telegram')">${t('connectTelegram')}</button></div>
+          <div class="ch"><span class="ch-name">🟢 ${t('whatsapp')}</span>${chState('whatsapp')}<button class="btn" id="waBtn" onclick="getCode('whatsapp')" ${status.whatsapp?.live ? '' : 'disabled'}>${t('connectWhatsapp')}</button></div>
+          <div class="ch"><span class="ch-name">📸 ${t('instagram')}</span>${chState('instagram')}<button class="btn2" onclick="getCode('instagram')" ${status.instagram?.live ? '' : 'disabled'}>${t('connect')}</button></div>
+          <div class="ch"><span class="ch-name">💬 ${t('messenger')}</span>${chState('messenger')}<button class="btn2" onclick="getCode('messenger')" ${status.messenger?.live ? '' : 'disabled'}>${t('connect')}</button></div>
+        </div>
+        <div class="code-box" id="codeBox"></div>
+      </div>
+
+      <div class="card">
+        <h2>${t('linked')}</h2>
+        <div class="list" id="linkList">${linkList}</div>
+      </div>
+
+      <div class="card" id="settingsCard">
+        <h2>${t('settings')}</h2>
+        <label class="f">${t('profitRule')}</label>
+        <div class="row">% <input type="number" id="margin" min="0" max="1000" step="1" value="${esc(margin)}" style="width:100px"></div>
+        <div class="note">${t('profitRuleHelp')}</div>
+
+        <label class="f">${t('channels')}</label>
+        <div class="chips">${PRODUCT_CHANNELS.map(([code, key]) => `<label class="chip"><input type="checkbox" name="chan" value="${code}" ${chans.includes(code) ? 'checked' : ''}>${t(key)}</label>`).join('')}</div>
+        <div class="note">${t('channelsHelp')}</div>
+
+        <label class="f">${t('publish')}</label>
+        <label class="chk"><input type="radio" name="mode" value="direct" ${settings.approval_mode !== 'approve' ? 'checked' : ''}>${t('direct')}</label>
+        <label class="chk"><input type="radio" name="mode" value="approve" ${settings.approval_mode === 'approve' ? 'checked' : ''}>${t('approve')}</label>
+
+        <label class="f">${t('reports')}</label>
+        <label class="chk"><input type="checkbox" id="morning" ${settings.morning_report !== false ? 'checked' : ''}>${t('morning')}</label>
+        <label class="chk"><input type="checkbox" id="weekly" ${settings.weekly_summary !== false ? 'checked' : ''}>${t('weekly')}</label>
+
+        <label class="f">${t('quiet')}</label>
+        <div class="row"><input type="time" id="qStart" value="${esc(String(settings.quiet_start || '22:00').slice(0, 5))}"> ${t('quietTo')} <input type="time" id="qEnd" value="${esc(String(settings.quiet_end || '08:00').slice(0, 5))}"></div>
+        <div class="note">${t('quietHelp')}</div>
+
+        <div class="save-row"><span class="save-msg" id="saveMsg"></span><button class="btn" id="saveBtn" onclick="save()">${t('save')}</button></div>
+      </div>
+
+      <div class="card">
+        <h2>${t('employees')}</h2>
+        <div class="note" style="margin:0 0 12px">${t('employeesHelp')}</div>
+        <div class="row">
+          <label class="f" style="margin:0">${t('role')}</label><select id="empRole">${roleOpts('orders')}</select>
+          <label class="f" style="margin:0">${t('channel')}</label>
+          <select id="empChannel"><option value="telegram">${t('telegram')}</option>${status.whatsapp?.live ? `<option value="whatsapp">${t('whatsapp')}</option>` : ''}</select>
+          <button class="btn2" id="empBtn" onclick="addEmployee()">${t('addEmployee')}</button>
+        </div>
+        <div class="code-box" id="empCodeBox"></div>
+      </div>`;
+    document.getElementById('settingsCard').addEventListener('input', markDirty);
+    document.getElementById('settingsCard').addEventListener('change', markDirty);
+    dirty = false;
+  }
+  function markDirty() { dirty = true; document.getElementById('saveMsg').textContent = t('unsaved'); }
+
+  function showCode(boxId, channel, d) {
+    const box = document.getElementById(boxId);
+    let help = t('codeHelpOther'), btn = '';
+    if (channel === 'telegram') {
+      help = d.deepLink ? t('codeHelpTg') : t('codeHelpTgOff');
+      if (d.deepLink) btn = `<a class="btn" href="${esc(d.deepLink)}" target="_blank" rel="noopener">${t('openTelegram')}</a>`;
+    } else if (channel === 'whatsapp' && d.deepLink) {
+      help = t('codeHelpWa');
+      btn = `<a class="btn" href="${esc(d.deepLink)}" target="_blank" rel="noopener">${t('openWhatsapp')}</a>`;
+    }
+    box.innerHTML = `<div class="note" style="margin:0">${t('codeTitle')}</div><div class="code" id="${boxId}Code">${esc(d.code)}</div>
+      <div class="note" style="margin:0 0 10px">${help}</div>${btn}<div class="note">${t('codeExpires')}</div>`;
+    box.style.display = 'block';
+  }
+  async function getCode(channel) {
+    try {
+      const d = await callFn({ action: 'link_code', channel });
+      showCode('codeBox', channel, d);
+      pollLinks();
+    } catch (e) { toast(e.message, true); }
+  }
+  async function addEmployee() {
+    const btn = document.getElementById('empBtn');
+    btn.disabled = true;
+    try {
+      const channel = document.getElementById('empChannel').value;
+      const d = await callFn({ action: 'link_code', channel, role: document.getElementById('empRole').value, isOwner: false });
+      showCode('empCodeBox', channel, d);
+      pollLinks();
+    } catch (e) { toast(e.message, true); } finally { btn.disabled = false; }
+  }
+  // Kod alındıktan sonra 30 dk boyunca yeni bağlantıyı bekle (sayfa yenilemeden listede görünsün)
+  function pollLinks() {
+    clearInterval(pollLinks._t);
+    const until = Date.now() + 30 * 60_000;
+    pollLinks._t = setInterval(async () => {
+      if (Date.now() > until) return clearInterval(pollLinks._t);
+      const { data } = await HS.db.from('assistant_links').select('id, channel, external_id, display_name, role, is_owner, created_at').eq('user_id', userId).neq('channel', 'test').order('created_at');
+      if ((data || []).length !== links.length) {
+        links = data || [];
+        const keep = dirty ? readSettings() : null;
+        render();
+        if (keep) { Object.assign(settings, keep.settings); rules = keep.rules; render(); markDirty(); }
+        toast(t('linked') + ' ✓');
+      }
+    }, 5000);
+  }
+  async function unlink(id) {
+    if (!confirm(t('unlinkConfirm'))) return;
+    const { error } = await HS.db.from('assistant_links').delete().eq('id', id).eq('user_id', userId);
+    if (error) return toast(t('errGeneric'), true);
+    links = links.filter(l => l.id !== id);
+    document.querySelector(`[data-link="${id}"]`)?.remove();
+    if (!links.length) document.getElementById('linkList').innerHTML = `<div class="empty">${t('noLinks')}</div>`;
+    toast(t('unlinked'));
+  }
+  function readSettings() {
+    const m = Math.max(0, Math.min(1000, Number(document.getElementById('margin').value) || 0));
+    return {
+      settings: {
+        approval_mode: document.querySelector('input[name=mode]:checked')?.value === 'approve' ? 'approve' : 'direct',
+        default_channels: [...document.querySelectorAll('input[name=chan]:checked')].map(x => x.value),
+        morning_report: document.getElementById('morning').checked,
+        weekly_summary: document.getElementById('weekly').checked,
+        quiet_start: document.getElementById('qStart').value || '22:00',
+        quiet_end: document.getElementById('qEnd').value || '08:00',
+      },
+      rules: { ...rules, margin: m },
+    };
+  }
+  async function save() {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    try {
+      const r = readSettings();
+      if (!r.settings.default_channels.length) r.settings.default_channels = ['own_store'];
+      const a = await HS.db.from('assistant_settings').upsert({ user_id: userId, ...r.settings, updated_at: new Date().toISOString() });
+      if (a.error) throw a.error;
+      const b = await HS.db.from('import_rules').upsert({ user_id: userId, rules: r.rules, updated_at: new Date().toISOString() });
+      if (b.error) throw b.error;
+      Object.assign(settings, r.settings); rules = r.rules; dirty = false;
+      document.getElementById('saveMsg').textContent = '';
+      toast(t('saved'));
+    } catch (e) { toast(t('errGeneric'), true); } finally { btn.disabled = false; }
+  }
+
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    await load();
+  })();
+  window.addEventListener('hs:langchange', () => { applyStatic(); if (settings) { const k = dirty ? readSettings() : null; if (k) { Object.assign(settings, k.settings); rules = k.rules; } render(); if (k) markDirty(); } });
+</script>
+</body>
+</html>

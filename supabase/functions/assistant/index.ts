@@ -137,7 +137,8 @@ Deno.serve(async (req) => {
       return json({ error: "Geçersiz işlem" }, 400);
     }
     // Satıcı
-    const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    // Proje deseni: oturum anahtarı gövdede (userAccessToken); eski çağrılar için Authorization başlığı da kabul
+    const bearer = String(b?.userAccessToken || (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "")).trim();
     const { data } = bearer.split(".").length === 3 ? await db.auth.getUser(bearer) : { data: { user: null } };
     const userId = data?.user?.id;
     if (!userId) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
