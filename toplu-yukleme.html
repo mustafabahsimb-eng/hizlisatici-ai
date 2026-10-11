@@ -265,6 +265,11 @@
     <div class="step-head"><div class="step-num">4</div><div class="step-title" data-t="s4Title"></div></div>
     <div class="consent">
       <label class="chk"><input type="checkbox" id="consentChk" onchange="updateImportBtn()"> <span data-t="consent"></span></label>
+      <div id="aeSourceRow" style="display:none;margin-top:10px">
+        <div style="font-size:13px;color:#c3c9d4;margin-bottom:6px" data-t="aeSourceQ"></div>
+        <label class="chk" style="margin-right:18px"><input type="radio" name="aeSrc" value="aliexpress" onchange="updateImportBtn()"> <span data-t="aeSourceAe"></span></label>
+        <label class="chk"><input type="radio" name="aeSrc" value="own" onchange="updateImportBtn()"> <span data-t="aeSourceOwn"></span></label>
+      </div>
       <label class="chk" id="imageTermsRow" style="display:none;margin-top:8px"><input type="checkbox" id="imageTermsChk" onchange="updateImportBtn()"> <span data-t="imageTerms"></span></label>
     </div>
     <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
@@ -391,6 +396,10 @@
       photoWorking: 'Fotoğraf hazırlanıyor (arka plan temizleniyor)...',
       photoBgFail: 'Arka plan temizlenemedi; fotoğraf olduğu gibi eklendi.',
       imageTerms: 'Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir',
+      aeSourceQ: 'AliExpress ürünleri için kaynak (AliExpress seçilirse siparişler otomatik AliExpress\'e verilir):',
+      aeSourceAe: 'AliExpress',
+      aeSourceOwn: 'Kendi stoğum',
+      needAeSource: 'AliExpress ürünleri için kaynağı seç.',
       needImageTerms: 'Devam etmek için görsel kullanım onayını işaretle.',
       wNoSpecs: 'Özellik yok',
       wExists: 'Zaten ekli',
@@ -536,6 +545,10 @@
       photoWorking: 'Preparing the photo (removing background)...',
       photoBgFail: 'The background could not be removed; the photo was added as is.',
       imageTerms: 'I sell original products; I am responsible for the use of the images',
+      aeSourceQ: 'Source for AliExpress products (with AliExpress, orders are placed on AliExpress automatically):',
+      aeSourceAe: 'AliExpress',
+      aeSourceOwn: 'My own stock',
+      needAeSource: 'Choose the source for AliExpress products.',
       needImageTerms: 'Tick the image use confirmation to continue.',
       wNoSpecs: 'No specs',
       wExists: 'Already added',
@@ -1048,7 +1061,11 @@
     const btn = document.getElementById('importBtn');
     btn.textContent = fmt(t('importBtn'), { n: HS.number(n) });
     document.getElementById('imageTermsRow').style.display = imageTermsAccepted ? 'none' : '';
-    btn.disabled = !n || !document.getElementById('consentChk').checked || (!imageTermsAccepted && !document.getElementById('imageTermsChk').checked);
+    // Ürün kaynağı kuralı: AliExpress linkinden gelen ürünlerde kaynak satıcıya sorulur
+    const hasAe = items.some(i => i.selected && i.source_platform === 'aliexpress');
+    document.getElementById('aeSourceRow').style.display = hasAe ? '' : 'none';
+    const aeChosen = !!document.querySelector('input[name="aeSrc"]:checked');
+    btn.disabled = !n || !document.getElementById('consentChk').checked || (!imageTermsAccepted && !document.getElementById('imageTermsChk').checked) || (hasAe && !aeChosen);
   }
 
   // ---------- Kaynak sekmeleri ----------
@@ -1937,6 +1954,9 @@
     const sel = items.filter(i => i.selected);
     if (!sel.length) return;
     if (!document.getElementById('consentChk').checked) { toast(t('needConsent'), true); return; }
+    const aeSrcEl = document.querySelector('input[name="aeSrc"]:checked');
+    if (sel.some(i => i.source_platform === 'aliexpress') && !aeSrcEl) { toast(t('needAeSource'), true); return; }
+    const aeDropship = !!aeSrcEl && aeSrcEl.value === 'aliexpress';
     if (!imageTermsAccepted) {
       if (!document.getElementById('imageTermsChk').checked) { toast(t('needImageTerms'), true); return; }
       const up = await db.from('user_profiles').update({ image_terms_accepted_at: new Date().toISOString(), image_terms_text: t('imageTerms') }).eq('user_id', userId).select('user_id');
@@ -1979,10 +1999,11 @@
           sale_price: it.newPrice > 0 ? it.newPrice : 0,
           generated_title: it.name.slice(0, 300),
           generated_description: fullDescription(it),
-          // AliExpress'ten gelen ürün: tedarikçili (siparişi otomatik AliExpress / CJ eşdeğerinden verilir)
-          supplier: it.source_platform === 'aliexpress' && it.source_item_id ? 'aliexpress' : null,
-          supplier_item_id: it.source_platform === 'aliexpress' ? (it.source_item_id || null) : null,
-          supplier_cost: it.source_platform === 'aliexpress' && it.price > 0 ? it.price : null,
+          // Ürün kaynağı: yalnız satıcı "AliExpress" derse tedarikçili (sipariş otomatik AliExpress / CJ eşdeğerinden);
+          // diğer her şey "Kendi stoğum" (supplier boş)
+          supplier: aeDropship && it.source_platform === 'aliexpress' && it.source_item_id ? 'aliexpress' : null,
+          supplier_item_id: aeDropship && it.source_platform === 'aliexpress' ? (it.source_item_id || null) : null,
+          supplier_cost: aeDropship && it.source_platform === 'aliexpress' && it.price > 0 ? it.price : null,
           image_url: it.images[0] || null,
           cost_currency: itemCurrency(it, r),
           content_language: 'tr',
@@ -2065,7 +2086,7 @@
           if (lvRows.length) await db.from('listing_variants').insert(lvRows);
         }
         // AliExpress ürünleri için CJ eşdeğeri araması arka planda başlasın (saatlik görev de tekrar dener)
-        pairs.filter(p => p.it.source_platform === 'aliexpress').forEach(p => {
+        pairs.filter(p => aeDropship && p.it.source_platform === 'aliexpress').forEach(p => {
           fetch(HS.SUPABASE_URL + '/functions/v1/cj-alt-match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },

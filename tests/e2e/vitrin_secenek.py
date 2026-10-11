@@ -28,6 +28,10 @@ def import_link(page, url):
     page.wait_for_selector("#previewBox .pname", timeout=120000)
     before = page.evaluate("async () => (await HS.db.from('products').select('id').order('id', {ascending:false}).limit(1)).data?.[0]?.id || 0")
     page.check("#consentChk")
+    if page.is_visible("#imageTermsRow"):
+        page.check("#imageTermsChk")
+    if page.is_visible("#aeSourceRow"):
+        page.check("input[name=aeSrc][value=aliexpress]")  # tedarikçili (dropshipping)
     page.click("#importBtn")
     page.wait_for_selector("#resultBox.ok, #resultBox.err", timeout=120000)
     return page.evaluate("""async (before) => {

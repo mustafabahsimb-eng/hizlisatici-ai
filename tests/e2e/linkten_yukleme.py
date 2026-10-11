@@ -48,6 +48,8 @@ def main():
 
         before = page.evaluate("async () => (await HS.db.from('products').select('id').order('id', {ascending:false}).limit(1)).data?.[0]?.id || 0")
         page.check("#consentChk")
+        if page.is_visible("#imageTermsRow"):
+            page.check("#imageTermsChk")
         page.click("#importBtn")
         page.wait_for_selector("#resultBox.ok, #resultBox.err", timeout=120000)
         c.check("Aktarım başarılı", "ok" in (page.get_attribute("#resultBox", "class") or ""), page.inner_text("#resultBox")[:160])
