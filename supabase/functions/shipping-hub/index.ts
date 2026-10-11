@@ -488,6 +488,15 @@ Deno.serve(async (req) => {
     }
     if (body?.action === "create" && body?.marketplaceOrderId) return json(await enqueueMp(userId, String(body.marketplaceOrderId), body?.accountId));
     if (body?.action === "create") return json(await enqueue(userId, String(body.storeOrderId || ""), body?.accountId));
+    if (body?.action === "default") {
+      const id = String(body.accountId || "");
+      const { data: a } = await db.from("shipping_accounts").select("id").eq("id", id).eq("user_id", userId).maybeSingle();
+      if (!a) return json({ error: "Kargo hesabı bulunamadı" }, 404);
+      await db.from("shipping_accounts").update({ is_default: false }).eq("user_id", userId).neq("id", id);
+      await db.from("shipping_accounts").update({ is_default: true }).eq("id", id);
+      return json({ ok: true });
+    }
+    if (body?.action === "labels") return json(await mergedLabels(userId));
     if (body?.action === "label") {
       const { data: sh } = await db.from("shipments").select("label_path").eq("id", String(body.shipmentId || "")).eq("user_id", userId).maybeSingle();
       if (!sh?.label_path) return json({ error: "Etiket henüz hazır değil" }, 404);
@@ -566,6 +575,10 @@ async function enqueue(userId: string, storeOrderId: string, accountId?: string)
   const { data: a } = await db.from("shipping_accounts").select("id, provider, mode").eq("id", acc).eq("user_id", userId).maybeSingle();
   if (!a) return { ok: false, error: "Kargo hesabı bulunamadı" };
   let { data: sh } = await db.from("shipments").select("*").eq("store_order_id", storeOrderId).neq("status", "cancelled").maybeSingle();
+  if (sh?.status === "error") {
+    await db.from("shipments").update({ status: "pending", attempts: 0, last_error: null, account_id: a.id, provider: a.provider, test: a.mode === "test" }).eq("id", sh.id);
+    sh = { ...sh, status: "pending", attempts: 0, account_id: a.id, provider: a.provider };
+  }
   if (!sh) {
     const ins = await db.from("shipments").insert({ user_id: userId, store_order_id: storeOrderId, account_id: a.id, provider: a.provider, test: a.mode === "test" }).select("*").single();
     if (ins.error) throw ins.error;
@@ -587,6 +600,10 @@ async function enqueueMp(userId: string, moId: string, accountId?: string) {
   const { data: a } = acc ? await db.from("shipping_accounts").select("id, provider, mode").eq("id", acc).eq("user_id", userId).maybeSingle() : { data: null };
   if (!a && !String(mo.marketplace_code).startsWith("amazon_")) return { ok: false, error: "Kargo hesabı bağlı değil" };
   let { data: sh } = await db.from("shipments").select("*").eq("marketplace_order_id", moId).neq("status", "cancelled").maybeSingle();
+  if (sh?.status === "error") {
+    await db.from("shipments").update({ status: "pending", attempts: 0, last_error: null }).eq("id", sh.id);
+    sh = { ...sh, status: "pending", attempts: 0 };
+  }
   if (!sh) {
     const ins = await db.from("shipments").insert({ user_id: userId, marketplace_order_id: moId, account_id: a?.id || null, provider: a?.provider || "amazon", test: a ? a.mode === "test" : false }).select("*").single();
     if (ins.error) throw ins.error;
@@ -594,6 +611,28 @@ async function enqueueMp(userId: string, moId: string, accountId?: string) {
   }
   const results = await runQueue(sh.id);
   return { ok: true, shipmentId: sh.id, result: results[0] ?? null };
+}
+
+// Henüz kargoya teslim edilmemiş gönderilerin etiketleri tek PDF'te (yazıcıya tek seferde)
+async function mergedLabels(userId: string) {
+  const { data: shs } = await db.from("shipments").select("id, label_path").eq("user_id", userId).eq("status", "created").not("label_path", "is", null).order("created_at").limit(200);
+  if (!shs?.length) return { ok: false, error: "Bekleyen etiket yok" };
+  const { PDFDocument } = await import("npm:pdf-lib@1.17.1");
+  const merged = await PDFDocument.create();
+  for (const s of shs) {
+    const { data: f } = await db.storage.from("shipping-labels").download(s.label_path);
+    if (!f) continue;
+    try {
+      const src = await PDFDocument.load(new Uint8Array(await f.arrayBuffer()));
+      (await merged.copyPages(src, src.getPageIndices())).forEach((pg: any) => merged.addPage(pg));
+    } catch (_) { /* bozuk dosya atlanır */ }
+  }
+  if (!merged.getPageCount()) return { ok: false, error: "Etiket dosyaları okunamadı" };
+  const path = `${userId}/toplu-${new Date().toISOString().replace(/[:.]/g, "-")}.pdf`;
+  const up = await db.storage.from("shipping-labels").upload(path, await merged.save(), { contentType: "application/pdf", upsert: true });
+  if (up.error) return { ok: false, error: up.error.message };
+  const { data: signed } = await db.storage.from("shipping-labels").createSignedUrl(path, 3600);
+  return { ok: true, url: signed?.signedUrl, count: merged.getPageCount() };
 }
 
 export { trendyolLabel }; // pazaryeri siparişleri akışı (Trendyol canlı bağlantısı gelince) için

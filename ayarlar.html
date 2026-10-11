@@ -64,6 +64,19 @@
     border: 1px solid #2a3040; background: #0d0f16; object-fit: contain; padding: 6px;
   }
 
+  .btn-ghost { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 9px 14px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .btn-ghost:hover { border-color: #3a4258; color: #fff; }
+  .ship-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .ship-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: #0d0f16; border: 1px solid #232838; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .ship-item b { color: #fff; }
+  .ship-tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; margin-left: 6px; background: #232838; color: #c3c9d4; }
+  .ship-tag.ok { background: #123222; color: #6ee7b7; }
+  .ship-tag.warn { background: #2a2410; color: #f2d16b; }
+  .ship-tag.err { background: #2a1416; color: #f28b8b; }
+  .ship-item .acts { display: flex; gap: 6px; }
+  .ship-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #232838; }
+  .ship-sub { font-size: 13px; font-weight: 600; color: #cfd4de; margin: 16px 0 8px; }
+  .ship-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   .check-row { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; }
   .check-row input[type="checkbox"] {
     width: 18px; height: 18px; margin-top: 1px; accent-color: #1D9E75; flex-shrink: 0; cursor: pointer;
@@ -309,6 +322,48 @@
       </div>
     </div>
 
+    <!-- ========== KARGO ========== -->
+    <div class="section-title" id="kargo" data-t="secShip"></div>
+    <div class="card">
+      <div class="card-desc" data-t="dShip"></div>
+      <div class="ship-list" id="shipList"></div>
+      <button type="button" class="btn-ghost" id="shipAddBtn" onclick="toggleShipForm(true)" data-t="shipAdd"></button>
+      <div class="ship-form" id="shipForm" style="display:none">
+        <div class="grid">
+          <div class="field">
+            <label for="ship_provider" data-t="lShipProvider"></label>
+            <select id="ship_provider" onchange="renderShipFields()"></select>
+          </div>
+          <div class="field">
+            <label for="ship_mode" data-t="lShipMode"></label>
+            <select id="ship_mode"><option value="live" data-t="shipLive"></option><option value="test" data-t="shipTest"></option></select>
+          </div>
+        </div>
+        <div class="grid" id="shipCredFields" style="margin-top:12px"></div>
+        <div class="hint" id="shipProviderNote" style="margin-top:6px"></div>
+        <div class="ship-sub" data-t="lShipSender"></div>
+        <div class="grid">
+          <div class="field"><label for="ship_s_name" data-t="lShipSName"></label><input type="text" id="ship_s_name" maxlength="120"></div>
+          <div class="field"><label for="ship_s_phone" data-t="lPhone"></label><input type="tel" id="ship_s_phone" maxlength="40"></div>
+          <div class="field full"><label for="ship_s_address" data-t="lShipSAddress"></label><input type="text" id="ship_s_address" maxlength="300"></div>
+          <div class="field"><label for="ship_s_district" data-t="lShipSDistrict"></label><input type="text" id="ship_s_district" maxlength="80"></div>
+          <div class="field"><label for="ship_s_city" data-t="lShipSCity"></label><input type="text" id="ship_s_city" maxlength="80"></div>
+        </div>
+        <div class="error-text" id="shipError" style="display:none"></div>
+        <div class="ship-actions">
+          <button type="button" class="btn-ghost" onclick="toggleShipForm(false)" data-t="shipCancel"></button>
+          <button type="button" class="btn" id="shipConnectBtn" onclick="connectShip()" data-t="shipConnect"></button>
+        </div>
+      </div>
+      <div class="check-row" style="margin-top: 14px;">
+        <input type="checkbox" id="shipping_auto">
+        <div>
+          <label for="shipping_auto" data-t="lShipAuto"></label>
+          <div class="hint" data-t="hShipAuto"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ========== OTOMATİK SİPARİŞ ========== -->
     <div class="section-title" id="otomatik-siparis" data-t="secAutoOrder"></div>
     <div class="card">
@@ -417,6 +472,44 @@ const T = {
     dEpr: '<strong>Ambalaj (EPR) kayıt numaraları:</strong> Bazı ülkelerde satış yapmak için ambalaj kayıt numarası gerekiyor (Almanya\'da LUCID, Fransa\'da UIN). Sadece satış yaptığın ülkeleri doldur.',
     epr_DE: 'Almanya – LUCID numarası', epr_FR: 'Fransa – UIN numarası', epr_PL: 'Polonya – BDO numarası',
     epr_IT: 'İtalya – kayıt numarası', epr_NL: 'Hollanda – kayıt numarası', epr_IE: 'İrlanda – kayıt numarası', epr_DK: 'Danimarka – kayıt numarası',
+    secShip: '🚚 Kargo',
+    dShip: 'Kendi gönderdiğin siparişlerde (Kendi stoğum / Toptancı) kargo gönderisi ve barkodlu etiket kendiliğinden hazırlanır; takip numarası siparişe, müşterinin takip sayfasına ve pazaryerine gider. Kendi kargo anlaşman yoksa Geliver ya da Basit Kargo ile anlaşmasız gönderebilirsin.',
+    shipAdd: '+ Kargo hesabı bağla',
+    lShipProvider: 'Kargo firması',
+    lShipMode: 'Ortam',
+    shipLive: 'Canlı',
+    shipTest: 'Test',
+    lShipSender: 'Gönderen bilgileri (etikette görünür)',
+    lShipSName: 'Gönderen adı',
+    lShipSAddress: 'Adres',
+    lShipSDistrict: 'İlçe',
+    lShipSCity: 'İl',
+    shipCancel: 'Vazgeç',
+    shipConnect: 'Bağla',
+    shipConnecting: 'Bağlanıyor...',
+    shipDefault: 'Varsayılan',
+    shipMakeDefault: 'Varsayılan yap',
+    shipRemove: 'Kaldır',
+    shipRemoveConfirm: 'Bu kargo hesabı kaldırılsın mı? Kayıtlı bilgiler de silinir.',
+    shipStOk: 'Bağlı',
+    shipStPending: 'Doğrulama bekliyor',
+    shipStErr: 'Hata',
+    shipNone: 'Henüz bağlı kargo hesabı yok.',
+    shipPendingNote: 'Kargo sunucusu şu an yanıt vermiyor; bilgilerin kaydedildi, doğrulama arka planda tekrar denenecek.',
+    shipConnected: 'Kargo hesabı bağlandı.',
+    shipFillAll: 'Lütfen kargo bilgilerini doldur.',
+    lShipAuto: 'Siparişlere kargo gönderisini otomatik oluştur',
+    hShipAuto: 'Kapalıysa Siparişler sayfasından "📦 Kargoya ver" ile sen başlatırsın.',
+    fYkUser: 'Web servis kullanıcı adı',
+    fYkPass: 'Web servis şifresi',
+    fToken: 'API anahtarı',
+    fUser: 'Kullanıcı adı',
+    fPass: 'Şifre',
+    fCustomer: 'Müşteri kodu',
+    nYurtici: 'Yurtiçi Kargo şubenden "web servis kullanıcı adı ve şifresi" iste. Test ortamı için YKTEST / YK kullanılabilir.',
+    nGeliver: 'Kargo anlaşması gerekmez. app.geliver.io > Ayarlar > API Anahtarları.',
+    nBasit: 'Kargo anlaşması gerekmez. basitkargo.com hesabındaki API anahtarı.',
+    nPendingCarrier: 'Bilgilerin şifreli kasada saklanır; firmanın web servis belgesi ve test erişimi tamamlanınca gönderiler otomatik başlar.',
     secReturn: '📦 İade Adresi',
     secAutoOrder: '🤖 Otomatik sipariş',
     dAutoOrder: 'Mağazana gelen tedarikçili (CJ, AliExpress) siparişler kendiliğinden tedarikçiye gönderilir. Zararlı siparişler (ürün + kargo + komisyon) her zaman ödenmeden onayına düşer.',
@@ -516,6 +609,44 @@ const T = {
     dEpr: '<strong>Packaging (EPR) registration numbers:</strong> Some countries require a packaging registration number to sell (LUCID in Germany, UIN in France). Only fill in the countries you sell to.',
     epr_DE: 'Germany – LUCID number', epr_FR: 'France – UIN number', epr_PL: 'Poland – BDO number',
     epr_IT: 'Italy – registration number', epr_NL: 'Netherlands – registration number', epr_IE: 'Ireland – registration number', epr_DK: 'Denmark – registration number',
+    secShip: '🚚 Shipping',
+    dShip: 'For orders you ship yourself (own stock / wholesaler), the shipment and barcode label are prepared automatically; the tracking number goes to the order, the customer tracking page and the marketplace. Without your own carrier contract you can ship via Geliver or Basit Kargo.',
+    shipAdd: '+ Connect a carrier account',
+    lShipProvider: 'Carrier',
+    lShipMode: 'Environment',
+    shipLive: 'Live',
+    shipTest: 'Test',
+    lShipSender: 'Sender details (shown on the label)',
+    lShipSName: 'Sender name',
+    lShipSAddress: 'Address',
+    lShipSDistrict: 'District',
+    lShipSCity: 'City',
+    shipCancel: 'Cancel',
+    shipConnect: 'Connect',
+    shipConnecting: 'Connecting...',
+    shipDefault: 'Default',
+    shipMakeDefault: 'Make default',
+    shipRemove: 'Remove',
+    shipRemoveConfirm: 'Remove this carrier account? Saved credentials will be deleted too.',
+    shipStOk: 'Connected',
+    shipStPending: 'Verification pending',
+    shipStErr: 'Error',
+    shipNone: 'No carrier account connected yet.',
+    shipPendingNote: 'The carrier server is not responding right now; your details were saved and verification will be retried in the background.',
+    shipConnected: 'Carrier account connected.',
+    shipFillAll: 'Please fill in the carrier details.',
+    lShipAuto: 'Create shipments for orders automatically',
+    hShipAuto: 'If off, you start them yourself with "📦 Ship" on the Orders page.',
+    fYkUser: 'Web service username',
+    fYkPass: 'Web service password',
+    fToken: 'API key',
+    fUser: 'Username',
+    fPass: 'Password',
+    fCustomer: 'Customer code',
+    nYurtici: 'Ask your Yurtiçi Kargo branch for the "web service username and password". For the test environment use YKTEST / YK.',
+    nGeliver: 'No carrier contract needed. app.geliver.io > Settings > API Keys.',
+    nBasit: 'No carrier contract needed. The API key from your basitkargo.com account.',
+    nPendingCarrier: 'Your details are stored in the encrypted vault; shipments start automatically once the carrier\'s web service documents and test access are complete.',
     secReturn: '📦 Return Address',
     secAutoOrder: '🤖 Automatic orders',
     dAutoOrder: 'Supplier (CJ, AliExpress) orders from your store are sent to the supplier automatically. Loss-making orders (product + shipping + commission) always wait for your approval unpaid.',
@@ -694,6 +825,103 @@ async function loadProfile() {
   fillForm(profile);
 }
 
+
+// ---------- Kargo hesapları (shipping-hub; bilgiler Vault'ta) ----------
+const SHIP_PROVIDERS = [
+  ['yurtici', 'Yurtiçi Kargo', [['wsUserName', 'fYkUser'], ['wsPassword', 'fYkPass']], 'nYurtici'],
+  ['geliver', 'Geliver', [['token', 'fToken']], 'nGeliver'],
+  ['basitkargo', 'Basit Kargo', [['token', 'fToken']], 'nBasit'],
+  ['aras', 'Aras Kargo', [['username', 'fUser'], ['password', 'fPass'], ['customerCode', 'fCustomer']], 'nPendingCarrier'],
+  ['mng', 'MNG Kargo', [['username', 'fUser'], ['password', 'fPass'], ['customerCode', 'fCustomer']], 'nPendingCarrier'],
+  ['ptt', 'PTT Kargo', [['username', 'fUser'], ['password', 'fPass'], ['customerCode', 'fCustomer']], 'nPendingCarrier'],
+  ['surat', 'Sürat Kargo', [['username', 'fUser'], ['password', 'fPass'], ['customerCode', 'fCustomer']], 'nPendingCarrier'],
+  ['hepsijet', 'HepsiJet', [['username', 'fUser'], ['password', 'fPass'], ['customerCode', 'fCustomer']], 'nPendingCarrier'],
+];
+let shipAccounts = [];
+async function shipCall(body) {
+  const { data: { session } } = await db.auth.getSession();
+  const r = await fetch(SUPABASE_URL + '/functions/v1/shipping-hub', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_KEY },
+    body: JSON.stringify(body)
+  });
+  return await r.json().catch(() => ({}));
+}
+async function loadShipping() {
+  const { data } = await db.from('shipping_accounts').select('id, provider, mode, is_default, account_name, status, last_error, settings').eq('user_id', currentUserId).order('connected_at');
+  shipAccounts = data || [];
+  renderShipping();
+}
+function renderShipping() {
+  const sel = $('ship_provider');
+  const prev = sel.value;
+  sel.innerHTML = SHIP_PROVIDERS.map(p => '<option value="' + p[0] + '">' + p[1] + '</option>').join('');
+  if (prev) sel.value = prev;
+  renderShipFields();
+  const list = $('shipList');
+  if (!shipAccounts.length) { list.innerHTML = '<div class="hint">' + escapeHtmlS(t('shipNone')) + '</div>'; return; }
+  list.innerHTML = shipAccounts.map(a => {
+    const name = (SHIP_PROVIDERS.find(p => p[0] === a.provider) || [0, a.provider])[1];
+    const pending = a.settings && a.settings.verify_pending;
+    const st = a.status === 'error' ? '<span class="ship-tag err" title="' + escapeHtmlS(a.last_error || '') + '">' + t('shipStErr') + '</span>'
+      : pending ? '<span class="ship-tag warn">' + t('shipStPending') + '</span>' : '<span class="ship-tag ok">' + t('shipStOk') + '</span>';
+    return '<div class="ship-item" data-ship="' + a.id + '"><span><b>' + escapeHtmlS(name) + '</b>' +
+      '<span class="ship-tag">' + (a.mode === 'test' ? t('shipTest') : t('shipLive')) + '</span>' + st +
+      (a.is_default ? '<span class="ship-tag ok">' + t('shipDefault') + '</span>' : '') + '</span>' +
+      '<span class="acts">' + (a.is_default ? '' : '<button type="button" class="btn-ghost" onclick="defaultShip(\'' + a.id + '\')">' + t('shipMakeDefault') + '</button>') +
+      '<button type="button" class="btn-ghost" onclick="removeShip(\'' + a.id + '\')">' + t('shipRemove') + '</button></span></div>';
+  }).join('');
+}
+function escapeHtmlS(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function renderShipFields() {
+  const p = SHIP_PROVIDERS.find(x => x[0] === $('ship_provider').value) || SHIP_PROVIDERS[0];
+  const keep = {};
+  document.querySelectorAll('#shipCredFields input').forEach(i => { keep[i.dataset.k] = i.value; });
+  $('shipCredFields').innerHTML = p[2].map(([k, label]) => '<div class="field"><label>' + escapeHtmlS(t(label)) + '</label>' +
+    '<input type="' + (/pass|token/i.test(k) ? 'password' : 'text') + '" data-k="' + k + '" autocomplete="off" data-lpignore="true" data-1p-ignore value="' + escapeHtmlS(keep[k] || '') + '"></div>').join('');
+  $('shipProviderNote').textContent = t(p[3]);
+}
+function toggleShipForm(on) {
+  $('shipForm').style.display = on ? 'block' : 'none';
+  $('shipAddBtn').style.display = on ? 'none' : '';
+  $('shipError').style.display = 'none';
+  if (on) {
+    // Gönderen bilgileri: iade adresi / marka bilgilerinden doldur
+    if (!$('ship_s_name').value) $('ship_s_name').value = $('ret_name').value || $('brand_name').value || '';
+    if (!$('ship_s_phone').value) $('ship_s_phone').value = $('ret_phone').value || '';
+    if (!$('ship_s_address').value) $('ship_s_address').value = $('ret_address').value || '';
+    if (!$('ship_s_city').value) $('ship_s_city').value = $('ret_city').value || '';
+  }
+}
+async function connectShip() {
+  const p = SHIP_PROVIDERS.find(x => x[0] === $('ship_provider').value);
+  const credentials = {};
+  let missing = false;
+  document.querySelectorAll('#shipCredFields input').forEach(i => { credentials[i.dataset.k] = i.value.trim(); if (!i.value.trim()) missing = true; });
+  const err = $('shipError');
+  if (missing) { err.textContent = t('shipFillAll'); err.style.display = 'block'; return; }
+  const btn = $('shipConnectBtn');
+  btn.disabled = true; btn.textContent = t('shipConnecting'); err.style.display = 'none';
+  try {
+    const d = await shipCall({ action: 'connect', provider: p[0], mode: $('ship_mode').value, credentials, makeDefault: !shipAccounts.length || undefined,
+      settings: { sender: { name: $('ship_s_name').value.trim(), phone: $('ship_s_phone').value.trim(), address: $('ship_s_address').value.trim(), district: $('ship_s_district').value.trim(), city: $('ship_s_city').value.trim() } } });
+    if (!d.ok) throw new Error(d.error || t('saveFail'));
+    toggleShipForm(false);
+    document.querySelectorAll('#shipCredFields input').forEach(i => { i.value = ''; });
+    setStatus(null);
+    alertShip(d.verifyPending ? t('shipPendingNote') : t('shipConnected'));
+    await loadShipping();
+  } catch (e) {
+    err.textContent = e.message; err.style.display = 'block';
+  } finally { btn.disabled = false; btn.textContent = t('shipConnect'); }
+}
+function alertShip(msg) { const el = $('shipProviderNote'); const list = $('shipList'); const n = document.createElement('div'); n.className = 'hint'; n.style.color = '#6ee7b7'; n.textContent = msg; list.parentNode.insertBefore(n, list); setTimeout(() => n.remove(), 6000); }
+async function defaultShip(id) { await shipCall({ action: 'default', accountId: id }); await loadShipping(); }
+async function removeShip(id) {
+  if (!confirm(t('shipRemoveConfirm'))) return;
+  await shipCall({ action: 'disconnect', accountId: id });
+  await loadShipping();
+}
+
 // Marka bilgileri store_settings tablosunda (faturalar buradan okuyor)
 async function loadBrand() {
   const { data, error } = await db.from('store_settings')
@@ -769,6 +997,7 @@ function fillForm(p) {
   $('oss_registered').checked = !!p.oss_registered;
   // Otomatik sipariş: varsayılan açık
   $('cj_auto_pay').checked = p.cj_auto_pay !== false;
+  $('shipping_auto').checked = p.shipping_auto !== false;
   $('ae_auto_pay').checked = p.ae_auto_pay !== false;
   $('wa_tracking_notify').checked = p.wa_tracking_notify !== false;
   $('ioss_number').value = p.ioss_number || '';
@@ -883,6 +1112,7 @@ async function saveProfile() {
     vat_number: vatRegistered ? valOrNull('vat_number') : null,
     oss_registered: $('oss_registered').checked,
     cj_auto_pay: $('cj_auto_pay').checked,
+    shipping_auto: $('shipping_auto').checked,
     ae_auto_pay: $('ae_auto_pay').checked,
     wa_tracking_notify: $('wa_tracking_notify').checked,
     ioss_number: valOrNull('ioss_number'),
@@ -944,6 +1174,7 @@ async function init() {
     await loadProfile();
     await loadBrand();
     loadWaTemplate();
+    await loadShipping();
     applyTexts();
     $('loading').classList.add('hidden');
     $('settingsForm').classList.remove('hidden');
@@ -967,6 +1198,7 @@ $('settingsForm').addEventListener('input', () => setStatus(null));
 
 // Üstteki bayrak düğmesiyle dil değişirse: sayfa + dil kutusu eşitlenir
 function onLangChange() {
+  if (typeof renderShipping === 'function' && document.getElementById('ship_provider')) renderShipping();
   if ($('ui_language').value !== lang() && (lang() === 'tr' || lang() === 'en')) $('ui_language').value = lang();
   applyTexts();
   renderWaTemplate();

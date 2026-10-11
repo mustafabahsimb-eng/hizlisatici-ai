@@ -157,6 +157,10 @@
     main { padding: 24px 16px 80px; }
     .money-box { text-align: left; }
   }
+  .ship-line { margin-top: 6px; font-size: 12px; color: #9aa3b2; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .btn-mini { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 4px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+  .btn-mini:hover { border-color: #1D9E75; color: #fff; }
+  .btn-mini:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
 <body>
@@ -200,6 +204,7 @@
       <select id="msChannel" onchange="renderSales()"></select>
       <label class="chk"><input type="checkbox" id="msShowTest" checked onchange="renderSales()"> <span data-t="showTest"></span></label>
       <div class="spacer"></div>
+      <button class="btn-secondary" id="labelsBtn" onclick="downloadLabels(this)" data-t="labelsAll"></button>
       <button class="btn-secondary" id="msRefreshBtn" onclick="loadSales()" data-t="refresh"></button>
     </div>
     <div class="order-list" id="msList"><div class="empty-state"><p data-t="loading"></p></div></div>
@@ -303,6 +308,13 @@
       tabPrintify: 'Printify',
       loading: 'Yükleniyor...',
       refresh: '🔄 Yenile',
+      labelsAll: '🏷️ Bekleyen etiketleri indir (PDF)',
+      labelBtn: '🏷️ Etiket',
+      shipBtn: '📦 Kargoya ver',
+      shipping: 'Hazırlanıyor...',
+      shipErr: 'Kargo hatası',
+      noLabels: 'Bekleyen etiket yok.',
+      noCarrier: 'Kargo hesabı bağlı değil. Ayarlar > 🚚 Kargo bölümünden bağla.',
       // gelen siparişler
       sOrders: 'Sipariş',
       sLiveOnly: 'test siparişleri hariç',
@@ -419,6 +431,13 @@
       tabPrintify: 'Printify',
       loading: 'Loading...',
       refresh: '🔄 Refresh',
+      labelsAll: '🏷️ Download pending labels (PDF)',
+      labelBtn: '🏷️ Label',
+      shipBtn: '📦 Ship',
+      shipping: 'Preparing...',
+      shipErr: 'Shipping error',
+      noLabels: 'No pending labels.',
+      noCarrier: 'No carrier account connected. Connect one under Settings > 🚚 Shipping.',
       sOrders: 'Orders',
       sLiveOnly: 'excluding test orders',
       sRevenue: 'Revenue',
@@ -620,6 +639,7 @@
       const { data, error } = await db.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(500);
       if (error) throw error;
       salesOrders = data || [];
+      await loadShipments();
       salesLoaded = true;
       fillChannelFilter();
       renderSales();
@@ -629,6 +649,79 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // ---------- Kargo: gönderiler, etiket, kargoya ver (shipping-hub) ----------
+  let shipByMo = {}, shipBySo = {}, dropship = new Set();
+  async function loadShipments() {
+    shipByMo = {}; shipBySo = {};
+    try {
+      const { data } = await db.from('shipments').select('id, store_order_id, marketplace_order_id, status, provider, carrier, tracking_number, label_path, last_error').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(1000);
+      (data || []).forEach(sh => {
+        if (sh.marketplace_order_id && !shipByMo[sh.marketplace_order_id]) shipByMo[sh.marketplace_order_id] = sh;
+        if (sh.store_order_id && !shipBySo[sh.store_order_id]) shipBySo[sh.store_order_id] = sh;
+      });
+      const pids = [...new Set(salesOrders.map(o => o.product_id).filter(Boolean))];
+      dropship = new Set();
+      for (let i = 0; i < pids.length; i += 200) {
+        const r = await db.from('products').select('id, supplier').in('id', pids.slice(i, i + 200));
+        (r.data || []).forEach(p => { if (['aliexpress', 'cj', 'printify'].includes(p.supplier)) dropship.add(p.id); });
+      }
+    } catch (e) { console.warn('shipments', e); }
+  }
+  function shipmentFor(o) {
+    return shipByMo[o.id] || (o.source_table === 'store_orders' && o.source_id ? shipBySo[o.source_id] : null) || null;
+  }
+  // Satıcının kendi gönderdiği sipariş mi (tedarikçi ya da pazaryeri kargosu değil)
+  function ownShipped(o) {
+    if (dropship.has(o.product_id)) return false;
+    if (o.raw && o.raw.marketplaceShips === true) return false;
+    return !isCancelled(o) && ['new', 'awaiting_supplier', 'ordered_from_supplier'].includes(String(o.status || 'new'));
+  }
+  async function shipCall(body) {
+    const { data: { session } } = await db.auth.getSession();
+    const r = await fetch(SUPABASE_URL + '/functions/v1/shipping-hub', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify(body)
+    });
+    return await r.json().catch(() => ({}));
+  }
+  async function openLabel(shipmentId, btn) {
+    btn.disabled = true;
+    const d = await shipCall({ action: 'label', shipmentId });
+    btn.disabled = false;
+    if (d.url) window.open(d.url, '_blank', 'noopener'); else alert(d.error || tt('shipErr'));
+  }
+  async function shipOrder(moId, btn) {
+    const o = salesOrders.find(x => x.id === moId);
+    if (!o) return;
+    btn.disabled = true; btn.textContent = tt('shipping');
+    const body = o.source_table === 'store_orders' && o.source_id ? { action: 'create', storeOrderId: o.source_id } : { action: 'create', marketplaceOrderId: o.id };
+    const d = await shipCall(body);
+    if (!d.ok) { alert(/Kargo hesabı/.test(d.error || '') ? tt('noCarrier') : (d.error || tt('shipErr'))); btn.disabled = false; btn.textContent = tt('shipBtn'); return; }
+    await loadShipments();
+    renderSales();
+  }
+  async function downloadLabels(btn) {
+    btn.disabled = true;
+    const d = await shipCall({ action: 'labels' });
+    btn.disabled = false;
+    if (d.url) window.open(d.url, '_blank', 'noopener'); else alert(d.error === 'Bekleyen etiket yok' ? tt('noLabels') : (d.error || tt('shipErr')));
+  }
+  function shipHtml(o) {
+    const sh = shipmentFor(o);
+    if (sh) {
+      const info = [sh.carrier, sh.tracking_number].filter(Boolean).join(' · ');
+      return '<div class="ship-line">🚚 ' + escapeHtml(info || sh.provider) +
+        (sh.status === 'error' ? ' <span class="chip test" title="' + escapeHtml(sh.last_error || '') + '">' + escapeHtml(tt('shipErr')) + '</span>' : '') +
+        (sh.label_path ? ' <button class="btn-mini" onclick="openLabel(\'' + sh.id + '\', this)">' + escapeHtml(tt('labelBtn')) + '</button>' : '') +
+        (sh.status === 'error' ? ' <button class="btn-mini" onclick="shipOrder(\'' + o.id + '\', this)">' + escapeHtml(tt('shipBtn')) + '</button>' : '') + '</div>';
+    }
+    if (o.marketplace_code === 'own_store' || ownShipped(o)) {
+      if (!ownShipped(o)) return '';
+      return '<div class="ship-line"><button class="btn-mini" onclick="shipOrder(\'' + o.id + '\', this)">' + escapeHtml(tt('shipBtn')) + '</button></div>';
+    }
+    return '';
   }
 
   function fillChannelFilter() {
@@ -738,7 +831,7 @@
           '<div class="order-name">' + escapeHtml(marketplaceName(o.marketplace_code)) +
             (test ? ' <span class="chip test">' + tt('testChip') + '</span>' : '') +
             (title ? ' <span class="chip">' + escapeHtml(title) + '</span>' : '') + '</div>' +
-          '<div class="order-meta">' + meta.join(' · ') + '</div>' +
+          '<div class="order-meta">' + meta.join(' · ') + '</div>' + (test ? '' : shipHtml(o)) +
         '</div>' +
         '<div class="order-right">' +
           '<div class="money-box"><div class="money-main">' + shownTotal + '</div>' +
