@@ -147,6 +147,9 @@ function render(d){
       (d.tracking_carrier ? '<div class="row"><span>' + esc(t('carrier')) + '</span><span>' + esc(d.tracking_carrier) + '</span></div>' : '') +
       '</div>' +
       '<a class="btn" target="_blank" rel="noopener" href="https://t.17track.net/' + (LANG === 'en' ? 'en' : 'tr') + '#nums=' + encodeURIComponent(d.tracking_number) + '">' + esc(t('track')) + '</a>';
+  } else if (d.tracking_carrier) {
+    // Gönderi oluşturuldu, kargo firması paketi henüz almadı (takip numarası teslim alınınca gelir)
+    info = '<div class="info"><div class="row"><span>' + esc(t('carrier')) + '</span><span>' + esc(d.tracking_carrier) + '</span></div></div>';
   }
   box.innerHTML = store +
     '<h1>' + esc(t('title')) + '</h1>' +
