@@ -1,3 +1,5 @@
+import { installEgress } from "../_shared/egress.ts";
+installEgress(); // sabit IP çıkışı (varsayılan kapalı; bkz. docs/sabit-ip-kurulumu.md)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

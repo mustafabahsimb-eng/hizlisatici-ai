@@ -1,0 +1,61 @@
+name: Sabit IP kurulum testi
+
+# infra/sabit-ip değişince kurulum betiğini GitHub'ın ücretsiz Ubuntu 24.04 makinesinde dener:
+# Squid kurulur, şifreli/izinli istekler geçer, diğerleri reddedilir. Sunucu parası harcanmaz.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'infra/sabit-ip/**'
+      - '.github/workflows/sabit-ip-kurulum-testi.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dene:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Kurulum betiğini çalıştır
+        env:
+          REPO_RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip
+          ALAN_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip/izinli-alanlar.txt
+        run: |
+          PW="$(openssl rand -hex 24)"
+          echo "::add-mask::$PW"
+          echo "PW=$PW" >> "$GITHUB_ENV"
+          curl -fsSL "$REPO_RAW/kurulum.sh" -o kurulum.sh
+          sudo env PROXY_PASSWORD="$PW" REPO_RAW="$REPO_RAW" ALAN_URL="$ALAN_URL" SKIP_UPGRADE=1 SKIP_FIREWALL=1 bash kurulum.sh
+
+      - name: Proxy davranışını doğrula
+        run: |
+          set -u
+          P="http://127.0.0.1:3128"
+          code() { curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$@" || true; }
+          fail=0
+          ok()  { echo "GEÇTİ $1"; }
+          bad() { echo "KALDI $1"; fail=1; }
+
+          ip=$(curl -fsS --max-time 20 -x "$P" -U "seltigo:$PW" https://api.ipify.org || true)
+          [[ "$ip" =~ ^[0-9.]+$ ]] && ok "Şifreyle izinli adrese çıkış ($ip)" || bad "Şifreyle izinli adrese çıkış ($ip)"
+
+          c=$(code -x "$P" -U "seltigo:$PW" https://developers.cjdropshipping.com/)
+          [ "$c" != "000" ] && ok "CJ adresine tünel (HTTP $c)" || bad "CJ adresine tünel"
+
+          c=$(code -x "$P" https://api.ipify.org)
+          [ "$c" = "000" ] || [ "$c" = "407" ] && ok "Şifresiz istek reddedildi" || bad "Şifresiz istek reddedilmedi ($c)"
+
+          c=$(code -x "$P" -U "seltigo:yanlis" https://api.ipify.org)
+          [ "$c" = "000" ] || [ "$c" = "407" ] && ok "Yanlış şifre reddedildi" || bad "Yanlış şifre reddedilmedi ($c)"
+
+          c=$(code -x "$P" -U "seltigo:$PW" https://www.example.com/)
+          [ "$c" = "000" ] || [ "$c" = "403" ] && ok "İzinsiz alan adı reddedildi" || bad "İzinsiz alan adı reddedilmedi ($c)"
+
+          c=$(code -x "$P" -U "seltigo:$PW" http://api.ipify.org/)
+          [ "$c" = "403" ] && ok "Düz HTTP isteği (CONNECT olmayan) reddedildi" || bad "HTTP isteği reddedilmedi ($c)"
+
+          sudo env ALAN_URL="$ALAN_URL" /usr/local/sbin/seltigo-alan-guncelle && ok "Alan adı güncelleyici çalışıyor" || bad "Alan adı güncelleyici"
+          systemctl is-active --quiet squid && ok "Squid çalışıyor" || bad "Squid çalışmıyor"
+          systemctl is-enabled --quiet seltigo-alan-guncelle.timer && ok "Güncelleme zamanlayıcısı açık" || bad "Zamanlayıcı kapalı"
+          grep -q 'Automatic-Reboot "true"' /etc/apt/apt.conf.d/52seltigo-upgrades && ok "Otomatik güncelleme ayarlı" || bad "Otomatik güncelleme"
+          exit $fail

@@ -12,6 +12,8 @@
 // CJ hesabı: satıcının kendi hesabı, yoksa sitenin hesabı (ürün kodları CJ'de herkes için aynı).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { installEgress } from "../_shared/egress.ts";
+installEgress(); // sabit IP çıkışı (varsayılan kapalı; bkz. docs/sabit-ip-kurulumu.md)
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";

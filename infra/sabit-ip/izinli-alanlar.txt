@@ -1,0 +1,20 @@
+# Sabit IP sunucusunun (Squid) tünel açmasına izin verilen alan adları.
+# Sunucu bu dosyayı 15 dakikada bir GitHub'dan çeker; değişiklik commit edilince kendiliğinden uygulanır.
+# Biçim: satır başına bir alan adı. Başında nokta olan alt alan adlarını da kapsar.
+# supabase egress_proxy.hosts listesindeki her alan burada da olmalı (yoksa proxy reddeder,
+# fonksiyon doğrudan bağlantıya döner ve hata egress_proxy.last_error'a yazılır).
+
+# CJ Dropshipping (aynı IP'den en fazla 3 kullanıcı sınırı)
+.cjdropshipping.com
+
+# Trendyol (test ortamı IP izni ister)
+.trendyol.com
+
+# eMAG (her satıcı IP'mizi hesabına ekler)
+.emag.ro
+.emag.bg
+.emag.hu
+
+# Sağlık kontrolü (çıkış IP'sini doğrulamak için)
+api64.ipify.org
+api.ipify.org

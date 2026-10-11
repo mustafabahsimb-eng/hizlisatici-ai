@@ -5,6 +5,8 @@
 // yoksa sitenin paylasilan/demo CJ_API_KEY anahtarina duser.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { installEgress } from "../_shared/egress.ts";
+installEgress(); // sabit IP çıkışı (varsayılan kapalı; bkz. docs/sabit-ip-kurulumu.md)
 
 const CJ_API_KEY_DEFAULT = Deno.env.get("CJ_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
