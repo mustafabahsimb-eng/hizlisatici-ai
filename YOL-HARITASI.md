@@ -51,9 +51,10 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
     - Her görselin kaynağı kaydediliyor (product_images.source_kind / source_url) ve önizlemede "Görsel kaynağı: ..." görünüyor; "Kendi fotoğrafımla değiştir"; ilk kullanım onayı tarihiyle kaydediliyor; "Seçilenleri ekle ({n})".
     - Testler: katalog_yukleme.py 18/18 (iki kez), gorsel_tamamlama.py 15/15.
   - Kalanlar:
-    - [ ] Ürün yüklendikten sonra panelde görseli değiştirme ve kaynağını görme: panelde ürün düzenleme / görsel sayfası henüz yok (sayfa ve adı için Mustafa'nın kararı gerekir).
+    - [x] Ürün düzenleme sayfası "✏️ Ürünü düzenle" (12 Ekim, Mustafa'nın kararı): ad, açıklama, fiyat, stok, kaynak (Kendi stoğum / Toptancı / AliExpress / CJ), beden/renk seçenekleri, görseller (kaynağı, "Kendi fotoğrafımla değiştir"). Test: urun_duzenle.py 17/17.
     - [ ] Basın / medya kiti araması gerçek markalarda nadiren sonuç verir (çoğu marka basın görselini ayrı sunmuyor); bulunamazsa ürün sayfasına geçiliyor.
-    - [ ] İnternet aramalı tamamlama değişken sonuç verebiliyor (bir kez otomatik tekrar var); ürün başına ~30-90 sn, çok ürünlü dosyalarda uzun sürer → arka plan görevine taşınabilir.
+    - [x] Görsel tamamlama arka planda (12 Ekim): image-complete-worker (2 dk), satıcı beklemez; panelde ilerleme ve bitiş bildirimi, üründe "Görsel eksik" etiketi. Hız: aynı anda 2 ürün, ürün başına ~30-90 sn (≈60-120 ürün/saat). Test: gorsel_tamamlama.py 18/18.
+    - [ ] Çok büyük partilerde hız: paralellik artırılabilir (yapay zekâ internet araması maliyeti ve hız sınırı izlenmeli).
 - [ ] **2b. Chrome eklentisi** (öne alındı, 12 Ekim 2026; şirket gerekmez)
   - Amaç: sunucunun okuyamadığı ya da yanlış ülke vitrinini gördüğü sitelerde ürünü satıcının kendi tarayıcısından okumak. İlk hedef Trendyol'un Türkiye fiyatı (TL) ve Türkçe içeriği.
   - Satıcı ürün sayfasındayken tek tıkla Seltigo'ya ekler; eklenti sayfadaki ürün verisini (ad, fiyat, görsel, seçenek, stok) okuyup Seltigo hesabına gönderir.

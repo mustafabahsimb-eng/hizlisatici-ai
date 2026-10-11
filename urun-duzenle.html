@@ -427,7 +427,7 @@
         const row = { url: im.url, position: pos++, source_kind: im.source_kind || null, source_url: im.source_url || null };
         if (im.id) { const r = await db.from('product_images').update(row).eq('id', im.id); if (r.error) throw r.error; }
         else {
-          const r = await db.from('product_images').insert(Object.assign({ product_id: productId, user_id: userId, source: 'seller' }, row)).select('id').single();
+          const r = await db.from('product_images').insert(Object.assign({ product_id: productId, user_id: userId, source: im.source_kind === 'seller_photo' ? 'upload' : 'supplier' }, row)).select('id').single();
           if (r.error) throw r.error;
           im.id = r.data.id; im._new = false;
         }

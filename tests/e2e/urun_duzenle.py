@@ -83,6 +83,11 @@ def main():
                 page.locator(".img-card").first.get_by_text("Kendi fotoğrafımla değiştir").click()
             fc.value.set_files(str(fx / "ekran.png"))
             page.wait_for_function("() => document.querySelector('.img-card .img-src') && document.querySelector('.img-card .img-src').textContent.includes('kendi fotoğrafın')", timeout=120000)
+            # Yeni fotoğraf ekle
+            with page.expect_file_chooser() as fc2:
+                page.get_by_text("📷 Fotoğraf çek / yükle").click()
+            fc2.value.set_files(str(fx / "ekran.png"))
+            page.wait_for_function("(n) => document.querySelectorAll('.img-card').length === n", arg=nimg, timeout=120000)
             page.click("#saveBtn")
             page.wait_for_function("() => document.getElementById('saveMsg').textContent.includes('Kaydedildi')", timeout=60000)
 
@@ -94,7 +99,7 @@ def main():
             c.check("Kaynak 'Toptancı' kaydedildi", page.eval_on_selector("#fSource", "e => e.options[e.selectedIndex].text") == "Toptancı")
             c.check("Yeni seçenek eklendi, sayılar doğru", page.locator("table.var tbody tr").count() == nvar + 1)
             c.check("Seçenek stoğu / satış durumu kaydedildi", page.input_value("[data-vs='0']") == "0" and not page.is_checked("[data-va='1']"))
-            c.check("Görsel silindi ve ilk görsel kendi fotoğrafı", page.locator(".img-card").count() == nimg - 1
+            c.check("Görsel silindi, yeni fotoğraf eklendi, ilk görsel kendi fotoğrafı", page.locator(".img-card").count() == nimg
                     and "kendi fotoğrafın" in page.locator(".img-card").first.inner_text())
             db = page.evaluate("""async (pid) => {
                 const p = (await HS.db.from('products').select('supplier, image_url, stock_status').eq('id', pid).single()).data;

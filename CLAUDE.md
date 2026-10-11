@@ -50,6 +50,8 @@
 - Sabit IP çıkışı: supabase/functions/_shared/egress.ts (installEgress), anahtar egress_proxy tablosunda (varsayılan kapalı), sağlık kontrolü egress-health (10 dk). CJ/Trendyol/eMAG'e bağlanan YENİ fonksiyonlara da installEgress eklenir. Ayrıntı: docs/sabit-ip-kurulumu.md.
 - AliExpress: test uygulaması (anahtar 24 sa, izin 48 sa, yenileme izni uzatmaz). Satıcı hesapları supplier_connections (Vault). Arama TR için countryCode=TR; ds.product.get TR'de boş dönerse "US" ile; adres ASCII olmalı; kapanan sipariş FINISH + extend_map.endReason.
 - Linkten ürün yükleme: product-import (platform okuyucuları; engellenen sitede ücretli okuma servisi anahtarı SCRAPER_ENABLED, varsayılan kapalı), source-sync (30 dk; "Fiyat ve stoğu otomatik güncel tut"), channel-copy ("✨ Metni kanala göre yaz"). Trendyol sunucudan uluslararası vitrin (Euro) verir.
+- Görsel tamamlama: image-complete-worker (2 dk; image_jobs / image_job_batches; panelde bildirim). Sıra: marka sitesi (basın/medya kiti → ürün sayfası) → toptancı sitesi → CJ/AliExpress → "Görsel eksik". product_images.source_kind/source_url kaynak; product_images.source yalnız supplier|studio|upload|other.
+- Ürün düzenleme: urun-duzenle.html?id= (panelde "✏️ Ürünü düzenle").
 - Müşteri takip sayfası: takip.html?t=<tracking_token> (get_order_tracking RPC).
 
 ## Açık işler ve bulgular (güncel durum: YOL-HARITASI.md "Durum notları")

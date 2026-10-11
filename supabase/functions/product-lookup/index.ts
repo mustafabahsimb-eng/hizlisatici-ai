@@ -8,6 +8,7 @@
 // Sadece giriş yapmış kullanıcılar kullanabilir.
 // POST { action: "media", site, brand, code, name } -> { found, url, images }
 // POST { action: "market", brand, code, name } -> { found, kind: "cj"|"aliexpress", url, images, name }
+// Sistem çağrısı (image-complete-worker): gövdede { cronSecret, userId }; alt çağrılara da aktarılır.
 //
 // POST { action: "site", brand, samples: [{code,name}], hint, language }
 //   -> { site: "cenova.com.tr" }            (üreticinin sitesini bulur)
@@ -380,12 +381,15 @@ Answer ONLY with JSON: {"url":"https://..."} — the exact product page URL for 
   return u;
 }
 
+// Sistem çağrısında alt fonksiyonlara aktarılacak kimlik ({ cronSecret, userId }); her isteğe ayrı geçirilir
+type Sys = Record<string, string> | null;
+
 // Bulunan sayfayı mevcut product-import fonksiyonuyla oku (aynı okuma mantığı)
-async function readProduct(url: string, auth: string, language: string): Promise<any> {
+async function readProduct(url: string, auth: string, language: string, sys: Sys = null): Promise<any> {
   const r = await fetch(SUPABASE_URL + "/functions/v1/product-import", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: auth, apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ url, language }),
+    body: JSON.stringify({ url, language, ...(sys || {}) }),
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d?.kind !== "product" || !d?.item) return null;
@@ -447,21 +451,21 @@ Answer ONLY with JSON: {"url":"https://..."}: a press, media, "basın", "medya",
 }
 
 // ---------------- CJ / AliExpress eşleşmesi ----------------
-async function callFn(name: string, auth: string, payload: unknown): Promise<any> {
+async function callFn(name: string, auth: string, payload: unknown, sys: Sys = null): Promise<any> {
   const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: auth, apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...(payload as Record<string, unknown>), ...(sys || {}) }),
   });
   return await r.json().catch(() => ({}));
 }
-async function marketMatch(auth: string, brand: string, code: string, name: string) {
+async function marketMatch(auth: string, brand: string, code: string, name: string, sys: Sys = null) {
   const query = [brand, name].filter(Boolean).join(" ").slice(0, 120);
   const want = [brand, name, code].filter(Boolean).join(" ");
   const userToken = auth.replace(/^Bearer\s+/i, "");
   const [cj, ae] = await Promise.all([
-    callFn("cj-search", auth, { keyword: query, userAccessToken: userToken }).catch(() => ({})),
-    callFn("aliexpress-search", auth, { keyword: query, country: "TR" }).catch(() => ({})),
+    callFn("cj-search", auth, { keyword: query, userAccessToken: userToken }, sys).catch(() => ({})),
+    callFn("aliexpress-search", auth, { keyword: query, country: "TR" }, sys).catch(() => ({})),
   ]);
   const cands: any[] = [];
   (cj?.products || []).forEach((p: any) => cands.push({ kind: "cj", name: p.name, image: p.image, url: p.id ? `https://cjdropshipping.com/product/-p-${p.id}.html` : "" }));
@@ -476,9 +480,11 @@ async function marketMatch(auth: string, brand: string, code: string, name: stri
 // ---------------- Ana ----------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
-
   const body = await req.json().catch(() => ({}));
+  const CRON = Deno.env.get("CRON_SECRET") ?? "";
+  const sysCall = !!CRON && typeof body?.cronSecret === "string" && body.cronSecret.trim() === CRON.trim() && typeof body?.userId === "string";
+  const sys: Sys = sysCall ? { cronSecret: String(body.cronSecret), userId: String(body.userId) } : null;
+  if (!sysCall && !(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
   const language = String(body?.language || "tr");
   const en = language.toLowerCase().startsWith("en");
   const E = (tr: string, eng: string) => (en ? eng : tr);
@@ -504,7 +510,7 @@ Deno.serve(async (req) => {
         // Model kodu yok: adıyla (internet araması, yalnız o sitede) bul, adı örtüşmeli
         if (!site || nameWords(name).size < 2) return json({ found: false, reason: "no_code" });
         const u = await searchWithAI(site, brand, "", name);
-        const it = u ? await readProduct(u, auth, language) : null;
+        const it = u ? await readProduct(u, auth, language, sys) : null;
         if (!it || !nameMatch(name, it.name || "", 0.6)) return json({ found: false });
         return json({
           found: true, url: u, searchTpl: String(body?.searchTpl || ""),
@@ -525,7 +531,7 @@ Deno.serve(async (req) => {
         if (gu.url) {
           g = gu.pattern;
           // sayfa başlığında kod geçtiği zaten doğrulandı
-          item = await readProduct(gu.url, auth, language);
+          item = await readProduct(gu.url, auth, language, sys);
           if (item) url = gu.url;
         }
       }
@@ -534,7 +540,7 @@ Deno.serve(async (req) => {
         const s = await searchOnSite(site, code, sTpl);
         if (s.tpl) sTpl = s.tpl;
         if (s.url) {
-          item = await readProduct(s.url, auth, language);
+          item = await readProduct(s.url, auth, language, sys);
           if (item && itemHasCode(item, s.url, code)) url = s.url; else item = null;
         }
       }
@@ -543,7 +549,7 @@ Deno.serve(async (req) => {
       if (!item) {
         const u2 = await searchWithAI(site, brand, code, name);
         if (u2 && u2 !== url) {
-          const it2 = await readProduct(u2, auth, language);
+          const it2 = await readProduct(u2, auth, language, sys);
           if (it2 && itemHasCode(it2, u2, code)) { item = it2; url = u2; }
         }
       }
@@ -568,7 +574,7 @@ Deno.serve(async (req) => {
 
     if (action === "market") {
       const auth = req.headers.get("Authorization") || "";
-      const m = await marketMatch(auth, brand, String(body?.code || "").slice(0, 80), String(body?.name || "").slice(0, 200));
+      const m = await marketMatch(auth, brand, String(body?.code || "").slice(0, 80), String(body?.name || "").slice(0, 200), sys);
       if (!m) return json({ found: false });
       return json({ found: true, kind: m.kind, url: m.url, images: [m.image], name: m.name });
     }

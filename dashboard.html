@@ -132,6 +132,9 @@
     cursor: pointer; white-space: nowrap; background: #241a3d; color: #c9a8f5;
   }
   .price-calc-btn { font-size: 12px; padding: 7px 12px; }
+  .edit-btn { font-size: 12px; padding: 7px 12px; }
+  .alarm-banner.ok-banner { background: #10261d; border-color: #1D9E75; }
+  .alarm-banner.ok-banner .alarm-summary { color: #6ee7b7; }
   .icon-btn-mini {
     background: transparent; border: 1px solid #2a3040; color: #9aa3b2;
     width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 12px;
@@ -323,6 +326,13 @@
     <div class="alarm-summary" id="orderSummary" onclick="go('orders.html')"></div>
   </div>
 
+  <div class="alarm-banner" id="imgBanner" style="display:none;">
+    <div class="alarm-summary" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <span id="imgSummary"></span>
+      <button class="icon-btn-mini" id="imgClose" style="display:none" onclick="dismissImgBanner()" title="✕">✕</button>
+    </div>
+  </div>
+
   <div class="alarm-banner" id="alarmBanner" style="display:none;">
     <div class="alarm-summary" id="alarmSummary" onclick="toggleAlarmDetail()"></div>
     <div id="alarmDetail" style="display:none;"></div>
@@ -469,6 +479,10 @@
       'main.noStore': '🧭 Henüz mağazan yok: Mağazanı kur',
       'ord.balance': '⚠️ {n} sipariş CJ bakiyesi bekliyor',
       'ord.approval': '⚠️ {n} sipariş onayını bekliyor',
+      'img.running': '🔎 Ürün görselleri arka planda aranıyor: {d} / {t}',
+      'img.done': '🖼️ Görsel araması bitti: {f} ürünün görseli bulundu',
+      'img.missing': ', {m} ürün için görsel bulunamadı ("Görsel eksik"; ürünü düzenleyip kendi fotoğrafını ekleyebilirsin)',
+      'img.missingTag': 'Görsel eksik',
       'conn.expired': '⚠️ {p} bağlantının süresi doldu — yeniden bağla',
       'conn.expiring': '⚠️ {p} bağlantın {d} tarihinde sona eriyor — yeniden bağla',
       'conn.error': '⚠️ {p} bağlantında sorun var — yeniden bağla',
@@ -625,6 +639,10 @@
       'main.noStore': '🧭 No store yet: Build your store',
       'ord.balance': '⚠️ {n} orders waiting for CJ balance',
       'ord.approval': '⚠️ {n} orders awaiting your approval',
+      'img.running': '🔎 Searching product images in the background: {d} / {t}',
+      'img.done': '🖼️ Image search finished: images found for {f} products',
+      'img.missing': ', none found for {m} products ("Image missing"; edit the product to add your own photo)',
+      'img.missingTag': 'Image missing',
       'conn.expired': '⚠️ Your {p} connection has expired — reconnect',
       'conn.expiring': '⚠️ Your {p} connection ends on {d} — reconnect',
       'conn.error': '⚠️ There is a problem with your {p} connection — reconnect',
@@ -872,13 +890,51 @@
     document.getElementById('orderBanner').style.display = parts.length ? '' : 'none';
   }
 
+  // ---------- Arka plan görsel arama bildirimi ----------
+  let imgBatches = [];
+  async function loadImgBanner() {
+    try {
+      const { data } = await HS.db.from('image_job_batches').select('id, total, found, missing, status')
+        .is('notified_at', null).order('created_at', { ascending: false }).limit(20);
+      imgBatches = data || [];
+    } catch (e) { imgBatches = []; }
+    renderImgBanner();
+    // Sürüyorsa ara ara yenile
+    clearTimeout(loadImgBanner._t);
+    if (imgBatches.some(b => b.status === 'running')) loadImgBanner._t = setTimeout(() => { loadImgBanner(); }, 60000);
+  }
+  function renderImgBanner() {
+    const el = document.getElementById('imgBanner');
+    if (!imgBatches.length) { el.style.display = 'none'; return; }
+    const running = imgBatches.filter(b => b.status === 'running');
+    const sum = (arr, k) => arr.reduce((a, b) => a + (b[k] || 0), 0);
+    let txt;
+    if (running.length) {
+      txt = t('img.running', { d: HS.number(sum(running, 'found') + sum(running, 'missing')), t: HS.number(sum(running, 'total')) });
+    } else {
+      const m = sum(imgBatches, 'missing');
+      txt = t('img.done', { f: HS.number(sum(imgBatches, 'found')) }) + (m ? t('img.missing', { m: HS.number(m) }) : '');
+    }
+    document.getElementById('imgSummary').textContent = txt;
+    document.getElementById('imgClose').style.display = running.length ? 'none' : '';
+    el.classList.toggle('ok-banner', true);   // bilgi bildirimi (hata değil)
+    el.style.display = '';
+  }
+  async function dismissImgBanner() {
+    const ids = imgBatches.filter(b => b.status === 'done').map(b => b.id);
+    if (ids.length) await HS.db.from('image_job_batches').update({ notified_at: new Date().toISOString() }).in('id', ids);
+    imgBatches = imgBatches.filter(b => b.status !== 'done');
+    renderImgBanner();
+  }
+
   async function init() {
     const ctx = await HS.init();
     if (!ctx) return;
     document.getElementById('userEmail').textContent = ctx.user.email;
-    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); renderConnBanner(); });
+    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); renderConnBanner(); renderImgBanner(); });
     loadOrderBanner();
     loadConnBanner();
+    loadImgBanner();
     // Admin menü linki sadece yöneticilere görünür
     HS.db.rpc('hs_is_admin').then(r => {
       if (r && r.data === true) document.getElementById('adminBtn').style.display = '';
@@ -1108,7 +1164,7 @@
         <div style="display:flex; align-items:flex-start; gap:12px;">
           <input type="checkbox" class="product-checkbox" data-id="${id}" ${selectedProductIds.has(String(p.id)) ? 'checked' : ''} onchange="toggleProductSelect('${id}', this)">
           <div>
-            <div class="product-name">${esc(p.name || t('dash.unnamed'))}${p.is_bundle ? `<span class="bundle-badge">${esc(t('dash.bundleBadge'))}</span>` : ''}</div>
+            <div class="product-name">${esc(p.name || t('dash.unnamed'))}${p.is_bundle ? `<span class="bundle-badge">${esc(t('dash.bundleBadge'))}</span>` : ''}${p.image_missing ? `<span class="bundle-badge" style="background:#3a2f12;color:#e6c96a">${esc(t('img.missingTag'))}</span>` : ''}</div>
             ${marginPct !== null ? `<div class="product-meta">${esc(t('dash.margin', { p: HS.percent(marginPct) }))}</div>` : ''}
             <div class="channel-row">${channelChips(p)}</div>
           </div>

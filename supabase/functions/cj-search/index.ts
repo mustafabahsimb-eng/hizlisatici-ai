@@ -212,8 +212,16 @@ async function hsIsLoggedIn(req: Request): Promise<boolean> {
   }
 }
 
+// Sistem çağrısı (arka plan görsel tamamlama görevi): CRON_SECRET; sitenin CJ hesabıyla arar
+async function isSystemCall(req: Request): Promise<boolean> {
+  const cron = Deno.env.get("CRON_SECRET") ?? "";
+  if (!cron) return false;
+  const b = await req.clone().json().catch(() => ({}));
+  return typeof b?.cronSecret === "string" && b.cronSecret.trim() === cron.trim();
+}
+
 Deno.serve(async (req: Request) => {
-  if (req.method !== "OPTIONS" && !(await hsIsLoggedIn(req))) {
+  if (req.method !== "OPTIONS" && !(await isSystemCall(req)) && !(await hsIsLoggedIn(req))) {
     return new Response(JSON.stringify({ error: "Bu işlem için giriş yapmalısın. / Please log in." }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -388,6 +388,8 @@
       imgN: '{n} resim',
       wNoPrice: 'Fiyat yok',
       wNoImage: 'Görsel eksik',
+      bgNote: '🔎 Görseli ya da özellikleri eksik <b>{n}</b> ürün, eklendikten sonra arka planda markanın sitesinde, toptancının sitesinde ve CJ / AliExpress\'te aranacak. Beklemene gerek yok; bitince panelde haber vereceğiz.',
+      bgStarted: ' 🔎 <b>{n}</b> ürünün görseli arka planda aranıyor; bitince panelde haber vereceğiz.',
       imgSource: 'Görsel kaynağı: {s}',
       imgSrcCatalog: 'yüklenen dosya',
       imgSrcSeller: 'kendi fotoğrafın',
@@ -537,6 +539,8 @@
       imgN: '{n} images',
       wNoPrice: 'No price',
       wNoImage: 'Image missing',
+      bgNote: '🔎 <b>{n}</b> products without images or specs will be searched in the background after you add them (brand site, wholesaler site, CJ / AliExpress). No need to wait; we will notify you in the panel.',
+      bgStarted: ' 🔎 Images for <b>{n}</b> products are being searched in the background; we will notify you in the panel.',
       imgSource: 'Image source: {s}',
       imgSrcCatalog: 'uploaded file',
       imgSrcSeller: 'your own photo',
@@ -1028,6 +1032,7 @@
       (list.length > shown ? '<div class="more-row"><button class="btn-secondary btn-small" onclick="showMore()">' + esc(fmt(t('showMore'), { n: HS.number(Math.min(PAGE_SIZE, list.length - shown)) })) + '</button></div>' : '') +
       '</div>';
     updateImportBtn();
+    if (!running && !lookupState) renderBgNote();
   }
   function showMore() { shown += PAGE_SIZE; renderPreview(); }
   function removeItem(i) { items.splice(i, 1); renderPreview(); }
@@ -1593,7 +1598,7 @@
     } finally {
       running = false;
     }
-    if (priceRows.length) await autoComplete();
+    renderBgNote();
   }
 
   function findRow(code, byNorm) {
@@ -1777,6 +1782,14 @@
     it.lkFilled = it.lkFilled || {};
     it.lkFilled.images = true;
     return true;
+  }
+  // Görsel tamamlama ürünler eklendikten sonra arka planda yapılır; satıcı beklemez
+  function renderBgNote() {
+    const n = items.filter(i => i.selected && !i.exists && (!i.images.length || !i.specs.length)).length;
+    const el = document.getElementById('lookupBar');
+    if (!n) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.innerHTML = fmt(t('bgNote'), { n: HS.number(n) });
   }
   function renderLookupBar() {
     const el = document.getElementById('lookupBar');
@@ -1983,6 +1996,7 @@
     await uploadPdfImages(sel);
 
     let added = 0, failed = 0, lastErr = '', imgErr = '';
+    const needJobs = [];   // görseli / özelliği eksik eklenen ürünler
     const CHUNK = 40;
     for (let i = 0; i < sel.length; i += CHUNK) {
       const chunk = sel.slice(i, i + CHUNK);
@@ -2093,6 +2107,7 @@
             body: JSON.stringify({ productId: p.id })
           }).catch(() => {});
         });
+        pairs.forEach(p => { if (!p.it.images.length || !p.it.specs.length) needJobs.push(p.id); });
         added += pairs.length;
         pairs.forEach(p => { p.it.selected = false; p.it.exists = true; });
       } catch (e) {
@@ -2100,6 +2115,22 @@
         lastErr = e.message || String(e);
         console.error(e);
       }
+    }
+
+    // Arka plan görsel tamamlama işleri
+    let bgN = 0;
+    if (needJobs.length) {
+      try {
+        const b = await db.from('image_job_batches').insert({ user_id: userId, total: needJobs.length }).select('id').single();
+        if (b.error) throw b.error;
+        for (let i = 0; i < needJobs.length; i += 500) {
+          const jr = await db.from('image_jobs').insert(needJobs.slice(i, i + 500).map(id => ({
+            batch_id: b.data.id, user_id: userId, product_id: id, wholesaler_site: docSite || null
+          })));
+          if (jr.error) throw jr.error;
+        }
+        bgN = needJobs.length;
+      } catch (e) { console.warn('image_jobs', e); }
     }
 
     document.getElementById('importProgress').style.display = 'none';
@@ -2114,6 +2145,8 @@
     if (imgErr) {
       resBox.innerHTML += '<div style="color:#e6c96a;margin-top:6px">' + esc(t('imgSaveErr') + imgErr) + '</div>';
     }
+    if (bgN) resBox.innerHTML += '<div style="margin-top:6px">' + fmt(t('bgStarted'), { n: HS.number(bgN) }) + '</div>';
+    renderBgNote();
     renderPreview();
   }
 
