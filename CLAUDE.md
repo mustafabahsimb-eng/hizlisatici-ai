@@ -43,12 +43,13 @@
 - Canlı veritabanına SQL: `supabase db query --linked --project-ref ytucdrrgxsjhrqmaxckt -f dosya.sql` (dosya `--` ile başlıyorsa -f şart). Zamanlanmış işler gizli anahtarı cron komutunun içinde taşır; yeni cron'u mevcut bir işin komutunu SQL içinde kopyalayarak kur (anahtar dışarı çıkmasın).
 
 ## Otomasyon altyapısı (özet; ayrıntı kodda)
-- Tedarikçi siparişi: cj-order-worker (5 dk; CJ + AliExpress, zarar/bakiye kontrolü, AliExpress→CJ eşdeğeri yönlendirmesi, orders.fulfilled_via), cj-tracking-sync (2 sa; CJ + AliExpress takip, mağaza siparişi + müşteriye WhatsApp), wa-template-worker (30 dk; WhatsApp şablonu her satıcıda Meta onayına), cj-alt-match (1 sa; AliExpress ürününün CJ eşdeğeri), token-refresher (3 sa; AliExpress/Instagram/Meta/Etsy/eBay/Wix anahtarları; yenilenemezse panelde uyarı).
+- Tedarikçi siparişi: cj-order-worker (5 dk; CJ + AliExpress, zarar/bakiye kontrolü, AliExpress→CJ eşdeğeri yönlendirmesi, orders.fulfilled_via), cj-tracking-sync (2 sa; CJ + AliExpress takip, mağaza siparişi + müşteriye WhatsApp), wa-template-worker (30 dk; WhatsApp şablonu her satıcıda Meta onayına), cj-alt-match (1 sa; AliExpress ürününün CJ eşdeğeri: görsel (seviye 3) → anahtar kelime → CJ sourcing talebi), token-refresher (3 sa; AliExpress/Instagram/Meta/Etsy/eBay/Wix anahtarları; yenilenemezse panelde uyarı).
 - CJ giriş anahtarı cj_tokens tablosunda paylaşılır (getAccessToken saniyede 1 çağrı). CJ "aynı IP'den 3 kullanıcı" sınırı var; işçiler tekrar dener, kalıcı çözüm sabit IP.
+- Sabit IP çıkışı: supabase/functions/_shared/egress.ts (installEgress), anahtar egress_proxy tablosunda (varsayılan kapalı), sağlık kontrolü egress-health (10 dk). CJ/Trendyol/eMAG'e bağlanan YENİ fonksiyonlara da installEgress eklenir. Ayrıntı: docs/sabit-ip-kurulumu.md.
 - AliExpress: test uygulaması (anahtar 24 sa, izin 48 sa, yenileme izni uzatmaz). Satıcı hesapları supplier_connections (Vault). Arama TR için countryCode=TR; ds.product.get TR'de boş dönerse "US" ile; adres ASCII olmalı; kapanan sipariş FINISH + extend_map.endReason.
 - Müşteri takip sayfası: takip.html?t=<tracking_token> (get_order_tracking RPC).
 
 ## Açık işler ve bulgular (güncel durum: YOL-HARITASI.md "Durum notları")
-- Sabit IP: altyapı hazırlanıyor/hazır, varsayılan KAPALI; sunucu alınınca sadece IP girilip açılacak (ödeme bekliyor).
+- Sabit IP: altyapı HAZIR ve denendi, anahtar KAPALI; sunucu alınınca IP girilip açılır (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün"). Ödeme bekliyor.
 - AliExpress yayın başvurusu: şirket kurulunca (Corporation). CJ seviye 3 (toplam 2.000 $ sipariş) gelene kadar CJ eşleştirme anahtar kelimeyle + sourcing.
 - İzlenecek: CJ sourcing talepleri (test kullanıcısının 84, 85, 86, 88 ürünleri), WhatsApp kargo şablonu Meta onayı, ilk gerçek CJ/AliExpress ödemesi.

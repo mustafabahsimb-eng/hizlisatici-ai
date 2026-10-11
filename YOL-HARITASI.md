@@ -9,12 +9,13 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
   - CJ: aynı IP'den en fazla 3 kullanıcı hesabı ("one ip limit 3 users"); testlerde birkaç kez yaşandı, işçiler tekrar deneyerek geçiyor; satıcı sayısı artınca şart
   - Seçim: Hetzner Almanya, CX23 (€5,49 + IPv4 €0,50 = €5,99/ay, sık stok dışı) ya da CPX02 (IPv4 dahil €6,49/ay). Alternatif: AWS Lightsail ($5/ay), QuotaGuard ($19+/ay).
   - KARAR (2026-10-11): ödeme sonraya; altyapı şimdiden hazırlanır, varsayılan kapalı. Kurulum: `docs/sabit-ip-kurulumu.md`.
+  - HAZIR (2026-10-11): proxy modülü 7 fonksiyonda, egress_proxy anahtarı (kapalı), egress-health (10 dk), Hetzner kurulum betiği + GitHub Actions testi. Kalan: sunucuyu satın alıp IP'yi girmek.
 - [ ] **E-posta gönderen adı** — Supabase'in kendi e-posta servisi "Supabase Auth" adıyla ve saatte birkaç e-postayla sınırlı gönderiyor; alan adıyla özel SMTP gerekli (şablonlar Seltigo'ya çevrildi).
 - [ ] **CJ gerçek ödeme adımı** — Bakiyeden otomatik ödeme (payBalanceV2) para harcamamak için denenmedi; ilk gerçek siparişte izlenmeli.
 - [ ] **AliExpress uygulamasını yayın (online) aşamasına geçir** — test aşamasında anahtar 24 saat, izin 48 saat; yayında 30/60 gün. Adımlar ve başvuru metinleri: `docs/aliexpress-yayin-basvurusu.md` (KARAR: şirket kurulunca "Corporation" olarak başvurulacak; tür sonradan değiştirilemez).
 - [x] **AliExpress otomatik ödeme yolu** — API Pay her alıcı için AliExpress onayı (PayPal) istiyor ve Türkiye desteklenmiyor. Kuruldu: AliExpress ürünlerinin CJ eşdeğeri arka planda bulunuyor (görselle arama / CJ sourcing talebi); AliExpress'te ödeme yapılamayan satıcıda sipariş CJ'den verilip CJ bakiyesinden ödeniyor. Desteklenen ülkelerde AliExpress'in kendi API Pay'i kullanılıyor (başvuru e-postası: `docs/aliexpress-yayin-basvurusu.md`, Metin D).
 - [ ] **CJ sourcing sonuçlarını gözle** — CJ ekibinin eşdeğer bulma süresi/başarısı belgede yok; açılan ilk test talepleri izleniyor.
-- [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor. Şart: CJ'ye toplam 2.000 $ sipariş (LV1 0 $, LV2 500 $, LV3 2.000 $, LV4 100.000 $, LV5 500.000 $; satın alınamaz, sıfırlanmaz, anlaşmazlıklı siparişler sayılmaz). O zamana kadar: anahtar kelimeyle eşleştirme + sourcing talebi.
+- [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor. Şart: CJ'ye toplam 2.000 $ sipariş (LV1 0 $, LV2 500 $, LV3 2.000 $, LV4 100.000 $, LV5 500.000 $; satın alınamaz, sıfırlanmaz, anlaşmazlıklı siparişler sayılmaz). O zamana kadar: anahtar kelimeyle eşleştirme (kuruldu, 11 Ekim) + sourcing talebi.
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Sıradaki işler
@@ -43,9 +44,12 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - CJ sourcing talepleri: test kullanıcısının 84, 85, 86, 88 ürünleri (CJSPU…). Sonuç gelince süre/başarı Mustafa'ya bildirilecek, test ürünleri kaldırılacak.
 - WhatsApp kargo şablonu: Meta onayı bekliyor (wa-template-worker izliyor).
 - İlk gerçek CJ bakiyeden ödeme ve AliExpress'in API Pay'i hiç denenmedi (para harcamamak için).
-- Sabit IP altyapısı: hazırlandı, kapalı (bkz. docs/sabit-ip-kurulumu.md).
+- Sabit IP altyapısı: hazırlandı ve denendi, kapalı (bkz. docs/sabit-ip-kurulumu.md).
+- CJ anahtar kelime eşleştirmesi: denemede "araç telefon tutucu" ve "tüy toplayıcı rulo" doğru bulundu; benzer ama farklı ürünler (kasap bıçağı ≠ bıçak seti, havuz lambası ≠ LED şerit, telefon kılıfı ≠ drone kumanda kılıfı) reddedildi. Test ürünlerinin (84, 85, 86, 88) hiçbiri CJ kataloğunda adıyla bulunamadı, sourcing sürüyor.
+- cj-search: CJ'nin saniyede 1 istek / IP sınırına takıldığında Ürün Ekle'de arama boş kalabiliyor (testte 2 kez görüldü, tekrar denemede geçti). Satıcıya anlaşılır hata + otomatik tekrar deneme eklenmeli.
 
 **Öğrenilenler**
 - AliExpress test uygulaması: anahtar 24 sa, izin 48 sa (yayında 30/60 gün); yenileme izni uzatmaz → en geç 60 günde bir yeniden bağlanma; panel 1 gün önce uyarır.
 - AliExpress araması Türkiye için countryCode=TR ile yapılmalı (yoksa ürünlerin çoğu Türkiye'ye gönderilemiyor); adres İngilizce karakter olmalı.
-- CJ getAccessToken saniyede 1 çağrı; anahtar 180 gün → cj_tokens'ta paylaşılıyor. CJ görselle arama seviye 3 istiyor.
+- CJ getAccessToken saniyede 1 çağrı; anahtar 180 gün → cj_tokens'ta paylaşılıyor. CJ görselle arama seviye 3 istiyor. CJ ürün araması (listV2) da saniyede 1 istek.
+- Supabase çalışma ortamı HTTP proxy destekliyor (Deno.createHttpClient); doğrudan çıkış bazen IPv6.

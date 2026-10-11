@@ -15,11 +15,11 @@ permissions:
 jobs:
   dene:
     runs-on: ubuntu-24.04
+    env:
+      REPO_RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip
+      ALAN_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip/izinli-alanlar.txt
     steps:
       - name: Kurulum betiğini çalıştır
-        env:
-          REPO_RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip
-          ALAN_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/infra/sabit-ip/izinli-alanlar.txt
         run: |
           PW="$(openssl rand -hex 24)"
           echo "::add-mask::$PW"
