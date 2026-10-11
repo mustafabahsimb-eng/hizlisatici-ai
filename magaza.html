@@ -82,11 +82,17 @@
   .modal h3{margin:0 0 4px 0;}
   .modal .modal-product{color:var(--text-dim); font-size:13px; margin-bottom:16px;}
   .modal label{font-size:12px; color:var(--text-dim); display:block; margin:10px 0 4px;}
-  .modal input, .modal textarea{
+  .modal input, .modal textarea, .modal select{
     width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--border);
     background:var(--bg-panel-2); color:var(--text); font-size:14px; font-family:inherit;
   }
   .modal textarea{resize:vertical; min-height:60px;}
+  .variant-box{display:flex; gap:12px; align-items:flex-start; margin-bottom:6px;}
+  .variant-box img{width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--border); flex:none;}
+  .variant-fields{flex:1; min-width:0;}
+  .variant-fields label:first-child{margin-top:0;}
+  .variant-note{font-size:12px; color:#f28b8b; margin-top:6px;}
+  .card-options{font-size:12px; color:var(--text-dim); margin:-2px 0 8px;}
   .modal-actions{display:flex; gap:8px; margin-top:18px;}
   .modal-actions button{flex:1;}
   .privacy-note{font-size:11px; color:var(--text-dim); margin-top:12px; line-height:1.5;}
@@ -116,6 +122,11 @@
     <h3 data-t="orderTitle"></h3>
     <div class="modal-product" id="modalProductName"></div>
     <form id="orderForm">
+      <div class="variant-box" id="variantBox" style="display:none">
+        <img id="variantImg" alt="" style="display:none">
+        <div class="variant-fields" id="variantFields"></div>
+      </div>
+      <div class="variant-note" id="variantNote"></div>
       <label for="orderName" data-t="fName"></label>
       <input type="text" id="orderName" required maxlength="200" autocomplete="name">
       <label for="orderPhone" data-t="fPhone"></label>
@@ -201,6 +212,10 @@ const T = {
     privacy: 'Bilgilerin sadece bu siparişin teslimatı için satıcıyla paylaşılır.',
     cancel: 'Vazgeç',
     send: 'Siparişi Gönder',
+    choose: 'Seç',
+    chooseOption: 'Lütfen seçenek seç',
+    optionSoldOut: 'Bu seçenek tükendi',
+    optionsN: '{n} seçenek',
     sending: 'Gönderiliyor...',
     orderOk: 'Siparişiniz alındı! En kısa sürede iletişime geçilecek.',
     orderFail: 'Sipariş gönderilemedi',
@@ -247,6 +262,10 @@ const T = {
     privacy: 'Your details are shared with the seller only to deliver this order.',
     cancel: 'Cancel',
     send: 'Send Order',
+    choose: 'Choose',
+    chooseOption: 'Please choose an option',
+    optionSoldOut: 'This option is sold out',
+    optionsN: '{n} options',
     sending: 'Sending...',
     orderOk: 'Your order has been received! The seller will contact you shortly.',
     orderFail: 'Could not send order',
@@ -374,7 +393,8 @@ function renderProducts(){
       '<div class="card-body">' +
         '<div class="card-title">' + escapeHtml(title) + '</div>' +
         descHtml +
-        '<div class="card-price">' + oldHtml + escapeHtml(formatPrice(p.sale_price, p.currency)) + '</div>' +
+        (p.variants && p.variants.length ? '<div class="card-options">' + escapeHtml(optionSummary(p)) + '</div>' : '') +
+        '<div class="card-price">' + oldHtml + escapeHtml(formatPrice(minPrice(p), p.currency)) + '</div>' +
         saveHtml +
         '<div style="display:flex; gap:8px;">' +
           '<button class="primary buy-btn" style="flex:1;">' + escapeHtml(t('buy')) + '</button>' +
@@ -416,14 +436,86 @@ async function loadStore(){
   }
 }
 
+/* ============== Seçenekler (beden / renk) ============== */
+// Kaynak sitelerden gelen seçenek adlarını müşterinin dilinde göster
+const OPTION_NAMES_TR = { size: 'Beden', color: 'Renk', colour: 'Renk', material: 'Malzeme', style: 'Model', pattern: 'Desen', capacity: 'Kapasite', length: 'Uzunluk', 'ships from': 'Gönderim yeri' };
+function optionName(k){
+  if (LANG !== 'tr') return k;
+  return OPTION_NAMES_TR[String(k).trim().toLowerCase()] || k;
+}
+function optionKeys(p){
+  const keys = [];
+  (p.variants || []).forEach(v => Object.keys(v.attributes || {}).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
+  return keys;
+}
+function optionSummary(p){
+  const keys = optionKeys(p);
+  if (!keys.length) return '';
+  const first = keys[0];
+  const vals = [...new Set(p.variants.map(v => v.attributes[first]).filter(Boolean))];
+  return optionName(first) + ': ' + vals.slice(0, 6).join(', ') + (vals.length > 6 ? '…' : '') +
+    (keys.length > 1 ? ' · ' + t('optionsN', { n: p.variants.length }) : '');
+}
+function minPrice(p){
+  const av = (p.variants || []).filter(v => v.available && v.price > 0).map(v => v.price);
+  return av.length ? Math.min(...av) : p.sale_price;
+}
+let selectedVariant = null;
+function renderVariantFields(p){
+  const box = document.getElementById('variantBox');
+  const fields = document.getElementById('variantFields');
+  const keys = optionKeys(p);
+  selectedVariant = null;
+  document.getElementById('variantNote').textContent = '';
+  document.getElementById('variantImg').style.display = 'none';
+  if (!keys.length){ box.style.display = 'none'; fields.innerHTML = ''; return; }
+  box.style.display = '';
+  fields.innerHTML = keys.map((k, i) => {
+    const vals = [...new Set(p.variants.map(v => v.attributes[k]).filter(Boolean))];
+    return '<label for="opt' + i + '">' + escapeHtml(optionName(k)) + '</label>' +
+      '<select id="opt' + i + '" data-key="' + escapeHtml(k) + '">' +
+        '<option value="">' + escapeHtml(t('choose')) + '</option>' +
+        vals.map(v => {
+          const any = p.variants.some(x => x.attributes[k] === v && x.available);
+          return '<option value="' + escapeHtml(v) + '"' + (any ? '' : ' disabled') + '>' + escapeHtml(v + (any ? '' : ' (' + t('optionSoldOut') + ')')) + '</option>';
+        }).join('') +
+      '</select>';
+  }).join('');
+  fields.querySelectorAll('select').forEach(sel => {
+    // Tek değerli seçenekleri kendiliğinden seç
+    const enabled = [...sel.options].filter(o => o.value && !o.disabled);
+    if (enabled.length === 1) sel.value = enabled[0].value;
+    sel.addEventListener('change', () => onVariantChange(p));
+  });
+  onVariantChange(p);
+}
+function onVariantChange(p){
+  const chosen = {};
+  let complete = true;
+  document.querySelectorAll('#variantFields select').forEach(sel => {
+    if (sel.value) chosen[sel.dataset.key] = sel.value; else complete = false;
+  });
+  const keys = optionKeys(p);
+  const match = complete ? p.variants.find(v => keys.every(k => (v.attributes[k] || '') === (chosen[k] || ''))) : null;
+  selectedVariant = match && match.available ? match : null;
+  document.getElementById('variantNote').textContent = complete && !selectedVariant ? t('optionSoldOut') : '';
+  const img = document.getElementById('variantImg');
+  const shown = match || p.variants.find(v => v.image_url && Object.keys(chosen).every(k => v.attributes[k] === chosen[k]));
+  const src = safeImg((shown && shown.image_url) || p.image_url);
+  if (src) { img.src = src; img.style.display = ''; } else img.style.display = 'none';
+  const price = selectedVariant ? selectedVariant.price : minPrice(p);
+  document.getElementById('modalProductName').textContent = productTitle(p) + ' · ' + formatPrice(price, p.currency);
+}
+
 /* ============== Sipariş Modalı ============== */
 let selectedProduct = null;
 
 function openOrderModal(product){
   selectedProduct = product;
   document.getElementById('modalProductName').textContent =
-    productTitle(product) + ' · ' + formatPrice(product.sale_price, product.currency);
+    productTitle(product) + ' · ' + formatPrice(minPrice(product), product.currency);
   document.getElementById('orderForm').reset();
+  renderVariantFields(product);
   document.getElementById('orderQty').value = 1;
   document.getElementById('orderForm').style.display = '';
   document.getElementById('orderDone').style.display = 'none';
@@ -454,6 +546,10 @@ document.getElementById('orderModalOverlay').addEventListener('click', (e) => {
 document.getElementById('orderForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!selectedProduct) return;
+  if (optionKeys(selectedProduct).length && !selectedVariant) {
+    showToast(document.getElementById('variantNote').textContent || t('chooseOption'), 3500, true);
+    return;
+  }
   const submitBtn = document.getElementById('orderSubmitBtn');
   submitBtn.disabled = true;
   submitBtn.textContent = t('sending');
@@ -469,6 +565,7 @@ document.getElementById('orderForm').addEventListener('submit', async (e) => {
         store_slug: slug,
         product_id: selectedProduct.id,
         listing_id: selectedProduct.listing_id || null,
+        variant_id: selectedVariant ? selectedVariant.id : null,
         customer_name: document.getElementById('orderName').value.trim(),
         customer_phone: document.getElementById('orderPhone').value.trim(),
         customer_address: document.getElementById('orderAddress').value.trim(),

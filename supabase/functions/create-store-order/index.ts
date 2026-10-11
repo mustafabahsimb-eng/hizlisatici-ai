@@ -4,7 +4,9 @@
 // fiyat ilandan alınır. Dışarıya sipariş no, durum ve müşterinin takip anahtarı döner.
 // POST { store_slug, product_id, listing_id, customer_name, customer_phone,
 //        customer_address, customer_city, customer_district, customer_zip,
-//        quantity, language }
+//        quantity, language, variant_id? }
+// Ürünün seçenekleri (beden/renk) varsa variant_id zorunludur; seçenek fiyatı sunucuda hesaplanır
+// (ilan fiyatı × seçenek maliyeti / ürün maliyeti; get-store ile aynı).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -85,7 +87,7 @@ Deno.serve(async (req) => {
     // 3) Ürün: silinmemiş, birleştirilmemiş, tükenmemiş
     const { data: product, error: pErr } = await db
       .from("products")
-      .select("id, stock_status, deleted_at, merged_into")
+      .select("id, stock_status, deleted_at, merged_into, store_visible, supplier_price")
       .eq("id", listing.product_id)
       .eq("user_id", store.user_id)
       .maybeSingle();
@@ -93,12 +95,39 @@ Deno.serve(async (req) => {
     if (!product || product.deleted_at || product.merged_into) {
       return json({ error: msg("Ürün bulunamadı", "Product not found") }, 404);
     }
-    if (product.stock_status === "tukendi") {
+    if (product.stock_status === "tukendi" || product.store_visible === false) {
       return json({ error: msg("Bu ürün tükendi", "This product is sold out") }, 409);
     }
 
-    // 4) Adet, fiyat (her zaman sunucudan, ilandaki fiyat) ve adres ayrı alanlarda
-    const price = Number(listing.price);
+    // 4) Seçenek (beden/renk)
+    const { data: vars, error: vErr } = await db
+      .from("product_variants")
+      .select("id, attributes, cost, stock_qty, stock_status")
+      .eq("product_id", product.id)
+      .eq("is_default", false)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+    if (vErr) throw vErr;
+    const options = (vars || []).filter((v) => v.attributes && Object.keys(v.attributes).length);
+    let variant = null;
+    if (options.length) {
+      variant = options.find((v) => v.id === String(body.variant_id || "")) || null;
+      if (!variant) return json({ error: msg("Lütfen seçenek seç (beden, renk...)", "Please choose an option (size, colour...)") }, 400);
+      if (variant.stock_status === "tukendi" || (variant.stock_qty != null && Number(variant.stock_qty) <= 0)) {
+        return json({ error: msg("Bu seçenek tükendi", "This option is sold out") }, 409);
+      }
+    }
+    // Okunur etiket; Türkçe mağazada kaynak sitelerin seçenek adları Türkçeleştirilir (magaza.html ile aynı)
+    const OPTION_NAMES_TR = { size: "Beden", color: "Renk", colour: "Renk", material: "Malzeme", style: "Model", pattern: "Desen", capacity: "Kapasite", length: "Uzunluk", "ships from": "Gönderim yeri" };
+    const optName = (k) => (en ? k : OPTION_NAMES_TR[String(k).trim().toLowerCase()] || k);
+    const variantLabel = variant
+      ? Object.entries(variant.attributes).map(([k, v]) => `${optName(k)}: ${v}`).join(" · ").slice(0, 200)
+      : null;
+
+    // 5) Adet, fiyat (her zaman sunucudan, ilandaki fiyat) ve adres ayrı alanlarda
+    let price = Number(listing.price);
+    const pc = Number(product.supplier_price), vc = Number(variant?.cost);
+    if (variant && price > 0 && pc > 0 && vc > 0) price = Math.round(price * (vc / pc) * 100) / 100;
     const cur = listing.currency || "TRY";
 
     const { data: order, error: iErr } = await db
@@ -107,6 +136,8 @@ Deno.serve(async (req) => {
         user_id: store.user_id,
         product_id: listing.product_id,
         listing_id: listing.id,
+        variant_id: variant ? variant.id : null,
+        variant_label: variantLabel,
         customer_name: name,
         customer_phone: phone,
         customer_address: address,

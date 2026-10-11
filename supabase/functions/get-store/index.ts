@@ -13,13 +13,32 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Vitrinde gösterilmeyecek ürünler: silinmiş, başka ürüne birleştirilmiş, stokta yok
+// Vitrinde gösterilmeyecek ürünler: silinmiş, başka ürüne birleştirilmiş, tükenmiş, vitrinden gizlenmiş
+// (stok izleyicileri tükenen ürünü store_visible=false yapar)
 function isSellable(p: any) {
   if (!p) return false;
   if (p.deleted_at) return false;
   if (p.merged_into) return false;
-  if (p.stock_status === "out_of_stock") return false;
+  if (p.stock_status === "out_of_stock" || p.stock_status === "tukendi") return false;
+  if (p.store_visible === false) return false;
   return true;
+}
+
+// Herkese açık vitrine yalnız bu alanlar çıkar (alış fiyatı, tedarikçi bilgisi vb. çıkmaz)
+const PUBLIC_FIELDS = ["id", "name", "generated_title", "generated_description", "image_url", "bundle_items", "is_bundle",
+  "stock_status", "brand", "specs", "content_language"];
+function publicProduct(p: any) {
+  const o: any = {};
+  PUBLIC_FIELDS.forEach((k) => { if (p[k] !== undefined) o[k] = p[k]; });
+  return o;
+}
+
+// Seçenek fiyatı: ilan fiyatı × (seçenek maliyeti / ürün maliyeti) -> kâr oranı her seçenekte aynı.
+// create-store-order aynı hesabı yapar (fiyat her zaman sunucuda belirlenir).
+function variantPrice(listingPrice: number, productCost: unknown, variantCost: unknown): number {
+  const pc = Number(productCost), vc = Number(variantCost);
+  if (!(listingPrice > 0) || !(pc > 0) || !(vc > 0)) return listingPrice;
+  return Math.round(listingPrice * (vc / pc) * 100) / 100;
 }
 
 serve(async (req) => {
@@ -69,11 +88,34 @@ serve(async (req) => {
         (prods || []).forEach((p: any) => { productMap[String(p.id)] = p; });
       }
 
+      // ===== 3) Seçenekler (beden/renk) =====
+      const varMap: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: vars } = await supabase
+          .from("product_variants")
+          .select("id, product_id, attributes, cost, stock_qty, stock_status, image_url")
+          .in("product_id", ids)
+          .eq("is_default", false)
+          .eq("is_active", true)
+          .is("deleted_at", null);
+        (vars || []).forEach((v: any) => {
+          if (!v.attributes || !Object.keys(v.attributes).length) return;
+          (varMap[String(v.product_id)] ||= []).push(v);
+        });
+      }
+
       products = (listings || [])
         .map((l: any) => ({ l, p: productMap[String(l.product_id)] }))
         .filter(({ p }) => isSellable(p))
         .map(({ l, p }) => ({
-          ...p,
+          ...publicProduct(p),
+          variants: (varMap[String(p.id)] || []).map((v: any) => ({
+            id: v.id,
+            attributes: v.attributes,
+            price: variantPrice(Number(l.price ?? p.sale_price), p.supplier_price, v.cost),
+            available: !(v.stock_status === "tukendi" || (v.stock_qty != null && Number(v.stock_qty) <= 0)),
+            image_url: v.image_url || null,
+          })),
           // eski alan adları korunuyor (magaza.html ve create-store-order uyumlu kalsın)
           id: p.id,
           listing_id: l.id,
@@ -94,10 +136,15 @@ serve(async (req) => {
         .eq("store_visible", true)
         .order("created_at", { ascending: false });
       if (prodErr) throw prodErr;
-      products = (legacy || []).filter(isSellable).map((p: any) => ({ ...p, currency: "TRY" }));
+      products = (legacy || []).filter(isSellable).map((p: any) => ({ ...publicProduct(p), sale_price: p.sale_price, variants: [], currency: "TRY" }));
     }
 
-    return json({ store, products, source });
+    // Mağazadan da yalnız vitrinde gereken alanlar (vergi no, adres, kullanıcı kimliği vb. çıkmaz)
+    const publicStore = {
+      store_slug: store.store_slug, store_name: store.store_name,
+      business_name: store.business_name || null, business_logo_url: store.business_logo_url || null,
+    };
+    return json({ store: publicStore, products, source });
   } catch (err) {
     console.error(err);
     return json({ error: (err as Error).message || "Sunucu hatası" }, 500);

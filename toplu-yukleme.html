@@ -1605,7 +1605,10 @@
           sale_price: it.newPrice > 0 ? it.newPrice : 0,
           generated_title: it.name.slice(0, 300),
           generated_description: fullDescription(it),
-          supplier: null,
+          // AliExpress'ten gelen ürün: tedarikçili (siparişi otomatik AliExpress / CJ eşdeğerinden verilir)
+          supplier: it.source_platform === 'aliexpress' && it.source_item_id ? 'aliexpress' : null,
+          supplier_item_id: it.source_platform === 'aliexpress' ? (it.source_item_id || null) : null,
+          supplier_cost: it.source_platform === 'aliexpress' && it.price > 0 ? it.price : null,
           image_url: it.images[0] || null,
           cost_currency: itemCurrency(it, r),
           content_language: 'tr',
@@ -1682,6 +1685,14 @@
           const lvRows = (li.data || []).filter(l => vmap[l.product_id]).map(l => ({ listing_id: l.id, variant_id: vmap[l.product_id], user_id: userId, price: l.price, status: l.status }));
           if (lvRows.length) await db.from('listing_variants').insert(lvRows);
         }
+        // AliExpress ürünleri için CJ eşdeğeri araması arka planda başlasın (saatlik görev de tekrar dener)
+        pairs.filter(p => p.it.source_platform === 'aliexpress').forEach(p => {
+          fetch(HS.SUPABASE_URL + '/functions/v1/cj-alt-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+            body: JSON.stringify({ productId: p.id })
+          }).catch(() => {});
+        });
         added += pairs.length;
         pairs.forEach(p => { p.it.selected = false; p.it.exists = true; });
       } catch (e) {

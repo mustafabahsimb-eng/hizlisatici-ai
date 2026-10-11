@@ -719,6 +719,8 @@
       if (ext) meta.push('<span title="' + escapeHtml(ext) + '">' + tt('orderNo') + ': ' + escapeHtml(extShort) + '</span>');
       if (date) meta.push(fmtDate(date));
       if (qty) meta.push(tt('qty', { n: qty }));
+      const vLabel = o.variant_label || (o.raw && o.raw.variant_label);
+      if (vLabel) meta.push('<b>' + escapeHtml(vLabel) + '</b>');
       if (buyer) meta.push(escapeHtml(buyer));
       if (country || city) meta.push(escapeHtml([city, country].filter(Boolean).join(' / ')));
 
@@ -879,6 +881,7 @@
       if (o.platform) metaParts.push(escapeHtml(o.platform === 'own_store' ? marketplaceName('own_store') : o.platform));
       if (o.marketplace_order_no) metaParts.push(tt('orderNo') + ': ' + escapeHtml(o.marketplace_order_no));
       metaParts.push(tt('qty', { n: o.quantity }));
+      if (o.variant_label) metaParts.push('<b>' + escapeHtml(o.variant_label) + '</b>');
       if (o.customer_name) metaParts.push(escapeHtml(o.customer_name));
       if (o.customer_city) metaParts.push(escapeHtml(o.customer_city));
       if (o.created_at) metaParts.push(fmtDate(o.created_at));

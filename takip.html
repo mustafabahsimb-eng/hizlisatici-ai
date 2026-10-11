@@ -151,7 +151,7 @@ function render(d){
   box.innerHTML = store +
     '<h1>' + esc(t('title')) + '</h1>' +
     '<div class="card">' +
-      '<div class="product">' + esc(d.product_name || '') + '</div>' +
+      '<div class="product">' + esc(d.product_name || '') + (d.variant_label ? ' <span style="opacity:.75">(' + esc(d.variant_label) + ')</span>' : '') + '</div>' +
       '<div class="meta">' + esc(t('qty', { n: d.quantity || 1 })) + (date ? ' · ' + esc(t('orderedAt', { d: date })) : '') + '</div>' +
       (cancelled ? '<div class="cancelled">' + esc(t('cancelled')) + '</div>' : '<ul class="steps">' + steps + '</ul>') +
       info +

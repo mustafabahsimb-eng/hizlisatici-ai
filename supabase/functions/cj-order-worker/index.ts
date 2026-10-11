@@ -187,6 +187,31 @@ async function lossHold(o: any, costUsd: number | null, supplierName: string): P
   return { id: o.id, status: "onay_bekliyor", note: reason };
 }
 
+// Müşterinin vitrinde seçtiği seçenek (beden/renk). Varsayılan seçenekse null.
+async function orderVariant(o: any): Promise<{ supplier_variant_id: string | null; supplier_sku: string | null; attributes: Record<string, string> } | null> {
+  if (!o.variant_id) return null;
+  const { data: v } = await db.from("product_variants")
+    .select("supplier_variant_id, supplier_sku, attributes, is_default").eq("id", o.variant_id).maybeSingle();
+  if (!v || v.is_default || !v.attributes || !Object.keys(v.attributes).length) return null;
+  return { supplier_variant_id: v.supplier_variant_id || null, supplier_sku: v.supplier_sku || null, attributes: v.attributes };
+}
+const variantText = (a: Record<string, string>) => Object.entries(a).map(([k, v]) => `${k}: ${v}`).join(", ");
+
+// AliExpress ürününün CJ eşdeğerinde aynı seçeneği bul (seçenek adlarındaki değerlerle: "Black-XL", "36" ...)
+async function matchCjVariant(token: string, pid: string, attrs: Record<string, string>): Promise<string | null> {
+  const pd = await cj(token, `/product/query?pid=${encodeURIComponent(pid)}`, { method: "GET" });
+  const variants: any[] = pd?.data?.variants || [];
+  const norm = (x: unknown) => String(x ?? "").toLowerCase().replace(/[^a-z0-9ğüşıöç.]+/gi, " ").trim();
+  const vals = Object.values(attrs).map(norm).filter(Boolean);
+  if (!vals.length) return null;
+  const hits = variants.filter((v) => {
+    const words = new Set(norm(`${v.variantKey || ""} ${v.variantNameEn || ""}`).split(/\s+/));
+    const text = " " + [...words].join(" ") + " ";
+    return vals.every((val) => text.includes(" " + val + " "));
+  });
+  return hits.length ? String(hits[0].vid) : null;
+}
+
 async function processOrder(o: any, opts: { approved?: boolean } = {}): Promise<Outcome> {
   if (o.fulfilled_via === "cj") return await processCj(o, opts);   // AliExpress ürünü, CJ eşdeğerinden
   if (o.supplier === "aliexpress") return await processAe(o, opts);
@@ -254,6 +279,25 @@ async function processCj(o: any, opts: { approved?: boolean } = {}): Promise<Out
       vid = pd?.data?.variants?.[0]?.vid || null;
       if (!vid) return await failOrRetry(o, "CJ'de bu ürünün seçeneği bulunamadı.");
       await db.from("products").update({ supplier_variant_id: vid }).eq("id", product.id);
+    }
+
+    // Müşterinin seçtiği seçenek (beden/renk)
+    const ov = await orderVariant(o);
+    if (ov) {
+      if (!viaAlt && ov.supplier_variant_id) {
+        vid = ov.supplier_variant_id; // CJ ürününün kendi seçeneği
+      } else if (viaAlt) {
+        const m = await matchCjVariant(token, String(product.supplier_item_id), ov.attributes);
+        if (m) vid = m;
+        else if (!opts.approved) {
+          await update(o.id, {
+            status: "onay_bekliyor", hold_reason: "secenek_eslesmedi",
+            error_message: `Müşterinin seçtiği seçenek (${variantText(ov.attributes)}) CJ eşdeğerinde bulunamadı. ` +
+              "Onaylarsan CJ eşdeğerinin kayıtlı seçeneği gönderilir; uygun değilse siparişi iptal et.",
+          });
+          return { id: o.id, status: "onay_bekliyor", note: "secenek_eslesmedi" };
+        }
+      }
     }
 
     const city = (o.customer_city || "").trim();
@@ -561,7 +605,21 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
     price: parseFloat(s.offer_sale_price || s.sku_price) || null,
     stock: Number(s.sku_available_stock ?? s.s_k_u_available_stock ?? s.ipm_sku_stock ?? 0),
   }));
-  const sku = (product?.supplier_variant_id && skus.find((s) => s.sku_id === String(product.supplier_variant_id)))
+  // Müşteri vitrinde seçenek seçtiyse yalnız o seçenek gönderilir (yanlış beden/renk gitmesin)
+  const ov = await orderVariant(o);
+  const chosenSku = ov
+    ? (ov.supplier_variant_id && skus.find((s) => s.sku_id === String(ov.supplier_variant_id)))
+      || (ov.supplier_sku && skus.find((s) => s.sku_attr === ov.supplier_sku)) || null
+    : null;
+  if (ov && !chosenSku) {
+    await update(o.id, {
+      status: "onay_bekliyor", hold_reason: "secenek_yok",
+      error_message: `Müşterinin seçtiği seçenek (${variantText(ov.attributes)}) AliExpress'te artık yok. Siparişi iptal edebilir ya da müşteriyle görüşebilirsin.`,
+    });
+    return { id: o.id, status: "onay_bekliyor", note: "secenek_yok" };
+  }
+  const sku = chosenSku
+    || (product?.supplier_variant_id && skus.find((s) => s.sku_id === String(product.supplier_variant_id)))
     || (product?.supplier_sku_attr && skus.find((s) => s.sku_attr === product.supplier_sku_attr))
     || skus.filter((s) => s.stock > 0 && s.price).sort((a, b) => a.price! - b.price!)[0];
   if (!sku || !sku.price) return await failOrRetry(o, "AliExpress'te bu ürünün satılabilir seçeneği bulunamadı.");
@@ -572,7 +630,7 @@ async function processAe(o: any, opts: { approved?: boolean } = {}): Promise<Out
     });
     return { id: o.id, status: "onay_bekliyor", note: "stok_yok" };
   }
-  if (product && (product.supplier_variant_id !== sku.sku_id || product.supplier_sku_attr !== sku.sku_attr)) {
+  if (!chosenSku && product && (product.supplier_variant_id !== sku.sku_id || product.supplier_sku_attr !== sku.sku_attr)) {
     await db.from("products").update({ supplier_variant_id: sku.sku_id, supplier_sku_attr: sku.sku_attr || null }).eq("id", product.id);
   }
 
