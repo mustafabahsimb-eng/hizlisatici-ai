@@ -16,6 +16,7 @@
 - Her özellik OTOMASYON olarak tasarlanır. Satıcının elle yapacağı ara çözümler önerme ("elle paylaş", "linki koy gerisi senin" gibi). Engel varsa otomatiğe giden yolu söyle.
 - "Olmaz" deyip erteleme. Önce nasıl yapılabileceğini söyle (gerçek satıcı hesabı yoksa sandbox/test ortamı gibi).
 - Kalite çıtası yüksek: tam ve profesyonel. İşi küçültüp yarım bırakma.
+- Satıcı HİÇBİR ZAMAN Excel/şablon doldurmaz, sütun başlığı düzeltmez. Dosya yükleme alanları her türlü dosyayı (PDF, Excel, CSV, fotoğraf, ekran görüntüsü) kabul eder ve içeriği yapay zekâyla kendisi anlar. Arayüz metinlerinde "Excel'i doldur / şablon indir" gibi ifadeler kullanılmaz.
 - Yeni fikirler yol haritasına eklenir (YOL-HARITASI.md), hemen yapılacak demek değildir.
 - Ödeme gerektiren işlerde (sunucu, ücretli servis, abonelik): altyapıyı ve kodu şimdiden eksiksiz hazırla, varsayılan KAPALI bir anahtarla bekleyecek şekilde kur; ödemeyi kullanıcı sonra yapar. Ödeme günü sadece gerekli değeri (IP, anahtar vb.) girip açmak yetmeli.
 - Kalıcı kararlar (2026-10-11):

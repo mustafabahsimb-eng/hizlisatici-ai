@@ -19,7 +19,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
-Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları onaylandı (aşağıdaki tablo).
+Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 2b (Chrome eklentisi) Trendyol'un Türkiye fiyatı sorununu çözer, bu yüzden öne alındı (Mustafa, 12 Ekim); 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları onaylandı (aşağıdaki tablo).
 
 - [~] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
   - Tek ürün linki (AliExpress, Trendyol, satıcının kendi sitesi, toptancı sayfası) → ad, açıklama, fiyat, görseller, varyantlar otomatik.
@@ -34,9 +34,9 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
     - "✨ Metni kanala göre yaz" (channel-copy): 8 kanal kuralı.
     - Test: tests/e2e/linkten_yukleme.py 10/10.
   - Kalanlar / bilinen sınırlar:
-    - [ ] Trendyol Türkiye dışındaki sunuculara uluslararası vitrini veriyor (Euro, Almanca): görsel/seçenek/özellik doğru, fiyat Euro. Türkiye fiyatı için Türkiye'den okuma gerekir → Chrome eklentisi (satıcının tarayıcısından) ya da Türkiye çıkışlı okuma servisi.
+    - [ ] Trendyol Türkiye dışındaki sunuculara uluslararası vitrini veriyor (Euro, Almanca): görsel/seçenek/özellik doğru, fiyat Euro. ÇÖZÜM: 2b Chrome eklentisi (satıcının tarayıcısından Türkiye fiyatı).
     - [ ] Bazı siteler sunucudan okumayı engelliyor (ör. Cloudflare korumalı): Shopify/WooCommerce ise veri adreslerine düşülüyor; değilse ücretli okuma servisi gerekir. Altyapı hazır, varsayılan KAPALI: Edge secret SCRAPER_ENABLED=true + SCRAPER_URL_TEMPLATE (ör. ScrapingBee/ZenRows, "{url}" yer tutuculu). Ödeme günü sadece bu iki değer girilir.
-    - [ ] Mağaza sayfasında (magaza.html) müşterinin beden/renk seçebilmesi: seçenekler kayıtlı, vitrinde seçim ve sepette seçenek henüz yok.
+    - [x] Mağaza vitrininde beden/renk seçimi (12 Ekim): seçenek fiyatı ve görseli, tükenen seçenek kapalı; seçenek mağaza siparişine, tedarikçi siparişine (AliExpress SKU / CJ eşdeğerinde ad eşleşmesi) ve müşteri takip sayfasına geçiyor. Test: vitrin_secenek.py 10/10. Not: gerçek AliExpress/CJ siparişinde seçenek seçimi para harcamamak için denenmedi; ilk gerçek seçenekli siparişte izlenmeli.
     - [ ] Kendi mağaza dışındaki kanallardaki ilan fiyatları (Trendyol vb.) source-sync ile henüz güncellenmiyor (o kanalların gönderimi açılınca sync-worker kuyruğuna bağlanacak).
 - [ ] **2. PDF'den ürün yükleme** (şirket gerekmez; temel var: price-list-parse resimsiz fiyat listesini okuyor)
   - Üç tür: (a) resimli katalog — ad, kod, fiyat ve fotoğraf ayıklanıp eşleştirilir; (b) resimsiz fiyat listesi/tablo; (c) taranmış/fotoğraf PDF — OCR ile okunur.
@@ -44,6 +44,11 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
   - Görsel telif güvencesi: marka görsellerinde önce markanın medya kiti / basın görselleri sayfası, sonra ürün sayfası. Her görselin kaynağı kaydedilir ve satıcıya gösterilir ("Görsel kaynağı: ..."). İlk kullanımda satıcı onayı: "Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir" (onay tarihiyle kaydedilir). Satıcı görseli istediği an kendi fotoğrafıyla değiştirebilir.
   - Önizleme listesi; satıcı işaretlediklerini tek tıkla ekler. Telefondan da yüklenebilir (dosya veya kamera).
   - Bağlı iş: **Kullanım koşulları taslağı** (henüz yok) — görsel sorumluluk maddesi eklenecek; yayın öncesi hukukçu kontrolü.
+- [ ] **2b. Chrome eklentisi** (öne alındı, 12 Ekim 2026; şirket gerekmez)
+  - Amaç: sunucunun okuyamadığı ya da yanlış ülke vitrinini gördüğü sitelerde ürünü satıcının kendi tarayıcısından okumak. İlk hedef Trendyol'un Türkiye fiyatı (TL) ve Türkçe içeriği.
+  - Satıcı ürün sayfasındayken tek tıkla Seltigo'ya ekler; eklenti sayfadaki ürün verisini (ad, fiyat, görsel, seçenek, stok) okuyup Seltigo hesabına gönderir.
+  - Linkten çekilen ve otomatik takipteki (source_sync) Trendyol ürünlerinde Türkiye fiyatı da eklentiyle güncellenebilmeli (satıcının tarayıcısı açıkken arka planda).
+  - Chrome Web Mağazası'na yayın: geliştirici hesabı tek seferlik 5 $ (ödeme gerektirir → altyapı hazırlanır, yayın ödemeden sonra); o zamana kadar "paketlenmemiş eklenti" olarak denenir.
 - [ ] **3. "Link ver, mağazan hazır" akışı** (1'e dayanır)
   - Kendi sitesi olan satıcı Mağazanı Kur'da site adresini verir → ürünler çekilir → Seltigo mağazası hazır açılır.
   - Asıl değer dağıtım: akış sonunda "bu ürünleri Trendyol, Instagram, WhatsApp kataloğu ve diğer kanallara gönder" seçeneği.
@@ -63,7 +68,7 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
 | Toplu Yükleme, link sekmesi | "🔗 Link yapıştır" (mevcut) |
 | Fiyat/stok takibi | "Fiyat ve stoğu otomatik güncel tut" + aralık "6 saatte bir" / "Günde bir" |
 | AI metin düğmesi | "✨ Metni kanala göre yaz" |
-| PDF sekmesi (eski "Fiyat listesi yükle (PDF/Excel)") | "📄 PDF / Katalog / Excel yükle" |
+| Dosya sekmesi (eski "Fiyat listesi yükle (PDF/Excel)") | "📄 Katalog / fiyat listesi yükle" (12 Ekim'de değişti; "Excel" kelimesi geçmez) |
 | Görseli olmayan ürün etiketi | "Görsel eksik" |
 | Görsel eksik üründe düğme | "📷 Fotoğraf çek / yükle" |
 | Görsel değiştirme | "Kendi fotoğrafımla değiştir" |
@@ -86,7 +91,7 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
 - [ ] WhatsApp ürün linki ("satıcıya yaz")
 - [ ] İkas / Ticimax / WooCommerce bağlantıları
 - [ ] Admin paneli eksikleri
-- [ ] Chrome eklentisi
+- [ ] Chrome eklentisi → öne alındı, yukarıda "2b"
 - [ ] Shopify / Wix / eBay: ürün gönderme + Hesaplarım'a "Bağla" düğmeleri (bağlantı kaydı hazır)
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
 
