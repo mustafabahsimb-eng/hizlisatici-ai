@@ -151,6 +151,9 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
   4. Secrets: AMAZON_APP_ID, AMAZON_LWA_CLIENT_ID, AMAZON_LWA_CLIENT_SECRET (+ deneme için AMAZON_SANDBOX_REFRESH_TOKEN) -> amazon-connect selftest -> Hesaplarım'dan bağlanma testi (Claude).
   5. Amazon Appstore listesi ve yayın onayı -> AMAZON_APP_DRAFT=false; canlıya geçiş AMAZON_LIVE=true.
 
+## Ayrı ürünler: Seltigo Ads, İçerik otomasyonu, İade otomasyonu (13 Ekim 2026)
+- Mimari plan taslağı: docs/mimari-plan-ads-icerik-iade.md — Mustafa'nın onayını bekliyor; onaydan önce kodlanmaz.
+
 ## Ertelenenler (şimdi yapılmaz)
 - Görsel tamamlama hızlandırma
 - WhatsApp + Instagram katalog otomasyonu (şirket sonrası canlı)
