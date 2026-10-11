@@ -404,6 +404,21 @@ Deno.serve(async (req) => {
 
   const started = Date.now();
 
+  // Sistem: tek AliExpress siparişinin AliExpress'teki durumuna bak (kayıt yapmaz)
+  const sysBody = await req.clone().json().catch(() => ({}));
+  if (sysBody?.peekOrderId) {
+    const { data: o } = await db.from("orders").select("id, user_id, status, supplier_order_id").eq("id", String(sysBody.peekOrderId)).maybeSingle();
+    if (!o?.supplier_order_id) return json({ error: "sipariş yok" }, 404);
+    const aeTok = await aeToken(String(o.user_id));
+    if (!aeTok) return json({ error: "AliExpress anahtarı yok" }, 400);
+    const res = await aeCall("aliexpress.trade.ds.order.get", aeTok, {
+      order_id: String(o.supplier_order_id),
+      single_order_query: JSON.stringify({ order_id: Number(o.supplier_order_id) }),
+    });
+    const r = res?.aliexpress_trade_ds_order_get_response?.result || res?.aliexpress_ds_trade_order_get_response?.result || res;
+    return json({ ok: true, order_status: r?.order_status, end_reason: aeEndReason(r || {}), raw: JSON.stringify(r).slice(0, 600) });
+  }
+
   try {
     const { data: orders, error } = await db
       .from("orders")

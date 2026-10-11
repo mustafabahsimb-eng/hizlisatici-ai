@@ -18,9 +18,38 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor. Şart: CJ'ye toplam 2.000 $ sipariş (LV1 0 $, LV2 500 $, LV3 2.000 $, LV4 100.000 $, LV5 500.000 $; satın alınamaz, sıfırlanmaz, anlaşmazlıklı siparişler sayılmaz). O zamana kadar: anahtar kelimeyle eşleştirme (kuruldu, 11 Ekim) + sourcing talebi.
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
+## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
+Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları Mustafa'nın onayını bekliyor (aşağıdaki "Önerilen adlar").
+
+- [ ] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
+  - Tek ürün linki (AliExpress, Trendyol, satıcının kendi sitesi, toptancı sayfası) → ad, açıklama, fiyat, görseller, varyantlar otomatik.
+  - AI içeriği seçilen kanala göre yeniden yazar (Trendyol / Instagram / kendi mağaza üslubu ve kuralları).
+  - Mağaza / kategori / site adresi → tüm ürünler toplu çekilir. API varsa API (AliExpress DS, Shopify/WooCommerce açık uçları, XML besleme), yoksa sayfa okuma (kazıma); satıcı farkı görmez.
+  - Çekilen ürünlerde kaynak adresi saklanır; fiyat/stok değişiklikleri belirli aralıklarla otomatik güncellenir (stock-price-monitor benzeri zamanlanmış görev, zarar kontrolüyle).
+  - Eski madde "Siteden toplu ürün çekmeyi tamamlama (Excel indir)" buraya katıldı.
+- [ ] **2. PDF'den ürün yükleme** (şirket gerekmez; temel var: price-list-parse resimsiz fiyat listesini okuyor)
+  - Üç tür: (a) resimli katalog — ad, kod, fiyat ve fotoğraf ayıklanıp eşleştirilir; (b) resimsiz fiyat listesi/tablo; (c) taranmış/fotoğraf PDF — OCR ile okunur.
+  - Resimsiz ürünlerde görsel ve bilgi otomatik tamamlanır, sırayla: 1) markanın resmi sitesi (marka + model/kod ile ürün sayfası; resmi görseller + teknik özellikler, açıklama bunlarla zenginleşir), 2) toptancının sitesi, 3) CJ/AliExpress eşleşmesi. Hiçbirinde yoksa "Görsel eksik" etiketiyle eklenir; satıcı telefonla çekip ekler, arka plan otomatik temizlenir (remove-background). Rastgele/telifli görsel alınmaz.
+  - Görsel telif güvencesi: marka görsellerinde önce markanın medya kiti / basın görselleri sayfası, sonra ürün sayfası. Her görselin kaynağı kaydedilir ve satıcıya gösterilir ("Görsel kaynağı: ..."). İlk kullanımda satıcı onayı: "Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir" (onay tarihiyle kaydedilir). Satıcı görseli istediği an kendi fotoğrafıyla değiştirebilir.
+  - Önizleme listesi; satıcı işaretlediklerini tek tıkla ekler. Telefondan da yüklenebilir (dosya veya kamera).
+  - Bağlı iş: **Kullanım koşulları taslağı** (henüz yok) — görsel sorumluluk maddesi eklenecek; yayın öncesi hukukçu kontrolü.
+- [ ] **3. "Link ver, mağazan hazır" akışı** (1'e dayanır)
+  - Kendi sitesi olan satıcı Mağazanı Kur'da site adresini verir → ürünler çekilir → Seltigo mağazası hazır açılır.
+  - Asıl değer dağıtım: akış sonunda "bu ürünleri Trendyol, Instagram, WhatsApp kataloğu ve diğer kanallara gönder" seçeneği.
+  - Paket: bu giriş akışı ücretsiz pakette; çok kanal ve otomasyonlar ücretli pakette (paket.html ile uyumlu hale getirilecek).
+  - Ayarlar'a "Web sitem" alanı; doluysa mağaza sayfasında satıcının sitesine bağlantı.
+  - Linkten çekilen ürünlerde orijinal sayfa adresi saklanır; ürün kartında "Satın Al" yanında "Satıcının sitesinde gör".
+  - İsteğe bağlı "Satın Al düğmesi kendi siteme gitsin"; dışarı giden tıklamalar ürün bazında kaydedilir (satış ilgisi verisi kaybolmasın).
+- [ ] **4. WhatsApp + Instagram katalog otomasyonu** (temel var: social-catalog, catalog-feed)
+  - Ürünler Meta Catalog API ile otomatik Meta kataloğuna; fiyat/stok değişince güncellenir.
+  - Katalog satıcının WhatsApp Business Platform hesabına ve Instagram Alışveriş'e bağlanır.
+  - WhatsApp'tan tek ürün ve çoklu ürün mesajları otomatik gönderilebilir.
+  - Altyapı Meta test numarasıyla sandbox modunda kurulur (varsayılan kapalı anahtar kuralı); şirket kurulunca (Meta işletme doğrulaması) canlıya geçilir.
+
+**Önerilen adlar (onay bekliyor):** sohbette Mustafa'ya sunuldu; onaylananlar buraya yazılacak.
+
 ## Sıradaki işler
 - [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
-- [ ] Siteden toplu ürün çekmeyi tamamlama (Excel indir)
 - [ ] Müşteri Hizmetleri Otomatik Pilotu (WhatsApp / Instagram mesajları)
 - [ ] WhatsApp ürün linki ("satıcıya yaz")
 - [ ] İkas / Ticimax / WooCommerce bağlantıları
@@ -37,7 +66,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 
 **Test siparişleri (para harcanmadı)**
 - 4 CJ test siparişi: bizde iptal, CJ'den silindi.
-- 1 AliExpress test siparişi (e9d6008d…): bizde iptal; AliExpress'te ödenmemiş olarak açık, ödeme süresi dolunca AliExpress kendisi kapatır (API ile iptal yok). İstenirse AliExpress uygulamasından elle iptal edilebilir.
+- 1 AliExpress test siparişi (e9d6008d…, AliExpress no 1123253643719483): bizde iptal; AliExpress'te ödenmemiş (PLACE_ORDER_SUCCESS, 26,63 $ ödenmedi). Ödeme süresi 20 gün → en geç 31 Ekim 2026'da AliExpress kendisi kapatır; API ile iptal yok. Para çekilmez.
 - Test ürünleri (81 dışında) kaldırıldı. Ürün 81 "Silicone phone case" mağazada 279,90 TL (kargo dahil maliyet ~210 TL).
 
 **İzlenecek / yarım**
