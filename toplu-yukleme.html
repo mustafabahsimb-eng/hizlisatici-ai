@@ -1244,7 +1244,21 @@
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
     dz.addEventListener('drop', (e) => { const fs = e.dataTransfer && e.dataTransfer.files; if (fs && fs.length) onFilesPicked(fs); });
+    // HIZ: dosya sayfanın herhangi bir yerine bırakılabilir; katalog sekmesi kendiliğinden açılır
+    document.addEventListener('dragover', (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
+    document.addEventListener('drop', (e) => {
+      if (dz.contains(e.target)) return;
+      const fs = e.dataTransfer && e.dataTransfer.files;
+      if (!fs || !fs.length) return;
+      e.preventDefault();
+      setSrc('file');
+      onFilesPicked(fs);
+    });
   })();
+  // HIZ: link yapıştırılınca çekme kendiliğinden başlar ("Ürünleri Çek"e basmaya gerek yok)
+  document.getElementById('srcUrl').addEventListener('paste', () => {
+    setTimeout(() => { if (/^https?:\/\/\S+\.\S+/i.test(document.getElementById('srcUrl').value.trim())) startFetch(); }, 50);
+  });
 
   async function readPdf(file) {
     setProgress(t('fileLib'), 5);
@@ -1544,6 +1558,7 @@
   }
   async function onFilesPicked(list) {
     if (!list || !list.length || running) return;
+    if (srcMode !== 'file') setSrc('file');
     const files = Array.from(list);
     const bad = files.filter(f => !fileKind(f));
     if (bad.length) { toast(fmt(t('fileBad'), { n: bad.map(f => f.name).join(', ') }), true); }
@@ -2169,6 +2184,11 @@
       const pr = await db.from('user_profiles').select('image_terms_accepted_at').eq('user_id', userId).maybeSingle();
       imageTermsAccepted = !!(pr.data && pr.data.image_terms_accepted_at);
     } catch (e) { imageTermsAccepted = false; }
+    // HIZ: kullanım hakkı onayını daha önce verdiyse işaretli gelir (her yükleme import_consents'e yine yazılır)
+    try {
+      const ic = await db.from('import_consents').select('id').eq('user_id', userId).limit(1);
+      if (ic.data && ic.data.length) document.getElementById('consentChk').checked = true;
+    } catch (e) { /* işaretsiz kalır */ }
     renderPreview();
   })();
 
