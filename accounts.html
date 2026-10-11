@@ -86,6 +86,10 @@
   .acc-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .acc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 
+  .amz-regions { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 6px; }
+  .amz-region { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; width: 100%; padding: 12px 14px; }
+  .amz-region small { font-size: 12px; opacity: .75; font-weight: 400; white-space: normal; line-height: 1.4; }
+  .amz-region { white-space: normal; }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
     align-items: center; justify-content: center; padding: 20px; z-index: 100;
@@ -193,6 +197,22 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="amazonRegionOverlay">
+  <div class="modal-box">
+    <div class="modal-title" data-t="amzRegionTitle"></div>
+    <div class="modal-sub" data-t="amzRegionSub"></div>
+    <div class="amz-regions">
+      <button class="acc-btn secondary amz-region" onclick="connectAmazon('eu')"><b data-t="amzEu"></b><small data-t="amzEuSub"></small></button>
+      <button class="acc-btn secondary amz-region" onclick="connectAmazon('na')"><b data-t="amzNa"></b><small data-t="amzNaSub"></small></button>
+      <button class="acc-btn secondary amz-region" onclick="connectAmazon('fe')"><b data-t="amzFe"></b><small data-t="amzFeSub"></small></button>
+    </div>
+    <div class="modal-error" id="amazonRegionError"></div>
+    <div class="modal-actions">
+      <button class="acc-btn secondary" onclick="closeAmazonRegion()" data-t="btnCancel"></button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="igGuideOverlay">
   <div class="modal-box">
     <div class="modal-title" data-t="igGuideTitle"></div>
@@ -274,6 +294,16 @@
       fOptional: '(isteğe bağlı)',
       connectTitle: '{name} Mağazanı Bağla',
       btnConnect: 'Mağazanı Bağla',
+      amzRegionTitle: 'Amazon mağazanı bağla',
+      amzRegionSub: 'Amazon hesabının bulunduğu bölgeyi seç. Amazon sayfasında onay verince bağlantı kendiliğinden kurulur; bölgendeki tüm Amazon ülkeleri birlikte bağlanır.',
+      amzEu: 'Avrupa',
+      amzEuSub: 'Almanya, İngiltere, Fransa, İtalya, İspanya, Hollanda, İsveç, Polonya, Belçika, BAE, Suudi Arabistan…',
+      amzNa: 'Kuzey Amerika',
+      amzNaSub: 'ABD, Kanada, Meksika, Brezilya',
+      amzFe: 'Uzak Doğu',
+      amzFeSub: 'Japonya, Avustralya, Singapur',
+      amzSoon: 'Amazon bağlantısı çok yakında açılacak.',
+      amzRedirecting: "Amazon'a yönlendiriliyor...",
       btnAddAnother: '+ Bağlantı Ekle',
       btnSave: 'Bağla',
       btnCancel: 'Vazgeç',
@@ -398,6 +428,16 @@
       fOptional: '(optional)',
       connectTitle: 'Connect your {name} store',
       btnConnect: 'Connect Store',
+      amzRegionTitle: 'Connect your Amazon store',
+      amzRegionSub: 'Choose the region of your Amazon account. Approve on the Amazon page and the connection is set up automatically; all Amazon countries in that region are connected together.',
+      amzEu: 'Europe',
+      amzEuSub: 'Germany, UK, France, Italy, Spain, Netherlands, Sweden, Poland, Belgium, UAE, Saudi Arabia…',
+      amzNa: 'North America',
+      amzNaSub: 'USA, Canada, Mexico, Brazil',
+      amzFe: 'Far East',
+      amzFeSub: 'Japan, Australia, Singapore',
+      amzSoon: 'Amazon connection is coming very soon.',
+      amzRedirecting: 'Redirecting to Amazon...',
       btnAddAnother: '+ Add Connection',
       btnSave: 'Connect',
       btnCancel: 'Cancel',
@@ -524,7 +564,10 @@
     n11:         { name: 'N11', group: 'TR', codes: ['n11_tr'], verify: true, signup: 'https://magazadestek.n11.com/satis-surecleri/magaza-uyelik-sureci-44', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     ciceksepeti: { name: 'Çiçeksepeti', group: 'TR', codes: ['ciceksepeti_tr'], verify: true, signup: 'https://www.ciceksepeti.com/s/ciceksepetinde-satis-yap', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey'] },
     pttavm:      { name: 'PTT AVM', group: 'TR', codes: ['pttavm_tr'], verify: true, signup: 'https://www.pttavm.com/satici-ol', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
-    amazontr:    { name: 'Amazon TR', group: 'TR', codes: ['amazon_tr'], verify: false, signup: 'https://satis.amazon.com.tr/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    amazontr:    { name: 'Amazon TR', group: 'TR', codes: ['amazon_tr'], verify: false, signup: 'https://satis.amazon.com.tr/', oauth: 'tr' },
+    amazon:      { name: 'Amazon', group: 'INTL', codes: ['amazon_de', 'amazon_uk', 'amazon_fr', 'amazon_it', 'amazon_es', 'amazon_nl', 'amazon_se', 'amazon_pl', 'amazon_be', 'amazon_ie',
+                   'amazon_ae', 'amazon_sa', 'amazon_eg', 'amazon_in', 'amazon_za', 'amazon_us', 'amazon_ca', 'amazon_mx', 'amazon_br', 'amazon_jp', 'amazon_au', 'amazon_sg'],
+                   verify: false, signup: 'https://sell.amazon.com/', oauth: 'pick' },
     pazarama:    { name: 'Pazarama', group: 'TR', codes: ['pazarama_tr'], verify: true, signup: 'https://isortagim.pazarama.com/auth/seller-application', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     walmart:     { name: 'Walmart Marketplace', group: 'INTL', codes: ['walmart_us'], verify: true, signup: 'https://marketplace.walmart.com/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     woocommerce: { name: 'WooCommerce', group: 'INTL', codes: ['woocommerce'], verify: true, signup: null, labels: ['fSiteUrl', 'fConsumerKey', 'fConsumerSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
@@ -546,8 +589,9 @@
   function connectionsFor(key) {
     const code = mpCodeFor(key);
     const row = mpRowFor(key);
+    const codes = MP[key].codes;
     return connections.filter(c => !c.deleted_at && (
-      (c.marketplace_code && c.marketplace_code === code) ||
+      (c.marketplace_code && (c.marketplace_code === code || codes.includes(c.marketplace_code))) ||
       (row && c.marketplace_id != null && String(c.marketplace_id) === String(row.id))
     ));
   }
@@ -589,9 +633,10 @@
           '</div>';
       }).join('') + '</div>';
     }
+    const openFn = def.oauth ? 'connectAmazon(\'' + def.oauth + '\')' : 'openConnectModal(\'' + key + '\')';
     const right = list.length
-      ? '<button class="acc-btn secondary" onclick="openConnectModal(\'' + key + '\')">' + t('btnAddAnother') + '</button>'
-      : '<span class="acc-status none">' + t('stNone') + '</span><button class="acc-btn" onclick="openConnectModal(\'' + key + '\')">' + t('btnConnect') + '</button>';
+      ? '<button class="acc-btn secondary" onclick="' + openFn + '">' + t('btnAddAnother') + '</button>'
+      : '<span class="acc-status none">' + t('stNone') + '</span><button class="acc-btn" id="connect-' + key + '" onclick="' + openFn + '">' + t('btnConnect') + '</button>';
     return '<div class="acc-row"><div class="acc-info"><div class="acc-name">' + esc(def.name) + '</div>' +
       '<div class="acc-desc">' + t('d_' + key) + signup + '</div>' + connHtml + '</div>' +
       '<div class="acc-right">' + right + '</div></div>';
@@ -774,8 +819,7 @@
 
     // Uluslararası
     let intl = '';
-    intl += staticRow('Amazon', 'd_amazon',
-      '<span class="acc-status none">' + t('stNone') + '</span><a class="acc-btn" href="https://sell.amazon.com/" target="_blank" rel="noopener">' + t('btnOpenAccount') + '</a>');
+    intl += mpRowHtml('amazon');
     intl += mpRowHtml('walmart');
     intl += mpRowHtml('woocommerce');
     intl += '<div class="acc-row"><div class="acc-info"><div class="acc-name">Etsy</div><div class="acc-desc">' + t('d_etsy') +
@@ -842,6 +886,34 @@
     document.getElementById('connectModalOverlay').style.display = 'none';
     currentKey = null;
   }
+
+  // ---------- Amazon (SP-API, Amazon onay sayfası ile) ----------
+  async function connectAmazon(region) {
+    if (region === 'pick') {
+      document.getElementById('amazonRegionError').textContent = '';
+      document.getElementById('amazonRegionOverlay').style.display = 'flex';
+      return;
+    }
+    const session = await getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    const inModal = document.getElementById('amazonRegionOverlay').style.display === 'flex';
+    try {
+      const res = await fetch(HS.SUPABASE_URL + '/functions/v1/amazon-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+        body: JSON.stringify({ action: 'start', region, userAccessToken: session.access_token }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (d.ok && d.url) { toast(t('amzRedirecting')); window.location.href = d.url; return; }
+      const msg = d.notReady ? t('amzSoon') : (d.error || t('errServer'));
+      if (inModal) document.getElementById('amazonRegionError').textContent = msg;
+      else toast(msg, true);
+    } catch (e) {
+      if (inModal) document.getElementById('amazonRegionError').textContent = t('errServer');
+      else toast(t('errServer'), true);
+    }
+  }
+  function closeAmazonRegion() { document.getElementById('amazonRegionOverlay').style.display = 'none'; }
 
   async function getSession() {
     const { data: { session } } = await db.auth.getSession();

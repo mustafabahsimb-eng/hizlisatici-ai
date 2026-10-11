@@ -348,9 +348,12 @@ async function questionsReply(link: Link): Promise<Reply> {
 export async function renderAlert(kind: string, p: any, userId: string): Promise<{ reply: Reply; need: "orders" | "products" | "owner" } | null> {
   if (kind === "new_order") {
     const { data: pr } = await db.from("products").select("generated_title, name").eq("id", p.product_id).maybeSingle();
-    return { need: "orders", reply: {
-      text: `🛒 Yeni sipariş: ${short(pr?.generated_title || pr?.name, 60)}${p.variant ? " (" + p.variant + ")" : ""} ×${p.quantity || 1} — ${money((Number(p.unit_price) || 0) * (p.quantity || 1), p.currency || "TRY")}\n${p.customer || ""}, ${p.city || ""}`,
-      buttons: [{ id: `order:${p.store_order_id}`, title: "Siparişi gör" }] } };
+    // Pazaryeri siparişi (ör. amazon_tr -> "Amazon TR"); Kendi Mağazam siparişinde düğme, diğerlerinde sipariş sayfası bağlantısı
+    const mp = p.marketplace ? String(p.marketplace).replace(/^amazon_(\w+)$/, (_: string, c: string) => "Amazon " + c.toUpperCase()) : "";
+    const text = `🛒 Yeni sipariş${mp ? " (" + mp + ")" : ""}: ${short(pr?.generated_title || pr?.name, 60)}${p.variant ? " (" + p.variant + ")" : ""} ×${p.quantity || 1} — ${money((Number(p.unit_price) || 0) * (p.quantity || 1), p.currency || "TRY")}\n${p.customer || ""}, ${p.city || ""}`;
+    return { need: "orders", reply: p.store_order_id
+      ? { text, buttons: [{ id: `order:${p.store_order_id}`, title: "Siparişi gör" }] }
+      : { text, link: { title: "Siparişi gör", url: `${SITE}/orders.html` } } };
   }
   if (kind === "stock") return { need: "products", reply: { text: `📉 Stok ${p.status === "tukendi" ? "bitti" : "bitiyor"}: ${short(p.name, 60)}${p.qty != null ? " (kalan " + p.qty + ")" : ""}`, buttons: [{ id: `stock:${p.product_id}`, title: "Stok ekle" }] } };
   if (kind === "loss_approval") return { need: "owner", reply: { text: `⚠️ Onay bekleyen sipariş: ${short(p.message, 400)}`, buttons: [{ id: `approve:${p.order_id}`, title: "Onayla" }, { id: `cancel:${p.order_id}`, title: "İptal" }] } };

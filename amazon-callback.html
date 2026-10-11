@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Bağlantısı</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; background: #0f1117; color: #fff; }
+  .box { text-align: center; padding: 32px 40px 40px; background: #171a23; border: 1px solid #2a2f3d; border-radius: 12px; max-width: 460px; width: 100%; box-sizing: border-box; }
+  #langSwitcherHost { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+  #langSwitcherHost .hs-lang { margin-left: 0; }
+  .spinner { border: 4px solid #2a2f3d; border-top: 4px solid #1D9E75; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #message { color: #cfd4de; font-size: 15px; line-height: 1.5; }
+  #message.error { color: #f28b8b; }
+  #message.success { color: #4ade80; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div id="langSwitcherHost"></div>
+  <div class="spinner" id="spinner"></div>
+  <p id="message"></p>
+</div>
+
+<script src="app.js"></script>
+<script>
+  HS.i18n.add({
+    tr: {
+      'amz.pageTitle': 'Amazon Bağlantısı',
+      'amz.connecting': 'Amazon mağazan bağlanıyor, lütfen bekle...',
+      'amz.noCode': 'Amazon bağlantısı tamamlanmadı (onay bilgisi gelmedi).',
+      'amz.noSession': 'Oturum bulunamadı, giriş sayfasına yönlendiriliyorsun...',
+      'amz.success': 'Amazon mağazan bağlandı: ',
+      'amz.sandbox': ' (test ortamı)',
+      'amz.errPrefix': 'Bağlantı hatası: ',
+      'amz.unknown': 'Bilinmeyen hata'
+    },
+    en: {
+      'amz.pageTitle': 'Amazon Connection',
+      'amz.connecting': 'Connecting your Amazon store, please wait...',
+      'amz.noCode': 'Amazon connection was not completed (no approval received).',
+      'amz.noSession': 'No session found, redirecting to the login page...',
+      'amz.success': 'Your Amazon store is connected: ',
+      'amz.sandbox': ' (test environment)',
+      'amz.errPrefix': 'Connection error: ',
+      'amz.unknown': 'Unknown error'
+    }
+  });
+
+  const msgEl = document.getElementById('message');
+  const spinnerEl = document.getElementById('spinner');
+  let msgKey = 'amz.connecting', msgExtra = '', msgClass = '';
+  function renderMsg() {
+    document.title = HS.t('amz.pageTitle');
+    msgEl.textContent = HS.t(msgKey) + msgExtra;
+    msgEl.className = msgClass;
+  }
+  function setMsg(key, cls, extra) { msgKey = key; msgClass = cls || ''; msgExtra = extra || ''; renderMsg(); }
+  window.addEventListener('hs:langchange', renderMsg);
+
+  // Amazon pazar kodu -> okunur ad
+  const NAMES = { tr: 'Türkiye', de: 'Almanya', uk: 'Birleşik Krallık', fr: 'Fransa', it: 'İtalya', es: 'İspanya', nl: 'Hollanda', se: 'İsveç', pl: 'Polonya',
+    be: 'Belçika', ie: 'İrlanda', ae: 'BAE', sa: 'Suudi Arabistan', eg: 'Mısır', in: 'Hindistan', za: 'Güney Afrika', us: 'ABD', ca: 'Kanada', mx: 'Meksika',
+    br: 'Brezilya', jp: 'Japonya', au: 'Avustralya', sg: 'Singapur' };
+
+  async function handleCallback() {
+    await HS.init({ auth: false });
+    renderMsg();
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('spapi_oauth_code');
+    const state = params.get('state');
+    const sellingPartnerId = params.get('selling_partner_id');
+    if (!code || !state) {
+      setMsg('amz.noCode', 'error'); spinnerEl.style.display = 'none';
+      setTimeout(() => window.location.href = 'accounts.html', 3000);
+      return;
+    }
+    const { data: { session } } = await HS.db.auth.getSession();
+    if (!session) {
+      setMsg('amz.noSession');
+      setTimeout(() => window.location.href = 'index.html', 2000);
+      return;
+    }
+    try {
+      const response = await fetch(HS.SUPABASE_URL + '/functions/v1/amazon-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+        body: JSON.stringify({ action: 'callback', code, state, sellingPartnerId, userAccessToken: session.access_token }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.ok) {
+        const names = (result.marketplaces || []).map(c => NAMES[String(c).replace('amazon_', '')] || c).join(', ');
+        setMsg('amz.success', 'success', names + (result.environment === 'sandbox' ? HS.t('amz.sandbox') : ''));
+        spinnerEl.style.display = 'none';
+        setTimeout(() => window.location.href = 'accounts.html', 2500);
+      } else {
+        throw new Error(result.error || HS.t('amz.unknown'));
+      }
+    } catch (err) {
+      setMsg('amz.errPrefix', 'error', err.message);
+      spinnerEl.style.display = 'none';
+      setTimeout(() => window.location.href = 'accounts.html', 5000);
+    }
+  }
+  handleCallback();
+</script>
+</body>
+</html>

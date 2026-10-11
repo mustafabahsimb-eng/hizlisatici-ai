@@ -66,6 +66,8 @@ Her adımı bitir, Playwright ile test et, canlıda çalışır halde GitHub'a g
 - Linkten ürün yükleme: product-import (platform okuyucuları; engellenen sitede ücretli okuma servisi anahtarı SCRAPER_ENABLED, varsayılan kapalı), source-sync (30 dk; "Fiyat ve stoğu otomatik güncel tut"), channel-copy ("✨ Metni kanala göre yaz"). Trendyol sunucudan uluslararası vitrin (Euro) verir.
 - Görsel tamamlama: image-complete-worker (2 dk; image_jobs / image_job_batches; panelde bildirim). Sıra: marka sitesi (basın/medya kiti → ürün sayfası) → toptancı sitesi → CJ/AliExpress → "Görsel eksik". product_images.source_kind/source_url kaynak; product_images.source yalnız supplier|studio|upload|other.
 - Ürün düzenleme: urun-duzenle.html?id= (panelde "✏️ Ürünü düzenle").
+- Seltigo Asistan: _shared/assistant-core.ts + assistant-channels.ts; assistant (kuyruk 1 dk, raporlar), telegram-bot, whatsapp-webhook (ASSISTANT_WA_PHONE_ID -> asistan), meta-dm-webhook (varsayılan kapalı); panel asistan.html. Telegram/WhatsApp canlı testi Mustafa hesapları açınca (ertelendi).
+- Amazon SP-API: _shared/amazon.ts (pazarlar, LWA, sp()), _shared/amazon-listing.ts (ilan), _shared/amazon-orders.ts; amazon-connect (bağlanma, selftest), amazon-orders (15 dk), sync-worker amazon_* adaptörü. Varsayılan SANDBOX (AMAZON_LIVE yok). Ayrıntı docs/amazon-sp-api.md.
 - Müşteri takip sayfası: takip.html?t=<tracking_token> (get_order_tracking RPC).
 
 ## Açık işler ve bulgular (güncel durum: YOL-HARITASI.md "Durum notları")

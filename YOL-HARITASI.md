@@ -162,8 +162,14 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
 
 ## Durum notları (11 Ekim 2026)
+**Amazon SP-API (13 Ekim 2026)** — altyapı bitti, varsayılan SANDBOX; ayrıntı docs/amazon-sp-api.md
+- Hesaplarım'dan Amazon onayıyla bağlanma (TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (ASIN eşleme / AI'lı tam ilan / seçenekler / prova), sipariş çekme + tedarikçiye yönlendirme + kargo bildirimi (amazon-orders 15 dk). Testler: Amazon'un sandbox örnekleriyle 9/9, Hesaplarım 8/8.
+- Bekleyen (Mustafa): Amazon geliştirici uygulaması (Profesyonel satıcı hesabı ya da şirketle Solution Provider Portal) -> secrets -> gerçek sandbox testi. Bölge adları (Avrupa / Kuzey Amerika / Uzak Doğu) onay bekliyor.
+
 **Seltigo Asistan (13 Ekim 2026)**
 - Kod ve altyapı bitti, canlıda: ortak çekirdek (_shared/assistant-core.ts), kanal göndericileri (_shared/assistant-channels.ts), assistant (kod, durum, bildirim kuyruğu 1 dk, sabah raporu / haftalık özet, bağlantı uyarıları, WhatsApp şablonu onaya gönderme), telegram-bot, whatsapp-webhook (Seltigo numarası -> asistan), meta-dm-webhook (Instagram DM / Messenger, varsayılan KAPALI). Panel: asistan.html (🤖 Asistan). Testler: asistan_cekirdek.py 21/21, asistan_panel.py 11/11.
+- Arayüz adları onaylandı (13 Ekim): eklenti adları, asistan düğmeleri ([Evet] [Vazgeç] vb.), 🤖 Asistan sayfası adları.
+- Canlı test ERTELENDİ (Mustafa, 13 Ekim): Telegram ve WhatsApp hesaplarını sonra açacak; haber verince canlı test yapılacak.
 - Bekleyen (Mustafa'nın hesabı): Telegram bot anahtarı (BotFather) -> secret TELEGRAM_BOT_TOKEN + assistant action telegram_webhook; Meta WhatsApp test numarası (ASSISTANT_WA_PHONE_ID / TOKEN / WABA_ID / DISPLAY_NUMBER, ASSISTANT_WA_ENABLED=true) -> uçtan uca test + seltigo_asistan_bildirim_v1 şablonunu onaya gönder; sesli komut için ücretli STT anahtarı (STT_API_KEY, isteğe bağlı).
 - Eksik üreticiler: iade uyarısı (iade otomasyonu ile), rakip fiyat uyarısı (fiyat takibi ile). Pazaryeri kanallarına (Trendyol vb.) asistandan gönderim şimdilik "bağlantın canlı değil" der; ilan aktarımı sync kuyruğuna bağlanacak (eksik taramasında).
 **Çözüldü**

@@ -4,6 +4,8 @@
 // Zamanlanmış görev (cron) çağırır. Güvenlik: CRON_SECRET.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { AMAZON_MARKETS, marketByCode, amazonConfigured } from "../_shared/amazon.ts";
+import { submitListing, withdrawListing } from "../_shared/amazon-listing.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -395,6 +397,64 @@ async function genericProvaAdapter(action, listing) {
   };
 }
 
+// 🟡 Amazon (TR + Global; SP-API Listings Items)
+// Bağlantı yoksa / Amazon uygulaması tanımlı değilse genel prova. Bağlantıda dry_run açıksa (varsayılan) Amazon'un
+// kendi kontrolü (VALIDATION_PREVIEW) çalışır, hiçbir şey yayınlanmaz. Sandbox bağlantısı sandbox uç noktasına gider.
+async function amazonAdapter(action, listing) {
+  const now = new Date().toISOString();
+  const market = marketByCode(listing.marketplace_code);
+  let conn = null;
+  if (listing.connection_id) {
+    const { data } = await db.from("store_connections").select("id, status, environment, external_seller_id, settings").eq("id", listing.connection_id).maybeSingle();
+    conn = data || null;
+  }
+  if (!market || !conn || conn.status !== "connected" || !amazonConfigured()) return genericProvaAdapter(action, listing);
+  const { data: cred } = await db.rpc("store_connection_get_credentials", { p_connection_id: conn.id });
+  if (!cred || !cred.refresh_token) throw new Error("amazon_credentials_missing");
+  const ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox" };
+  const sellerId = conn.external_seller_id || cred.seller_id;
+  const preview = (conn.settings || {}).dry_run !== false;
+
+  if (action === "unpublish") {
+    if (preview) {
+      const validation = { ...(listing.validation || {}), ok: true, dry_run: true, action: "unpublish", note: "Amazon'da stok 0 yapılarak satışa kapatılır.", checked_at: now };
+      return { patch: { validation, validated_at: now, last_sync_error: "prova_ok" }, info: { dry_run: true, action } };
+    }
+    const n = await withdrawListing(ctx, sellerId, market, listing);
+    return { patch: { validated_at: now }, info: { withdrawn: n } };
+  }
+
+  let product = null, variants = [], images = [];
+  if (listing.product_id != null) {
+    const { data: p } = await db.from("products").select("*").eq("id", listing.product_id).maybeSingle();
+    product = p || null;
+    const { data: v } = await db.from("product_variants").select("*").eq("product_id", listing.product_id).is("deleted_at", null).order("created_at");
+    variants = v || [];
+    const { data: imgs } = await db.from("product_images").select("url, position").eq("product_id", listing.product_id).order("position");
+    images = (imgs || []).map((i) => i.url).filter(Boolean);
+    if (!images.length && product && product.image_url) images = [product.image_url];
+  }
+  if (!product) throw new Error("product_not_found");
+
+  const r = await submitListing({ db, ctx, market, sellerId, listing, product, variants, images, stockQty: product.stock_qty, preview });
+  const validation = {
+    ok: r.ok, dry_run: preview, action: "publish", marketplace: listing.marketplace_code, errors: r.errors, warnings: r.warnings,
+    amazon: r.amazon, checked_at: now,
+  };
+  const amzSkus: any[] = Array.isArray(r.amazon.skus) ? r.amazon.skus : [];
+  const main = amzSkus.find((x) => x.parent) || amzSkus[0];
+  return {
+    patch: {
+      validation, validated_at: now,
+      last_sync_error: preview ? (r.ok ? "prova_ok" : "prova_failed") : (r.ok ? null : "amazon_rejected"),
+      external_listing_id: main ? main.sku : listing.external_listing_id,
+      ...(r.amazon.url ? { external_url: r.amazon.url } : {}),
+      ...(!preview && r.ok && !listing.published_at ? { published_at: now } : {}),
+    },
+    info: { dry_run: preview, ok: r.ok, errors: r.errors.length, warnings: r.warnings.length, skus: r.skus.length },
+  };
+}
+
 const ADAPTERS = {
   own_store: ownStoreAdapter,
   trendyol_tr: trendyolAdapter,
@@ -403,8 +463,8 @@ const ADAPTERS = {
   ciceksepeti_tr: genericProvaAdapter,
   pttavm_tr: genericProvaAdapter,
   pazarama_tr: genericProvaAdapter,
-  amazon_tr: genericProvaAdapter,
 };
+for (const m of AMAZON_MARKETS) ADAPTERS[m.code] = amazonAdapter;
 
 // ---------------------------------------------------------
 // Tek bir işi işle
