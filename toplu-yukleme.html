@@ -327,7 +327,7 @@
       addedUnmatched: '{n} ürün önizlemeye eklendi (resim ve özellikleri yok; istersen linkten çekip tamamlayabilirsin).',
       urlPh: 'https://tedarikci.com/kategori/ip-kameralar  veya  https://.../bayi.xml',
       fetchBtn: '🔍 Ürünleri Çek',
-      s1Hint: '<b>Tek ürün linki</b> → o ürün gelir. <b>Kategori linki</b> → o kategorideki tüm ürünler (sayfa sayfa) gelir. <b>XML linki</b> (bayi panelindeki XML entegrasyon adresi) → firmanın tüm ürünleri saniyeler içinde gelir; en hızlısı budur.',
+      s1Hint: '<b>Tek ürün linki</b> → o ürün gelir. <b>Kategori linki</b> → o kategorideki tüm ürünler (sayfa sayfa) gelir. <b>Site ya da mağaza adresi</b> (AliExpress, Trendyol, Shopify, WooCommerce ve diğer siteler) → sitedeki tüm ürünler seçenekleriyle (beden, renk) gelir. <b>XML linki</b> (bayi panelindeki XML entegrasyon adresi) → firmanın tüm ürünleri saniyeler içinde gelir; en hızlısı budur.',
       stop: 'Durdur',
       fetching: 'Sayfa okunuyor...',
       scanning: 'Kategori taranıyor: {n} ürün linki bulundu (sayfa {p})',
@@ -398,6 +398,12 @@
       specsHeader: 'Teknik Özellikler',
       delSel: '🗑 Seçilenleri listeden çıkar ({n})',
       clearList: '↺ Listeyi temizle',
+      copyBtn: '✨ Metni kanala göre yaz',
+      copyRunning: 'Yazılıyor... ({d} / {t})',
+      copyDone: '{n} ürünün metni yeniden yazıldı.',
+      copyErr: 'Bazı ürünlerin metni yazılamadı: ',
+      copyNone: 'Önce listeden ürün seç.',
+      copyOwn: '🏪 Kendi Mağazam',
       rowDel: 'Listeden çıkar',
       confirmDelSel: '{n} ürün önizleme listesinden çıkarılsın mı? (Panelindeki ürünler etkilenmez.)',
       confirmClear: 'Önizleme listesi tamamen temizlensin mi? (Panelindeki ürünler etkilenmez.)',
@@ -453,7 +459,7 @@
       addedUnmatched: '{n} products added to the preview (no images or specs; you can fetch them from a link to complete them).',
       urlPh: 'https://supplier.com/category/ip-cameras  or  https://.../dealer.xml',
       fetchBtn: '🔍 Fetch Products',
-      s1Hint: '<b>Single product link</b> → that product. <b>Category link</b> → every product in that category (page by page). <b>XML link</b> (the XML integration address in your dealer panel) → all of the supplier\'s products in seconds; the fastest option.',
+      s1Hint: '<b>Single product link</b> → that product. <b>Category link</b> → every product in that category (page by page). <b>Site or store address</b> (AliExpress, Trendyol, Shopify, WooCommerce and other sites) → every product on the site with its variants (size, colour). <b>XML link</b> (the XML integration address in your dealer panel) → all of the supplier\'s products in seconds; the fastest option.',
       stop: 'Stop',
       fetching: 'Reading the page...',
       scanning: 'Scanning category: {n} product links found (page {p})',
@@ -524,6 +530,12 @@
       specsHeader: 'Technical Specifications',
       delSel: '🗑 Remove selected from list ({n})',
       clearList: '↺ Clear list',
+      copyBtn: '✨ Rewrite text for the channel',
+      copyRunning: 'Writing... ({d} / {t})',
+      copyDone: 'Text rewritten for {n} products.',
+      copyErr: 'Some texts could not be written: ',
+      copyNone: 'Select products from the list first.',
+      copyOwn: '🏪 My Store',
       rowDel: 'Remove from list',
       confirmDelSel: 'Remove {n} products from the preview list? (Products in your dashboard are not affected.)',
       confirmClear: 'Clear the whole preview list? (Products in your dashboard are not affected.)',
@@ -644,6 +656,51 @@
   }
 
   // ---------- Çekme ----------
+  // ---------- ✨ Metni kanala göre yaz ----------
+  let copyChannel = 'own_store', copyRunning = false, copyProgress = '';
+  async function rewriteCopy() {
+    if (copyRunning) return;
+    const sel = items.filter(i => i.selected && !i.exists);
+    if (!sel.length) { toast(t('copyNone'), true); return; }
+    copyRunning = true;
+    const BATCH = 8, total = sel.length;
+    let done = 0, ok = 0, lastErr = '', idx = 0;
+    copyProgress = fmt(t('copyRunning'), { d: 0, t: total });
+    renderPreview();
+    const batches = [];
+    for (let i = 0; i < sel.length; i += BATCH) batches.push(sel.slice(i, i + BATCH));
+    const worker = async () => {
+      while (idx < batches.length) {
+        const b = batches[idx++];
+        try {
+          const res = await fetch(HS.SUPABASE_URL + '/functions/v1/channel-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+            body: JSON.stringify({ channel: copyChannel, items: b.map(it => ({ name: it.name, description: it.description, specs: it.specs, brand: it.brand, category: it.category })) })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.error || !Array.isArray(data.items)) throw new Error(data.error || ('HTTP ' + res.status));
+          data.items.forEach((o, k) => {
+            if (!o || !o.title) return;
+            b[k].name = o.title;
+            b[k].description = o.description || b[k].description;
+            b[k].key = itemKey(b[k]);
+            ok++;
+          });
+        } catch (e) { lastErr = e.message || String(e); }
+        done += b.length;
+        copyProgress = fmt(t('copyRunning'), { d: Math.min(done, total), t: total });
+        const btn = document.getElementById('copyBtn');
+        if (btn) btn.textContent = copyProgress;
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    copyRunning = false;
+    renderPreview();
+    if (lastErr) toast(t('copyErr') + lastErr, true);
+    else toast(fmt(t('copyDone'), { n: HS.number(ok) }));
+  }
+
   async function callImport(url) {
     const res = await fetch(HS.SUPABASE_URL + '/functions/v1/product-import', {
       method: 'POST',
@@ -863,6 +920,11 @@
         chip('all', t('fAll'), items.length) + chip('selected', t('fSelected'), nSel) +
         chip('problem', t('fProblem'), nProb) + chip('exists', t('fExists'), nEx) +
         '<div class="spacer"></div>' +
+        '<select id="copyChannel" class="btn-small" style="width:auto" onchange="copyChannel=this.value">' +
+          [['own_store', t('copyOwn')], ['trendyol', 'Trendyol'], ['hepsiburada', 'Hepsiburada'], ['n11', 'n11'], ['instagram', 'Instagram'], ['whatsapp', 'WhatsApp'], ['etsy', 'Etsy'], ['amazon', 'Amazon']]
+            .map(o => '<option value="' + o[0] + '"' + (copyChannel === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') +
+        '</select>' +
+        '<button class="btn-secondary btn-small" id="copyBtn" onclick="rewriteCopy()"' + (nSel && !copyRunning ? '' : ' disabled') + '>' + esc(copyRunning ? copyProgress : t('copyBtn')) + '</button>' +
         '<button class="btn-secondary btn-small" onclick="removeSelected()"' + (nSel ? '' : ' disabled') + '>' + esc(fmt(t('delSel'), { n: HS.number(nSel) })) + '</button>' +
         '<button class="btn-secondary btn-small" onclick="clearList()">' + esc(t('clearList')) + '</button>' +
       '</div>' +

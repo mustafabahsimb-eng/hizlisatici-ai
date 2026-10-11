@@ -28,6 +28,18 @@ def main():
         row = page.locator("#previewBox tbody tr").first.inner_text()
         c.check("Önizlemede ürün ve seçenek sayısı görünüyor", "seçenek" in row, row.replace("\n", " ")[:160])
 
+        # ✨ Metni kanala göre yaz (Trendyol kuralları: Türkçe, emojisiz, en fazla 100 karakter)
+        old_name = page.inner_text("#previewBox .pname")
+        c.check("'✨ Metni kanala göre yaz' düğmesi görünüyor", page.inner_text("#copyBtn") == "✨ Metni kanala göre yaz")
+        page.select_option("#copyChannel", "trendyol")
+        page.click("#copyBtn")
+        page.wait_for_function("() => { const b = document.getElementById('copyBtn'); return b && b.textContent.startsWith('✨'); }", timeout=120000)
+        new_name = page.inner_text("#previewBox .pname")
+        import re
+        c.check("Başlık Trendyol'a göre yeniden yazıldı", new_name != old_name and len(new_name) <= 100
+                and not re.search(r"[\U0001F300-\U0001FAFF]", new_name), f"{old_name} → {new_name}")
+        page.screenshot(path=str(shots / "linkten_yukleme_metin.png"))
+
         c.check("'Fiyat ve stoğu otomatik güncel tut' görünüyor ve seçili",
                 page.is_visible("#syncChk") and page.is_checked("#syncChk"), page.inner_text("label:has(#syncChk)"))
         page.select_option("#syncHours", "6")
