@@ -58,6 +58,11 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const slug = url.searchParams.get("slug");
+    // Sayfalama (mağaza sayfası 48'er yükler); limit verilmezse tümü (catalog-feed ve eski çağrılar)
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? Math.max(1, Math.min(100, Number(limitParam) || 48)) : null;
+    const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+    let total: number | null = null;
     if (!slug) return json({ error: "slug parametresi gerekli" }, 400);
 
     const supabase = createClient(
@@ -78,14 +83,27 @@ serve(async (req) => {
 
     try {
       // ===== YENİ YAPI: 1) Kendi Mağazam ilanları =====
-      const { data: listings, error: listErr } = await supabase
+      let lq = supabase
         .from("listings")
-        .select("*")
+        // Satılabilir ürünler veritabanında süzülür (silinmiş / birleştirilmiş / vitrinden gizlenmiş ürünün ilanı sayfaya girmez)
+        .select("*, p:products!listings_product_id_fkey!inner(id, stock_status)", limit ? { count: "exact" } : undefined)
         .eq("user_id", store.user_id)
         .eq("marketplace_code", "own_store")
         .eq("status", "published")
-        .order("created_at", { ascending: false });
-      if (listErr) throw listErr;
+        .is("deleted_at", null)
+        .is("p.deleted_at", null)
+        .is("p.merged_into", null)
+        .not("p.store_visible", "is", false)
+        .or("stock_status.is.null,stock_status.not.in.(tukendi,out_of_stock)", { referencedTable: "p" })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true });
+      if (limit) lq = lq.range(offset, offset + limit - 1);
+      const lr = await lq;
+      // Son sayfanın ötesi (PGRST103) = boş sayfa
+      const listings = lr.error && (lr.error as any).code === "PGRST103" ? [] : lr.data;
+      const count = lr.count;
+      if (lr.error && (lr.error as any).code !== "PGRST103") throw lr.error;
+      if (limit) total = count ?? null;
 
       // ===== 2) Bu ilanların ürünleri (ayrı sorgu, belirsizlik yok) =====
       const ids = [...new Set((listings || []).map((l: any) => l.product_id).filter((x: any) => x != null))];
@@ -157,7 +175,8 @@ serve(async (req) => {
       business_name: store.business_name || null, business_logo_url: store.business_logo_url || null,
       website_url: store.website_url || null, buy_on_website: store.buy_on_website === true,
     };
-    return json({ store: publicStore, products, source });
+    const next_offset = limit && total != null && offset + limit < total ? offset + limit : null;
+    return json({ store: publicStore, products, source, ...(limit ? { total, next_offset } : {}) });
   } catch (err) {
     console.error(err);
     return json({ error: (err as Error).message || "Sunucu hatası" }, 500);

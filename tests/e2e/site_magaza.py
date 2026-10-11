@@ -77,6 +77,15 @@ def main():
             store.goto(f"{SITE}/magaza.html?slug={slug}")
             store.wait_for_selector(".card", timeout=60000)
             c.check("Mağaza başlığında site bağlantısı", store.is_visible("#storeWebsite") and "demos.flatsome.com" in store.inner_text("#storeWebsite"))
+            first = store.locator(".card").count()
+            total = int(store.inner_text("#storeSub").split(" ")[0])  # mağazadaki tüm ürünler (öncekiler dahil)
+            for _ in range(10):
+                store.mouse.wheel(0, 20000)
+                store.wait_for_timeout(1200)
+                if store.locator(".card").count() >= total:
+                    break
+            allc = store.locator(".card").count()
+            c.check("Mağaza sayfa sayfa yükleniyor (48 + kaydırınca devamı)", first == min(48, total) and allc == total and total >= n, f"ilk {first}, kaydırınca {allc} / {total}")
             links = store.locator(".seller-link")
             c.check("Ürün kartında \"Satıcının sitesinde gör\"", links.count() >= 10 and links.first.inner_text() == "Satıcının sitesinde gör"
                     and "demos.flatsome.com" in (links.first.get_attribute("href") or ""), str(links.count()))

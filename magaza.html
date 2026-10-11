@@ -104,6 +104,7 @@
   }
   .toast.err{border-color:var(--danger);}
   .loading{text-align:center; padding:60px 20px; color:var(--text-dim);}
+  .more-sentinel { height: 1px; }
   .seller-link { display: block; text-align: center; margin-top: 8px; font-size: 13px; color: #6ee7b7; text-decoration: none; }
   .seller-link:hover { text-decoration: underline; }
   .store-website { display: inline-block; margin-top: 4px; font-size: 13px; color: #6ee7b7; text-decoration: none; }
@@ -376,7 +377,7 @@ function renderStore(){
     if (w) { ws.href = w; ws.textContent = '🌐 ' + w.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
   }
   document.title = name + t('pageSuffix');
-  document.getElementById('storeSub').textContent = t('productsN', { n: currentProducts.length });
+  document.getElementById('storeSub').textContent = t('productsN', { n: storeTotal || currentProducts.length });
 }
 
 function renderProducts(){
@@ -387,9 +388,14 @@ function renderProducts(){
     return;
   }
   content.innerHTML = '<div class="grid" id="productGrid"></div>';
+  appendCards(currentProducts);
+  updateSentinel();
+}
+const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%2316213a'/%3E%3C/svg%3E";
+function appendCards(list){
   const grid = document.getElementById('productGrid');
-  const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%2316213a'/%3E%3C/svg%3E";
-  currentProducts.forEach(p => {
+  if (!grid) return;
+  list.forEach(p => {
     const title = productTitle(p);
     const desc = (p.generated_description || '').replace(/<[^>]*>/g, '').slice(0, 140);
     const img = safeImg(p.image_url) || placeholderImg;
@@ -439,6 +445,46 @@ function renderProducts(){
   });
 }
 
+// Sayfa sayfa yükleme: ilk 48 ürün, aşağı kaydırdıkça devamı (çok ürünlü mağazada sayfa hızlı açılır)
+const PAGE_SIZE = 48;
+let storeTotal = 0, nextOffset = null, loadingMore = false;
+async function fetchPage(offset){
+  const res = await fetch(SUPABASE_URL + '/functions/v1/get-store?slug=' + encodeURIComponent(slug) + '&limit=' + PAGE_SIZE + '&offset=' + offset, {
+    headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || t('loadFail'));
+  return data;
+}
+async function loadMore(){
+  if (loadingMore || nextOffset == null) return;
+  loadingMore = true;
+  try {
+    const data = await fetchPage(nextOffset);
+    const more = (data.products || []).filter(p => !currentProducts.some(x => x.id === p.id));
+    currentProducts = currentProducts.concat(more);
+    nextOffset = data.next_offset ?? null;
+    appendCards(more);
+    updateSentinel();
+  } catch (e) { console.error(e); }
+  finally { loadingMore = false; }
+}
+let moreObserver = null;
+function updateSentinel(){
+  let s = document.getElementById('moreSentinel');
+  if (nextOffset == null) { if (s) s.remove(); return; }
+  if (!s) {
+    s = document.createElement('div');
+    s.id = 'moreSentinel';
+    s.className = 'more-sentinel';
+    document.getElementById('content').appendChild(s);
+  }
+  if (!moreObserver && 'IntersectionObserver' in window) {
+    moreObserver = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) loadMore(); }, { rootMargin: '600px' });
+  }
+  if (moreObserver) { moreObserver.disconnect(); moreObserver.observe(s); }
+}
+
 async function loadStore(){
   if (!slug){
     document.getElementById('content').innerHTML = '<div class="empty-msg">' + escapeHtml(t('noSlug')) + '</div>';
@@ -446,13 +492,11 @@ async function loadStore(){
     return;
   }
   try {
-    const res = await fetch(SUPABASE_URL + '/functions/v1/get-store?slug=' + encodeURIComponent(slug), {
-      headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || t('loadFail'));
+    const data = await fetchPage(0);
     currentStore = data.store;
     currentProducts = data.products || [];
+    storeTotal = data.total ?? currentProducts.length;
+    nextOffset = data.next_offset ?? null;
     // Adreste dil yoksa: ilanların diline göre
     if (!T[urlLang] && currentProducts.length && T[currentProducts[0].language]) {
       LANG = currentProducts[0].language;
