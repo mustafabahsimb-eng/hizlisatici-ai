@@ -10,7 +10,7 @@
 // Güvenlik: CRON_SECRET (sync-worker ile aynı şifre).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
+import { notifyWhatsApp } from "../_shared/customer-notify.ts";
 import { installEgress } from "../_shared/egress.ts";
 installEgress(); // sabit IP çıkışı (varsayılan kapalı; bkz. docs/sabit-ip-kurulumu.md)
 
@@ -20,12 +20,6 @@ const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 const AUTH_URL = "https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken";
 const ORDER_DETAIL_URL = "https://developers.cjdropshipping.com/api2.0/v1/shopping/order/getOrderDetail";
-const GRAPH = "https://graph.facebook.com/v21.0";
-
-// wa-template-worker ile aynı şablon
-const WA_TEMPLATE_NAME = "seltigo_kargo_takip_v1";
-const WA_TEMPLATE_LANG = "tr";
-
 const MAX_ORDERS = 100;        // bir çalışmada en fazla kaç sipariş
 const TIME_BUDGET_MS = 45000;  // Edge Function süresini aşmamak için
 
@@ -113,18 +107,6 @@ async function getCjToken(apiKey: string): Promise<string | null> {
   return await cjAccessToken(apiKey);
 }
 
-// Müşteri telefonunu WhatsApp biçimine çevir (TR varsayılan)
-function waPhone(raw: string | null, country: string | null): string | null {
-  let d = String(raw || "").replace(/\D/g, "");
-  if (!d) return null;
-  if (d.startsWith("00")) d = d.slice(2);
-  if ((country || "TR").toUpperCase() === "TR") {
-    if (d.length === 11 && d.startsWith("0")) d = "90" + d.slice(1);
-    else if (d.length === 10 && d.startsWith("5")) d = "90" + d;
-  }
-  return d.length >= 10 && d.length <= 15 ? d : null;
-}
-
 // Mağaza siparişini güncelle; uygunsa müşteriye WhatsApp gönder
 async function updateStoreOrder(o: any, newStatus: string, trackNumber: string | null, carrier: string | null, summary: any) {
   if (!o.store_order_id) return;
@@ -144,69 +126,11 @@ async function updateStoreOrder(o: any, newStatus: string, trackNumber: string |
 
   const number = trackNumber || so.tracking_number;
   if (!number || so.whatsapp_notified_at || newStatus === "iptal") return;
-  const sent = await notifyWhatsApp(o.user_id, so, number);
+  const sent = await notifyWhatsApp(db, o.user_id, so, number);
   if (sent === true) summary.whatsapp++;
   else if (sent) summary.errors.push(`${o.id}: WhatsApp: ${sent}`);
 }
 
-// true: gönderildi, null: gönderilmesi gerekmiyor/şartlar yok, string: hata
-async function notifyWhatsApp(userId: string, so: any, trackNumber: string): Promise<true | null | string> {
-  const { data: prof } = await db.from("user_profiles").select("wa_tracking_notify").eq("user_id", userId).maybeSingle();
-  if (prof && prof.wa_tracking_notify === false) return null;
-  if (!(await featureEnabled(userId, "wa_customer_notify"))) return null;
-
-  const { data: tpl } = await db
-    .from("whatsapp_templates")
-    .select("channel_id, status")
-    .eq("user_id", userId)
-    .eq("name", WA_TEMPLATE_NAME)
-    .eq("language", WA_TEMPLATE_LANG)
-    .eq("status", "APPROVED")
-    .limit(1)
-    .maybeSingle();
-  if (!tpl) return null; // şablon henüz onaylı değil: sadece takip sayfası
-
-  const { data: ch } = await db
-    .from("social_channels")
-    .select("account_id, access_token, active")
-    .eq("id", tpl.channel_id)
-    .maybeSingle();
-  if (!ch?.active || !ch.access_token) return null;
-
-  const to = waPhone(so.customer_phone, so.customer_country);
-  if (!to) return "müşteri telefonu geçersiz";
-
-  const { data: store } = await db.from("store_settings").select("store_name, business_name").eq("user_id", userId).maybeSingle();
-  const storeName = String(store?.store_name || store?.business_name || "Mağaza").slice(0, 60);
-  const firstName = String(so.customer_name || "").trim().split(/\s+/)[0] || "Merhaba";
-
-  const r = await fetch(`${GRAPH}/${ch.account_id}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ch.access_token}` },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "template",
-      template: {
-        name: WA_TEMPLATE_NAME,
-        language: { code: WA_TEMPLATE_LANG },
-        components: [
-          { type: "body", parameters: [
-            { type: "text", text: firstName.slice(0, 40) },
-            { type: "text", text: storeName },
-            { type: "text", text: String(trackNumber).slice(0, 60) },
-          ] },
-          { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: so.tracking_token }] },
-        ],
-      },
-    }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d?.error) return String(d?.error?.message || `HTTP ${r.status}`).slice(0, 160);
-
-  await db.from("store_orders").update({ whatsapp_notified_at: new Date().toISOString() }).eq("id", so.id);
-  return true;
-}
 
 // ---------------------------------------------------------
 // AliExpress (satıcının kendi hesabı; sipariş-worker ile aynı anahtar yönetimi)

@@ -19,6 +19,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { installEgress } from "../_shared/egress.ts";
 import { marketByCode } from "../_shared/amazon.ts";
+import { notifyWhatsApp } from "../_shared/customer-notify.ts";
 import { buyAmazonLabel, labelToPdf, parcelFor, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
 installEgress(); // sabit IP çıkışı (Yurtiçi canlı ortamı IP izni ister; bkz. docs/sabit-ip-kurulumu.md)
 
@@ -380,7 +381,11 @@ async function createShipment(sh: any) {
   if (mo) {
     // Pazaryeri siparişi: takip numarası gelince amazon-orders Amazon'a "gönderildi" bildirir
     if (r.tracking) await db.from("marketplace_orders").update({ tracking_number: r.tracking, carrier: patch.tracking_carrier }).eq("id", mo.id);
-  } else await db.from("store_orders").update(patch).eq("id", order.id);
+  } else {
+    await db.from("store_orders").update(patch).eq("id", order.id);
+    // Kendi gönderdiği sipariş: takip numarası çıkınca müşteriye WhatsApp (CJ / AliExpress akışıyla aynı şablon)
+    if (r.tracking && !order.whatsapp_notified_at) await notifyWhatsApp(db, sh.user_id, { ...order, tracking_number: r.tracking }, r.tracking).catch(() => null);
+  }
   return { created: true, ref: r.ref };
 }
 
@@ -418,6 +423,11 @@ async function trackShipment(sh: any) {
       if ((t.status === "shipped" || t.status === "delivered") && !so.shipped_at) { p.shipped_at = now; p.status = "shipped"; }
       if (t.status === "delivered" && !so.delivered_at) { p.delivered_at = now; p.status = "delivered"; }
       if (Object.keys(p).length) await db.from("store_orders").update(p).eq("id", so.id);
+      const num = t.tracking || so.tracking_number;
+      if (num && t.status !== "cancelled") {
+        const { data: full } = await db.from("store_orders").select("*").eq("id", so.id).maybeSingle();
+        if (full && !full.whatsapp_notified_at) await notifyWhatsApp(db, sh.user_id, full, num).catch(() => null);
+      }
     }
   }
   return { status: t.status, tracking: t.tracking || null };
@@ -461,7 +471,8 @@ Deno.serve(async (req) => {
       if (body?.action === "create" && body?.userId && body?.marketplaceOrderId) return json(await enqueueMp(String(body.userId), String(body.marketplaceOrderId), body?.accountId));
       if (body?.action === "create" && body?.userId && body?.storeOrderId) return json(await enqueue(String(body.userId), String(body.storeOrderId), body?.accountId));
       const results = await runQueue(body?.shipmentId ? String(body.shipmentId) : undefined);
-      return json({ ok: true, processed: results.length, results });
+      const reverified = body?.shipmentId ? [] : await reverifyPending();
+      return json({ ok: true, processed: results.length, results, reverified });
     }
     // Satıcı
     const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
@@ -495,8 +506,14 @@ async function connect(userId: string, b: any) {
   if (!PROVIDERS[provider]) return { ok: false, error: "Desteklenmeyen kargo firması" };
   const mode = b.mode === "test" ? "test" : "live";
   const c = b.credentials && typeof b.credentials === "object" ? b.credentials : {};
-  try { await PROVIDERS[provider].verify(mode, c); } catch (e) { return { ok: false, error: short((e as Error).message) }; }
-  const settings = { sender: b.settings?.sender || {} };
+  // Kargo sunucusuna ulaşılamazsa (yavaş test sunucusu vb.) hesap kaydedilir, doğrulama arka planda tekrar denenir (10 dk'lık görev)
+  let verifyPending = false;
+  try { await PROVIDERS[provider].verify(mode, c); } catch (e) {
+    const msg = short((e as Error).message);
+    if (!isNetworkError(msg)) return { ok: false, error: msg };
+    verifyPending = true;
+  }
+  const settings: Record<string, unknown> = { sender: b.settings?.sender || {}, ...(verifyPending ? { verify_pending: true } : {}) };
   const { data: acc, error } = await db.from("shipping_accounts").upsert({
     user_id: userId, provider, mode, account_name: b.accountName || CARRIER_NAMES[provider], settings,
     status: "connected", last_error: null, updated_at: new Date().toISOString(),
@@ -508,7 +525,32 @@ async function connect(userId: string, b: any) {
     await db.from("shipping_accounts").update({ is_default: false }).eq("user_id", userId).neq("id", acc.id);
     await db.from("shipping_accounts").update({ is_default: true }).eq("id", acc.id);
   }
-  return { ok: true, accountId: acc.id };
+  return { ok: true, accountId: acc.id, ...(verifyPending ? { verifyPending: true, note: "Kargo sunucusu şu an yanıt vermiyor; bilgilerin kaydedildi, doğrulama arka planda tekrar denenecek." } : {}) };
+}
+
+function isNetworkError(msg: string): boolean {
+  return /bağlanılamadı|timed out|timeout|ECONN|network|fetch failed|HTTP 5\d\d/i.test(msg);
+}
+
+// Doğrulaması bekleyen kargo hesapları: tekrar dene; bilgi yanlışsa hesap hataya düşer + satıcıya uyarı
+async function reverifyPending() {
+  const { data: accs } = await db.from("shipping_accounts").select("id, user_id, provider, mode, settings").eq("status", "connected").eq("settings->>verify_pending", "true").limit(10);
+  const out: unknown[] = [];
+  for (const a of accs || []) {
+    try {
+      await PROVIDERS[a.provider].verify(a.mode, await creds(a.id));
+      const { verify_pending: _v, ...rest } = a.settings || {};
+      await db.from("shipping_accounts").update({ settings: rest, last_error: null, updated_at: new Date().toISOString() }).eq("id", a.id);
+      out.push({ id: a.id, verified: true });
+    } catch (e) {
+      const msg = short((e as Error).message);
+      if (isNetworkError(msg)) { out.push({ id: a.id, pending: true }); continue; }
+      await db.from("shipping_accounts").update({ status: "error", last_error: msg, updated_at: new Date().toISOString() }).eq("id", a.id);
+      await db.rpc("assistant_enqueue", { p_user: a.user_id, p_kind: "connection", p_payload: { name: CARRIER_NAMES[a.provider] || a.provider }, p_dedupe: "ship:" + a.id });
+      out.push({ id: a.id, error: msg });
+    }
+  }
+  return out;
 }
 
 // Siparişe gönderi aç ve hemen oluştur
