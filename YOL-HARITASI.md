@@ -175,6 +175,19 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
 
 ## Durum notları (11 Ekim 2026)
+**Eksik taraması düzeltmeleri (13-14 Ekim 2026 gecesi; hepsi canlıda)**
+- 1 Instagram paylaşım kuyruğu düzeltildi + 10 dk'lık görev kuruldu (kuyruk daha önce hiç çalışmıyordu).
+- 2 Pazaryeri siparişleri: marketplace-orders (15 dk) — Trendyol (v2), n11, Hepsiburada, Çiçeksepeti, Pazarama, Shopify, WooCommerce, Etsy, eBay, Walmart, Wix; takip bildirimi Shopify/Woo/Etsy/eBay/Walmart/Wix. Taklit testler 13/13, tetikleyiciler 5/5. Hepsiburada / Çiçeksepeti / Pazarama alan adları resmi belgeye erişilemediği için esnek okunuyor, satıcı hesabıyla doğrulanacak. PTT AVM: belge satıcı panelinde (hesap gerekli).
+- 3 Asistandan eklenen ürünler Varsayılan kanallar'a gider (_shared/distribute.ts). 6 Kendi gönderilen siparişte müşteriye WhatsApp. 7 Kargo sunucusu yanıt vermezse hesap kaydedilir, doğrulama arka planda. 8 Excel yazıları kaldırıldı. 9 Gönderilecekler'de Beden/Renk. 11 Vitrin 48'er yüklenir; silinen ürünün ilanları yayından kalkar (eski 1.000+ satır sorunu). 12 Dönüş sayfaları HS.db.
+- 5 Panel kargo ekranları (Ayarlar > 🚚 Kargo, Siparişler'de etiket / kargoya ver) ve 10 Mağazanı Kur alt yazısı: adları Claude seçti, Mustafa sabah onaylayacak (liste aşağıda "Onay bekleyen adlar").
+- 4 Paketler: fiyatlandırma en sona; tek yerden aç/kapa altyapısı kuruldu (feature_flags).
+
+**Onay bekleyen adlar (13-14 Ekim gecesi Claude seçti)**
+- Ayarlar: bölüm "🚚 Kargo"; "+ Kargo hesabı bağla", "Kargo firması", "Ortam" (Canlı / Test), "Gönderen bilgileri (etikette görünür)", "Gönderen adı", "Bağla", "Vazgeç", "Varsayılan", "Varsayılan yap", "Kaldır", "Bağlı", "Doğrulama bekliyor", "Hata", "Siparişlere kargo gönderisini otomatik oluştur"; alanlar "Web servis kullanıcı adı / şifresi", "API anahtarı", "Kullanıcı adı", "Şifre", "Müşteri kodu".
+- Siparişler: "🏷️ Etiket", "📦 Kargoya ver", "🏷️ Bekleyen etiketleri indir (PDF)".
+- Mağazanı Kur alt yazısı: "Siten varsa adresini ver, ürünlerin mağazana gelsin; yoksa hobinden yola çıkarak birkaç dakikada hazır bir mağaza kuralım."
+- Toplu Yükleme alt yazısı: "… Form ya da tablo doldurmak yok." Asistan bağlantısı: "Mağazayı aç".
+
 **Amazon SP-API (13 Ekim 2026)** — altyapı bitti, varsayılan SANDBOX; ayrıntı docs/amazon-sp-api.md
 - Hesaplarım'dan Amazon onayıyla bağlanma (TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (ASIN eşleme / AI'lı tam ilan / seçenekler / prova), sipariş çekme + tedarikçiye yönlendirme + kargo bildirimi (amazon-orders 15 dk). Testler: Amazon'un sandbox örnekleriyle 13/13, veritabanı 7/7, Hesaplarım 8/8. Etiket (Buy Shipping) ve barkodsuz katalog eşleme eklendi.
 - Bekleyen (Mustafa): Amazon geliştirici uygulaması (Profesyonel satıcı hesabı ya da şirketle Solution Provider Portal) -> secrets -> gerçek sandbox testi. Bölge adları onaylandı. Mustafa'nın kararı: geliştirici kaydı şirket sonrası (public developer).
