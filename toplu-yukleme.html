@@ -263,7 +263,14 @@
     <div class="consent">
       <label class="chk"><input type="checkbox" id="consentChk" onchange="updateImportBtn()"> <span data-t="consent"></span></label>
     </div>
-    <label class="chk" style="margin-bottom:14px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
+    <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
+    <div class="row" style="margin-bottom:14px;align-items:center;gap:10px">
+      <label class="chk" style="margin:0"><input type="checkbox" id="syncChk" checked> <span data-t="syncKeep"></span></label>
+      <select id="syncHours" style="width:auto">
+        <option value="6" data-t="sync6"></option>
+        <option value="24" selected data-t="sync24"></option>
+      </select>
+    </div>
     <div class="row">
       <button class="btn-primary" id="importBtn" onclick="doImport()" disabled></button>
       <button class="btn-secondary" disabled data-t="excelSoon"></button>
@@ -375,6 +382,10 @@
       consent: 'Bu ürün görsellerini, açıklamalarını ve bilgilerini kullanma hakkım olduğunu (ör. tedarikçimin/bayisi olduğum firmanın ürünleri) ve bu içeriklerden doğacak sorumluluğun bana ait olduğunu kabul ediyorum.',
       consentLog: 'Kullanıcı, içe aktarılan ürün görsellerini ve içeriklerini kullanma hakkı olduğunu ve sorumluluğun kendisine ait olduğunu onayladı.',
       publishStore: '🏪 Kendi mağazamda da hemen yayınla',
+      syncKeep: 'Fiyat ve stoğu otomatik güncel tut',
+      sync6: '6 saatte bir',
+      sync24: 'Günde bir',
+      varN: '{n} seçenek',
       importBtn: '🏪 Ürünlerime ekle ({n})',
       excelSoon: '📊 Excel indir (ikas / Ticimax / Trendyol) · yakında',
       needConsent: 'Devam etmek için kullanım hakkı onayını işaretle.',
@@ -497,6 +508,10 @@
       consent: 'I confirm that I have the right to use these product images, descriptions and details (e.g. products of my supplier / the brand I am a dealer of) and that I am responsible for this content.',
       consentLog: 'The user confirmed they have the right to use the imported product images and content and that they are responsible for it.',
       publishStore: '🏪 Also publish in my store right away',
+      syncKeep: 'Keep price and stock up to date automatically',
+      sync6: 'Every 6 hours',
+      sync24: 'Once a day',
+      varN: '{n} variants',
       importBtn: '🏪 Add to my products ({n})',
       excelSoon: '📊 Download Excel (ikas / Ticimax / Trendyol) · soon',
       needConsent: 'Tick the usage-rights confirmation to continue.',
@@ -688,6 +703,20 @@
       const first = await callImport(url);
       if (first.kind === 'feed') {
         addItems(first.items || []);
+        // Mağaza listesi sayfa sayfa gelir (Shopify / WooCommerce)
+        let next = first.next_page || '';
+        const seenFeed = new Set([url]);
+        while (next && !seenFeed.has(next) && items.length < MAX_LINKS * 3 && !stopFlag) {
+          seenFeed.add(next);
+          setProgress(fmt(t('feedDone'), { n: HS.number(items.length) }), 50);
+          renderPreview();
+          try {
+            const pr = await callImport(next);
+            if (pr.kind !== 'feed' || !(pr.items || []).length) break;
+            addItems(pr.items);
+            next = pr.next_page || '';
+          } catch (e) { break; }
+        }
         setProgress(fmt(t('feedDone'), { n: HS.number(items.length) }), 100);
       } else if (first.kind === 'product') {
         addItems([first.item]);
@@ -806,7 +835,8 @@
       const img = it.images[0]
         ? '<img class="thumb" loading="lazy" referrerpolicy="no-referrer" src="' + esc(it.images[0]) + '" onerror="this.outerHTML=\'<div class=thumb-empty>📦</div>\'">'
         : '<div class="thumb-empty">📦</div>';
-      const meta = [it.brand || r.brand, it.model_code, r.category || it.category].filter(Boolean).map(esc).join(' · ');
+      const nVar = Array.isArray(it.variants) ? it.variants.length : 0;
+      const meta = [it.brand || r.brand, it.model_code, r.category || it.category, nVar > 1 ? fmt(t('varN'), { n: nVar }) : ''].filter(Boolean).map(esc).join(' · ');
       const specs = it.specs.length
         ? '<button class="spec-toggle" onclick="toggleSpecs(' + idx + ')">' + esc(fmt(t('specsN'), { n: it.specs.length })) + ' · ' + esc(it.open ? t('specsHide') : t('specsShow')) + '</button>' +
           (it.open ? '<div class="spec-list">' + it.specs.slice(0, 40).map(s => '<div><span>' + esc(s.k) + ':</span> ' + esc(s.v) + '</div>').join('') + '</div>' : '')
@@ -1483,6 +1513,8 @@
     if (dupN && !confirm(fmt(t('confirmDup'), { n: dupN }))) return;
     const r = rules();
     const publish = document.getElementById('publishChk').checked;
+    const sync = document.getElementById('syncChk').checked;
+    const syncHours = Number(document.getElementById('syncHours').value) === 6 ? 6 : 24;
     const btn = document.getElementById('importBtn');
     btn.disabled = true;
     const resBox = document.getElementById('resultBox');
@@ -1518,6 +1550,11 @@
           store_visible: publish,
           specs: it.specs.length ? it.specs : null,
           source_url: it.url || null,
+          source_platform: it.source_platform || (it.url ? 'web' : null),
+          source_item_id: it.source_item_id || null,
+          source_sync: !!(sync && it.url),
+          source_sync_hours: syncHours,
+          stock_qty: Number.isFinite(it.stock) && it.stock !== null ? it.stock : null,
           model_code: it.model_code || null,
           brand: r.brand || it.brand || null
         }));
@@ -1537,6 +1574,23 @@
         if (imgRows.length) {
           const ir = await db.from('product_images').insert(imgRows);
           if (ir.error) { imgErr = ir.error.message; console.warn('product_images', ir.error); }
+        }
+
+        // Seçenekler (beden, renk...): varsayılan seçeneğe ek olarak her biri ayrı kayıt
+        const varRows = [];
+        pairs.forEach(p => (p.it.variants || []).slice(0, 100).forEach((v, k) => {
+          if (!v || !v.attributes || !Object.keys(v.attributes).length) return;
+          varRows.push({
+            product_id: p.id, user_id: userId, sku: 'HS-' + p.id + '-' + (k + 1),
+            supplier_variant_id: v.supplier_variant_id || null, supplier_sku: v.sku || null,
+            attributes: v.attributes, cost: v.price > 0 ? v.price : null, cost_currency: itemCurrency(p.it, r),
+            stock_qty: Number.isFinite(v.stock) && v.stock !== null ? v.stock : null,
+            stock_status: v.stock === 0 ? 'tukendi' : null, image_url: v.image || null, is_default: false, is_active: true
+          });
+        }));
+        for (let k = 0; k < varRows.length; k += 500) {
+          const vr = await db.from('product_variants').insert(varRows.slice(k, k + 500));
+          if (vr.error) { imgErr = vr.error.message; console.warn('product_variants', vr.error); }
         }
 
         // Kendi mağazada yayın

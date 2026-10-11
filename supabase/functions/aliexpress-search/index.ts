@@ -283,6 +283,59 @@ async function quote(accessToken: string, productId: string, skuId: string | nul
   };
 }
 
+// Ürünün tüm bilgisi (linkten ürün yükleme): ad, açıklama, görseller, özellikler, seçenekler
+async function detail(accessToken: string, productId: string, country: string) {
+  const get = async (shipTo: string) => {
+    const r = await aeCall("aliexpress.ds.product.get", accessToken, {
+      product_id: productId, ship_to_country: shipTo, target_currency: "USD", target_language: "en",
+    });
+    return { raw: r, result: r?.aliexpress_ds_product_get_response?.result };
+  };
+  let { raw, result } = await get(country);
+  if (!result || !result.ae_item_base_info_dto) ({ raw, result } = await get("US"));
+  if (!result || !result.ae_item_base_info_dto) {
+    return { error: "AliExpress ürün bilgisi alınamadı: " + JSON.stringify(raw?.error_response || raw).slice(0, 200) };
+  }
+  const base = result.ae_item_base_info_dto || {};
+  const images = String(result.ae_multimedia_info_dto?.image_urls || "").split(";").map((x) => x.trim()).filter(Boolean);
+  const specs = list(result.ae_item_properties?.ae_item_property || result.ae_item_properties)
+    .map((p: any) => ({ k: String(p.attr_name || "").slice(0, 80), v: String(p.attr_value || "").slice(0, 200) }))
+    .filter((p: any) => p.k && p.v);
+  const variants = list(result.ae_item_sku_info_dtos).map((s: any) => {
+    const props = list(s.ae_sku_property_dtos || s.aeop_s_k_u_propertys);
+    const attributes: Record<string, string> = {};
+    let image: string | null = null;
+    props.forEach((p: any) => {
+      const k = String(p.sku_property_name || "Seçenek");
+      attributes[k] = String(p.property_value_definition_name || p.sku_property_value || "");
+      if (p.sku_image && !image) image = String(p.sku_image);
+    });
+    return {
+      supplier_variant_id: String(s.sku_id || s.id || ""),
+      sku_attr: s.sku_attr || null,
+      attributes,
+      price: parseFloat(s.offer_sale_price || s.sku_price) || null,
+      stock: Number(s.sku_available_stock ?? s.s_k_u_available_stock ?? s.ipm_sku_stock ?? 0),
+      image,
+    };
+  }).filter((v: any) => v.supplier_variant_id);
+  const prices = variants.map((v: any) => v.price).filter((n: any) => n > 0);
+  return {
+    item: {
+      name: String(base.subject || "").slice(0, 300),
+      description: String(base.detail || base.mobile_detail || ""),
+      images: images.slice(0, 12),
+      specs: specs.slice(0, 80),
+      price: prices.length ? Math.min(...prices) : null,
+      currency: "USD",
+      stock: variants.reduce((a: number, v: any) => a + (v.stock || 0), 0),
+      variants: variants.slice(0, 100),
+      source_platform: "aliexpress",
+      source_item_id: productId,
+    },
+  };
+}
+
 const hsHandler = (async (req: Request, userId: string | null = null) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -293,7 +346,8 @@ const hsHandler = (async (req: Request, userId: string | null = null) => {
     const keyword = reqBody?.keyword || "";
     // action: "quote" -> fiyat, seçenek ve kargo (Ürün Ekle'de kargo dahil maliyet)
     const isQuote = reqBody?.action === "quote";
-    if (!isQuote && !keyword) {
+    const isDetail = reqBody?.action === "detail";
+    if (!isQuote && !isDetail && !keyword) {
       return new Response(JSON.stringify({ error: "Arama kelimesi gerekli" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -322,6 +376,20 @@ const hsHandler = (async (req: Request, userId: string | null = null) => {
     ) {
       const newToken = await refreshAccessToken(supabase, tok.refreshToken);
       if (newToken) tok.accessToken = newToken;
+    }
+
+    if (isDetail) {
+      const productId = String(reqBody?.productId || "").replace(/\D/g, "");
+      if (!productId) {
+        return new Response(JSON.stringify({ error: "Ürün numarası gerekli" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const d = await detail(tok.accessToken as string, productId, String(reqBody?.country || "TR").toUpperCase().slice(0, 2));
+      return new Response(JSON.stringify(d), {
+        status: (d as any).error ? 502 : 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (isQuote) {
@@ -430,7 +498,17 @@ async function hsIsLoggedIn(req: Request): Promise<string | null> {
 }
 
 Deno.serve(async (req: Request) => {
-  const userId = req.method === "OPTIONS" ? null : await hsIsLoggedIn(req);
+  // Sistem çağrısı (source-sync -> product-import -> burası): CRON_SECRET + satıcının kimliği
+  let userId: string | null = null;
+  if (req.method !== "OPTIONS") {
+    const sys = await req.clone().json().catch(() => ({}));
+    const cron = Deno.env.get("CRON_SECRET") ?? "";
+    if (cron && typeof sys?.cronSecret === "string" && sys.cronSecret.trim() === cron.trim() && typeof sys?.userId === "string") {
+      userId = sys.userId;
+    } else {
+      userId = await hsIsLoggedIn(req);
+    }
+  }
   if (req.method !== "OPTIONS" && !userId) {
     return new Response(JSON.stringify({ error: "Bu işlem için giriş yapmalısın. / Please log in." }), {
       status: 401,

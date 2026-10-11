@@ -4,6 +4,14 @@
 //   - XML beslemesi (bayi XML'i, Google Shopping vb.)  -> { kind: "feed", items: [...] }
 //   - Kategori / liste sayfası                          -> { kind: "category", links: [...], next_page }
 //   - Tek ürün sayfası                                  -> { kind: "product", item: {...} }
+// Platforma özel okuma (satıcı farkı görmez; API varsa API, yoksa sayfa):
+//   AliExpress (DS API, aliexpress-search "detail"), Shopify (/products/x.json, /products.json),
+//   WooCommerce (Store API), Trendyol (sayfa içi ürün verisi), JSON-LD varyantları,
+//   site ana sayfası -> site haritası (sitemap) ile tüm ürün linkleri.
+// Ürünlerde: variants [{ supplier_variant_id, sku, attributes, price, stock, image }],
+//   source_platform, source_item_id. Mağaza bazlı listeler { kind: "feed", items, next_page }.
+// Site otomatik okumayı engelliyorsa ve okuma servisi açıksa (SCRAPER_ENABLED=true +
+//   SCRAPER_URL_TEMPLATE secret, "{url}" yer tutuculu; ücretli, varsayılan KAPALI) onunla tekrar dener.
 // Sadece giriş yapmış kullanıcılar kullanabilir.
 // POST { url, language }
 // =========================================================
@@ -11,6 +19,9 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const MAX_HTML = 3_000_000;   // 3 MB
 const MAX_XML = 40_000_000;   // 40 MB
 const MAX_FEED_ITEMS = 5000;
+const SCRAPER_ENABLED = (Deno.env.get("SCRAPER_ENABLED") ?? "") === "true";
+const SCRAPER_URL_TEMPLATE = Deno.env.get("SCRAPER_URL_TEMPLATE") ?? ""; // ör. https://servis/api?key=...&url={url}
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,22 +134,40 @@ function absUrl(href: string, base: URL): string | null {
 function uniq<T>(arr: T[]): T[] { return Array.from(new Set(arr)); }
 
 // ---------------- Sayfayı indir ----------------
-async function download(u: URL): Promise<{ text: string; type: string; finalUrl: URL }> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 25000);
+function looksBlocked(status: number, text: string): boolean {
+  if ([401, 403, 429, 503].includes(status)) return true;
+  const head = text.slice(0, 6000);
+  return text.length < 20000 && /cf-chl|challenge-platform|Just a moment\.\.\.|captcha-delivery|px-captcha|Attention Required/i.test(head);
+}
+async function download(u: URL, accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"): Promise<{ text: string; type: string; finalUrl: URL }> {
   try {
-    const r = await fetch(u.toString(), {
+    return await downloadOnce(u, accept, false);
+  } catch (e) {
+    const msg = String((e as Error)?.message || e);
+    if (msg.startsWith("blocked") && SCRAPER_ENABLED && SCRAPER_URL_TEMPLATE) return await downloadOnce(u, accept, true);
+    throw e;
+  }
+}
+async function downloadOnce(u: URL, accept: string, viaScraper: boolean): Promise<{ text: string; type: string; finalUrl: URL }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), viaScraper ? 60000 : 25000);
+  try {
+    const target = viaScraper ? SCRAPER_URL_TEMPLATE.replace("{url}", encodeURIComponent(u.toString())) : u.toString();
+    const r = await fetch(target, {
       signal: ctrl.signal,
       redirect: "follow",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": accept,
         "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
       },
     });
-    const finalUrl = isSafeUrl(r.url || u.toString());
-    if (!finalUrl) throw new Error("blocked_redirect");
-    if (!r.ok) throw new Error("http_" + r.status);
+    const finalUrl = viaScraper ? u : isSafeUrl(r.url || u.toString());
+    if (!finalUrl) throw new Error("unsafe_redirect");
+    if (!r.ok) {
+      if (!viaScraper && looksBlocked(r.status, "")) throw new Error("blocked_" + r.status);
+      throw new Error("http_" + r.status);
+    }
     const type = (r.headers.get("content-type") || "").toLowerCase();
     const buf = new Uint8Array(await r.arrayBuffer());
     if (buf.length > MAX_XML) throw new Error("too_large");
@@ -150,10 +179,24 @@ async function download(u: URL): Promise<{ text: string; type: string; finalUrl:
     if (declared && declared.toLowerCase() !== charset.toLowerCase()) {
       try { text = new TextDecoder(declared.toLowerCase()).decode(buf); charset = declared; } catch { /* kalsın */ }
     }
+    if (!viaScraper && looksBlocked(200, text)) throw new Error("blocked_page");
     return { text, type, finalUrl };
   } finally {
     clearTimeout(timer);
   }
+}
+async function getJson(u: URL): Promise<{ data: any; headers: Headers } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(u.toString(), {
+      signal: ctrl.signal, redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SeltigoBot/1.0)", "Accept": "application/json" },
+    });
+    if (!r.ok || !isSafeUrl(r.url || u.toString())) return null;
+    const data = await r.json().catch(() => null);
+    return data == null ? null : { data, headers: r.headers };
+  } catch { return null; } finally { clearTimeout(timer); }
 }
 
 // ---------------- XML beslemesi ----------------
@@ -420,7 +463,13 @@ async function parseHtml(html: string, base: URL) {
     item.category = clean(typeof prod.category === "string" ? prod.category : "", 200);
     item.description = clean(stripTags(prod.description || ""), 5000);
     const im = Array.isArray(prod.image) ? prod.image : (prod.image ? [prod.image] : []);
-    item.images = im.map((x: any) => absUrl(typeof x === "string" ? x : x?.url || x?.contentUrl || "", base)).filter(Boolean);
+    // Görsel; metin, { url } ya da { contentUrl: [..] } biçiminde gelebilir
+    const flat: string[] = [];
+    im.forEach((x: any) => {
+      if (typeof x === "string") flat.push(x);
+      else if (x) [x.url, x.contentUrl].flat().forEach((y: any) => { if (typeof y === "string") flat.push(y); });
+    });
+    item.images = flat.map((x) => absUrl(x, base)).filter(Boolean);
     if (Array.isArray(prod.additionalProperty)) {
       prod.additionalProperty.forEach((p: any) => { if (p?.name && p?.value != null) item.specs.push({ k: clean(p.name, 80), v: clean(p.value, 200) }); });
     }
@@ -485,12 +534,310 @@ Rules: For a product page fill "product" (specs = technical specifications as ke
   return { kind: "product", item };
 }
 
+// ---------------- Platform okuyucuları ----------------
+type Variant = { supplier_variant_id: string; sku: string; attributes: Record<string, string>; price: number | null; stock: number | null; image: string | null };
+const stockOf = (avail: unknown, qty: unknown): number | null => {
+  const n = Number(qty);
+  if (qty != null && qty !== "" && Number.isFinite(n)) return n;
+  if (avail === false) return 0;
+  return null; // var ama adet bilinmiyor
+};
+
+// AliExpress: satıcının (yoksa sitenin) AliExpress hesabıyla DS API
+async function aliexpressItem(u: URL, authHeader: string, sys: { cronSecret: string; userId: string } | null = null) {
+  const id = (u.pathname.match(/\/item\/(\d+)/) || [])[1] || u.searchParams.get("productId") || "";
+  if (!id) return null;
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/aliexpress-search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+    body: JSON.stringify({ action: "detail", productId: id, country: "TR", ...(sys || {}) }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!d?.item?.name) return { error: String(d?.error || "AliExpress ürünü okunamadı").slice(0, 200) };
+  const it = d.item;
+  return {
+    kind: "product",
+    item: {
+      url: `https://www.aliexpress.com/item/${id}.html`, name: clean(it.name, 300), price: it.price, list_price: null,
+      currency: "USD", stock: it.stock ?? null, model_code: "", barcode: "", brand: "", category: "",
+      description: clean(stripTags(it.description || ""), 5000), images: it.images || [], specs: it.specs || [],
+      variants: (it.variants || []).map((v: any) => ({
+        supplier_variant_id: v.supplier_variant_id, sku: v.sku_attr || "", attributes: v.attributes || {},
+        price: v.price, stock: v.stock, image: v.image,
+      })).filter((v: Variant) => Object.keys(v.attributes).length),
+      source_platform: "aliexpress", source_item_id: id,
+    },
+  };
+}
+
+// Shopify
+function shopifyProduct(p: any, origin: string) {
+  const optNames: string[] = (p.options || []).map((o: any) => String(o?.name || o || ""));
+  const imgById = new Map<number, string>();
+  (p.images || []).forEach((im: any) => { if (im?.id && im?.src) imgById.set(im.id, im.src); });
+  const fix = (x: string) => (x && x.startsWith("//") ? "https:" + x : x);
+  const variants: Variant[] = (p.variants || []).map((v: any) => {
+    const attributes: Record<string, string> = {};
+    [v.option1, v.option2, v.option3].forEach((val: any, i: number) => {
+      if (val && val !== "Default Title") attributes[optNames[i] || `Seçenek ${i + 1}`] = String(val);
+    });
+    return {
+      supplier_variant_id: String(v.id), sku: clean(v.sku, 80), attributes,
+      price: parsePrice(v.price), stock: stockOf(v.available, v.inventory_quantity),
+      image: fix(v.featured_image?.src || (v.image_id ? imgById.get(v.image_id) || "" : "")) || null,
+    };
+  });
+  const real = variants.filter((v) => Object.keys(v.attributes).length);
+  const prices = variants.map((v) => v.price).filter((n): n is number => !!n);
+  const imgs: string[] = (p.images || []).map((im: any) => fix(typeof im === "string" ? im : im?.src || "")).filter(Boolean);
+  const anyUnknown = variants.some((v) => v.stock === null);
+  return {
+    url: `${origin}/products/${p.handle}`, name: clean(p.title, 300),
+    price: prices.length ? Math.min(...prices) : null, list_price: parsePrice(p.variants?.[0]?.compare_at_price),
+    currency: null, stock: anyUnknown ? null : variants.reduce((a, v) => a + (v.stock || 0), 0),
+    model_code: clean(p.variants?.[0]?.sku || "", 80), barcode: clean(p.variants?.[0]?.barcode || "", 40),
+    brand: clean(p.vendor, 80), category: clean(p.product_type, 200),
+    description: clean(stripTags(p.body_html || p.description || ""), 5000),
+    images: uniq(imgs).slice(0, 12), specs: [] as { k: string; v: string }[],
+    variants: real.slice(0, 100),
+    source_platform: "shopify", source_item_id: String(p.id),
+  };
+}
+// Shopify ürün listesi fiyatları mağazanın ana para birimindedir; o da /meta.json'da yazar.
+// (cart.js ziyaretçinin ülkesine göre değişir, kullanılmaz.)
+const shopCurrency = new Map<string, string | null>();
+async function shopifyCurrency(origin: string): Promise<string | null> {
+  if (shopCurrency.has(origin)) return shopCurrency.get(origin)!;
+  const r = await getJson(new URL(`${origin}/meta.json`));
+  const c = typeof r?.data?.currency === "string" && /^[A-Z]{3}$/.test(r.data.currency) ? r.data.currency : null;
+  shopCurrency.set(origin, c);
+  return c;
+}
+const SHOPIFY_PAGES_PER_CALL = 4;
+async function shopifyList(u: URL) {
+  const coll = (u.pathname.match(/\/collections\/[^/]+/) || [""])[0];
+  let page = Math.max(1, parseInt(u.searchParams.get("page") || "1", 10));
+  const items: any[] = [];
+  for (let i = 0; i < SHOPIFY_PAGES_PER_CALL; i++, page++) {
+    const r = await getJson(new URL(`${u.origin}${coll}/products.json?limit=250&page=${page}`));
+    const list = r?.data?.products;
+    if (!Array.isArray(list) || !list.length) return { items, next: "" };
+    const cur = await shopifyCurrency(u.origin);
+    list.forEach((p: any) => items.push({ ...shopifyProduct(p, u.origin), currency: cur }));
+    if (list.length < 250) return { items, next: "" };
+  }
+  return { items, next: `${u.origin}${coll}/products.json?page=${page}` };
+}
+async function shopifySingle(u: URL) {
+  const handle = (u.pathname.match(/\/products\/([^/?#]+)/) || [])[1];
+  if (!handle) return null;
+  const r = await getJson(new URL(`${u.origin}/products/${handle}.json`));
+  return r?.data?.product ? { ...shopifyProduct(r.data.product, u.origin), currency: await shopifyCurrency(u.origin) } : null;
+}
+
+// WooCommerce (herkese açık Store API)
+function wooMoney(prices: any, key: string): number | null {
+  if (!prices || prices[key] == null || prices[key] === "") return null;
+  const n = Number(prices[key]) / Math.pow(10, Number(prices.currency_minor_unit ?? 2));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+function wooProduct(p: any) {
+  const price = wooMoney(p.prices, "price"), regular = wooMoney(p.prices, "regular_price");
+  return {
+    url: p.permalink, name: clean(stripTags(p.name || ""), 300), price,
+    list_price: regular && price && regular > price ? regular : null, currency: p.prices?.currency_code || null,
+    stock: p.is_in_stock === false ? 0 : (p.low_stock_remaining ?? null), model_code: clean(p.sku, 80), barcode: "",
+    brand: clean((p.brands || [])[0]?.name || "", 80), category: clean((p.categories || []).map((c: any) => c.name).join(" > "), 200),
+    description: clean(stripTags(p.description || p.short_description || ""), 5000),
+    images: (p.images || []).map((im: any) => im.src).filter(Boolean).slice(0, 12),
+    specs: (p.attributes || []).filter((a: any) => !a.has_variations)
+      .map((a: any) => ({ k: clean(a.name, 80), v: clean((a.terms || []).map((t: any) => t.name).join(", "), 200) })).filter((x: any) => x.k && x.v),
+    variants: [] as Variant[],
+    source_platform: "woocommerce", source_item_id: String(p.id),
+  };
+}
+async function wooVariants(origin: string, p: any, item: any) {
+  const out: Variant[] = [];
+  for (const v of (p.variations || []).slice(0, 40)) {
+    const r = await getJson(new URL(`${origin}/wp-json/wc/store/v1/products/${v.id}`));
+    const d = r?.data;
+    const attributes: Record<string, string> = {};
+    (v.attributes || []).forEach((a: any) => { if (a?.name) attributes[a.name] = String(a.value || ""); });
+    out.push({
+      supplier_variant_id: String(v.id), sku: clean(d?.sku, 80), attributes,
+      price: wooMoney(d?.prices, "price"),
+      stock: d ? (d.is_in_stock === false ? 0 : d.low_stock_remaining ?? null) : null,
+      image: d?.images?.[0]?.src || null,
+    });
+  }
+  item.variants = out;
+  return item;
+}
+const WOO_PAGES_PER_CALL = 5;
+async function wooList(u: URL) {
+  let page = Math.max(1, parseInt(u.searchParams.get("page") || "1", 10));
+  const items: any[] = [];
+  for (let i = 0; i < WOO_PAGES_PER_CALL; i++, page++) {
+    const r = await getJson(new URL(`${u.origin}/wp-json/wc/store/v1/products?per_page=100&page=${page}`));
+    const list = r?.data;
+    if (!Array.isArray(list) || !list.length) return { items, next: "" };
+    list.forEach((p: any) => items.push(wooProduct(p)));
+    const total = parseInt(r?.headers.get("x-wp-totalpages") || "0", 10);
+    if (list.length < 100 || (total && page >= total)) return { items, next: "" };
+  }
+  return { items, next: `${u.origin}/wp-json/wc/store/v1/products?page=${page}` };
+}
+async function wooSingle(u: URL) {
+  const slug = u.pathname.split("/").filter(Boolean).pop() || "";
+  if (!slug) return null;
+  const r = await getJson(new URL(`${u.origin}/wp-json/wc/store/v1/products?slug=${encodeURIComponent(slug)}`));
+  const p = Array.isArray(r?.data) ? r!.data[0] : null;
+  return p ? await wooVariants(u.origin, p, wooProduct(p)) : null;
+}
+
+// Trendyol: sayfanın içindeki ürün verisi.
+// Not: Trendyol Türkiye dışındaki sunuculara uluslararası vitrini (ör. /de, Euro, Almanca) veriyor.
+// Görsel, seçenek, barkod, marka ve özellikler aynı; fiyat o vitrinin para biriminde gelir.
+function trendyolFromHtml(html: string, base: URL) {
+  // Yeni yapı (2026): window["__envoy__SHARED_PROPS"] = { product: {...} }
+  const em = html.match(/window\["__envoy__SHARED_PROPS"\]\s*=\s*(\{[\s\S]*?\})\s*;?\s*<\/script>/);
+  if (em) {
+    let env: any = null;
+    try { env = JSON.parse(em[1]); } catch { env = null; }
+    const p = env?.product;
+    if (p?.name) {
+      const ldProd = jsonLdNodes(html).find((n) => isType(n, "Product"));
+      const offer = Array.isArray(ldProd?.offers) ? ldProd.offers[0] : ldProd?.offers;
+      const currency = guessCurrency(offer?.priceCurrency) || (/^\/(de|en|bg|ro|gr|cz|sk|hu|pl|az|sa|ae)\//.test(base.pathname) ? null : "TRY");
+      const vs: any[] = Array.isArray(p.variants) ? p.variants : [];
+      const variants: Variant[] = vs.map((v: any) => ({
+        supplier_variant_id: String(v.itemNumber || v.barcode || ""),
+        sku: clean(v.barcode, 80),
+        attributes: { [clean(p.variantAttributeName || p.sizeAttributeName || "Seçenek", 40)]: String(v.beautifiedValue || v.value || "") },
+        price: parsePrice(v.price?.value),
+        stock: v.inStock === false ? 0 : null, image: null,
+      })).filter((v) => v.supplier_variant_id && Object.values(v.attributes)[0]);
+      const prices = variants.map((v) => v.price).filter((n): n is number => !!n);
+      const brand = clean(p.brand?.name || p.webBrand?.name, 80);
+      return {
+        url: base.toString(), name: clean((brand && !String(p.name).startsWith(brand) ? brand + " " : "") + p.name, 300),
+        price: prices.length ? Math.min(...prices) : parsePrice(offer?.price), list_price: null,
+        currency: currency || guessCurrency(offer?.priceCurrency), stock: p.inStock === false ? 0 : null,
+        model_code: clean(p.productCode || "", 80), barcode: clean(vs[0]?.barcode || "", 40), brand,
+        category: clean(String(p.category?.hierarchy || p.category?.name || "").replace(/\//g, " > "), 200),
+        description: clean(stripTags(ldProd?.description || ""), 5000),
+        images: uniq((p.images || []).map((x: string) => String(x))).slice(0, 12),
+        specs: (p.attributes || []).map((a: any) => ({ k: clean(a.key?.name, 80), v: clean(a.value?.name, 200) })).filter((x: any) => x.k && x.v),
+        variants: variants.length > 1 ? variants.slice(0, 100) : [],
+        source_platform: "trendyol", source_item_id: String(p.id || ""),
+      };
+    }
+  }
+  // Eski yapı
+  const m = html.match(/__PRODUCT_DETAIL_APP_INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});\s*(?:window\.|<\/script>)/);
+  if (!m) return null;
+  let st: any;
+  try { st = JSON.parse(m[1]); } catch { return null; }
+  const p = st?.product;
+  if (!p?.name) return null;
+  const cdn = (x: string) => (x.startsWith("http") ? x : "https://cdn.dsmcdn.com" + (x.startsWith("/") ? "" : "/") + x);
+  const attrName = p.variants?.[0]?.attributeName || "Seçenek";
+  const variants: Variant[] = (p.allVariants || p.variants || []).map((v: any) => ({
+    supplier_variant_id: String(v.itemNumber || v.barcode || v.value || v.attributeValue || ""),
+    sku: clean(v.barcode, 80),
+    attributes: { [attrName]: String(v.value || v.attributeValue || "") },
+    price: parsePrice(v.price?.sellingPrice?.value ?? v.price),
+    stock: v.inStock === false ? 0 : null, image: null,
+  })).filter((v: Variant) => Object.values(v.attributes)[0]);
+  return {
+    url: base.toString(), name: clean(p.name, 300),
+    price: parsePrice(p.price?.sellingPrice?.value ?? p.price?.discountedPrice?.value), list_price: parsePrice(p.price?.originalPrice?.value),
+    currency: "TRY", stock: p.hasStock === false ? 0 : null, model_code: clean(p.productCode || "", 80), barcode: "",
+    brand: clean(p.brand?.name, 80), category: clean(p.category?.hierarchy || p.category?.name, 200),
+    description: clean((p.contentDescriptions || []).map((d: any) => stripTags(d.description || "")).join("\n"), 5000),
+    images: (p.images || []).map((x: string) => cdn(String(x))).slice(0, 12),
+    specs: (p.attributes || []).map((a: any) => ({ k: clean(a.key?.name, 80), v: clean(a.value?.name, 200) })).filter((x: any) => x.k && x.v),
+    variants: variants.length > 1 ? variants.slice(0, 100) : [],
+    source_platform: "trendyol", source_item_id: String(p.id || (base.pathname.match(/-p-(\d+)/) || [])[1] || ""),
+  };
+}
+
+// JSON-LD varyantları (ProductGroup.hasVariant)
+function jsonLdVariants(html: string, base: URL): Variant[] {
+  const group = jsonLdNodes(html).find((n) => isType(n, "ProductGroup"));
+  const out: Variant[] = [];
+  if (group && Array.isArray(group.hasVariant)) {
+    const varies: string[] = (Array.isArray(group.variesBy) ? group.variesBy : [group.variesBy]).filter(Boolean)
+      .map((x: string) => String(x).split("/").pop() || "");
+    for (const v of group.hasVariant.slice(0, 100)) {
+      const offer = Array.isArray(v.offers) ? v.offers[0] : v.offers || {};
+      const attributes: Record<string, string> = {};
+      varies.forEach((k) => {
+        const key = k.charAt(0).toLowerCase() + k.slice(1);
+        if (v[key]) attributes[k] = String(typeof v[key] === "object" ? v[key].name || "" : v[key]);
+      });
+      (v.additionalProperty || []).forEach((ap: any) => { if (ap?.name && ap?.value != null) attributes[ap.name] = String(ap.value); });
+      if (!Object.keys(attributes).length && v.name) attributes["Seçenek"] = clean(v.name, 80);
+      const im = Array.isArray(v.image) ? v.image[0] : v.image;
+      out.push({
+        supplier_variant_id: clean(v.sku || v["@id"] || "", 80), sku: clean(v.sku, 80), attributes,
+        price: parsePrice(offer?.price), stock: /OutOfStock/i.test(String(offer?.availability || "")) ? 0 : null,
+        image: im ? absUrl(typeof im === "string" ? im : im.url || "", base) : null,
+      });
+    }
+  }
+  return out.length > 1 ? out : [];
+}
+
+// Site ana sayfası: site haritasından ürün linkleri
+const MAX_SITEMAP_LINKS = 3000;
+const NOT_PRODUCT = /\/(blog|blogs|haber|news|kategori|category|categories|collections?|tag|tags|etiket|sayfa|page|pages|hakkimizda|iletisim|contact|about|cart|sepet|account|hesap|marka|brands?)(\/|$)/i;
+async function sitemapProductLinks(u: URL): Promise<string[]> {
+  const maps: string[] = [];
+  try {
+    const robots = await download(new URL(`${u.origin}/robots.txt`), "text/plain");
+    (robots.text.match(/^\s*sitemap:\s*\S+/gim) || []).forEach((l) => {
+      const x = l.replace(/^\s*sitemap:\s*/i, "").trim();
+      if (isSafeUrl(x)) maps.push(x);
+    });
+  } catch { /* robots.txt yok */ }
+  if (!maps.length) maps.push(`${u.origin}/sitemap.xml`, `${u.origin}/sitemap_index.xml`);
+  const links: string[] = [];
+  const seen = new Set<string>();
+  const queue = maps.slice(0, 5);
+  let fetched = 0;
+  while (queue.length && fetched < 12 && links.length < MAX_SITEMAP_LINKS) {
+    const m = queue.shift()!;
+    if (seen.has(m)) continue;
+    seen.add(m);
+    const mu = isSafeUrl(m);
+    if (!mu) continue;
+    let xml = "";
+    try { xml = (await download(mu, "application/xml,text/xml;q=0.9,*/*;q=0.5")).text; fetched++; } catch { continue; }
+    const locs = (xml.match(/<loc>\s*[^<\s]+\s*<\/loc>/gi) || []).map((x) => decodeEntities(x.replace(/<\/?loc>/gi, "").trim()));
+    if (/<sitemapindex/i.test(xml)) {
+      const prod = locs.filter((x) => /product|urun|ürün|item/i.test(x));
+      (prod.length ? prod : locs).slice(0, 10).forEach((x) => queue.push(x));
+      continue;
+    }
+    for (const l of locs) {
+      const lu = isSafeUrl(l);
+      if (!lu || lu.hostname !== u.hostname || lu.pathname === "/" || NOT_PRODUCT.test(lu.pathname)) continue;
+      links.push(lu.toString());
+      if (links.length >= MAX_SITEMAP_LINKS) break;
+    }
+  }
+  return uniq(links);
+}
+
 // ---------------- Ana ----------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
-
   const body = await req.json().catch(() => ({}));
+  // Sistem çağrısı (source-sync): CRON_SECRET + satıcının kimliği (AliExpress hesabı için)
+  const CRON = Deno.env.get("CRON_SECRET") ?? "";
+  const sysCall = !!CRON && typeof body?.cronSecret === "string" && body.cronSecret.trim() === CRON.trim();
+  if (!sysCall && !(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
   const en = String(body?.language || "").toLowerCase().startsWith("en");
   const E = (tr: string, eng: string) => (en ? eng : tr);
 
@@ -498,12 +845,56 @@ Deno.serve(async (req) => {
     const u = isSafeUrl(String(body?.url || "").trim());
     if (!u) return json({ error: E("Geçerli bir web adresi (http/https) yaz.", "Enter a valid web address (http/https).") }, 400);
 
+    const authHeader = req.headers.get("Authorization") || "";
+    const host = u.hostname.toLowerCase();
+
+    // AliExpress ürün linki -> DS API
+    if (/(^|\.)aliexpress\.(com|us|ru)$/.test(host) && /\/item\/\d+/.test(u.pathname)) {
+      const ae: any = await aliexpressItem(u, authHeader,
+        sysCall && typeof body?.userId === "string" ? { cronSecret: String(body.cronSecret), userId: body.userId } : null);
+      if (ae?.error) return json({ error: E("AliExpress ürünü okunamadı: ", "Could not read the AliExpress product: ") + ae.error }, 422);
+      if (ae) return json({ ...ae, url: ae.item.url, platform: "aliexpress" });
+    }
+    // Shopify / WooCommerce liste adresinin devamı (sayfalı)
+    if (/\/products\.json$/.test(u.pathname)) {
+      const r = await shopifyList(u);
+      return json({ kind: "feed", url: u.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "shopify" });
+    }
+    if (/\/wp-json\/wc\/store\/v1\/products$/.test(u.pathname)) {
+      const r = await wooList(u);
+      return json({ kind: "feed", url: u.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "woocommerce" });
+    }
+
     let page;
     try {
       page = await download(u);
     } catch (e) {
       const msg = String((e as Error)?.message || e);
-      if (msg.startsWith("http_4")) return json({ error: E("Site bu sayfayı vermedi (" + msg.slice(5) + "). Link doğru mu, giriş gerektiriyor mu?", "The site refused this page (" + msg.slice(5) + "). Is the link correct, does it need a login?") }, 422);
+      if (msg.startsWith("blocked")) {
+        // Sayfa engellense de mağaza altyapısının veri adresleri açık olabilir (Shopify / WooCommerce)
+        const isRootReq = u.pathname.replace(/\/+$/, "") === "";
+        if (/\/products\/[^/]+/.test(u.pathname)) {
+          const it = await shopifySingle(u);
+          if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "shopify" });
+        }
+        if (isRootReq || /\/collections(\/[^/]+)?\/?$/.test(u.pathname)) {
+          const r = await shopifyList(u);
+          if (r.items.length) return json({ kind: "feed", url: u.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "shopify" });
+        }
+        if (isRootReq) {
+          const r = await wooList(u);
+          if (r.items.length) return json({ kind: "feed", url: u.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "woocommerce" });
+        } else {
+          const it = await wooSingle(u);
+          if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "woocommerce" });
+        }
+        return json({
+          error: E("Bu site otomatik okumaya izin vermiyor. Kendi sitense ürünlerini XML beslemesi ya da Excel ile aktarabilirsin.",
+            "This site blocks automatic reading. If it is your site, import via an XML feed or Excel."),
+          blocked: true,
+        }, 422);
+      }
+      if (msg.startsWith("http_4")) return json({ error: E("Site bu sayfayı vermedi (" + msg.slice(5) + "). Link doğru mu, giriş gerektiriyor mu?", "The site refused this page (" + msg.slice(5) + "). Is the link correct, does it need a login?"), httpStatus: Number(msg.slice(5)) || null }, 422);
       if (msg === "too_large") return json({ error: E("Dosya çok büyük (en fazla 40 MB).", "File is too large (max 40 MB).") }, 413);
       if (msg.includes("abort")) return json({ error: E("Site çok geç cevap verdi, tekrar dene.", "The site took too long, try again.") }, 504);
       return json({ error: E("Sayfaya ulaşılamadı.", "Could not reach the page.") }, 422);
@@ -518,7 +909,46 @@ Deno.serve(async (req) => {
     }
     if (page.text.length > MAX_HTML * 3) return json({ error: E("Sayfa çok büyük.", "The page is too large.") }, 413);
 
-    const res = await parseHtml(page.text, page.finalUrl);
+    const html = page.text;
+    const fu = page.finalUrl;
+    const isRoot = fu.pathname.replace(/\/+$/, "") === "";
+    const sniff = html.slice(0, 400000);
+    const isShopify = /cdn\.shopify\.com|Shopify\.shop\s*=|shopify-digital-wallet/i.test(sniff);
+    const isWoo = /wp-content\/plugins\/woocommerce|woocommerce-page|wc-block-/i.test(sniff);
+
+    if (isShopify) {
+      if (/\/products\/[^/]+/.test(fu.pathname)) {
+        const it = await shopifySingle(fu);
+        if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "shopify" });
+      } else if (isRoot || /\/collections(\/[^/]+)?\/?$/.test(fu.pathname)) {
+        const r = await shopifyList(fu);
+        if (r.items.length) return json({ kind: "feed", url: fu.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "shopify" });
+      }
+    }
+    if (isWoo) {
+      if (isRoot || /\/(shop|magaza|urunler|products)\/?$/i.test(fu.pathname)) {
+        const r = await wooList(fu);
+        if (r.items.length) return json({ kind: "feed", url: fu.toString(), items: r.items, total: r.items.length, next_page: r.next, platform: "woocommerce" });
+      } else if (/\/(product|urun)\//i.test(fu.pathname) || /<body[^>]+class=["'][^"']*single-product/i.test(sniff)) {
+        const it = await wooSingle(fu);
+        if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "woocommerce" });
+      }
+    }
+    if (/(^|\.)trendyol\.com$/.test(fu.hostname)) {
+      const it = trendyolFromHtml(html, fu);
+      if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "trendyol" });
+    }
+    // Site ana sayfası: site haritasından tüm ürün linkleri
+    if (isRoot) {
+      const links = await sitemapProductLinks(fu);
+      if (links.length >= 3) return json({ kind: "category", links: links.slice(0, 2000), next_page: "", url: fu.toString(), platform: "sitemap" });
+    }
+
+    const res = await parseHtml(html, fu);
+    if (res.kind === "product" && (res as any).item) {
+      (res as any).item.variants = jsonLdVariants(html, fu);
+      (res as any).item.source_platform = "web";
+    }
     if (res.kind === "product" && !(res as any).item?.name) {
       return json({ error: E("Bu sayfada ürün bilgisi bulunamadı.", "No product information found on this page.") }, 422);
     }
