@@ -193,6 +193,18 @@
           <label for="brand_address" data-t="lInvAddress"></label>
           <textarea id="brand_address" maxlength="500" data-tp="phInvAddress"></textarea>
         </div>
+        <div class="field full">
+          <label for="website_url" data-t="lWebsite"></label>
+          <input type="url" id="website_url" maxlength="300" placeholder="https://www.siten.com">
+          <div class="hint" data-t="hWebsite"></div>
+        </div>
+      </div>
+      <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="buy_on_website">
+        <div>
+          <label for="buy_on_website" data-t="lBuyOnWebsite"></label>
+          <div class="hint" data-t="hBuyOnWebsite"></div>
+        </div>
       </div>
     </div>
 
@@ -375,6 +387,10 @@ const T = {
     phBrandName: 'Örn: Yokyok',
     hBrandName: 'Müşterinin gördüğü ad. Resmi şirket adından farklı olabilir.',
     lLogo: 'Logo görsel adresi (URL)',
+    lWebsite: 'Web sitem',
+    hWebsite: 'Doluysa mağaza sayfanda sitene bağlantı çıkar; sitenden getirilen ürünlerde "Satıcının sitesinde gör" bağlantısı görünür.',
+    lBuyOnWebsite: 'Satın Al düğmesi kendi siteme gitsin',
+    hBuyOnWebsite: 'Açıksa sitenden getirilen ürünlerde Satın Al, müşteriyi ürünün senin sitendeki sayfasına götürür. Tıklamalar ürün bazında kaydedilir.',
     eLogo: 'Adres "https://" ile başlamalı.',
     lInvAddress: 'Fatura adresi',
     phInvAddress: 'Faturalarda görünecek adres',
@@ -470,6 +486,10 @@ const T = {
     phBrandName: 'e.g. Yokyok',
     hBrandName: 'The name customers see. Can differ from your official company name.',
     lLogo: 'Logo image address (URL)',
+    lWebsite: 'My website',
+    hWebsite: 'If filled, your store page links to your site; products imported from your site show a "View on seller\'s site" link.',
+    lBuyOnWebsite: 'Buy button goes to my own site',
+    hBuyOnWebsite: 'If on, Buy on products imported from your site takes the customer to the product page on your site. Clicks are recorded per product.',
     eLogo: 'The address must start with "https://".',
     lInvAddress: 'Invoice address',
     phInvAddress: 'Address shown on invoices',
@@ -552,7 +572,7 @@ const TIMEZONE_KEYS = ['Europe/Istanbul', 'Europe/London', 'Europe/Dublin', 'Eur
   'Europe/Amsterdam', 'Europe/Rome', 'Europe/Warsaw', 'Europe/Copenhagen', 'America/New_York', 'America/Chicago',
   'America/Denver', 'America/Los_Angeles', 'America/Toronto', 'America/Vancouver'];
 const EPR_CODES = ['DE', 'FR', 'PL', 'IT', 'NL', 'IE', 'DK'];
-const BRAND_FIELDS = ['brand_name', 'brand_logo_url', 'brand_address'];
+const BRAND_FIELDS = ['brand_name', 'brand_logo_url', 'brand_address', 'website_url', 'buy_on_website'];
 
 let currentUserId = null;
 let countries = [];
@@ -677,7 +697,7 @@ async function loadProfile() {
 // Marka bilgileri store_settings tablosunda (faturalar buradan okuyor)
 async function loadBrand() {
   const { data, error } = await db.from('store_settings')
-    .select('business_name, business_logo_url, business_address, business_tax_number')
+    .select('business_name, business_logo_url, business_address, business_tax_number, website_url, buy_on_website')
     .eq('user_id', currentUserId).limit(1);
   if (error) throw error;
   hasStore = !!(data && data.length);
@@ -691,8 +711,18 @@ async function loadBrand() {
   $('brand_name').value = s.business_name || '';
   $('brand_logo_url').value = s.business_logo_url || '';
   $('brand_address').value = s.business_address || '';
+  $('website_url').value = s.website_url || '';
+  $('buy_on_website').checked = s.buy_on_website === true;
   updateLogoPreview();
   if (!$('tax_number').value.trim() && s.business_tax_number) $('tax_number').value = s.business_tax_number;
+}
+
+// "Web sitem": "www.siten.com" de yazılabilir; https:// kendiliğinden eklenir
+function normalizeWebsite(v) {
+  v = String(v || '').trim();
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  try { return new URL(v).origin; } catch (e) { return null; }
 }
 
 function updateLogoPreview() {
@@ -881,7 +911,9 @@ async function saveProfile() {
         business_name: $('brand_name').value.trim(),
         business_logo_url: $('brand_logo_url').value.trim(),
         business_address: $('brand_address').value.trim(),
-        business_tax_number: $('tax_number').value.trim()
+        business_tax_number: $('tax_number').value.trim(),
+        website_url: normalizeWebsite($('website_url').value),
+        buy_on_website: $('buy_on_website').checked
       }).eq('user_id', currentUserId);
       if (brandError) throw brandError;
     }

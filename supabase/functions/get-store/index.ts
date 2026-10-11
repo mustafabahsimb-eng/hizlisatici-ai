@@ -33,6 +33,17 @@ function publicProduct(p: any) {
   return o;
 }
 
+// Ürünün satıcının KENDİ sitesindeki sayfası ("Satıcının sitesinde gör"): yalnız kaynak adresi mağazanın "Web sitem"
+// alanıyla aynı sitedeyse verilir (tedarikçi / toptancı linki vitrine asla çıkmaz)
+function sellerUrl(p: any, website: string | null): string | null {
+  if (!website || !p?.source_url) return null;
+  try {
+    const a = new URL(p.source_url), b = new URL(website);
+    const h = (x: string) => x.toLowerCase().replace(/^www\./, "");
+    return /^https?:$/.test(a.protocol) && h(a.hostname) === h(b.hostname) ? a.href : null;
+  } catch { return null; }
+}
+
 // Seçenek fiyatı: ilan fiyatı × (seçenek maliyeti / ürün maliyeti) -> kâr oranı her seçenekte aynı.
 // create-store-order aynı hesabı yapar (fiyat her zaman sunucuda belirlenir).
 function variantPrice(listingPrice: number, productCost: unknown, variantCost: unknown): number {
@@ -119,6 +130,7 @@ serve(async (req) => {
           // eski alan adları korunuyor (magaza.html ve create-store-order uyumlu kalsın)
           id: p.id,
           listing_id: l.id,
+          seller_url: sellerUrl(p, store.website_url || null),
           generated_title: l.title || p.generated_title || p.name,
           generated_description: l.description || p.generated_description || "",
           sale_price: l.price ?? l.sale_price ?? p.sale_price,
@@ -143,6 +155,7 @@ serve(async (req) => {
     const publicStore = {
       store_slug: store.store_slug, store_name: store.store_name,
       business_name: store.business_name || null, business_logo_url: store.business_logo_url || null,
+      website_url: store.website_url || null, buy_on_website: store.buy_on_website === true,
     };
     return json({ store: publicStore, products, source });
   } catch (err) {

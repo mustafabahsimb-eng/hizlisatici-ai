@@ -104,12 +104,17 @@
   }
   .toast.err{border-color:var(--danger);}
   .loading{text-align:center; padding:60px 20px; color:var(--text-dim);}
+  .seller-link { display: block; text-align: center; margin-top: 8px; font-size: 13px; color: #6ee7b7; text-decoration: none; }
+  .seller-link:hover { text-decoration: underline; }
+  .store-website { display: inline-block; margin-top: 4px; font-size: 13px; color: #6ee7b7; text-decoration: none; }
+  .store-website:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
 <header>
   <h1 id="storeName"></h1>
+  <a id="storeWebsite" class="store-website" target="_blank" rel="noopener" style="display:none"></a>
   <p id="storeSub"></p>
 </header>
 
@@ -233,6 +238,7 @@ const T = {
     contactPh: 'ornek@mail.com veya 05xx xxx xx xx',
     contactBtn: 'Bırak',
     contactSending: 'Gönderiliyor...',
+    onSellerSite: 'Satıcının sitesinde gör',
     pageSuffix: ' - Seltigo',
     bundleTag: '📦 Paket · {n} ürün',
     bundleSave: 'Tek tek almaktan {v} daha uygun',
@@ -283,6 +289,7 @@ const T = {
     contactPh: 'name@mail.com or phone number',
     contactBtn: 'Send',
     contactSending: 'Sending...',
+    onSellerSite: "View on seller's site",
     pageSuffix: ' - Seltigo',
     bundleTag: '📦 Bundle · {n} items',
     bundleSave: 'Save {v} vs. buying separately',
@@ -348,9 +355,26 @@ function bundleItems(p){
   return p.bundle_items.filter(it => it && it.name);
 }
 
+// Mağazadan satıcının sitesine giden tıklama (ürün bazında; kişisel veri yok)
+function logClick(productId, kind){
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/log_store_click', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ p_slug: slug, p_product_id: productId, p_kind: kind })
+    }).catch(() => {});
+  } catch (e) {}
+}
 function renderStore(){
   const name = getStoreName(currentStore);
   document.getElementById('storeName').textContent = name;
+  // "Web sitem" doluysa mağaza başlığında satıcının sitesine bağlantı (site adıyla)
+  const ws = document.getElementById('storeWebsite');
+  if (ws) {
+    const w = currentStore && /^https?:\/\//i.test(currentStore.website_url || '') ? currentStore.website_url : '';
+    ws.style.display = w ? '' : 'none';
+    if (w) { ws.href = w; ws.textContent = '🌐 ' + w.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''); }
+  }
   document.title = name + t('pageSuffix');
   document.getElementById('storeSub').textContent = t('productsN', { n: currentProducts.length });
 }
@@ -400,8 +424,16 @@ function renderProducts(){
           '<button class="primary buy-btn" style="flex:1;">' + escapeHtml(t('buy')) + '</button>' +
           '<button class="ask-btn">' + escapeHtml(t('ask')) + '</button>' +
         '</div>' +
+        (p.seller_url ? '<a class="seller-link" href="' + escapeHtml(p.seller_url) + '" target="_blank" rel="noopener">' + escapeHtml(t('onSellerSite')) + '</a>' : '') +
       '</div>';
-    card.querySelector('.buy-btn').addEventListener('click', () => openOrderModal(p));
+    // "Satın Al düğmesi kendi siteme gitsin" açıksa ve ürünün satıcı sitesinde sayfası varsa oraya gider (tıklama kaydedilir)
+    const toSite = currentStore && currentStore.buy_on_website && p.seller_url;
+    card.querySelector('.buy-btn').addEventListener('click', () => {
+      if (toSite) { logClick(p.id, 'buy'); window.open(p.seller_url, '_blank', 'noopener'); }
+      else openOrderModal(p);
+    });
+    const sl = card.querySelector('.seller-link');
+    if (sl) sl.addEventListener('click', () => logClick(p.id, 'view'));
     card.querySelector('.ask-btn').addEventListener('click', () => openAskModal(p));
     grid.appendChild(card);
   });

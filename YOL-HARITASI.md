@@ -94,7 +94,8 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
     - Instagram: yalnız kullanıcı önce yazınca, 24 saat içinde cevap; insan temsilci etiketi var. API'de gelen ek türleri arasında image, audio, video, file listeleniyor; ancak Instagram uygulaması kullanıcıya genelde dosya (PDF) gönderme imkânı vermiyor → Instagram'da PDF beklenmez, ekran görüntüsü / fotoğraf okunur. Gönderilen metin en fazla 1000 bayt.
     - WhatsApp Cloud API: 24 saatlik müşteri hizmeti penceresi; dışında yalnız onaylı şablon mesaj (ücretli); butonlu cevap en fazla 3 buton, ayrıca liste mesajı.
     - Telegram Bot API: 24 saat kuralı yok; satır içi butonlar (callback) ve sesli mesaj destekli; bot en fazla 20 MB dosya indirir (daha büyük PDF için kendi Bot API sunucusu → sabit IP sunucusuyla aynı makine olabilir).
-- [ ] **4. "Link ver, mağazan hazır" akışı** (1'e dayanır)
+- [x] **4. "Link ver, mağazan hazır" akışı** (13 Ekim 2026 bitti; site-store fonksiyonu, Mağazanı Kur, Ayarlar, vitrin; test tests/e2e/site_magaza.py 15/15: 67 ürünlük WooCommerce sitesi 30-45 sn'de mağazada (100 ürün ≈ 1 dk), 67 ilan pazaryeri provasından 25 sn'de geçti)
+  - Kalan: ücretsiz / ücretli paket ayrımı (paket altyapısı yok; fiyatlandırma kararı Mustafa'da) — şimdilik herkes çok kanala gönderebiliyor.
   - Kendi sitesi olan satıcı Mağazanı Kur'da site adresini verir → ürünler çekilir → Seltigo mağazası hazır açılır.
   - Asıl değer dağıtım: akış sonunda "bu ürünleri Trendyol, Instagram, WhatsApp kataloğu ve diğer kanallara gönder" seçeneği.
   - Paket: bu giriş akışı ücretsiz pakette; çok kanal ve otomasyonlar ücretli pakette (paket.html ile uyumlu hale getirilecek).

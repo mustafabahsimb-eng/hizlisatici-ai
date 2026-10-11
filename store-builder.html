@@ -96,6 +96,17 @@
     .logo-text, .user-email { display: none; }
     main { padding: 24px 16px; }
   }
+  .consent-row { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #c3c9d4; margin: 10px 0 4px; cursor: pointer; }
+  .consent-row input { width: auto; margin-top: 2px; accent-color: #1D9E75; }
+  .site-status { font-size: 15px; color: #fff; margin-bottom: 10px; }
+  .bar { height: 8px; background: #232838; border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0; background: #1D9E75; transition: width .4s; }
+  .site-note { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.5; }
+  .dist { margin: 18px 4px 0; padding: 16px 20px 4px; border-top: 1px solid #232838; text-align: left; }
+  .dist-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .dist-chip { display: flex; align-items: center; gap: 6px; border: 1px solid #2a3040; border-radius: 9px; padding: 7px 11px; font-size: 13px; cursor: pointer; color: #e6e8ee; }
+  .dist-chip input { width: auto; margin: 0; accent-color: #1D9E75; }
+  .dist-chip small { color: #9aa3b2; }
 </style>
 </head>
 <body>
@@ -114,6 +125,35 @@
 <main>
   <h1 data-t="title"></h1>
   <div class="subtitle" data-t="subtitle"></div>
+
+  <div id="siteProgress" class="card" style="display:none;">
+    <div class="site-status" id="siteStatus"></div>
+    <div class="bar"><div class="bar-fill" id="siteBar"></div></div>
+    <div class="site-note" id="siteNote"></div>
+  </div>
+
+  <div id="siteDone" class="card success-box" style="display:none;">
+    <div class="check">✅</div>
+    <h2 id="siteDoneTitle"></h2>
+    <p><span data-t="storeAddress"></span><br><a class="store-link" id="siteStoreLink" href="#" target="_blank" rel="noopener"></a></p>
+    <div class="success-actions">
+      <a class="primary" id="siteOpenStore" href="#" target="_blank" rel="noopener" data-t="openStore"></a>
+      <a class="secondary" href="dashboard.html" data-t="goDashboard"></a>
+    </div>
+    <div class="dist" id="distBox">
+      <div class="dist-list" id="distList"></div>
+      <button class="btn-primary" id="distBtn" onclick="distribute()" data-t="distBtn"></button>
+      <div class="site-note" id="distNote"></div>
+    </div>
+  </div>
+
+  <!-- Link ver, mağazan hazır: satıcının kendi sitesinden -->
+  <div id="siteCard" class="card">
+    <label for="siteInput" data-t="siteLabel"></label>
+    <input type="url" id="siteInput" placeholder="www.siten.com" autocomplete="off">
+    <label class="consent-row" id="siteConsentRow" style="display:none"><input type="checkbox" id="siteConsent"> <span data-t="imageTerms"></span></label>
+    <button class="btn-primary" id="siteBtn" onclick="startSite()" data-t="siteBtn"></button>
+  </div>
 
   <div id="step1" class="card">
     <div class="step-label" data-t="step1"></div>
@@ -190,6 +230,25 @@
       needProduct: 'En az bir ürün seçmelisin.',
       genericError: 'Bir hata oluştu',
       noSuggestions: 'Öneri gelmedi, farklı bir hobi yazarak tekrar dene.',
+      siteLabel: 'Web sitenin adresi',
+      siteBtn: 'Ürünlerimi getir',
+      imageTerms: 'Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir',
+      needSite: 'Sitenin adresini yaz (ör. www.siten.com).',
+      needConsent: 'Devam etmek için görsel kullanım onayını işaretle.',
+      siteStarting: 'Siten okunuyor...',
+      siteRunning: 'Ürünlerin getiriliyor: {done} / {total}',
+      siteNote: 'Sayfayı kapatabilirsin; iş arka planda sürer ve bitince panelde (ve asistanda) haber verilir. Eksik görseller arkadan tamamlanır.',
+      siteDone: '{n} ürün mağazanda yayında',
+      siteNone: 'Sitende ürün bulunamadı. Ürün sayfalarından birinin adresini yazmayı dene.',
+      siteFailed: '{n} sayfa okunamadı.',
+      distBtn: 'Bu ürünleri diğer kanallara da gönder',
+      distNoChannel: 'Bağlı başka kanalın yok. Hesaplarım sayfasından Trendyol, Amazon, Instagram gibi kanalları bağlayınca buradan tek seferde gönderebilirsin.',
+      distPick: 'En az bir kanal seç.',
+      distTest: 'test',
+      distDone: 'Gönderildi: {list}',
+      distListings: '{n} ilan',
+      distQueued: '{n} paylaşım sıraya alındı',
+      waCatalog: 'WhatsApp kataloğu',
     },
     en: {
       pageTitle: 'Build Your Store - Seltigo',
@@ -219,6 +278,25 @@
       needProduct: 'You need to select at least one product.',
       genericError: 'Something went wrong',
       noSuggestions: 'No suggestions came back, try again with a different hobby.',
+      siteLabel: 'Your website address',
+      siteBtn: 'Bring my products',
+      imageTerms: 'I sell original products and I am responsible for the use of images',
+      needSite: 'Enter your website address (e.g. www.yoursite.com).',
+      needConsent: 'Tick the image use confirmation to continue.',
+      siteStarting: 'Reading your website...',
+      siteRunning: 'Bringing your products: {done} / {total}',
+      siteNote: 'You can close this page; the job continues in the background and you are notified on the dashboard (and the assistant) when it is done. Missing images are completed later.',
+      siteDone: '{n} products are live in your store',
+      siteNone: 'No products were found on your site. Try entering the address of one of your product pages.',
+      siteFailed: '{n} pages could not be read.',
+      distBtn: 'Send these products to other channels too',
+      distNoChannel: 'You have no other connected channels. Connect Trendyol, Amazon, Instagram and others on My Accounts, then send from here in one go.',
+      distPick: 'Choose at least one channel.',
+      distTest: 'test',
+      distDone: 'Sent: {list}',
+      distListings: '{n} listings',
+      distQueued: '{n} posts queued',
+      waCatalog: 'WhatsApp catalog',
     }
   };
   function lang() {
@@ -264,6 +342,7 @@
     }
     currentSession = session;
     document.getElementById('userEmail').textContent = session.user.email;
+    prepareSite();
   }
 
   function showError(key, extra) {
@@ -395,7 +474,7 @@
 
       document.getElementById('step2').style.display = 'none';
       document.getElementById('step3').style.display = 'block';
-      const rel = 'magaza.html?m=' + encodeURIComponent(data.store_slug || lastSuggestion.store_slug || '');
+      const rel = 'magaza.html?slug=' + encodeURIComponent(data.store_slug || lastSuggestion.store_slug || '');
       const full = new URL(rel, window.location.href).href;
       const link = document.getElementById('storeLinkText');
       link.textContent = full;
@@ -410,11 +489,147 @@
     }
   }
 
+  // ================= Link ver, mağazan hazır =================
+  let siteJobId = null, sitePoll = null, siteJob = null, siteChannels = null;
+  function tv(key, vars) { let s = t(key); Object.keys(vars || {}).forEach(k => { s = s.split('{' + k + '}').join(vars[k]); }); return s; }
+  async function callSite(body) {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return {}; }
+    const res = await fetch(SUPABASE_URL + '/functions/v1/site-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ ...body, userAccessToken: session.access_token }),
+    });
+    return await res.json().catch(() => ({}));
+  }
+  async function prepareSite() {
+    // Görsel kullanım onayı daha önce verildiyse tekrar sorulmaz
+    const { data } = await db.from('user_profiles').select('image_terms_accepted_at').eq('user_id', currentSession.user.id).maybeSingle();
+    document.getElementById('siteConsentRow').style.display = data && data.image_terms_accepted_at ? 'none' : 'flex';
+    // Yarım kalan iş varsa ilerlemeyi göster
+    const { data: jobs } = await db.from('site_import_jobs').select('*').order('created_at', { ascending: false }).limit(1);
+    const j = jobs && jobs[0];
+    if (j && (j.status === 'queued' || j.status === 'running') && Date.now() - new Date(j.updated_at).getTime() < 10 * 60000) { siteJobId = j.id; showProgress(j); pollSite(); }
+    // Biten ve panelde bildirimi kapatılmamış iş: sonuç + diğer kanallara gönderme (yeni site de getirilebilir)
+    else if (j && j.status === 'done' && !j.notified_at && (j.product_ids || []).length) {
+      siteJobId = j.id;
+      await showSiteDone(j);
+      document.getElementById('siteCard').style.display = 'block';
+    }
+  }
+  async function startSite() {
+    hideError();
+    const url = document.getElementById('siteInput').value.trim();
+    if (!url) { showError('needSite'); return; }
+    const consentShown = document.getElementById('siteConsentRow').style.display !== 'none';
+    const consent = document.getElementById('siteConsent').checked;
+    if (consentShown && !consent) { showError('needConsent'); return; }
+    const btn = document.getElementById('siteBtn');
+    btn.disabled = true;
+    try {
+      const d = await callSite({ action: 'start', siteUrl: url, consent: consentShown ? consent : undefined });
+      if (!d.ok) { showError(null, d.error || t('genericError')); btn.disabled = false; return; }
+      siteJobId = d.jobId;
+      document.getElementById('siteDone').style.display = 'none';
+      document.getElementById('siteCard').style.display = 'none';
+      document.getElementById('step1').style.display = 'none';
+      showProgress({ status: 'queued', done: 0, total: 0, failed: 0 });
+      pollSite();
+    } catch (e) { showError(null, e.message); btn.disabled = false; }
+  }
+  function showProgress(j) {
+    siteJob = j;
+    document.getElementById('siteCard').style.display = 'none';
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('siteProgress').style.display = 'block';
+    const total = Math.max(j.total || 0, (j.done || 0) + (j.failed || 0));
+    document.getElementById('siteStatus').textContent = total ? tv('siteRunning', { done: j.done || 0, total }) : t('siteStarting');
+    document.getElementById('siteBar').style.width = (total ? Math.round(((j.done || 0) + (j.failed || 0)) / total * 100) : 3) + '%';
+    document.getElementById('siteNote').textContent = t('siteNote');
+  }
+  function pollSite() {
+    clearInterval(sitePoll);
+    sitePoll = setInterval(async () => {
+      const { data: j } = await db.from('site_import_jobs').select('*').eq('id', siteJobId).maybeSingle();
+      if (!j) return;
+      if (j.status === 'done' || j.status === 'error') { clearInterval(sitePoll); showSiteDone(j); }
+      else showProgress(j);
+    }, 2500);
+  }
+  async function showSiteDone(j) {
+    siteJob = j;
+    document.getElementById('siteProgress').style.display = 'none';
+    const n = (j.product_ids || []).length;
+    if (!n) {
+      document.getElementById('siteCard').style.display = 'block';
+      document.getElementById('siteBtn').disabled = false;
+      showError(null, t('siteNone') + (j.error ? ' (' + j.error + ')' : ''));
+      return;
+    }
+    document.getElementById('siteDone').style.display = 'block';
+    document.getElementById('siteBtn').disabled = false;
+    document.getElementById('siteDoneTitle').textContent = tv('siteDone', { n }) + (j.failed ? ' · ' + tv('siteFailed', { n: j.failed }) : '');
+    const rel = 'magaza.html?slug=' + encodeURIComponent(j.store_slug || '');
+    const link = document.getElementById('siteStoreLink');
+    link.textContent = new URL(rel, window.location.href).href;
+    link.href = rel;
+    document.getElementById('siteOpenStore').href = rel;
+    siteChannels = await callSite({ action: 'channels' });
+    renderChannels();
+  }
+  function renderChannels() {
+    const c = siteChannels || {};
+    const items = [];
+    (c.marketplaces || []).forEach(m => items.push(['mp:' + m.id, m.label || m.code, m.test]));
+    (c.instagram || []).forEach(i => items.push(['ig:' + i.id, 'Instagram' + (i.name ? ' @' + i.name : ''), false]));
+    if (c.whatsappCatalog) items.push(['wa', t('waCatalog'), false]);
+    const list = document.getElementById('distList');
+    if (!items.length) {
+      list.innerHTML = '';
+      document.getElementById('distBtn').style.display = 'none';
+      document.getElementById('distNote').textContent = t('distNoChannel');
+      return;
+    }
+    list.innerHTML = items.map(([id, name, test]) => '<label class="dist-chip"><input type="checkbox" value="' + escapeHtml(id) + '" checked> ' + escapeHtml(name) +
+      (test ? ' <small>(' + escapeHtml(t('distTest')) + ')</small>' : '') + '</label>').join('');
+  }
+  async function distribute() {
+    const channels = [...document.querySelectorAll('#distList input:checked')].map(x => x.value);
+    const note = document.getElementById('distNote');
+    if (!channels.length) { note.textContent = t('distPick'); return; }
+    const btn = document.getElementById('distBtn');
+    btn.disabled = true;
+    try {
+      const d = await callSite({ action: 'distribute', jobId: siteJob.id, channels });
+      if (!d.ok) throw new Error(d.error || t('genericError'));
+      const parts = [];
+      Object.entries(d.result || {}).forEach(([k, v]) => {
+        if (v && v.listings != null) parts.push(k + ': ' + tv('distListings', { n: v.listings }));
+        else if (v && v.queued != null) parts.push('Instagram: ' + tv('distQueued', { n: v.queued }));
+        else if (v && v.error) parts.push(k + ': ' + v.error);
+      });
+      // WhatsApp kataloğu: Meta kataloğuna gönderim (satıcının oturumuyla)
+      if (d.whatsappCatalog) {
+        const { data: { session } } = await db.auth.getSession();
+        const r = await fetch(SUPABASE_URL + '/functions/v1/social-catalog', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+          body: JSON.stringify({ action: 'sync', productIds: siteJob.product_ids, userAccessToken: session.access_token }),
+        }).then(x => x.json()).catch(() => ({}));
+        parts.push(t('waCatalog') + ': ' + (r.error ? r.error : '✓'));
+      }
+      note.textContent = tv('distDone', { list: parts.join(' · ') });
+    } catch (e) {
+      note.textContent = e.message;
+      btn.disabled = false;
+    }
+  }
+
   async function logout() {
     await db.auth.signOut();
     window.location.href = 'index.html';
   }
 
+  document.getElementById('siteInput').addEventListener('keydown', e => { if (e.key === 'Enter') startSite(); });
   document.getElementById('hobbyInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') getSuggestions();
   });
@@ -423,6 +638,8 @@
     applyStatic();
     renderError();
     renderProducts();
+    if (siteJob && document.getElementById('siteProgress').style.display === 'block') showProgress(siteJob);
+    if (siteJob && document.getElementById('siteDone').style.display === 'block') { showSiteDone(siteJob); }
   }
   window.addEventListener('hs:langchange', onLangChange);
   document.addEventListener('hs:langchange', onLangChange);

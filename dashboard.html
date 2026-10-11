@@ -327,6 +327,13 @@
     <div class="alarm-summary" id="orderSummary" onclick="go('orders.html')"></div>
   </div>
 
+  <div class="alarm-banner ok-banner" id="siteBanner" style="display:none;">
+    <div class="alarm-summary" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <span id="siteSummary" style="cursor:pointer" onclick="go('store-builder.html')"></span>
+      <button class="icon-btn-mini" id="siteClose" style="display:none" onclick="dismissSiteBanner()" title="✕">✕</button>
+    </div>
+  </div>
+
   <div class="alarm-banner" id="imgBanner" style="display:none;">
     <div class="alarm-summary" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
       <span id="imgSummary"></span>
@@ -481,6 +488,8 @@
       'main.noStore': '🧭 Henüz mağazan yok: Mağazanı kur',
       'ord.balance': '⚠️ {n} sipariş CJ bakiyesi bekliyor',
       'ord.approval': '⚠️ {n} sipariş onayını bekliyor',
+      'site.running': '🌐 {s} sitenden ürünler getiriliyor: {d} / {t}',
+      'site.done': '🌐 {s} sitendeki {n} ürün mağazanda yayında. Diğer kanallara göndermek için tıkla.',
       'img.running': '🔎 Ürün görselleri arka planda aranıyor: {d} / {t}',
       'img.done': '🖼️ Görsel araması bitti: {f} ürünün görseli bulundu',
       'img.missing': ', {m} ürün için görsel bulunamadı ("Görsel eksik"; ürünü düzenleyip kendi fotoğrafını ekleyebilirsin)',
@@ -642,6 +651,8 @@
       'main.noStore': '🧭 No store yet: Build your store',
       'ord.balance': '⚠️ {n} orders waiting for CJ balance',
       'ord.approval': '⚠️ {n} orders awaiting your approval',
+      'site.running': '🌐 Bringing products from {s}: {d} / {t}',
+      'site.done': '🌐 {n} products from {s} are live in your store. Click to send them to other channels.',
       'img.running': '🔎 Searching product images in the background: {d} / {t}',
       'img.done': '🖼️ Image search finished: images found for {f} products',
       'img.missing': ', none found for {m} products ("Image missing"; edit the product to add your own photo)',
@@ -930,11 +941,43 @@
     renderImgBanner();
   }
 
+  // ---------- Siteden ürün getirme ("Link ver, mağazan hazır") bildirimi ----------
+  let siteJobs = [];
+  async function loadSiteBanner() {
+    try {
+      const { data } = await HS.db.from('site_import_jobs').select('id, site_url, status, total, done, failed, product_ids')
+        .is('notified_at', null).order('created_at', { ascending: false }).limit(5);
+      siteJobs = data || [];
+    } catch (e) { siteJobs = []; }
+    renderSiteBanner();
+    clearTimeout(loadSiteBanner._t);
+    if (siteJobs.some(j => j.status === 'queued' || j.status === 'running')) loadSiteBanner._t = setTimeout(() => { loadSiteBanner(); }, 15000);
+  }
+  function renderSiteBanner() {
+    const el = document.getElementById('siteBanner');
+    if (!siteJobs.length) { el.style.display = 'none'; return; }
+    const j = siteJobs[0];
+    const host = String(j.site_url || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+    const running = j.status === 'queued' || j.status === 'running';
+    document.getElementById('siteSummary').textContent = running
+      ? t('site.running', { s: host, d: HS.number(j.done || 0), t: HS.number(Math.max(j.total || 0, (j.done || 0) + (j.failed || 0))) })
+      : t('site.done', { s: host, n: HS.number((j.product_ids || []).length) });
+    document.getElementById('siteClose').style.display = running ? 'none' : '';
+    el.style.display = '';
+  }
+  async function dismissSiteBanner() {
+    const ids = siteJobs.filter(j => j.status === 'done' || j.status === 'error').map(j => j.id);
+    if (ids.length) await HS.db.from('site_import_jobs').update({ notified_at: new Date().toISOString() }).in('id', ids);
+    siteJobs = siteJobs.filter(j => !ids.includes(j.id));
+    renderSiteBanner();
+  }
+
   async function init() {
     const ctx = await HS.init();
     if (!ctx) return;
     document.getElementById('userEmail').textContent = ctx.user.email;
-    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); renderConnBanner(); renderImgBanner(); });
+    window.addEventListener('hs:langchange', () => { renderAll(); renderOrderBanner(); renderConnBanner(); renderImgBanner(); renderSiteBanner(); });
+    loadSiteBanner();
     loadOrderBanner();
     loadConnBanner();
     loadImgBanner();

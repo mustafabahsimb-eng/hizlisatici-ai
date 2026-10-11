@@ -373,6 +373,9 @@ export async function renderAlert(kind: string, p: any, userId: string): Promise
   if (kind === "stock") return { need: "products", reply: { text: `📉 Stok ${p.status === "tukendi" ? "bitti" : "bitiyor"}: ${short(p.name, 60)}${p.qty != null ? " (kalan " + p.qty + ")" : ""}`, buttons: [{ id: `stock:${p.product_id}`, title: "Stok ekle" }] } };
   if (kind === "loss_approval") return { need: "owner", reply: { text: `⚠️ Onay bekleyen sipariş: ${short(p.message, 400)}`, buttons: [{ id: `approve:${p.order_id}`, title: "Onayla" }, { id: `cancel:${p.order_id}`, title: "İptal" }] } };
   if (kind === "cj_balance") return { need: "owner", reply: { text: `💳 CJ bakiyen yetmiyor; sipariş bekliyor. ${short(p.message, 300)}`, buttons: [{ id: "balance", title: "Bakiye yükle" }] } };
+  if (kind === "site_import") return { need: "owner", reply: {
+    text: `🌐 ${short(p.site, 60)} sitendeki ${p.count} ürün Kendi Mağazam'da yayında.`,
+    link: { title: "Mağazayı aç", url: `${SITE}/magaza.html?slug=${encodeURIComponent(p.slug || "")}` } } };
   if (kind === "connection") return { need: "owner", reply: { text: `🔌 ${short(p.name, 40)} bağlantının süresi doluyor${p.expires ? " (" + p.expires + ")" : ""}.`, buttons: [{ id: "reconnect", title: "Yeniden bağla" }] } };
   if (kind === "return") return { need: "orders", reply: { text: `↩️ İade talebi: ${short(p.text, 300)}`, buttons: [{ id: `order:${p.store_order_id || ""}`, title: "Siparişi gör" }] } };
   if (kind === "competitor") return { need: "owner", reply: {
