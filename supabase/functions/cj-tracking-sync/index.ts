@@ -10,6 +10,7 @@
 // Güvenlik: CRON_SECRET (sync-worker ile aynı şifre).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 import { installEgress } from "../_shared/egress.ts";
 installEgress(); // sabit IP çıkışı (varsayılan kapalı; bkz. docs/sabit-ip-kurulumu.md)
 
@@ -152,6 +153,7 @@ async function updateStoreOrder(o: any, newStatus: string, trackNumber: string |
 async function notifyWhatsApp(userId: string, so: any, trackNumber: string): Promise<true | null | string> {
   const { data: prof } = await db.from("user_profiles").select("wa_tracking_notify").eq("user_id", userId).maybeSingle();
   if (prof && prof.wa_tracking_notify === false) return null;
+  if (!(await featureEnabled(userId, "wa_customer_notify"))) return null;
 
   const { data: tpl } = await db
     .from("whatsapp_templates")

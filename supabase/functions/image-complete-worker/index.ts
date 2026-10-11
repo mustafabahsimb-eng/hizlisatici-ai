@@ -11,6 +11,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -52,6 +53,7 @@ async function processJob(job: any) {
     .select("id, user_id, name, generated_title, model_code, brand, image_url, specs, generated_description, deleted_at")
     .eq("id", job.product_id).maybeSingle();
   if (!p || p.deleted_at) return { kind: "skipped" };
+  if (!(await featureEnabled(p.user_id, "image_complete"))) return { kind: "skipped" };
   const { count: imgCount } = await db.from("product_images").select("id", { count: "exact", head: true })
     .eq("product_id", p.id).is("deleted_at", null);
   let needImg = !p.image_url && !imgCount;

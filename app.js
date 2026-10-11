@@ -406,8 +406,25 @@
     if (wrap) wrap.classList.remove('open');
   });
 
+  // ---------- Ücretli olabilecek özellikler (feature_flags; tek yerden aç / kapa) ----------
+  // HS.feature('multi_channel') -> Promise<boolean>. Kayıtsız anahtar ya da hata = açık.
+  let featureMap = null;
+  async function loadFeatures() {
+    if (featureMap) return featureMap;
+    try {
+      const r = await db.rpc('my_features');
+      featureMap = (!r.error && r.data) ? r.data : {};
+    } catch (e) { featureMap = {}; }
+    return featureMap;
+  }
+  async function feature(key) {
+    const m = await loadFeatures();
+    return m[key] !== false;
+  }
+
   // ---------- Dışa açılan ----------
   const HS = {
+    feature: feature,
     SUPABASE_URL: SUPABASE_URL,
     SUPABASE_KEY: SUPABASE_KEY,
     db: db,

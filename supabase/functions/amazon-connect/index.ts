@@ -9,6 +9,7 @@
 // Uygulama tanımlı değilse (secrets yok) "notReady" döner; bağlantı düğmesi "yakında" der. Varsayılan SANDBOX.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 import {
   AMAZON_MARKETS, amazonConfigured, amazonLive, CONNECT_REGIONS, consentUrl, exchangeCode, marketById, sp, type Ctx,
 } from "../_shared/amazon.ts";
@@ -128,6 +129,7 @@ Deno.serve(async (req) => {
       const region = String(b.region || "");
       const reg = CONNECT_REGIONS[region];
       if (!reg) return json({ ok: false, error: "Geçersiz bölge" }, 400);
+      if (!(await featureEnabled(userId, "amazon"))) return json({ ok: false, error: FEATURE_OFF_MSG, feature: "amazon" });
       if (!amazonConfigured()) return json({ ok: false, notReady: true, error: "Amazon bağlantısı çok yakında açılacak." });
       const state = randomState();
       await db.from("amazon_oauth_states").delete().lt("created_at", new Date(Date.now() - 86400_000).toISOString());

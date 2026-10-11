@@ -1,3 +1,4 @@
+import { featureEnabled, FEATURE_OFF_MSG, userIdFromToken } from "../_shared/features.ts";
 // =========================================================
 // HızlıSatıcı AI - product-import (Toplu Ürün Yükleme)
 // Bir linki okur ve ürün bilgilerini çıkarır:
@@ -838,7 +839,9 @@ Deno.serve(async (req) => {
   // Sistem çağrısı (source-sync): CRON_SECRET + satıcının kimliği (AliExpress hesabı için)
   const CRON = Deno.env.get("CRON_SECRET") ?? "";
   const sysCall = !!CRON && typeof body?.cronSecret === "string" && body.cronSecret.trim() === CRON.trim();
-  if (!sysCall && !(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  const fUid = sysCall ? (typeof body?.userId === "string" ? body.userId : "system") : await userIdFromToken(req.headers.get("Authorization"));
+  if (!fUid) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  if (!(await featureEnabled(fUid, "link_import"))) return json({ error: FEATURE_OFF_MSG, feature: "link_import" }, 403);
   const en = String(body?.language || "").toLowerCase().startsWith("en");
   const E = (tr: string, eng: string) => (en ? eng : tr);
 

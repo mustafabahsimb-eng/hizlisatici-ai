@@ -11,6 +11,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -187,6 +188,7 @@ async function connectedChannels(userId: string) {
 }
 
 async function distribute(userId: string, b: any) {
+  if (!(await featureEnabled(userId, "multi_channel"))) return { ok: false, error: FEATURE_OFF_MSG, feature: "multi_channel" };
   const { data: job } = await db.from("site_import_jobs").select("id, product_ids, status").eq("id", String(b.jobId || "")).eq("user_id", userId).maybeSingle();
   if (!job) return { ok: false, error: "İş bulunamadı" };
   const { data: mine } = await db.from("products").select("id").eq("user_id", userId).in("id", (job.product_ids || []).map(Number)).is("deleted_at", null);
@@ -258,6 +260,7 @@ Deno.serve(async (req) => {
 });
 
 async function start(userId: string, b: any) {
+  if (!(await featureEnabled(userId, "site_import"))) return { ok: false, error: FEATURE_OFF_MSG, feature: "site_import" };
   const u = normalizeUrl(b.siteUrl);
   if (!u) return { ok: false, error: "Geçerli bir web sitesi adresi yaz (ör. www.siten.com)." };
   // Görsel kullanım onayı (ilk kullanım): daha önce verilmediyse bu istekte verilmeli

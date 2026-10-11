@@ -1,3 +1,4 @@
+import { featureEnabled, FEATURE_OFF_MSG, userIdFromToken } from "../_shared/features.ts";
 // =========================================================
 // Seltigo - channel-copy ("✨ Metni kanala göre yaz")
 // Linkten / dosyadan çekilen ürünlerin başlık ve açıklamasını seçilen satış kanalının
@@ -70,7 +71,9 @@ async function ask(system: string, user: string): Promise<any> {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  const fUid = await userIdFromToken(req.headers.get("Authorization"));
+  if (!fUid) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  if (!(await featureEnabled(fUid, "ai_copy"))) return json({ error: FEATURE_OFF_MSG, feature: "ai_copy" }, 403);
   if (!ANTHROPIC_API_KEY) return json({ error: "Yapay zekâ anahtarı tanımlı değil" }, 500);
   const body = await req.json().catch(() => ({}));
   const ch = CHANNELS[String(body?.channel || "own_store")] || CHANNELS.own_store;

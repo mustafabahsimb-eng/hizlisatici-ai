@@ -8,6 +8,7 @@
 // Sandbox bağlantılarında sipariş çekilmez (statik sandbox gerçek sipariş üretmez; deneme amazon-connect selftest ile).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 import { amazonConfigured, marketByCode, restrictedToken, sp, type Ctx } from "../_shared/amazon.ts";
 import { buildOrderRow, confirmBody, STATUS } from "../_shared/amazon-orders.ts";
 
@@ -122,6 +123,7 @@ Deno.serve(async (req) => {
   for (const c of conns || []) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
     if (!marketByCode(c.marketplace_code)) continue;
+    if (!(await featureEnabled(c.user_id, "marketplace_orders"))) { out.push({ id: c.id, skipped: "paket" }); continue; }
     try {
       const { data: cred } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
       if (!cred?.refresh_token) throw new Error("Yenileme anahtarı yok");

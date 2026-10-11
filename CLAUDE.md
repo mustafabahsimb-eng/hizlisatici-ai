@@ -17,6 +17,7 @@
 - "Olmaz" deyip erteleme. Önce nasıl yapılabileceğini söyle (gerçek satıcı hesabı yoksa sandbox/test ortamı gibi).
 - Kalite çıtası yüksek: tam ve profesyonel. İşi küçültüp yarım bırakma.
 - Satıcı HİÇBİR ZAMAN Excel/şablon doldurmaz, sütun başlığı düzeltmez. Dosya yükleme alanları her türlü dosyayı (PDF, Excel, CSV, fotoğraf, ekran görüntüsü) kabul eder ve içeriği yapay zekâyla kendisi anlar. Arayüz metinlerinde "Excel'i doldur / şablon indir" gibi ifadeler kullanılmaz.
+- Paketler (2026-10-13): fiyatlandırma en sona, Mustafa ile birlikte. O zamana kadar ÜCRETLİ OLABİLECEK HER ÖZELLİK tek yerden aç/kapa: `feature_flags` tablosuna anahtar ekle (varsayılan açık), sunucuda `featureEnabled(userId, "anahtar")` (_shared/features.ts), panelde `HS.feature('anahtar')`, veritabanı tetikleyicisinde `feature_enabled(user, 'anahtar')`. Yeni özellik yazarken anahtarını da ekle. Satıcıya özel aç/kapa: user_feature_overrides. Test: tests/e2e/paket_anahtarlari.py.
 - Yeni fikirler yol haritasına eklenir (YOL-HARITASI.md), hemen yapılacak demek değildir.
 - Ödeme gerektiren işlerde (sunucu, ücretli servis, abonelik): altyapıyı ve kodu şimdiden eksiksiz hazırla, varsayılan KAPALI bir anahtarla bekleyecek şekilde kur; ödemeyi kullanıcı sonra yapar. Ödeme günü sadece gerekli değeri (IP, anahtar vb.) girip açmak yetmeli.
 - Kalıcı kararlar (2026-10-11):

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const GRAPH = "https://graph.instagram.com/v23.0";
 const MAX_ATTEMPTS = 5;
 const BATCH = 3;
@@ -118,6 +119,10 @@ Deno.serve(async (req) => {
       .eq("id", job.id).eq("status", "pending")
       .select("id").maybeSingle();
     if (!claimed) continue;
+    if (!(await featureEnabled(job.user_id, "instagram_autopost"))) {
+      await supabase.from("social_posts").update({ status: "error", error: FEATURE_OFF_MSG, updated_at: new Date().toISOString() }).eq("id", job.id);
+      continue;
+    }
 
     try {
       const { data: ch } = await supabase.from("social_channels")

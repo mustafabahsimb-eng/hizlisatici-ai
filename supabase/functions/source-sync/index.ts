@@ -11,6 +11,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -165,6 +166,7 @@ Deno.serve(async (req) => {
     const results: any[] = [];
     for (const p of list) {
       if (Date.now() - started > TIME_BUDGET_MS) break;
+      if (!(await featureEnabled(p.user_id, "source_sync"))) { results.push({ id: p.id, skipped: "paket" }); continue; }
       try { results.push(await syncProduct(p)); } catch (e) {
         results.push({ id: p.id, error: short((e as Error).message) });
         await db.from("products").update({ source_checked_at: new Date().toISOString(), source_note: "Kontrol hatası: " + short((e as Error).message, 150) }).eq("id", p.id);

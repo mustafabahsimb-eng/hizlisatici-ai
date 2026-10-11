@@ -6,6 +6,7 @@
 // HIZ KURALI: ilan önce açılır; ağır işler arkada. Kritik işlerde ikinci onay.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { featureEnabled, FEATURE_OFF_MSG } from "./features.ts";
 import type { Button, Reply } from "./assistant-channels.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -509,6 +510,11 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
   await db.from("assistant_messages").insert({ user_id: link.user_id, channel: link.channel, direction: "in" });
   link.last_inbound_at = new Date().toISOString();
 
+  // Paket anahtarları (tek yerden aç / kapa: feature_flags)
+  if (!(await featureEnabled(link.user_id, "assistant"))) return { link, replies: [{ text: "Seltigo Asistan paketinde kapalı. " + FEATURE_OFF_MSG }] };
+  if (link.channel === "whatsapp" && !(await featureEnabled(link.user_id, "assistant_whatsapp"))) {
+    return { link, replies: [{ text: "Seltigo Asistan'ın WhatsApp sürümü paketinde kapalı; Telegram'dan kullanabilirsin." }] };
+  }
   // WhatsApp ayrı ücretli paket + aylık mesaj sınırı (test kanalı ve Telegram serbest)
   if (link.channel === "whatsapp") {
     const st0 = await settings(link.user_id);
@@ -527,6 +533,7 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
     if (inc.file) {
       if (!can(link, "products")) return { link, replies: [NO_PERM] };
       if (inc.file.kind === "audio") {
+        if (!(await featureEnabled(link.user_id, "assistant_voice"))) return { link, replies: [{ text: "🎙️ Sesli komut paketinde kapalı. Yazarak gönderebilirsin." }] };
         if (!STT_API_KEY) return { link, replies: [{ text: "🎙️ Sesli komut şu an kapalı (konuşmayı yazıya çeviren servis henüz açılmadı). Şimdilik yazarak gönderebilir misin?" }] };
         const bytes = await inc.file.bytes();
         const fd = new FormData();

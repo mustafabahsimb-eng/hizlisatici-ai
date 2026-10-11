@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const GRAPH = "https://graph.facebook.com/v21.0";
@@ -162,6 +163,7 @@ Deno.serve(async (req: Request) => {
 
     // ---------- Ürünleri kataloğa gönder ----------
     if (action === "sync") {
+      if (!(await featureEnabled(userId, "meta_catalog"))) return json({ error: FEATURE_OFF_MSG, feature: "meta_catalog" }, 403);
       if (!row?.catalog_id) return json({ error: "Önce bir katalog seç" }, 400);
       const ids = (Array.isArray(body.productIds) ? body.productIds : []).map(String);
       // Satıcının "katalogda olmasın" dediği ürünler

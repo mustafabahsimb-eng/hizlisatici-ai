@@ -1,3 +1,4 @@
+import { featureEnabled, FEATURE_OFF_MSG, userIdFromToken } from "../_shared/features.ts";
 // =========================================================
 // Seltigo - price-list-parse (Toplu Ürün Yükleme: "📄 Katalog / fiyat listesi yükle")
 // Her türlü dosyadaki ürünleri okur: fiyat listesi, resimli katalog, tablo, taranmış sayfa,
@@ -128,7 +129,9 @@ Deno.serve(async (req) => {
   // Sistem çağrısı (Seltigo Asistan): CRON_SECRET
   const CRON = Deno.env.get("CRON_SECRET") ?? "";
   const sysCall = !!CRON && typeof body?.cronSecret === "string" && body.cronSecret.trim() === CRON.trim();
-  if (!sysCall && !(await hsIsLoggedIn(req))) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  const fUid = sysCall ? (typeof body?.userId === "string" ? body.userId : "system") : await userIdFromToken(req.headers.get("Authorization"));
+  if (!fUid) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+  if (!(await featureEnabled(fUid, "catalog_import"))) return json({ error: FEATURE_OFF_MSG, feature: "catalog_import" }, 403);
   const en = String(body?.language || "").toLowerCase().startsWith("en");
   const E = (tr: string, eng: string) => (en ? eng : tr);
 
