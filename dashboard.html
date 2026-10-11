@@ -387,6 +387,7 @@
       'dash.bundleNeedTwo': 'Paket yapmak için en az 2 ürün seç.',
       'dash.bundleBadge': '📦 Paket',
       'dash.share': 'Paylaş',
+      'dash.edit': '✏️ Ürünü düzenle',
       'dash.shareTitle': 'Sosyal medyada paylaş',
       'dash.selected': '{n} ürün seçildi',
       'dash.confirmBulk': '{n} ürünü silmek istediğine emin misin? Bu işlem geri alınamaz.',
@@ -542,6 +543,7 @@
       'dash.bundleNeedTwo': 'Select at least 2 products to create a bundle.',
       'dash.bundleBadge': '📦 Bundle',
       'dash.share': 'Share',
+      'dash.edit': '✏️ Edit product',
       'dash.shareTitle': 'Share on social media',
       'dash.selected': '{n} products selected',
       'dash.confirmBulk': 'Are you sure you want to delete {n} products? This cannot be undone.',
@@ -1116,6 +1118,7 @@
           ${autoPriceHtml}
           ${scoreHtml}
           ${priceHtml}
+          <button class="btn-secondary edit-btn" onclick="go('urun-duzenle.html?id=${id}')">${esc(t('dash.edit'))}</button>
           <button class="share-btn" title="${esc(t('dash.shareTitle'))}" onclick="go('social.html?ids=${id}')"><span class="share-icons"><i class="fa-brands fa-whatsapp"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook"></i><i class="fa-brands fa-telegram"></i></span>${esc(t('dash.share'))}</button>
           <div class="product-profit" style="${netProfit !== null && netProfit < 0 ? 'color:#f28b8b;' : ''}">${profitHtml}</div>
           <button class="delete-btn" title="${esc(t('dash.deleteTitle'))}" onclick="deleteProduct('${id}')">🗑</button>

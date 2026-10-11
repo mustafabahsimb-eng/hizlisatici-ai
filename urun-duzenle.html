@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo - Ürünü düzenle</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 8px; background: #1D9E75; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn { background: transparent; border: 1px solid #2a3040; color: #9aa3b2; padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  main { max-width: 900px; margin: 0 auto; padding: 28px 24px 120px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .back-link:hover { color: #fff; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 12px; }
+  label.f { display: block; font-size: 12px; color: #9aa3b2; margin: 12px 0 5px; }
+  label.f:first-of-type { margin-top: 0; }
+  input[type=text], input[type=number], input[type=url], textarea, select {
+    width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid #2a3040; background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit;
+  }
+  textarea { min-height: 150px; resize: vertical; line-height: 1.5; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #1D9E75; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .note { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.55; }
+  .note.warn { color: #e6c96a; }
+  .btn { background: #1D9E75; color: #fff; border: none; padding: 11px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn2 { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 8px 14px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .btn2:hover { border-color: #3a4258; color: #fff; }
+  .link-btn { background: none; border: none; color: #6ee7b7; font-size: 12px; cursor: pointer; padding: 4px 0; text-align: left; }
+  .link-btn:hover { text-decoration: underline; }
+  .del-btn { background: none; border: none; color: #f28b8b; cursor: pointer; font-size: 15px; }
+  table.var { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.var th { text-align: left; color: #9aa3b2; font-weight: 500; font-size: 12px; padding: 6px 6px; border-bottom: 1px solid #232838; }
+  table.var td { padding: 6px; border-bottom: 1px solid #1c2130; }
+  table.var input[type=text], table.var input[type=number] { padding: 7px 8px; font-size: 13px; }
+  .var-wrap { overflow-x: auto; }
+  .imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .img-card { background: #0d0f16; border: 1px solid #232838; border-radius: 10px; padding: 8px; position: relative; }
+  .img-card img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 6px; display: block; }
+  .img-card .main-tag { position: absolute; top: 12px; left: 12px; background: #1D9E75; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 6px; }
+  .img-src { font-size: 11px; color: #8b93a3; margin-top: 6px; overflow-wrap: anywhere; }
+  .img-add { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 150px; border: 2px dashed #2a3040; border-radius: 10px; color: #9aa3b2; cursor: pointer; font-size: 13px; padding: 10px; background: none; }
+  .img-add:hover { border-color: #1D9E75; color: #fff; }
+  .img-missing { color: #e6c96a; font-size: 13px; margin-bottom: 10px; }
+  .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #141821ee; border-top: 1px solid #232838; padding: 12px 24px; display: flex; justify-content: center; gap: 12px; align-items: center; backdrop-filter: blur(6px); }
+  .save-msg { font-size: 13px; color: #9aa3b2; }
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #123222; color: #6ee7b7; border: 1px solid #1D9E75; padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; z-index: 99; max-width: 90vw; }
+  .toast.err { background: #2a1416; color: #f28b8b; border-color: #6b2a2f; }
+  .loading { color: #9aa3b2; padding: 40px 0; text-align: center; }
+  @media (max-width: 640px) { main { padding: 20px 16px 120px; } .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div class="logo-text">Seltigo</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+
+<main>
+  <div class="top-row">
+    <h1 data-t="title"></h1>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+  <div id="content"><div class="loading" data-t="loading"></div></div>
+</main>
+
+<div class="save-bar" id="saveBar" style="display:none">
+  <span class="save-msg" id="saveMsg"></span>
+  <button class="btn" id="saveBtn" onclick="save()" data-t="save"></button>
+</div>
+<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="onPhoto(this.files[0]); this.value='';">
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'Seltigo - Ürünü düzenle',
+      logout: 'Çıkış yap',
+      title: '✏️ Ürünü düzenle',
+      back: '← Panele dön',
+      loading: 'Yükleniyor...',
+      notFound: 'Ürün bulunamadı.',
+      name: 'Ad',
+      desc: 'Açıklama',
+      price: 'Fiyat',
+      stock: 'Stok',
+      stockPh: 'Boş bırakırsan bilinmiyor sayılır',
+      source: 'Kaynak',
+      srcOwn: 'Kendi stoğum',
+      srcWholesaler: 'Toptancı',
+      srcAe: 'AliExpress',
+      srcCj: 'CJ',
+      srcPrintify: 'Printify',
+      srcNoteAuto: 'Bu ürünün siparişleri otomatik olarak {s}\'e verilir (zarar kontrolüyle).',
+      srcNoteSelf: 'Bu ürünün siparişlerini sen gönderirsin; tedarikçiye otomatik sipariş verilmez.',
+      srcLink: '{s} ürün linki',
+      srcLinkBad: '{s} linkinden ürün numarası okunamadı.',
+      variants: 'Beden/renk seçenekleri',
+      varStock: 'Stok',
+      varActive: 'Satışta',
+      varAdd: '+ Seçenek ekle',
+      varNone: 'Bu üründe seçenek yok.',
+      varKeyDefault1: 'Beden',
+      varKeyDefault2: 'Renk',
+      images: 'Görseller',
+      imgMain: 'Ana görsel',
+      imgSource: 'Görsel kaynağı: {s}',
+      imgSrcSeller: 'kendi fotoğrafın',
+      imgSrcCatalog: 'yüklenen dosya',
+      imgSrcUnknown: 'bilinmiyor',
+      ownPhoto: 'Kendi fotoğrafımla değiştir',
+      takePhoto: '📷 Fotoğraf çek / yükle',
+      imgMissing: 'Görsel eksik',
+      photoWorking: 'Fotoğraf hazırlanıyor (arka plan temizleniyor)...',
+      photoBgFail: 'Arka plan temizlenemedi; fotoğraf olduğu gibi eklendi.',
+      save: '💾 Kaydet',
+      saving: 'Kaydediliyor...',
+      saved: '✓ Kaydedildi',
+      unsaved: 'Kaydedilmemiş değişiklikler var',
+      needName: 'Ürün adı boş olamaz.',
+      error: 'Hata: ',
+      confirmLeave: 'Kaydedilmemiş değişiklikler var. Çıkmak istediğine emin misin?'
+    },
+    en: {
+      pageTitle: 'Seltigo - Edit product',
+      logout: 'Log out',
+      title: '✏️ Edit product',
+      back: '← Back to panel',
+      loading: 'Loading...',
+      notFound: 'Product not found.',
+      name: 'Name',
+      desc: 'Description',
+      price: 'Price',
+      stock: 'Stock',
+      stockPh: 'Leave empty if unknown',
+      source: 'Source',
+      srcOwn: 'My own stock',
+      srcWholesaler: 'Wholesaler',
+      srcAe: 'AliExpress',
+      srcCj: 'CJ',
+      srcPrintify: 'Printify',
+      srcNoteAuto: 'Orders for this product are placed on {s} automatically (with loss check).',
+      srcNoteSelf: 'You ship the orders of this product yourself; no automatic supplier order.',
+      srcLink: '{s} product link',
+      srcLinkBad: 'Could not read the product number from the {s} link.',
+      variants: 'Size/colour options',
+      varStock: 'Stock',
+      varActive: 'On sale',
+      varAdd: '+ Add option',
+      varNone: 'This product has no options.',
+      varKeyDefault1: 'Size',
+      varKeyDefault2: 'Colour',
+      images: 'Images',
+      imgMain: 'Main image',
+      imgSource: 'Image source: {s}',
+      imgSrcSeller: 'your own photo',
+      imgSrcCatalog: 'uploaded file',
+      imgSrcUnknown: 'unknown',
+      ownPhoto: 'Replace with my own photo',
+      takePhoto: '📷 Take / upload photo',
+      imgMissing: 'Image missing',
+      photoWorking: 'Preparing the photo (removing background)...',
+      photoBgFail: 'The background could not be removed; the photo was added as is.',
+      save: '💾 Save',
+      saving: 'Saving...',
+      saved: '✓ Saved',
+      unsaved: 'You have unsaved changes',
+      needName: 'The product name cannot be empty.',
+      error: 'Error: ',
+      confirmLeave: 'You have unsaved changes. Are you sure you want to leave?'
+    }
+  });
+
+  const t = HS.t;
+  const esc = HS.escapeHtml;
+  const db = HS.db;
+  const productId = Number(new URLSearchParams(location.search).get('id'));
+  const SOURCES = [['own', 'srcOwn'], ['wholesaler', 'srcWholesaler'], ['aliexpress', 'srcAe'], ['cj', 'srcCj']];
+
+  let userId = null;
+  let product = null;           // ürün kaydı
+  let ownListing = null;        // Kendi Mağazam ilanı
+  let variants = [];            // { id?, attributes, stock_qty, is_active, _new, _deleted }
+  let images = [];              // { id?, url, source_kind, source_url, _new, _deleted, _changed }
+  let source = 'own';
+  let sourceLink = '';
+  let dirty = false;
+  let photoTarget = -1;         // -1: yeni görsel, n: n. görseli değiştir
+
+  function fmt(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m); }
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'toast' + (isErr ? ' err' : ''); el.style.display = 'block';
+    clearTimeout(toast._t); toast._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+  function applyStatic() {
+    document.title = t('pageTitle');
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); });
+  }
+  function markDirty() { dirty = true; document.getElementById('saveMsg').textContent = t('unsaved'); }
+  // Kaynak sitelerden gelen seçenek adlarını Türkçe göster (kayıtlı veri değişmez; vitrinle aynı)
+  const OPTION_NAMES_TR = { size: 'Beden', color: 'Renk', colour: 'Renk', material: 'Malzeme', style: 'Model', pattern: 'Desen', capacity: 'Kapasite', length: 'Uzunluk', 'ships from': 'Gönderim yeri' };
+  function optionName(k) { return HS.lang === 'en' ? k : (OPTION_NAMES_TR[String(k).trim().toLowerCase()] || k); }
+  function srcName(s) { const x = SOURCES.find(o => o[0] === s); return x ? t(x[1]) : (s === 'printify' ? t('srcPrintify') : s); }
+
+  // ---------- Kaynak ----------
+  function sourceItemId(src, link) {
+    const v = String(link || '').trim();
+    if (!v) return '';
+    if (src === 'aliexpress') { const m = v.match(/\/item\/(\d+)/) || v.match(/^(\d{8,})$/); return m ? m[1] : ''; }
+    if (src === 'cj') { const m = v.match(/-p-([A-Za-z0-9-]+)\.html/) || v.match(/[?&]pid=([A-Za-z0-9-]+)/) || v.match(/^([A-Za-z0-9-]{10,})$/); return m ? m[1] : ''; }
+    return '';
+  }
+  function sourceLinkOf(p) {
+    if (p.supplier === 'aliexpress' && p.supplier_item_id) return 'https://www.aliexpress.com/item/' + p.supplier_item_id + '.html';
+    if (p.supplier === 'cj' && p.supplier_item_id) return 'https://cjdropshipping.com/product/-p-' + p.supplier_item_id + '.html';
+    return '';
+  }
+
+  // ---------- Görsel kaynağı ----------
+  function imgSourceText(im) {
+    if (im.source_kind === 'seller_photo') return t('imgSrcSeller');
+    const u = im.source_url || (im.source_kind ? '' : im.url);
+    if (!u) return im.source_kind === 'catalog' ? t('imgSrcCatalog') : t('imgSrcUnknown');
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; }
+  }
+
+  // ---------- Çizim ----------
+  function render() {
+    const p = product;
+    const cur = (ownListing && ownListing.currency) || p.cost_currency || 'TRY';
+    const keys = [];
+    variants.filter(v => !v._deleted).forEach(v => Object.keys(v.attributes || {}).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
+    const live = images.filter(i => !i._deleted);
+    const auto = source === 'aliexpress' || source === 'cj';
+    const srcOptions = SOURCES.map(o => '<option value="' + o[0] + '"' + (source === o[0] ? ' selected' : '') + '>' + esc(t(o[1])) + '</option>').join('') +
+      (source === 'printify' ? '<option value="printify" selected>' + esc(t('srcPrintify')) + '</option>' : '');
+
+    document.getElementById('content').innerHTML =
+      '<div class="card">' +
+        '<label class="f" for="fName">' + esc(t('name')) + '</label>' +
+        '<input type="text" id="fName" maxlength="300" value="' + esc(p._name) + '">' +
+        '<label class="f" for="fDesc">' + esc(t('desc')) + '</label>' +
+        '<textarea id="fDesc" maxlength="8000">' + esc(p._desc) + '</textarea>' +
+        '<div class="row2">' +
+          '<div><label class="f" for="fPrice">' + esc(t('price')) + ' (' + esc(cur) + ')</label>' +
+            '<input type="number" id="fPrice" min="0" step="0.01" value="' + (p._price != null ? p._price : '') + '"></div>' +
+          '<div><label class="f" for="fStock">' + esc(t('stock')) + '</label>' +
+            '<input type="number" id="fStock" min="0" step="1" placeholder="' + esc(t('stockPh')) + '" value="' + (p._stock != null ? p._stock : '') + '"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h2>' + esc(t('source')) + '</h2>' +
+        '<select id="fSource"' + (source === 'printify' ? ' disabled' : '') + '>' + srcOptions + '</select>' +
+        (auto ? '<label class="f" for="fSrcLink">' + esc(fmt(t('srcLink'), { s: srcName(source) })) + '</label>' +
+          '<input type="url" id="fSrcLink" value="' + esc(sourceLink) + '">' : '') +
+        '<div class="note">' + esc(auto ? fmt(t('srcNoteAuto'), { s: srcName(source) }) : (source === 'printify' ? '' : t('srcNoteSelf'))) + '</div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h2>' + esc(t('variants')) + '</h2>' +
+        (variants.filter(v => !v._deleted).length
+          ? '<div class="var-wrap"><table class="var"><thead><tr>' + keys.map(k => '<th>' + esc(optionName(k)) + '</th>').join('') +
+              '<th>' + esc(t('varStock')) + '</th><th>' + esc(t('varActive')) + '</th><th></th></tr></thead><tbody>' +
+              variants.map((v, i) => v._deleted ? '' : '<tr>' +
+                keys.map(k => '<td><input type="text" data-v="' + i + '" data-k="' + esc(k) + '" value="' + esc((v.attributes || {})[k] || '') + '"></td>').join('') +
+                '<td style="width:90px"><input type="number" min="0" step="1" data-vs="' + i + '" value="' + (v.stock_qty != null ? v.stock_qty : '') + '"></td>' +
+                '<td style="width:60px;text-align:center"><input type="checkbox" data-va="' + i + '"' + (v.is_active !== false ? ' checked' : '') + '></td>' +
+                '<td style="width:36px"><button class="del-btn" onclick="delVariant(' + i + ')">🗑</button></td></tr>').join('') +
+            '</tbody></table></div>'
+          : '<div class="note">' + esc(t('varNone')) + '</div>') +
+        '<div style="margin-top:10px"><button class="btn2" onclick="addVariant()">' + esc(t('varAdd')) + '</button></div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h2>' + esc(t('images')) + '</h2>' +
+        (live.length ? '' : '<div class="img-missing">' + esc(t('imgMissing')) + '</div>') +
+        '<div class="imgs">' +
+          images.map((im, i) => im._deleted ? '' : '<div class="img-card">' +
+            (live[0] === im ? '<span class="main-tag">' + esc(t('imgMain')) + '</span>' : '') +
+            '<img src="' + esc(im.url) + '" referrerpolicy="no-referrer" alt="">' +
+            '<div class="img-src">' + esc(fmt(t('imgSource'), { s: imgSourceText(im) })) + '</div>' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
+              '<button class="link-btn" onclick="pickPhoto(' + i + ')">' + esc(t('ownPhoto')) + '</button>' +
+              '<button class="del-btn" onclick="delImage(' + i + ')">🗑</button>' +
+            '</div></div>').join('') +
+          '<button class="img-add" onclick="pickPhoto(-1)">' + esc(t('takePhoto')) + '</button>' +
+        '</div>' +
+      '</div>';
+
+    // Değişiklik dinleyicileri
+    ['fName', 'fDesc', 'fPrice', 'fStock'].forEach(id => document.getElementById(id).addEventListener('input', () => { readForm(); markDirty(); }));
+    const fs = document.getElementById('fSource');
+    fs.addEventListener('change', () => { readForm(); source = fs.value; markDirty(); render(); });
+    const fl = document.getElementById('fSrcLink');
+    if (fl) fl.addEventListener('input', () => { sourceLink = fl.value; markDirty(); });
+    document.querySelectorAll('[data-v]').forEach(el => el.addEventListener('input', () => {
+      const v = variants[Number(el.dataset.v)]; v.attributes = Object.assign({}, v.attributes, { [el.dataset.k]: el.value }); v._changed = true; markDirty();
+    }));
+    document.querySelectorAll('[data-vs]').forEach(el => el.addEventListener('input', () => {
+      const v = variants[Number(el.dataset.vs)]; v.stock_qty = el.value === '' ? null : Math.max(0, parseInt(el.value, 10) || 0); v._changed = true; markDirty();
+    }));
+    document.querySelectorAll('[data-va]').forEach(el => el.addEventListener('change', () => {
+      const v = variants[Number(el.dataset.va)]; v.is_active = el.checked; v._changed = true; markDirty();
+    }));
+    document.getElementById('saveBar').style.display = 'flex';
+  }
+  function readForm() {
+    const g = id => document.getElementById(id);
+    if (!g('fName')) return;
+    product._name = g('fName').value;
+    product._desc = g('fDesc').value;
+    product._price = g('fPrice').value === '' ? null : Number(g('fPrice').value);
+    product._stock = g('fStock').value === '' ? null : Math.max(0, parseInt(g('fStock').value, 10) || 0);
+  }
+
+  function addVariant() {
+    readForm();
+    const keys = [];
+    variants.filter(v => !v._deleted).forEach(v => Object.keys(v.attributes || {}).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
+    const attrs = {};
+    (keys.length ? keys : [t('varKeyDefault1'), t('varKeyDefault2')]).forEach(k => { attrs[k] = ''; });
+    variants.push({ attributes: attrs, stock_qty: null, is_active: true, _new: true });
+    markDirty(); render();
+  }
+  function delVariant(i) { readForm(); variants[i]._deleted = true; markDirty(); render(); }
+  function delImage(i) { readForm(); images[i]._deleted = true; markDirty(); render(); }
+
+  // ---------- Fotoğraf (telefonda kamera açılır); arka plan otomatik temizlenir ----------
+  function pickPhoto(i) { readForm(); photoTarget = i; document.getElementById('photoInput').click(); }
+  function fileToCanvas(file, maxSide) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url); resolve(cv);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(file.name)); };
+      img.src = url;
+    });
+  }
+  async function onPhoto(file) {
+    if (!file) return;
+    toast(t('photoWorking'));
+    try {
+      const cv = await fileToCanvas(file, 1600);
+      let dataUrl = cv.toDataURL('image/jpeg', 0.9);
+      try {
+        const res = await fetch(HS.SUPABASE_URL + '/functions/v1/remove-background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ imageBase64: dataUrl })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.imageBase64) throw new Error(d.error || ('HTTP ' + res.status));
+        const img = new Image();
+        await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = d.imageBase64; });
+        const out = document.createElement('canvas');
+        out.width = img.naturalWidth; out.height = img.naturalHeight;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(img, 0, 0);
+        dataUrl = out.toDataURL('image/jpeg', 0.9);
+      } catch (e) { console.warn('remove-background', e); toast(t('photoBgFail'), true); }
+      if (photoTarget >= 0 && images[photoTarget]) {
+        Object.assign(images[photoTarget], { url: dataUrl, source_kind: 'seller_photo', source_url: null, _changed: true });
+      } else {
+        images.push({ url: dataUrl, source_kind: 'seller_photo', source_url: null, _new: true });
+      }
+      markDirty(); render();
+    } catch (e) { toast(t('error') + e.message, true); }
+  }
+  async function uploadDataUrl(dataUrl) {
+    const blob = await (await fetch(dataUrl)).blob();
+    const path = userId + '/edit/' + productId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    const up = await db.storage.from('product-images').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (up.error) throw up.error;
+    return db.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  }
+
+  function stockStatus(n) { return n == null ? null : (n <= 0 ? 'tukendi' : (n <= 5 ? 'az' : 'stokta')); }
+
+  // ---------- Kaydet ----------
+  async function save() {
+    readForm();
+    const p = product;
+    const name = String(p._name || '').trim();
+    if (!name) { toast(t('needName'), true); return; }
+    const auto = source === 'aliexpress' || source === 'cj';
+    const itemId = auto ? sourceItemId(source, sourceLink) : '';
+    if (auto && !itemId) { toast(fmt(t('srcLinkBad'), { s: srcName(source) }), true); return; }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = t('saving');
+    try {
+      // 1) Görseller (yeni / değişen fotoğraflar önce depoya)
+      for (const im of images) {
+        if (!im._deleted && String(im.url).indexOf('data:') === 0) im.url = await uploadDataUrl(im.url);
+      }
+      let pos = 0;
+      for (const im of images) {
+        if (im._deleted) {
+          if (im.id) { const r = await db.from('product_images').update({ deleted_at: new Date().toISOString() }).eq('id', im.id); if (r.error) throw r.error; }
+          continue;
+        }
+        const row = { url: im.url, position: pos++, source_kind: im.source_kind || null, source_url: im.source_url || null };
+        if (im.id) { const r = await db.from('product_images').update(row).eq('id', im.id); if (r.error) throw r.error; }
+        else {
+          const r = await db.from('product_images').insert(Object.assign({ product_id: productId, user_id: userId, source: 'seller' }, row)).select('id').single();
+          if (r.error) throw r.error;
+          im.id = r.data.id; im._new = false;
+        }
+        im._changed = false;
+      }
+      images = images.filter(i => !i._deleted);
+      const mainImg = images[0] ? images[0].url : null;
+
+      // 2) Ürün
+      const supplierChanged = (p.supplier || 'own') !== source || (auto && String(p.supplier_item_id || '') !== itemId);
+      const upd = {
+        name: name, generated_title: name, generated_description: p._desc || '',
+        sale_price: p._price != null ? p._price : p.sale_price,
+        stock_qty: p._stock, stock_status: p._stock != null ? stockStatus(p._stock) : p.stock_status,
+        image_url: mainImg, image_missing: !mainImg
+      };
+      if (source !== 'printify') {
+        upd.supplier = source === 'own' ? null : source;
+        if (supplierChanged) {
+          upd.supplier_item_id = auto ? itemId : null;
+          upd.supplier_variant_id = null;
+          upd.supplier_sku_attr = null;
+          if (source === 'aliexpress') { upd.cj_alt_status = null; upd.cj_alt_pid = null; upd.cj_alt_vid = null; }
+        }
+      }
+      // Stok bitince vitrinden gizle, gelince aç
+      if (p._stock === 0 && p.store_visible) upd.store_visible = false;
+      if (p._stock > 0 && p.stock_status === 'tukendi') upd.store_visible = true;
+      const r = await db.from('products').update(upd).eq('id', productId).select('*').single();
+      if (r.error) throw r.error;
+      const oldPrice = Number(p.sale_price) || 0;
+      product = Object.assign(r.data, { _name: name, _desc: upd.generated_description, _price: r.data.sale_price, _stock: r.data.stock_qty });
+
+      // 3) Kendi Mağazam ilanı (vitrin bu ilandan okur)
+      if (ownListing) {
+        const lu = { title: name, description: upd.generated_description };
+        if (p._price != null && p._price !== oldPrice) lu.price = p._price;
+        const lr = await db.from('listings').update(lu).eq('id', ownListing.id);
+        if (lr.error) throw lr.error;
+        if (lu.price != null) await db.from('listing_variants').update({ price: lu.price }).eq('listing_id', ownListing.id);
+      }
+
+      // 4) Seçenekler
+      let k = Date.now() % 100000;
+      for (const v of variants) {
+        if (v._deleted) {
+          if (v.id) { const x = await db.from('product_variants').update({ deleted_at: new Date().toISOString(), is_active: false }).eq('id', v.id); if (x.error) throw x.error; }
+          continue;
+        }
+        const attrs = {};
+        Object.keys(v.attributes || {}).forEach(key => { const val = String(v.attributes[key] || '').trim(); if (key.trim() && val) attrs[key.trim()] = val; });
+        if (!Object.keys(attrs).length) continue;
+        const row = { attributes: attrs, stock_qty: v.stock_qty, stock_status: stockStatus(v.stock_qty), is_active: v.is_active !== false };
+        if (v.id && v._changed) { const x = await db.from('product_variants').update(row).eq('id', v.id); if (x.error) throw x.error; }
+        else if (!v.id) {
+          const x = await db.from('product_variants').insert(Object.assign({ product_id: productId, user_id: userId, sku: 'HS-' + productId + '-E' + (k++), is_default: false }, row)).select('id').single();
+          if (x.error) throw x.error;
+          v.id = x.data.id;
+        }
+        v._changed = false; v._new = false;
+      }
+      variants = variants.filter(v => !v._deleted);
+
+      // 5) Kaynak AliExpress'e döndüyse CJ eşdeğeri araması başlasın
+      if (supplierChanged && source === 'aliexpress') {
+        fetch(HS.SUPABASE_URL + '/functions/v1/cj-alt-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ productId: productId })
+        }).catch(() => {});
+      }
+      dirty = false;
+      document.getElementById('saveMsg').textContent = t('saved');
+      toast(t('saved'));
+      render();
+    } catch (e) {
+      console.error(e);
+      toast(t('error') + (e.message || e), true);
+    } finally {
+      btn.disabled = false; btn.textContent = t('save');
+    }
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = t('confirmLeave'); return t('confirmLeave'); } });
+
+  // ---------- Yükle ----------
+  async function load() {
+    const [pr, ls, vr, im] = await Promise.all([
+      db.from('products').select('*').eq('id', productId).is('deleted_at', null).maybeSingle(),
+      db.from('listings').select('id, title, description, price, currency').eq('product_id', productId).eq('marketplace_code', 'own_store').is('deleted_at', null).limit(1).maybeSingle(),
+      db.from('product_variants').select('id, sku, attributes, stock_qty, is_active, created_at').eq('product_id', productId).eq('is_default', false).is('deleted_at', null),
+      db.from('product_images').select('id, url, position, source_kind, source_url').eq('product_id', productId).is('deleted_at', null).order('position')
+    ]);
+    if (!pr.data) { document.getElementById('content').innerHTML = '<div class="loading">' + esc(t('notFound')) + '</div>'; return; }
+    product = pr.data;
+    ownListing = ls.data || null;
+    product._name = (ownListing && ownListing.title) || product.generated_title || product.name || '';
+    product._desc = (ownListing && ownListing.description) || product.generated_description || '';
+    product._price = ownListing && ownListing.price != null ? Number(ownListing.price) : (product.sale_price != null ? Number(product.sale_price) : null);
+    product.sale_price = product._price;
+    product._stock = product.stock_qty;
+    // Sabit sıra: eklenme sırası (aynı anda eklenenlerde koddaki sıra numarası)
+    const seq = v => { const m = String(v.sku || '').match(/(\d+)$/); return m ? Number(m[1]) : 0; };
+    variants = (vr.data || []).filter(v => v.attributes && Object.keys(v.attributes).length)
+      .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : seq(a) - seq(b)));
+    images = im.data || [];
+    // Eski ürünler: görsel tablosunda kayıt yoksa ana görseli göster
+    if (!images.length && product.image_url) images = [{ url: product.image_url, source_kind: null, source_url: product.source_url || null, _new: true }];
+    source = product.supplier ? product.supplier : 'own';
+    sourceLink = sourceLinkOf(product);
+    render();
+  }
+
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    await load();
+  })();
+  window.addEventListener('hs:langchange', () => { applyStatic(); if (product) { readForm(); render(); } });
+</script>
+</body>
+</html>
