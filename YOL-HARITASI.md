@@ -38,12 +38,22 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
     - [ ] Bazı siteler sunucudan okumayı engelliyor (ör. Cloudflare korumalı): Shopify/WooCommerce ise veri adreslerine düşülüyor; değilse ücretli okuma servisi gerekir. Altyapı hazır, varsayılan KAPALI: Edge secret SCRAPER_ENABLED=true + SCRAPER_URL_TEMPLATE (ör. ScrapingBee/ZenRows, "{url}" yer tutuculu). Ödeme günü sadece bu iki değer girilir.
     - [x] Mağaza vitrininde beden/renk seçimi (12 Ekim): seçenek fiyatı ve görseli, tükenen seçenek kapalı; seçenek mağaza siparişine, tedarikçi siparişine (AliExpress SKU / CJ eşdeğerinde ad eşleşmesi) ve müşteri takip sayfasına geçiyor. Test: vitrin_secenek.py 10/10. Not: gerçek AliExpress/CJ siparişinde seçenek seçimi para harcamamak için denenmedi; ilk gerçek seçenekli siparişte izlenmeli.
     - [ ] Kendi mağaza dışındaki kanallardaki ilan fiyatları (Trendyol vb.) source-sync ile henüz güncellenmiyor (o kanalların gönderimi açılınca sync-worker kuyruğuna bağlanacak).
-- [ ] **2. PDF'den ürün yükleme** (şirket gerekmez; temel var: price-list-parse resimsiz fiyat listesini okuyor)
+- [~] **2. PDF'den ürün yükleme** (şirket gerekmez)
   - Üç tür: (a) resimli katalog — ad, kod, fiyat ve fotoğraf ayıklanıp eşleştirilir; (b) resimsiz fiyat listesi/tablo; (c) taranmış/fotoğraf PDF — OCR ile okunur.
   - Resimsiz ürünlerde görsel ve bilgi otomatik tamamlanır, sırayla: 1) markanın resmi sitesi (marka + model/kod ile ürün sayfası; resmi görseller + teknik özellikler, açıklama bunlarla zenginleşir), 2) toptancının sitesi, 3) CJ/AliExpress eşleşmesi. Hiçbirinde yoksa "Görsel eksik" etiketiyle eklenir; satıcı telefonla çekip ekler, arka plan otomatik temizlenir (remove-background). Rastgele/telifli görsel alınmaz.
   - Görsel telif güvencesi: marka görsellerinde önce markanın medya kiti / basın görselleri sayfası, sonra ürün sayfası. Her görselin kaynağı kaydedilir ve satıcıya gösterilir ("Görsel kaynağı: ..."). İlk kullanımda satıcı onayı: "Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir" (onay tarihiyle kaydedilir). Satıcı görseli istediği an kendi fotoğrafıyla değiştirebilir.
   - Önizleme listesi; satıcı işaretlediklerini tek tıkla ekler. Telefondan da yüklenebilir (dosya veya kamera).
-  - Bağlı iş: **Kullanım koşulları taslağı** (henüz yok) — görsel sorumluluk maddesi eklenecek; yayın öncesi hukukçu kontrolü.
+  - Bağlı iş: **Kullanım koşulları taslağı** — yazıldı: `docs/kullanim-kosullari-taslak.md` (görsel sorumluluk maddesi 3.2 dahil). Yayın öncesi hukukçu kontrolü + şirket bilgileri gerekli.
+  - DURUM (12 Ekim 2026): çoğu yapıldı ve denendi.
+    - Sekme "📄 Katalog / fiyat listesi yükle": PDF, taranmış PDF, Excel/CSV/ODS/TXT (başlık düzeni ne olursa olsun), fotoğraf ve ekran görüntüsü; birden çok dosya; telefondan fotoğraf.
+    - Resimli katalogda fotoğraf doğru ürüne bağlanıyor: model kodu varsa koda göre, yoksa sayfadaki resim alanları numaralanıp yapay zekâya eşleştiriliyor; taranmış sayfa / ekran görüntüsünde fotoğrafın yerini yapay zekâ buluyor.
+    - Görsel tamamlama zinciri: marka sitesi (basın / medya kiti → ürün sayfası) → toptancı sitesi (dosyada yazan web adresi) → CJ / AliExpress (sıkı ad eşleşmesi) → "Görsel eksik" + "📷 Fotoğraf çek / yükle" (arka plan otomatik temizlenir, beyaz zemin).
+    - Her görselin kaynağı kaydediliyor (product_images.source_kind / source_url) ve önizlemede "Görsel kaynağı: ..." görünüyor; "Kendi fotoğrafımla değiştir"; ilk kullanım onayı tarihiyle kaydediliyor; "Seçilenleri ekle ({n})".
+    - Testler: katalog_yukleme.py 18/18 (iki kez), gorsel_tamamlama.py 15/15.
+  - Kalanlar:
+    - [ ] Ürün yüklendikten sonra panelde görseli değiştirme ve kaynağını görme: panelde ürün düzenleme / görsel sayfası henüz yok (sayfa ve adı için Mustafa'nın kararı gerekir).
+    - [ ] Basın / medya kiti araması gerçek markalarda nadiren sonuç verir (çoğu marka basın görselini ayrı sunmuyor); bulunamazsa ürün sayfasına geçiliyor.
+    - [ ] İnternet aramalı tamamlama değişken sonuç verebiliyor (bir kez otomatik tekrar var); ürün başına ~30-90 sn, çok ürünlü dosyalarda uzun sürer → arka plan görevine taşınabilir.
 - [ ] **2b. Chrome eklentisi** (öne alındı, 12 Ekim 2026; şirket gerekmez)
   - Amaç: sunucunun okuyamadığı ya da yanlış ülke vitrinini gördüğü sitelerde ürünü satıcının kendi tarayıcısından okumak. İlk hedef Trendyol'un Türkiye fiyatı (TL) ve Türkçe içeriği.
   - Satıcı ürün sayfasındayken tek tıkla Seltigo'ya ekler; eklenti sayfadaki ürün verisini (ad, fiyat, görsel, seçenek, stok) okuyup Seltigo hesabına gönderir.

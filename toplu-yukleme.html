@@ -106,6 +106,9 @@
   .pname { color: #fff; font-weight: 600; line-height: 1.35; }
   .pmeta { font-size: 11px; color: #9aa3b2; margin-top: 3px; }
   .img-count { font-size: 11px; color: #9aa3b2; margin-top: 4px; text-align: center; }
+  .img-src { font-size: 10px; color: #8b93a3; margin-top: 4px; max-width: 120px; overflow-wrap: anywhere; }
+  .link-btn { background: none; border: none; color: #6ee7b7; font-size: 11px; padding: 4px 0 0; cursor: pointer; text-align: left; max-width: 120px; }
+  .link-btn:hover { text-decoration: underline; }
   .spec-toggle { background: none; border: none; color: #6ee7b7; font-size: 12px; cursor: pointer; padding: 0; margin-top: 4px; }
   .spec-list { margin-top: 6px; font-size: 12px; color: #c3c9d4; line-height: 1.6; }
   .spec-list span { color: #9aa3b2; }
@@ -262,6 +265,7 @@
     <div class="step-head"><div class="step-num">4</div><div class="step-title" data-t="s4Title"></div></div>
     <div class="consent">
       <label class="chk"><input type="checkbox" id="consentChk" onchange="updateImportBtn()"> <span data-t="consent"></span></label>
+      <label class="chk" id="imageTermsRow" style="display:none;margin-top:8px"><input type="checkbox" id="imageTermsChk" onchange="updateImportBtn()"> <span data-t="imageTerms"></span></label>
     </div>
     <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
     <div class="row" style="margin-bottom:14px;align-items:center;gap:10px">
@@ -280,6 +284,7 @@
       <div class="bar"><div id="importBar"></div></div>
     </div>
     <div class="result" id="resultBox"></div>
+    <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="onOwnPhoto(this.files[0]); this.value='';">
   </div>
 </main>
 
@@ -377,7 +382,16 @@
       specsHide: 'gizle',
       imgN: '{n} resim',
       wNoPrice: 'Fiyat yok',
-      wNoImage: 'Resim yok',
+      wNoImage: 'Görsel eksik',
+      imgSource: 'Görsel kaynağı: {s}',
+      imgSrcCatalog: 'yüklenen dosya',
+      imgSrcSeller: 'kendi fotoğrafın',
+      takePhoto: '📷 Fotoğraf çek / yükle',
+      ownPhoto: 'Kendi fotoğrafımla değiştir',
+      photoWorking: 'Fotoğraf hazırlanıyor (arka plan temizleniyor)...',
+      photoBgFail: 'Arka plan temizlenemedi; fotoğraf olduğu gibi eklendi.',
+      imageTerms: 'Orijinal ürün satıyorum, görsel kullanım sorumluluğu bana aittir',
+      needImageTerms: 'Devam etmek için görsel kullanım onayını işaretle.',
       wNoSpecs: 'Özellik yok',
       wExists: 'Zaten ekli',
       ok: '✓ Hazır',
@@ -390,7 +404,7 @@
       sync6: '6 saatte bir',
       sync24: 'Günde bir',
       varN: '{n} seçenek',
-      importBtn: '🏪 Ürünlerime ekle ({n})',
+      importBtn: 'Seçilenleri ekle ({n})',
       excelSoon: '📊 Excel indir (ikas / Ticimax / Trendyol) · yakında',
       needConsent: 'Devam etmek için kullanım hakkı onayını işaretle.',
       importing: '{d} / {t} ürün ekleniyor...',
@@ -513,7 +527,16 @@
       specsHide: 'hide',
       imgN: '{n} images',
       wNoPrice: 'No price',
-      wNoImage: 'No image',
+      wNoImage: 'Image missing',
+      imgSource: 'Image source: {s}',
+      imgSrcCatalog: 'uploaded file',
+      imgSrcSeller: 'your own photo',
+      takePhoto: '📷 Take / upload photo',
+      ownPhoto: 'Replace with my own photo',
+      photoWorking: 'Preparing the photo (removing background)...',
+      photoBgFail: 'The background could not be removed; the photo was added as is.',
+      imageTerms: 'I sell original products; I am responsible for the use of the images',
+      needImageTerms: 'Tick the image use confirmation to continue.',
       wNoSpecs: 'No specs',
       wExists: 'Already added',
       ok: '✓ Ready',
@@ -526,7 +549,7 @@
       sync6: 'Every 6 hours',
       sync24: 'Once a day',
       varN: '{n} variants',
-      importBtn: '🏪 Add to my products ({n})',
+      importBtn: 'Add selected ({n})',
       excelSoon: '📊 Download Excel (ikas / Ticimax / Trendyol) · soon',
       needConsent: 'Tick the usage-rights confirmation to continue.',
       importing: 'Adding {d} / {t} products...',
@@ -742,6 +765,9 @@
       it.key = itemKey(it);
       if (seen.has(it.key)) return;
       seen.add(it.key);
+      if (!it.imgSrc && it.images.length) {
+        it.imgSrc = it.url ? { kind: 'link', url: it.url } : { kind: 'catalog', url: '', file: sourceUrl || '' };
+      }
       it.selected = true;
       it.exists = false;
       it.priceEdited = false;
@@ -862,6 +888,48 @@
   }
 
   // ---------- Önizleme ----------
+  function imgSourceText(src) {
+    if (!src) return '';
+    if (src.kind === 'seller_photo') return t('imgSrcSeller');
+    if (src.kind === 'catalog') return src.file ? src.file : t('imgSrcCatalog');
+    try { return new URL(src.url).hostname.replace(/^www\./, ''); } catch (e) { return src.url || ''; }
+  }
+
+  // ---------- Kendi fotoğrafı (telefonda kamera açılır); arka plan otomatik temizlenir ----------
+  let photoFor = -1;
+  function pickOwnPhoto(i) { photoFor = i; document.getElementById('photoInput').click(); }
+  async function onOwnPhoto(file) {
+    const it = items[photoFor];
+    if (!file || !it) return;
+    toast(t('photoWorking'));
+    try {
+      const cv = await fileToCanvas(file, 1600);
+      let dataUrl = cv.toDataURL('image/jpeg', 0.9);
+      try {
+        const res = await fetch(HS.SUPABASE_URL + '/functions/v1/remove-background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ imageBase64: dataUrl })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.imageBase64) throw new Error(d.error || ('HTTP ' + res.status));
+        // Şeffaf PNG -> beyaz zeminli JPEG (pazaryerleri beyaz zemin ister)
+        const img = new Image();
+        await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = d.imageBase64; });
+        const out = document.createElement('canvas');
+        out.width = img.naturalWidth; out.height = img.naturalHeight;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(img, 0, 0);
+        dataUrl = out.toDataURL('image/jpeg', 0.9);
+      } catch (e) { console.warn('remove-background', e); toast(t('photoBgFail'), true); }
+      it.images = [dataUrl].concat(it.images.filter(u => u !== dataUrl)).slice(0, 12);
+      it.imgSrc = { kind: 'seller_photo', url: '' };
+      it.imageMissing = false;
+      renderPreview();
+    } catch (e) { toast(t('fnError') + e.message, true); }
+  }
+
   function problems(it) {
     const p = [];
     if (!(it.newPrice > 0)) p.push(['bad', t('wNoPrice')]);
@@ -913,7 +981,10 @@
       const lp = it.list_price > 0 ? '<div class="muted">PSF ' + esc(HS.money(it.list_price, cur)) + '</div>' : '';
       return '<tr>' +
         '<td><input type="checkbox" ' + (it.selected ? 'checked' : '') + ' onchange="toggleItem(' + idx + ', this.checked)"></td>' +
-        '<td>' + img + (it.images.length > 1 ? '<div class="img-count">' + esc(fmt(t('imgN'), { n: it.images.length })) + '</div>' : '') + '</td>' +
+        '<td>' + img + (it.images.length > 1 ? '<div class="img-count">' + esc(fmt(t('imgN'), { n: it.images.length })) + '</div>' : '') +
+          (it.images.length && it.imgSrc ? '<div class="img-src">' + esc(fmt(t('imgSource'), { s: imgSourceText(it.imgSrc) })) + '</div>' : '') +
+          '<button class="link-btn" onclick="pickOwnPhoto(' + idx + ')">' + esc(it.images.length ? t('ownPhoto') : t('takePhoto')) + '</button>' +
+        '</td>' +
         '<td><div class="pname">' + esc(it.name) + '</div>' + (meta ? '<div class="pmeta">' + meta + '</div>' : '') + '</td>' +
         '<td>' + specs + '</td>' +
         '<td class="num">' + esc(src) + lp + '</td>' +
@@ -976,7 +1047,8 @@
     const n = items.filter(i => i.selected).length;
     const btn = document.getElementById('importBtn');
     btn.textContent = fmt(t('importBtn'), { n: HS.number(n) });
-    btn.disabled = !n || !document.getElementById('consentChk').checked;
+    document.getElementById('imageTermsRow').style.display = imageTermsAccepted ? 'none' : '';
+    btn.disabled = !n || !document.getElementById('consentChk').checked || (!imageTermsAccepted && !document.getElementById('imageTermsChk').checked);
   }
 
   // ---------- Kaynak sekmeleri ----------
@@ -994,6 +1066,9 @@
   let unmatchedRows = [];
   let dbUpdates = [];
   let pdfImageMap = new Map();   // model kodu -> PDF'ten çıkan resimler
+  let docSite = '';              // dosyada yazan toptancı / tedarikçi sitesi (görsel tamamlamada 2. kaynak)
+  let imageTermsAccepted = false;
+  const siteByBrand = new Map(); // marka -> resmi site (görsel tamamlamada 1. kaynak)
   const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/';
   // PDF içindeki ürün resimlerini çıkarıp model kodlarına bağlar
   let pdfjsMod = null;
@@ -1187,6 +1262,7 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+          if (data.site && !docSite) docSite = data.site;
           out[my] = (data.rows || []).map(r => Object.assign({}, r, { page: my * PER + (r.page || 1) }));
         } catch (e) { lastErr = e.message; out[my] = []; }
         done++;
@@ -1203,7 +1279,18 @@
   async function readSheet(file) {
     setProgress(t('fileLib'), 10);
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    // CSV / TXT metin olarak çözülür (Türkçe karakterler bozulmasın): önce UTF-8, olmazsa Windows-1254
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    let wb;
+    if (ext === 'csv' || ext === 'txt') {
+      const buf = await file.arrayBuffer();
+      let text = new TextDecoder('utf-8').decode(buf);
+      if (text.indexOf('\uFFFD') >= 0) { try { text = new TextDecoder('windows-1254').decode(buf); } catch (e) { /* kalsın */ } }
+      // raw: say\u0131lar metin kal\u0131r; "149,90" / "3.999,00" T\u00FCrk\u00E7e bi\u00E7imiyle numVal'de do\u011Fru okunur
+      wb = XLSX.read(text.replace(/^\uFEFF/, ''), { type: 'string', raw: true });
+    } else {
+      wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    }
     const rows = [];
     const aiSheets = []; // sütunları tanınmayan sayfalar: yapay zekâ okur (satıcı şablon doldurmaz)
     for (const name of wb.SheetNames) {
@@ -1218,7 +1305,7 @@
         let price = find(/bayi|net|alış|alis|dealer|maliyet/);
         if (price < 0) price = find(/fiyat|price|tutar|birim/, /psf|tavsiye|liste|perakende|retail|msrp/);
         if (code >= 0 && (price >= 0 || list >= 0)) {
-          col = { code, price, list, name: find(/ürün\s*ad|urun\s*ad|açıklama|aciklama|tanım|tanim|name|description|isim|ürün$|urun$/, /kod|code/), cur: find(/döviz|doviz|para|currency|kur|birim$/) };
+          col = { code, price, list, name: find(/ürün\s*ad|urun\s*ad|açıklama|aciklama|tanım|tanim|name|description|isim|ürün$|urun$/, /kod|code/), cur: find(/döviz|doviz|para|currency|kur|birim$/), brand: find(/marka|brand|üretici|uretici|manufacturer/) };
           hi = r; break;
         }
       }
@@ -1229,11 +1316,13 @@
         const code = String(row[col.code] || '').trim();
         const price = col.price >= 0 ? numVal(row[col.price]) : null;
         const list = col.list >= 0 ? numVal(row[col.list]) : null;
-        if (!code || (!price && !list)) continue;
+        const nm = col.name >= 0 ? String(row[col.name] || '').trim() : '';
+        if (!code && !nm) continue; // model kodu olmayan ürün de alınır (adıyla)
         rows.push({
           code: code.slice(0, 80),
-          name: col.name >= 0 ? String(row[col.name] || '').slice(0, 200) : '',
-          price: price || list, list_price: price ? list : null,
+          name: nm.slice(0, 200),
+          brand: col.brand >= 0 ? String(row[col.brand] || '').trim().slice(0, 80) : '',
+          price: price || list || null, list_price: price ? list : null,
           currency: (col.cur >= 0 ? curOf(row[col.cur]) : null) || curOf(col.price >= 0 ? row[col.price] : '') || headerCur
         });
       }
@@ -1250,6 +1339,7 @@
       for (const part of parts.slice(0, 40)) {
         setProgress(fmt(t('sheetAi'), { d: done, t: parts.length }), 10 + done / parts.length * 80);
         const data = await callParse({ text: part });
+        if (data.site && !docSite) docSite = data.site;
         (data.rows || []).forEach(r => rows.push(r));
         done++;
       }
@@ -1324,6 +1414,7 @@
       const cv = await fileToCanvas(f, 2000);
       const jpg = cv.toDataURL('image/jpeg', 0.85);
       const data = await callParse({ imageBase64: jpg });
+      if (data.site && !docSite) docSite = data.site;
       const got = data.rows || [];
       // Fotoğraf yerleri ayrı ve odaklı bir adımda bulunur (okuma sırasında verilen konum kaba olabiliyor)
       const boxes = new Map();
@@ -1502,7 +1593,8 @@
     return {
       url: '', name: u.name || u.code, price: u.price, list_price: u.list_price, currency: u.currency,
       model_code: u.code, brand: u.brand || '', category: '', description: '',
-      images: (u.images && u.images.length ? u.images : (pdfImageMap.get(normCode(u.code)) || [])).slice(), specs: [], stock: null
+      images: (u.images && u.images.length ? u.images : (pdfImageMap.get(normCode(u.code)) || [])).slice(), specs: [], stock: null,
+      imgSrc: null
     };
   }
 
@@ -1647,8 +1739,27 @@
       await db.from('import_rules').upsert({ user_id: userId, rules: r, updated_at: new Date().toISOString() });
     } catch (e) { console.warn('rules patch', e); }
   }
+  function nameWordCount(s) { return String(s || '').split(/\s+/).filter(w => w.length > 2).length; }
   function needsLookup(it) {
-    return !it.lookupDone && normCode(it.model_code).length >= 3 && (!it.images.length || !it.specs.length);
+    return !it.lookupDone && (normCode(it.model_code).length >= 3 || nameWordCount(it.name) >= 2) && (!it.images.length || !it.specs.length);
+  }
+  // Markanın resmi sitesi (marka başına bir kez bulunur; satıcının elle verdiği site önceliklidir)
+  async function siteForBrand(brand, samples) {
+    const key = String(brand || '').trim().toLowerCase();
+    if (!key) return lookupSite;
+    if (siteByBrand.has(key)) return siteByBrand.get(key);
+    let site = '';
+    try { const res = await callLookup({ action: 'site', brand: brand, hint: sourceUrl, samples: samples }); site = normSiteC(res.site); } catch (e) { console.warn('site', e); }
+    siteByBrand.set(key, site);
+    return site;
+  }
+  function setImages(it, images, kind, url) {
+    if (it.images.length || !Array.isArray(images) || !images.length) return false;
+    it.images = images.slice(0, 12);
+    it.imgSrc = { kind: kind, url: url || '' };
+    it.lkFilled = it.lkFilled || {};
+    it.lkFilled.images = true;
+    return true;
   }
   function renderLookupBar() {
     const el = document.getElementById('lookupBar');
@@ -1664,9 +1775,9 @@
     else if (s.mode === 'nosite') h = esc(t('lkNoSite')) + ' <a onclick="changeSite()">' + esc(t('lkSetSite')) + '</a>';
     el.innerHTML = h;
   }
-  function mergeLookup(it, x, url) {
+  function mergeLookup(it, x, url, kind) {
     it.lkFilled = it.lkFilled || {};
-    if (!it.images.length && Array.isArray(x.images) && x.images.length) { it.images = x.images.slice(0, 12); it.lkFilled.images = true; }
+    setImages(it, x.images, kind || 'brand_site', url);
     if (!it.specs.length && Array.isArray(x.specs) && x.specs.length) { it.specs = x.specs.slice(0, 80); it.lkFilled.specs = true; }
     if (!it.description && x.description) { it.description = x.description; it.lkFilled.description = true; }
     if (!it.brand && x.brand) { it.brand = x.brand; it.lkFilled.brand = true; }
@@ -1676,7 +1787,7 @@
   // Önceki siteden gelen bilgileri geri al (site değiştirilince)
   function undoLookup(it) {
     const f = it.lkFilled || {};
-    if (f.images) it.images = [];
+    if (f.images) { it.images = []; it.imgSrc = null; }
     if (f.specs) it.specs = [];
     if (f.description) it.description = '';
     if (f.brand) it.brand = '';
@@ -1705,7 +1816,7 @@
           if (site) { lookupSite = site; lookupTpl = ''; lookupSkip = false; await saveRulesPatch({ site: site, siteSearch: '' }); }
         } catch (e) { console.warn('site', e); }
       }
-      if (!lookupSite) { lookupState = { mode: 'nosite' }; renderLookupBar(); return; }
+      if (!lookupSite) { lookupState = { mode: 'nosite' }; renderLookupBar(); }
 
       // 2) Her ürünü sitede ara (aynı anda 4 ürün)
       const r = rules();
@@ -1715,19 +1826,50 @@
       const worker = async () => {
         while (idx < total && !stopFlag) {
           const it = todo[idx++];
+          const brand = it.brand || r.brand || '';
           try {
-            const res = await callLookup({
-              action: 'find', site: lookupSite, brand: r.brand || it.brand || '', code: it.model_code, name: it.name,
-              searchTpl: lookupTpl, skipSiteSearch: lookupSkip
-            });
-            if (res.searchTpl && res.searchTpl !== lookupTpl) { lookupTpl = res.searchTpl; saveRulesPatch({ siteSearch: lookupTpl }); }
-            if (!lookupTpl && ++noTpl >= 3) lookupSkip = true; // sitenin araması çalışmıyor, sadece internet aramasıyla devam
+            // 1) Markanın resmi sitesi: önce basın / medya kiti, sonra ürün sayfası (görsel + teknik özellik)
+            const bSite = brand && brand.toLowerCase() !== String(r.brand || '').toLowerCase()
+              ? await siteForBrand(brand, [{ code: it.model_code, name: it.name }]) : lookupSite;
+            if (bSite) {
+              if (!it.images.length) {
+                try {
+                  const m = await callLookup({ action: 'media', site: bSite, brand: brand, code: it.model_code, name: it.name });
+                  if (m.found) setImages(it, m.images, 'brand_media_kit', m.url);
+                } catch (e) { console.warn('media', e); }
+              }
+              const res = await callLookup({
+                action: 'find', site: bSite, brand: brand, code: it.model_code, name: it.name,
+                searchTpl: bSite === lookupSite ? lookupTpl : '', skipSiteSearch: bSite === lookupSite ? lookupSkip : false
+              });
+              if (bSite === lookupSite) {
+                if (res.searchTpl && res.searchTpl !== lookupTpl) { lookupTpl = res.searchTpl; saveRulesPatch({ siteSearch: lookupTpl }); }
+                if (!lookupTpl && ++noTpl >= 3) lookupSkip = true; // sitenin araması çalışmıyor, sadece internet aramasıyla devam
+              }
+              let found = res.found && res.item ? res : null;
+              // İnternet araması değişken sonuç verebiliyor: bulunamazsa bir kez daha dene
+              if (!found && !it.images.length) {
+                const again = await callLookup({ action: 'find', site: bSite, brand: brand, code: it.model_code, name: it.name, skipSiteSearch: true });
+                if (again.found && again.item) found = again;
+              }
+              if (found) { mergeLookup(it, found.item, found.url, 'brand_site'); it.lookupFound = true; }
+            }
+            // 2) Toptancının sitesi (dosyada yazıyorsa)
+            if (!it.images.length && docSite && docSite !== bSite) {
+              const w = await callLookup({ action: 'find', site: docSite, brand: brand, code: it.model_code, name: it.name, skipSiteSearch: false });
+              if (w.found && w.item) { mergeLookup(it, w.item, w.url, 'wholesaler'); it.lookupFound = true; }
+            }
+            // 3) CJ / AliExpress eşleşmesi
+            if (!it.images.length) {
+              const mk = await callLookup({ action: 'market', brand: brand, code: it.model_code, name: it.name });
+              if (mk.found) { setImages(it, mk.images, mk.kind, mk.url); it.lookupFound = true; }
+            }
             it.lookupDone = true;
-            it.lookupFound = !!res.found;
-            if (res.found && res.item) { mergeLookup(it, res.item, res.url); f++; }
+            it.imageMissing = !it.images.length;
+            if (it.lookupFound) f++;
           } catch (e) {
             console.warn('lookup', it.model_code, e);
-            it.lookupDone = true; it.lookupFound = false;
+            it.lookupDone = true; it.lookupFound = !!it.images.length; it.imageMissing = !it.images.length;
           }
           d++;
           lookupState = { mode: 'running', d: d, t: total }; renderLookupBar();
@@ -1795,6 +1937,14 @@
     const sel = items.filter(i => i.selected);
     if (!sel.length) return;
     if (!document.getElementById('consentChk').checked) { toast(t('needConsent'), true); return; }
+    if (!imageTermsAccepted) {
+      if (!document.getElementById('imageTermsChk').checked) { toast(t('needImageTerms'), true); return; }
+      const up = await db.from('user_profiles').update({ image_terms_accepted_at: new Date().toISOString(), image_terms_text: t('imageTerms') }).eq('user_id', userId).select('user_id');
+      if (!up.error && (!up.data || !up.data.length)) {
+        await db.from('user_profiles').insert({ user_id: userId, image_terms_accepted_at: new Date().toISOString(), image_terms_text: t('imageTerms') });
+      }
+      imageTermsAccepted = true;
+    }
     const dupN = sel.filter(i => i.exists).length;
     if (dupN && !confirm(fmt(t('confirmDup'), { n: dupN }))) return;
     const r = rules();
@@ -1838,6 +1988,7 @@
           content_language: 'tr',
           store_visible: publish,
           specs: it.specs.length ? it.specs : null,
+          image_missing: !it.images.length,
           source_url: it.url || null,
           source_platform: it.source_platform || (it.url ? 'web' : null),
           source_item_id: it.source_item_id || null,
@@ -1859,7 +2010,11 @@
 
         // Görseller
         const imgRows = [];
-        pairs.forEach(p => p.it.images.slice(0, 12).forEach((u, pos) => imgRows.push({ product_id: p.id, user_id: userId, url: u, position: pos, source: 'supplier' })));
+        pairs.forEach(p => p.it.images.slice(0, 12).forEach((u, pos) => imgRows.push({
+          product_id: p.id, user_id: userId, url: u, position: pos, source: 'supplier',
+          source_kind: (p.it.imgSrc && p.it.imgSrc.kind) || null,
+          source_url: (p.it.imgSrc && (p.it.imgSrc.url || p.it.imgSrc.file)) || null
+        })));
         if (imgRows.length) {
           const ir = await db.from('product_images').insert(imgRows);
           if (ir.error) { imgErr = ir.error.message; console.warn('product_images', ir.error); }
@@ -1956,6 +2111,10 @@
     document.getElementById('stopBtn').style.display = 'none';
     applyStatic();
     await loadRules();
+    try {
+      const pr = await db.from('user_profiles').select('image_terms_accepted_at').eq('user_id', userId).maybeSingle();
+      imageTermsAccepted = !!(pr.data && pr.data.image_terms_accepted_at);
+    } catch (e) { imageTermsAccepted = false; }
     renderPreview();
   })();
 

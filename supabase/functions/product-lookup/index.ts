@@ -1,7 +1,13 @@
 // =========================================================
-// HızlıSatıcı AI - product-lookup (Toplu Ürün Yükleme: eksikleri üretici sitesinden tamamla)
-// Sadece model koduyla gelen ürünlerin resim / teknik özellik / açıklamasını üreticinin sitesinde bulur.
+// Seltigo - product-lookup (Toplu Ürün Yükleme: eksik görsel / bilgiyi tamamla)
+// Görsel tamamlama sırası (rastgele / telifli görsel alınmaz, her görselin kaynağı döner):
+//   1) markanın resmi sitesi: önce basın / medya kiti sayfası ("media"), sonra ürün sayfası ("find")
+//   2) toptancının sitesi ("find", site = toptancı)
+//   3) CJ / AliExpress eşleşmesi ("market"; ad benzerliği sıkı)
+// Model kodu yoksa ürün adıyla aranır (bulunan sayfanın adı ürün adıyla yeterince örtüşmeli).
 // Sadece giriş yapmış kullanıcılar kullanabilir.
+// POST { action: "media", site, brand, code, name } -> { found, url, images }
+// POST { action: "market", brand, code, name } -> { found, kind: "cj"|"aliexpress", url, images, name }
 //
 // POST { action: "site", brand, samples: [{code,name}], hint, language }
 //   -> { site: "cenova.com.tr" }            (üreticinin sitesini bulur)
@@ -142,7 +148,7 @@ function extractJson(text: string): any {
 // webSearch=true: Claude internette arar (allowedDomains verilirse sadece o sitede)
 async function askAI(system: string, user: string, webSearch: boolean, allowedDomains?: string[]): Promise<any> {
   if (!ANTHROPIC_API_KEY) return null;
-  const models = webSearch ? ["claude-sonnet-5", "claude-haiku-4-5"] : ["claude-haiku-4-5", "claude-sonnet-5"];
+  const models = webSearch ? ["claude-sonnet-5-5", "claude-sonnet-4-6"] : ["claude-haiku-4-5", "claude-sonnet-5-5"];
   for (const model of models) {
     try {
       const body: any = { model, max_tokens: 1500, system, messages: [{ role: "user", content: user }] };
@@ -366,7 +372,7 @@ function buildTpl(g: string, s: string): string {
 async function searchWithAI(site: string, brand: string, code: string, name: string): Promise<string> {
   const system = `You find the product detail page of a specific product on the web. Use web search.
 Answer ONLY with JSON: {"url":"https://..."} — the exact product page URL for this model code. Empty string if not found. Never guess a URL you did not see in search results.`;
-  const user = `Model code: ${code}\nProduct name: ${name || "-"}\nBrand: ${brand || "-"}\n` + (site ? `Search only on: ${site}` : `Prefer the manufacturer's official site.`);
+  const user = `Model code: ${code || "(none, use the product name)"}\nProduct name: ${name || "-"}\nBrand: ${brand || "-"}\n` + (site ? `Search only on: ${site}` : `Prefer the manufacturer's official site.`);
   const a = await askAI(system, user, true, site ? [site, "www." + site] : undefined);
   const u = String(a?.url || "");
   if (!isSafeUrl(u)) return "";
@@ -395,6 +401,78 @@ function itemHasCode(item: any, url: string, code: string): boolean {
   return hay.includes(nc);
 }
 
+// ---------------- Ad benzerliği (kod yokken doğrulama) ----------------
+const STOP = new Set(["ve", "ile", "for", "and", "the", "with", "adet", "set", "yeni", "new", "model", "urun", "ürün"]);
+function nameWords(s: unknown): Set<string> {
+  return new Set(String(s || "").toLocaleLowerCase("tr").replace(/[^a-z0-9çğıöşü ]+/gi, " ").split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP.has(w)));
+}
+// İki yönlü örtüşme: aranan adın ve bulunan adın kelimelerinin yeterli kısmı ortak olmalı
+function nameMatch(want: string, got: string, min = 0.6): boolean {
+  const A = nameWords(want), B = nameWords(got);
+  if (A.size < 2 || !B.size) return false;
+  let hit = 0;
+  A.forEach((w) => { if (B.has(w)) hit++; });
+  return hit / A.size >= min && hit / B.size >= min * 0.6;
+}
+
+// ---------------- Basın / medya kiti görselleri ----------------
+const IMG_RE = /\.(jpe?g|png|webp)(\?|$)/i;
+async function mediaKitImages(site: string, brand: string, code: string, name: string): Promise<{ url: string; images: string[] }> {
+  const system = `You find a brand's OFFICIAL press / media kit / image download page that contains a specific product's photos. Use web search.
+Answer ONLY with JSON: {"url":"https://..."}: a press, media, "basın", "medya", "görsel arşivi" or downloads page on the brand's own site that shows this product. Empty string if none. Never guess.`;
+  const a = await askAI(system, `Brand site: ${site}\nBrand: ${brand || "-"}\nModel code: ${code || "-"}\nProduct name: ${name || "-"}`, true, [site, "www." + site]);
+  const page = String(a?.url || "");
+  if (!isSafeUrl(page) || !sameSite(page, site)) return { url: "", images: [] };
+  const d = await download(page, 15000);
+  if (!d) return { url: "", images: [] };
+  const base = new URL(d.finalUrl);
+  const nc = normCode(code);
+  const words = [...nameWords(name)];
+  const out: string[] = [];
+  const tags = d.text.match(/<(img|a)\s[^>]*>/gi) || [];
+  for (const t of tags) {
+    const src = (t.match(/(?:data-src|src|href)=["']([^"']+)["']/i) || [])[1];
+    if (!src || !IMG_RE.test(src)) continue;
+    const alt = (t.match(/(?:alt|title)=["']([^"']*)["']/i) || [])[1] || "";
+    const hay = normCode(src + " " + alt);
+    const low = (src + " " + alt).toLocaleLowerCase("tr");
+    const ok = (nc.length >= 3 && hay.includes(nc)) || (words.length >= 2 && words.filter((w) => low.includes(w)).length >= Math.min(3, words.length));
+    if (!ok) continue;
+    const abs = absUrl(src, base);
+    if (abs && !out.includes(abs)) out.push(abs);
+    if (out.length >= 6) break;
+  }
+  return { url: out.length ? page : "", images: out };
+}
+
+// ---------------- CJ / AliExpress eşleşmesi ----------------
+async function callFn(name: string, auth: string, payload: unknown): Promise<any> {
+  const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: auth, apikey: SUPABASE_ANON_KEY },
+    body: JSON.stringify(payload),
+  });
+  return await r.json().catch(() => ({}));
+}
+async function marketMatch(auth: string, brand: string, code: string, name: string) {
+  const query = [brand, name].filter(Boolean).join(" ").slice(0, 120);
+  const want = [brand, name, code].filter(Boolean).join(" ");
+  const userToken = auth.replace(/^Bearer\s+/i, "");
+  const [cj, ae] = await Promise.all([
+    callFn("cj-search", auth, { keyword: query, userAccessToken: userToken }).catch(() => ({})),
+    callFn("aliexpress-search", auth, { keyword: query, country: "TR" }).catch(() => ({})),
+  ]);
+  const cands: any[] = [];
+  (cj?.products || []).forEach((p: any) => cands.push({ kind: "cj", name: p.name, image: p.image, url: p.id ? `https://cjdropshipping.com/product/-p-${p.id}.html` : "" }));
+  (ae?.products || []).forEach((p: any) => cands.push({
+    kind: "aliexpress", name: p.name, image: String(p.image || "").replace(/^\/\//, "https://"),
+    url: p.id ? `https://www.aliexpress.com/item/${p.id}.html` : "",
+  }));
+  const ok = cands.filter((c) => c.image && /^https?:/i.test(String(c.image)) && nameMatch(want, c.name || "", 0.6));
+  return ok[0] || null;
+}
+
 // ---------------- Ana ----------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -421,8 +499,21 @@ Deno.serve(async (req) => {
       const code = String(body?.code || "").trim().slice(0, 80);
       const name = String(body?.name || "").slice(0, 200);
       const site = normSite(body?.site);
-      if (normCode(code).length < 3) return json({ found: false, reason: "no_code" });
       const auth = req.headers.get("Authorization") || "";
+      if (normCode(code).length < 3) {
+        // Model kodu yok: adıyla (internet araması, yalnız o sitede) bul, adı örtüşmeli
+        if (!site || nameWords(name).size < 2) return json({ found: false, reason: "no_code" });
+        const u = await searchWithAI(site, brand, "", name);
+        const it = u ? await readProduct(u, auth, language) : null;
+        if (!it || !nameMatch(name, it.name || "", 0.6)) return json({ found: false });
+        return json({
+          found: true, url: u, searchTpl: String(body?.searchTpl || ""),
+          item: {
+            name: it.name || "", brand: it.brand || "", model_code: it.model_code || "", description: it.description || "",
+            category: it.category || "", images: (it.images || []).slice(0, 12), specs: (it.specs || []).slice(0, 80),
+          },
+        });
+      }
 
       const known = parseTpl(String(body?.searchTpl || ""));
       let g = known.g, sTpl = known.s;
@@ -466,6 +557,20 @@ Deno.serve(async (req) => {
           specs: Array.isArray(item.specs) ? item.specs.slice(0, 80) : [],
         },
       });
+    }
+
+    if (action === "media") {
+      const site = normSite(body?.site);
+      if (!site) return json({ found: false });
+      const r = await mediaKitImages(site, brand, String(body?.code || "").slice(0, 80), String(body?.name || "").slice(0, 200));
+      return json({ found: r.images.length > 0, url: r.url, images: r.images });
+    }
+
+    if (action === "market") {
+      const auth = req.headers.get("Authorization") || "";
+      const m = await marketMatch(auth, brand, String(body?.code || "").slice(0, 80), String(body?.name || "").slice(0, 200));
+      if (!m) return json({ found: false });
+      return json({ found: true, kind: m.kind, url: m.url, images: [m.image], name: m.name });
     }
 
     return json({ error: E("Geçersiz işlem.", "Invalid action.") }, 400);

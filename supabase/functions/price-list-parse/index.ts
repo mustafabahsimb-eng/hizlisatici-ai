@@ -6,7 +6,8 @@
 // Büyük PDF'ler tarayıcıda parçalara bölünüp (birkaç sayfa) ayrı ayrı gönderilir.
 // Sadece giriş yapmış kullanıcılar kullanabilir.
 // POST { pdfBase64 | imageBase64 | text, language }
-//   -> { rows: [{ code, name, price, list_price, currency, brand, page, box }] }
+//   -> { rows: [{ code, name, price, list_price, currency, brand, page, box }], site }
+//      site: belgede yazan tedarikçi / toptancı web adresi (görsel tamamlamada 2. kaynak)
 //      page: parçadaki sayfa (1'den); box: görsel girişte ürün fotoğrafının yeri [x0,y0,x1,y1] (0-1000)
 // POST { action: "page_photos", imageBase64, rows: [{ i, code, name }], boxes?: [{ n }] }
 //   -> { matches: [{ i, n } | { i, box }] }  sayfa görüntüsünde her ürünün fotoğrafı
@@ -84,7 +85,8 @@ CODE<TAB>NAME<TAB>PRICE<TAB>LIST_PRICE<TAB>CURRENCY<TAB>BRAND<TAB>PAGE<TAB>BOX
 - BRAND: the brand if written on the row, the section or the page header; else empty.
 - PAGE: page number within this input (1 for a single image or spreadsheet).
 - BOX: ONLY for image inputs: the product's PHOTO position on the image as x0,y0,x1,y1 in a 0-1000 scale (left,top,right,bottom). Empty if the product has no photo or the input is not an image.
-Skip headers, category titles, totals, notes, contact info. Never invent products, codes or prices. Read small text carefully.`;
+Skip headers, category titles, totals, notes, contact info. Never invent products, codes or prices. Read small text carefully.
+If the document shows the supplier's / company's own website (header, footer, contact block), output ONE extra first line: #SITE<TAB>domain (e.g. #SITE<TAB>ornektoptan.com). Never output a marketplace or social media domain there.`;
 
 const MATCH_SYSTEM = `You match product rows to their PHOTOS on a catalogue page image.
 You get the page image and a list of products (index, code, name) that appear on this page.
@@ -191,8 +193,14 @@ Deno.serve(async (req) => {
     if (!text.trim()) return json({ error: E("Dosya okunamadı: ", "Could not read the file: ") + err.slice(0, 200) }, 502);
 
     const rows: unknown[] = [];
+    let site = "";
     for (const line of text.split(/\r?\n/)) {
       if (!line.includes("\t")) continue;
+      if (line.startsWith("#SITE")) {
+        const d = String(line.split("\t")[1] || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[\/?#\s]/)[0];
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) && !/(trendyol|hepsiburada|n11|amazon|instagram|facebook|whatsapp|aliexpress|youtube|google)\./.test(d)) site = d;
+        continue;
+      }
       const c = line.split("\t").map((x) => x.trim());
       const code = (c[0] || "").replace(/^[`*"]+|[`*"]+$/g, "").slice(0, 80);
       const name = (c[1] || "").replace(/^[`*"]+|[`*"]+$/g, "").slice(0, 200);
@@ -206,7 +214,7 @@ Deno.serve(async (req) => {
       });
       if (rows.length >= 3000) break;
     }
-    return json({ rows });
+    return json({ rows, site });
   } catch (err) {
     console.error(err);
     return json({ error: E("Sunucu hatası", "Server error") }, 500);
