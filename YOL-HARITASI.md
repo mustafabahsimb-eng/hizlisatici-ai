@@ -162,6 +162,10 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
 
 ## Durum notları (11 Ekim 2026)
+**Seltigo Asistan (13 Ekim 2026)**
+- Kod ve altyapı bitti, canlıda: ortak çekirdek (_shared/assistant-core.ts), kanal göndericileri (_shared/assistant-channels.ts), assistant (kod, durum, bildirim kuyruğu 1 dk, sabah raporu / haftalık özet, bağlantı uyarıları, WhatsApp şablonu onaya gönderme), telegram-bot, whatsapp-webhook (Seltigo numarası -> asistan), meta-dm-webhook (Instagram DM / Messenger, varsayılan KAPALI). Panel: asistan.html (🤖 Asistan). Testler: asistan_cekirdek.py 21/21, asistan_panel.py 11/11.
+- Bekleyen (Mustafa'nın hesabı): Telegram bot anahtarı (BotFather) -> secret TELEGRAM_BOT_TOKEN + assistant action telegram_webhook; Meta WhatsApp test numarası (ASSISTANT_WA_PHONE_ID / TOKEN / WABA_ID / DISPLAY_NUMBER, ASSISTANT_WA_ENABLED=true) -> uçtan uca test + seltigo_asistan_bildirim_v1 şablonunu onaya gönder; sesli komut için ücretli STT anahtarı (STT_API_KEY, isteğe bağlı).
+- Eksik üreticiler: iade uyarısı (iade otomasyonu ile), rakip fiyat uyarısı (fiyat takibi ile). Pazaryeri kanallarına (Trendyol vb.) asistandan gönderim şimdilik "bağlantın canlı değil" der; ilan aktarımı sync kuyruğuna bağlanacak (eksik taramasında).
 **Çözüldü**
 - Instagram "süresi doldu": Meta anahtarı iptal etmişti (şifre/güvenlik); Mustafa yeniden bağladı. Yeniden bağlanınca eski "geçersiz" işaretinin silinmemesi hatası düzeltildi (instagram-token-exchange, social-meta-connect); ayarlar (otomatik paylaşım) artık korunuyor. Kayıt geçerli, bitiş 9 Aralık 2026. Not: hata yüzünden otomatik paylaşım ayarı sıfırlanmış olabilir.
 - AliExpress kapanan siparişleri "teslim edildi" sayma hatası düzeltildi (extend_map.endReason).
