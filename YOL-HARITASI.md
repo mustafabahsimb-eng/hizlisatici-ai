@@ -19,7 +19,7 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
 ## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
-Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temelidir; 2b (Chrome eklentisi) Trendyol'un Türkiye fiyatı sorununu çözer, bu yüzden öne alındı (Mustafa, 12 Ekim); 3, 1'in üstüne kurulur; 4'ün canlıya geçişi şirket ister, bu yüzden sandbox ile en sona. Arayüz adları onaylandı (aşağıdaki tablo).
+Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome eklentisi (Trendyol TL fiyatı); 3 Seltigo Asistan (Telegram'da canlı, şirket gerekmez; ilk gerçek kullanıcılar buradan başlar; 1-2'deki okuyucuları kullanır); 4 "Link ver, mağazan hazır" (1'in üstüne); 5 WhatsApp + Instagram katalog otomasyonu (Meta; asistanın WhatsApp/Instagram/Messenger sürümleriyle aynı Meta altyapısı, şirketle canlı); 6 Ölü stok eritici (en az 30-60 günlük satış verisi gerekir; uygulama asistan ve panelden). Arayüz adları onaylandı (aşağıdaki tablo).
 
 - [~] **1. Linkten ürün yükleme** (şirket gerekmez; temel var: Toplu Ürün Yükleme "Link yapıştır", product-import, product-lookup)
   - Tek ürün linki (AliExpress, Trendyol, satıcının kendi sitesi, toptancı sayfası) → ad, açıklama, fiyat, görseller, varyantlar otomatik.
@@ -60,18 +60,43 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
   - Satıcı ürün sayfasındayken tek tıkla Seltigo'ya ekler; eklenti sayfadaki ürün verisini (ad, fiyat, görsel, seçenek, stok) okuyup Seltigo hesabına gönderir.
   - Linkten çekilen ve otomatik takipteki (source_sync) Trendyol ürünlerinde Türkiye fiyatı da eklentiyle güncellenebilmeli (satıcının tarayıcısı açıkken arka planda).
   - Chrome Web Mağazası'na yayın: geliştirici hesabı tek seferlik 5 $ (ödeme gerektirir → altyapı hazırlanır, yayın ödemeden sonra); o zamana kadar "paketlenmemiş eklenti" olarak denenir.
-- [ ] **3. "Link ver, mağazan hazır" akışı** (1'e dayanır)
+- [ ] **3. Seltigo Asistan: "Mağazanı WhatsApp'tan yönet"** (12 Ekim 2026'da eklendi; adlar onay bekliyor)
+  Satıcı mağazasını Seltigo'nun numarasıyla / botuyla yazışarak yönetir. Tek çekirdek (komut anlama, ürün ekleme, uyarı, rapor), kanal başına ince bağlayıcı.
+  - **Gönder, gerisi otomatik:** toptancı PDF'i iletilince ürünler önizleme listesiyle gelir ("hepsini ekle" / "1-15 ekle"); fotoğraf + "350'ye sat, 20 tane" ile ilan açılır; link gönderilince ürün eklenir; sesli mesajla komut (konuşmadan yazıya). Temel hazır: price-list-parse, product-import, channel-copy, image-complete-worker, voice-product-parse.
+  - **Fiyat:** PDF akışında satış fiyatı Ayarlar'daki kâr kuralına göre (ör. "alışın üstüne %40"); mesajda farklı oran söylenebilir ("1-15'i %50 kârla ekle"). Zarar kontrolü (komisyon + kargo) burada da çalışır.
+  - **Kanal ve onay:** ürünler satıcının bağlı olduğu ve Ayarlar'da varsayılan seçtiği kanallarda yayınlanır; mesajda kanal söylenebilir ("sadece Trendyol'a"). Ayarlar: "yayından önce onay iste" / "direkt yayınla"; onay modunda özet + [Yayınla] [Fiyatları düzenle].
+  - **Butonlu anlık uyarılar:** yeni sipariş; stok bitiyor; iade; zararlı sipariş onayı [Onayla] [İptal]; CJ bakiyesi azaldı; bağlantı süresi doluyor; rakip fiyat düşürdü [Fiyatı düşür] [Böyle kalsın].
+  - **Soru-cevap:** "bu ay ne kadar kâr ettim", "en çok ne satıyor", "hangi ürün zarar ediyor"; her sabah kısa rapor, pazartesi haftalık özet.
+  - **Günlük iş:** "bugün gönderilecekler" listesi ve kargo etiketleri PDF'i (Kendi stoğum / Toptancı siparişleri için kargo firması entegrasyonu gerekir → ayrı iş, şirket gerektirebilir); müşteri sorularının özeti + önerilen cevap onaya.
+  - **Güvenlik:** yalnız kayıtlı (doğrulanmış) numara / hesap komut verir; fiyat düşürme, toplu silme gibi kritik işlerde ikinci onay; sessiz saatler; çalışanlara sınırlı yetki.
+  - **Kanallar:**
+    - Telegram: önce CANLI (şirket gerekmez, ücretsiz). İlk gerçek kullanıcılar buradan başlar.
+    - WhatsApp (ayrı ücretli paket), Instagram DM, Facebook Messenger: aynı çekirdekle şimdi sandbox'ta kurulur (varsayılan kapalı anahtar), şirket kurulunca canlıya geçer.
+    - Instagram / Messenger'da: komut, fotoğraf / link ile ürün ekleme, soru-cevap. Messenger'da PDF de kabul edilir; Instagram'da katalog ekran görüntüleri okunur.
+    - Meta'nın 24 saat kuralı: bu iki kanalda otomatik rapor / uyarı yalnız pencere açıkken gider; tam uyarılar için WhatsApp / Telegram önerilir.
+  - **Doğrulanan kısıtlar (resmi belgeler, 12 Ekim 2026):**
+    - Messenger: kullanıcı yazınca 24 saat; dışında yalnız HUMAN_AGENT etiketiyle elle cevap (7 gün) — otomatik bildirim için kullanılamaz; "One-Time Notification" beta ve Instagram'da yok; Sponsored Messages reklam ve Instagram'da yok. Otomatik botlar her girdiye 30 sn içinde cevap vermeli; otomatik olduğunu belirtmeli. Gelen ek türleri: image, audio, video, file, sticker, fallback (link).
+    - Instagram: yalnız kullanıcı önce yazınca, 24 saat içinde cevap; insan temsilci etiketi var. API'de gelen ek türleri arasında image, audio, video, file listeleniyor; ancak Instagram uygulaması kullanıcıya genelde dosya (PDF) gönderme imkânı vermiyor → Instagram'da PDF beklenmez, ekran görüntüsü / fotoğraf okunur. Gönderilen metin en fazla 1000 bayt.
+    - WhatsApp Cloud API: 24 saatlik müşteri hizmeti penceresi; dışında yalnız onaylı şablon mesaj (ücretli); butonlu cevap en fazla 3 buton, ayrıca liste mesajı.
+    - Telegram Bot API: 24 saat kuralı yok; satır içi butonlar (callback) ve sesli mesaj destekli; bot en fazla 20 MB dosya indirir (daha büyük PDF için kendi Bot API sunucusu → sabit IP sunucusuyla aynı makine olabilir).
+- [ ] **4. "Link ver, mağazan hazır" akışı** (1'e dayanır)
   - Kendi sitesi olan satıcı Mağazanı Kur'da site adresini verir → ürünler çekilir → Seltigo mağazası hazır açılır.
   - Asıl değer dağıtım: akış sonunda "bu ürünleri Trendyol, Instagram, WhatsApp kataloğu ve diğer kanallara gönder" seçeneği.
   - Paket: bu giriş akışı ücretsiz pakette; çok kanal ve otomasyonlar ücretli pakette (paket.html ile uyumlu hale getirilecek).
   - Ayarlar'a "Web sitem" alanı; doluysa mağaza sayfasında satıcının sitesine bağlantı.
   - Linkten çekilen ürünlerde orijinal sayfa adresi saklanır; ürün kartında "Satın Al" yanında "Satıcının sitesinde gör".
   - İsteğe bağlı "Satın Al düğmesi kendi siteme gitsin"; dışarı giden tıklamalar ürün bazında kaydedilir (satış ilgisi verisi kaybolmasın).
-- [ ] **4. WhatsApp + Instagram katalog otomasyonu** (temel var: social-catalog, catalog-feed)
+- [ ] **5. WhatsApp + Instagram katalog otomasyonu** (temel var: social-catalog, catalog-feed)
   - Ürünler Meta Catalog API ile otomatik Meta kataloğuna; fiyat/stok değişince güncellenir.
   - Katalog satıcının WhatsApp Business Platform hesabına ve Instagram Alışveriş'e bağlanır.
   - WhatsApp'tan tek ürün ve çoklu ürün mesajları otomatik gönderilebilir.
   - Altyapı Meta test numarasıyla sandbox modunda kurulur (varsayılan kapalı anahtar kuralı); şirket kurulunca (Meta işletme doğrulaması) canlıya geçilir.
+
+- [ ] **6. Ölü stok eritici** (12 Ekim 2026'da eklendi; adlar onay bekliyor)
+  - 30-60 gündür satmayan ürünleri bulur (süre ayarlanabilir), otomatik eritme planı önerir: kademeli indirim, satan ürünle paket (bundle-suggest temeli var), Instagram paylaşımı.
+  - Satıcının belirlediği alt fiyatın altına ASLA inmez; zarar kontrolü her zaman çalışır.
+  - Satıcı onaylarsa (panelden ya da Seltigo Asistan'dan) plan otomatik uygulanır; her adım ve sonucu raporlanır.
+  - Ön koşul: en az 30-60 günlük gerçek satış verisi (marketplace_orders / store_orders).
 
 **Onaylı arayüz adları (Mustafa, 11 Ekim 2026):**
 | Yer | Ad |
@@ -95,6 +120,9 @@ Sıra bağımlılığa göre: 1 ve 2 şirket gerektirmez ve diğerlerinin temeli
 | Katalog anahtarı | "Ürünleri kataloğa otomatik gönder" |
 | WhatsApp düğmeleri | "Ürünü gönder" / "Seçili ürünleri gönder" |
 | Test modu etiketi | "Test modu (Meta test numarası)" |
+| Ürün düzenleme sayfası (12 Ekim) | düğmeler "💾 Kaydet", "+ Seçenek ekle"; etiketler "Ana görsel", "Satışta"; alan "AliExpress ürün linki" / "CJ ürün linki" |
+| Toplu Ürün Yükleme (12 Ekim) | soru "AliExpress ürünleri için kaynak" (AliExpress / Kendi stoğum) |
+| Panel "Ürün ekle" kartı alt yazısı (12 Ekim) | "Tek ürün, link, katalog ya da fotoğraf" |
 
 ## Sıradaki işler
 - [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
