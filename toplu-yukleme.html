@@ -175,7 +175,7 @@
       <div class="hint" data-th="s1Hint"></div>
     </div>
     <div id="filePanel" style="display:none">
-      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" style="display:none" onchange="onFilePicked(this.files[0]); this.value='';">
+      <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.csv,.ods,.txt,image/*" style="display:none" onchange="onFilesPicked(this.files); this.value='';">
       <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()" data-th="dropText"></div>
       <div class="row" style="margin-top:12px">
         <label class="muted" data-t="vatLabel" style="font-size:13px;color:#c3c9d4"></label>
@@ -295,8 +295,11 @@
       subtitle: 'Tedarikçinin linkini yapıştır; ürünler resimleri, açıklamaları ve teknik özellikleriyle gelsin. Excel doldurmak yok.',
       s1Title: 'Kaynak',
       tabLink: '🔗 Link yapıştır',
-      tabFile: '📄 Fiyat listesi yükle (PDF/Excel)',
-      dropText: '📄 <b>PDF, Excel ya da CSV fiyat listesini</b> buraya sürükle ya da tıklayıp seç',
+      tabFile: '📄 Katalog / fiyat listesi yükle',
+      dropText: '📄 <b>Katalog, fiyat listesi, tablo, fotoğraf ya da ekran görüntüsü</b>: ne varsa buraya sürükle ya da tıklayıp seç. Telefondan sayfaların fotoğrafını çekip birden çok dosya seçebilirsin.',
+      imgReading: 'Görüntüler okunuyor... ({d} / {t})',
+      photoMatch: 'Ürün fotoğrafları eşleştiriliyor... (sayfa {d} / {t})',
+      sheetAi: 'Tablo yapay zekâyla okunuyor... ({d} / {t} parça)',
       fileHint: 'Sadece fiyat listesini yüklersen içindeki ürünler doğrudan önizlemeye gelir. Linkten ürün çektiysen (resim ve özellikler için) listedeki <b>model kodları</b> onlarla eşleşir ve fiyatlar otomatik dolar. Panelindeki ürünlerin fiyatları da güncellenebilir.',
       vatLabel: 'Listedeki fiyatlar:',
       vat0: 'KDV dahil / olduğu gibi kullan',
@@ -306,13 +309,14 @@
       fileReading: 'Fiyat listesi okunuyor... ({d} / {t} parça)',
       fileLib: 'Dosya hazırlanıyor...',
       pdfImgs: 'PDF\'teki resimler çıkarılıyor... (sayfa {d} / {t})',
-      fileImgs: ' <b>{n}</b> ürüne PDF\'ten resim eklendi.',
+      fileImgs: ' <b>{n}</b> ürüne dosyadan resim eklendi.',
       uploadingImgs: 'Resimler yükleniyor... ({d} / {t})',
       secs: '{s} sn',
       imgSaveErr: 'Bazı ürün resimleri galeriye kaydedilemedi: ',
-      fileBad: 'Bu dosya türü desteklenmiyor. PDF, XLSX, XLS ya da CSV yükle.',
+      fileBad: 'Bu dosya okunamadı ({n}). PDF, tablo dosyası, fotoğraf ya da ekran görüntüsü yükleyebilirsin.',
       fileNoRows: 'Dosyada fiyatlı ürün satırı bulunamadı.',
-      fileNoCols: 'Excel sütunları anlaşılamadı. İlk satırda "Model/Kod" ve "Fiyat" başlıkları olmalı.',
+      fileNoCols: 'Dosyada ürün bulunamadı.',
+      fileSummaryNew: 'Dosyadan <b>{n}</b> ürün okundu ve aşağıda önizlemeye eklendi. Panelindeki <b>{u}</b> üründe fiyat değişikliği var.',
       fileSummary: '<b>{n}</b> fiyat okundu. Önizlemedeki <b>{p}</b> ürünün fiyatı dolduruldu. Panelindeki <b>{u}</b> üründe fiyat değişikliği var. <b>{x}</b> satır eşleşmedi.',
       updTitle: 'Panelindeki ürünlerde fiyat güncellemesi',
       updBtn: '💾 Fiyatları güncelle ({n})',
@@ -427,8 +431,11 @@
       subtitle: 'Paste your supplier\'s link; products arrive with images, descriptions and technical specs. No spreadsheets.',
       s1Title: 'Source',
       tabLink: '🔗 Paste a link',
-      tabFile: '📄 Upload price list (PDF/Excel)',
-      dropText: '📄 Drag your <b>PDF, Excel or CSV price list</b> here or click to choose',
+      tabFile: '📄 Upload catalogue / price list',
+      imgReading: 'Reading images... ({d} / {t})',
+      photoMatch: 'Matching product photos... (page {d} / {t})',
+      sheetAi: 'Reading the table with AI... ({d} / {t} parts)',
+      dropText: '📄 <b>Catalogue, price list, table, photo or screenshot</b>: drag anything here or click to choose. On a phone you can photograph the pages and pick several files.',
       fileHint: 'If you upload only the price list, its products appear directly in the preview. If you fetched products from a link (for images and specs), the <b>model codes</b> are matched with them and prices fill in automatically. Prices of products in your dashboard can be updated too.',
       vatLabel: 'Prices in the list:',
       vat0: 'VAT included / use as is',
@@ -438,13 +445,14 @@
       fileReading: 'Reading the price list... ({d} / {t} parts)',
       fileLib: 'Preparing the file...',
       pdfImgs: 'Extracting images from the PDF... (page {d} / {t})',
-      fileImgs: ' Images from the PDF were added to <b>{n}</b> products.',
+      fileImgs: ' Images from the file were added to <b>{n}</b> products.',
       uploadingImgs: 'Uploading images... ({d} / {t})',
       secs: '{s} s',
       imgSaveErr: 'Some product images could not be saved to the gallery: ',
-      fileBad: 'This file type is not supported. Upload PDF, XLSX, XLS or CSV.',
+      fileBad: 'This file could not be read ({n}). You can upload a PDF, a spreadsheet, a photo or a screenshot.',
       fileNoRows: 'No priced product rows were found in the file.',
-      fileNoCols: 'Could not understand the spreadsheet columns. The first row should have "Model/Code" and "Price" headers.',
+      fileNoCols: 'No products found in the file.',
+      fileSummaryNew: '<b>{n}</b> products were read from the file and added to the preview below. <b>{u}</b> products in your panel have price changes.',
       fileSummary: '<b>{n}</b> prices read. Prices filled for <b>{p}</b> products in the preview. <b>{u}</b> products in your dashboard have price changes. <b>{x}</b> rows did not match.',
       updTitle: 'Price updates for products in your dashboard',
       updBtn: '💾 Update prices ({n})',
@@ -1138,7 +1146,7 @@
     const dz = document.getElementById('dropZone');
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
-    dz.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) onFilePicked(f); });
+    dz.addEventListener('drop', (e) => { const fs = e.dataTransfer && e.dataTransfer.files; if (fs && fs.length) onFilesPicked(fs); });
   })();
 
   async function readPdf(file) {
@@ -1179,7 +1187,7 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
-          out[my] = data.rows || [];
+          out[my] = (data.rows || []).map(r => Object.assign({}, r, { page: my * PER + (r.page || 1) }));
         } catch (e) { lastErr = e.message; out[my] = []; }
         done++;
         tick();
@@ -1197,6 +1205,7 @@
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
     const rows = [];
+    const aiSheets = []; // sütunları tanınmayan sayfalar: yapay zekâ okur (satıcı şablon doldurmaz)
     for (const name of wb.SheetNames) {
       const data = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
       // Başlık satırını bul (ilk 20 satır içinde)
@@ -1213,7 +1222,7 @@
           hi = r; break;
         }
       }
-      if (hi < 0) continue;
+      if (hi < 0) { aiSheets.push(data); continue; }
       const headerCur = curOf(data[hi].join(' '));
       for (let r = hi + 1; r < data.length; r++) {
         const row = data[r];
@@ -1229,27 +1238,237 @@
         });
       }
     }
+    if (aiSheets.length) {
+      const lines = [];
+      aiSheets.forEach(data => data.forEach(r => {
+        const cells = r.map(x => String(x == null ? '' : x).replace(/[\t\r\n]+/g, ' ').trim());
+        if (cells.some(Boolean)) lines.push(cells.join('\t'));
+      }));
+      const CHUNK = 250, parts = [];
+      for (let i = 0; i < lines.length; i += CHUNK) parts.push(lines.slice(i, i + CHUNK).join('\n'));
+      let done = 0;
+      for (const part of parts.slice(0, 40)) {
+        setProgress(fmt(t('sheetAi'), { d: done, t: parts.length }), 10 + done / parts.length * 80);
+        const data = await callParse({ text: part });
+        (data.rows || []).forEach(r => rows.push(r));
+        done++;
+      }
+    }
     if (!rows.length) throw new Error(t('fileNoCols'));
     return rows;
   }
 
-  async function onFilePicked(file) {
-    if (!file || running) return;
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
+  // Okuma çağrısı; geçici hata (sunucu / yapay zekâ yoğunluğu) ya da boş sonuçta bir kez daha dener
+  async function callParse(payload) {
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(HS.SUPABASE_URL + '/functions/v1/price-list-parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify(Object.assign({ language: HS.lang }, payload))
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status >= 400 && res.status < 500) throw Object.assign(new Error(data.error || ('HTTP ' + res.status)), { final: true });
+        if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+        const empty = payload.action ? !(data.matches || []).length : !(data.rows || []).length;
+        if (empty && attempt === 0) { lastErr = null; continue; }
+        return data;
+      } catch (e) {
+        lastErr = e;
+        if (e.final) break;
+      }
+    }
+    if (lastErr) throw lastErr;
+    return payload.action ? { matches: [] } : { rows: [] };
+  }
+
+  // Görüntü dosyasını (fotoğraf / ekran görüntüsü; telefondan da) tuvale çiz
+  function fileToCanvas(file, maxSide) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        resolve(cv);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(file.name)); };
+      img.src = url;
+    });
+  }
+  // 0-1000 ölçekli kutuyu tuvalden kes (biraz pay bırakarak)
+  function cropBox(cv, box) {
+    const pad = 8;
+    const x0 = Math.max(0, Math.floor(box[0] / 1000 * cv.width) - pad), y0 = Math.max(0, Math.floor(box[1] / 1000 * cv.height) - pad);
+    const x1 = Math.min(cv.width, Math.ceil(box[2] / 1000 * cv.width) + pad), y1 = Math.min(cv.height, Math.ceil(box[3] / 1000 * cv.height) + pad);
+    if (x1 - x0 < 40 || y1 - y0 < 40) return null;
+    const k = Math.min(1, 1000 / Math.max(x1 - x0, y1 - y0));
+    const out = document.createElement('canvas');
+    out.width = Math.round((x1 - x0) * k); out.height = Math.round((y1 - y0) * k);
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, out.width, out.height);
+    return out.toDataURL('image/jpeg', 0.88);
+  }
+  async function readImages(files) {
+    const rows = [];
+    let done = 0;
+    for (const f of files) {
+      setProgress(fmt(t('imgReading'), { d: done, t: files.length }), 10 + done / files.length * 85);
+      const cv = await fileToCanvas(f, 2000);
+      const jpg = cv.toDataURL('image/jpeg', 0.85);
+      const data = await callParse({ imageBase64: jpg });
+      const got = data.rows || [];
+      // Fotoğraf yerleri ayrı ve odaklı bir adımda bulunur (okuma sırasında verilen konum kaba olabiliyor)
+      const boxes = new Map();
+      if (got.length) {
+        try {
+          const pm = await callParse({ action: 'page_photos', imageBase64: jpg, rows: got.map((r, i) => ({ i: i, code: r.code, name: r.name })) });
+          (pm.matches || []).forEach(m => { if (m.box) boxes.set(m.i, m.box); });
+        } catch (e) { console.warn('fotoğraf yerleri bulunamadı', e); }
+      }
+      got.forEach((r, i) => {
+        const box = boxes.get(i) || r.box;
+        const im = box ? cropBox(cv, box) : null;
+        rows.push(Object.assign({}, r, { images: im ? [im] : [], fileName: f.name }));
+      });
+      done++;
+    }
+    return rows;
+  }
+
+  // PDF: model koduyla eşleşmeyen ürünlerin fotoğrafı (kodsuz katalog / taranmış sayfa).
+  // Sayfadaki resim alanları belliyse numaralanıp yapay zekâya hangisinin hangi ürün olduğu sorulur;
+  // taranmış sayfada (resim alanı yok) fotoğrafın yerini yapay zekâ bulur.
+  async function matchPdfPhotos(file, rows) {
+    const need = new Map(); // sayfa -> [satır sırası]
+    rows.forEach((r, i) => {
+      if (pdfImageMap.get(normCode(r.code)) || (r.images && r.images.length) || !r.page) return;
+      if (!need.has(r.page)) need.set(r.page, []);
+      need.get(r.page).push(i);
+    });
+    if (!need.size) return;
+    const lib = await loadPdfJs();
+    const OPS = lib.OPS;
+    const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [...need.keys()].filter(p => p >= 1 && p <= pdf.numPages).sort((a, b) => a - b).slice(0, 60);
+    let done = 0;
+    for (const pno of pages) {
+      setProgress(fmt(t('photoMatch'), { d: done, t: pages.length }), 90 + done / pages.length * 10);
+      done++;
+      try {
+        const page = await pdf.getPage(pno);
+        const base = page.getViewport({ scale: 1 });
+        const pageArea = base.width * base.height;
+        const ops = await page.getOperatorList();
+        let ctm = [1, 0, 0, 1, 0, 0];
+        const stack = [], boxes = [];
+        for (let i = 0; i < ops.fnArray.length; i++) {
+          const fn = ops.fnArray[i], args = ops.argsArray[i];
+          if (fn === OPS.save) stack.push(ctm.slice());
+          else if (fn === OPS.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+          else if (fn === OPS.transform) ctm = mulM(ctm, args);
+          else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageXObjectRepeat) {
+            const xs = [ctm[4], ctm[4] + ctm[0], ctm[4] + ctm[2], ctm[4] + ctm[0] + ctm[2]];
+            const ys = [ctm[5], ctm[5] + ctm[1], ctm[5] + ctm[3], ctm[5] + ctm[1] + ctm[3]];
+            const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
+            const w = Math.max.apply(null, xs) - x, h = Math.max.apply(null, ys) - y;
+            if (w < 20 || h < 20 || w * h > pageArea * 0.5 || w / h > 4 || h / w > 4) continue;
+            boxes.push({ x, y, w, h });
+          }
+        }
+        const scale = 2;
+        const vp = page.getViewport({ scale });
+        const cv = document.createElement('canvas');
+        cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const pageRows = need.get(pno).map(i => ({ i: i, code: rows[i].code, name: rows[i].name }));
+        let payload, rects = [];
+        if (boxes.length) {
+          // Resim alanlarını numaralı kırmızı kutularla işaretle
+          const mark = document.createElement('canvas');
+          mark.width = cv.width; mark.height = cv.height;
+          const mctx = mark.getContext('2d');
+          mctx.drawImage(cv, 0, 0);
+          mctx.lineWidth = 4; mctx.strokeStyle = '#ff0000'; mctx.fillStyle = '#ff0000'; mctx.font = 'bold 28px sans-serif';
+          rects = boxes.slice(0, 60).map((b, k) => {
+            const r = vp.convertToViewportRectangle([b.x, b.y, b.x + b.w, b.y + b.h]);
+            const x0 = Math.min(r[0], r[2]), y0 = Math.min(r[1], r[3]), x1 = Math.max(r[0], r[2]), y1 = Math.max(r[1], r[3]);
+            mctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+            mctx.fillText(String(k + 1), x0 + 6, y0 + 30);
+            return { n: k + 1, box: [x0 / cv.width * 1000, y0 / cv.height * 1000, x1 / cv.width * 1000, y1 / cv.height * 1000] };
+          });
+          payload = { action: 'page_photos', imageBase64: mark.toDataURL('image/jpeg', 0.8), rows: pageRows, boxes: rects.map(r => ({ n: r.n })) };
+        } else {
+          payload = { action: 'page_photos', imageBase64: cv.toDataURL('image/jpeg', 0.8), rows: pageRows };
+        }
+        const data = await callParse(payload);
+        (data.matches || []).forEach(m => {
+          const row = rows[m.i];
+          if (!row) return;
+          const box = m.n ? (rects.find(r => r.n === m.n) || {}).box : m.box;
+          const im = box ? cropBox(cv, box) : null;
+          if (im) row.images = [im];
+        });
+        page.cleanup();
+      } catch (e) { console.warn('sayfa fotoğrafları eşleştirilemedi', pno, e); }
+    }
+  }
+
+  const SHEET_EXT = ['xlsx', 'xls', 'csv', 'ods', 'txt'];
+  function fileKind(f) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf' || f.type === 'application/pdf') return 'pdf';
+    if (SHEET_EXT.includes(ext)) return 'sheet';
+    if (/^image\//.test(f.type) || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'heic', 'heif'].includes(ext)) return 'image';
+    return null;
+  }
+  async function onFilesPicked(list) {
+    if (!list || !list.length || running) return;
+    const files = Array.from(list);
+    const bad = files.filter(f => !fileKind(f));
+    if (bad.length) { toast(fmt(t('fileBad'), { n: bad.map(f => f.name).join(', ') }), true); }
+    const ok = files.filter(f => fileKind(f));
+    if (ok.length) await onFilePicked(ok);
+  }
+  async function onFilePicked(files) {
+    if (!Array.isArray(files)) files = [files];
+    if (!files.length || running) return;
     const box = document.getElementById('fileResult');
     box.style.display = 'none';
-    if (!['pdf', 'xlsx', 'xls', 'csv'].includes(ext)) { toast(t('fileBad'), true); return; }
     running = true;
     document.getElementById('stopBtn').style.display = 'none';
+    const exts = new Set();
     try {
-      let rows = ext === 'pdf' ? await readPdf(file) : await readSheet(file);
+      let rows = [];
       pdfImageMap = new Map();
-      if (ext === 'pdf' && rows.length) {
-        try {
-          pdfImageMap = await extractPdfImages(file, rows.map(r => r.code).filter(Boolean),
-            (d, n) => setProgress(fmt(t('pdfImgs'), { d: d, t: n }), 90 + d / n * 10));
-        } catch (e) { console.warn('PDF resimleri çıkarılamadı', e); pdfImageMap = new Map(); }
+      const images = files.filter(f => fileKind(f) === 'image');
+      for (const file of files) {
+        const kind = fileKind(file);
+        exts.add((file.name.split('.').pop() || '').toUpperCase());
+        if (kind === 'pdf') {
+          const pr = await readPdf(file);
+          if (pr.length) {
+            try {
+              const m = await extractPdfImages(file, pr.map(r => r.code).filter(Boolean),
+                (d, n) => setProgress(fmt(t('pdfImgs'), { d: d, t: n }), 85 + d / n * 5));
+              m.forEach((v, k) => pdfImageMap.set(k, v));
+            } catch (e) { console.warn('PDF resimleri çıkarılamadı', e); }
+            try { await matchPdfPhotos(file, pr); } catch (e) { console.warn('PDF fotoğraf eşleştirme', e); }
+          }
+          rows = rows.concat(pr);
+        } else if (kind === 'sheet') {
+          rows = rows.concat(await readSheet(file));
+        }
       }
+      if (images.length) rows = rows.concat(await readImages(images));
+      const file = files[0];
       const vat = parseFloat(document.getElementById('vatSel').value) || 0;
       if (vat) rows = rows.map(r => Object.assign({}, r, {
         price: r.price ? Math.round(r.price * (1 + vat / 100) * 100) / 100 : r.price,
@@ -1257,9 +1476,9 @@
       }));
       priceRows = rows;
       if (!rows.length) throw new Error(t('fileNoRows'));
-      sourceUrl = file.name;
+      sourceUrl = files.length > 1 ? files.map(f => f.name).join(', ').slice(0, 300) : file.name;
       await applyPriceList();
-      setProgress(fmt(t('feedDone'), { n: HS.number(rows.length) }).replace('XML', ext.toUpperCase()), 100);
+      setProgress(fmt(t('feedDone'), { n: HS.number(rows.length) }).replace('XML', Array.from(exts).join('/')), 100);
     } catch (e) {
       setProgress(t('fnError') + e.message, 0);
       toast(t('fnError') + e.message, true);
@@ -1282,13 +1501,15 @@
   function rowToItem(u) {
     return {
       url: '', name: u.name || u.code, price: u.price, list_price: u.list_price, currency: u.currency,
-      model_code: u.code, brand: '', category: '', description: '', images: (pdfImageMap.get(normCode(u.code)) || []).slice(), specs: [], stock: null
+      model_code: u.code, brand: u.brand || '', category: '', description: '',
+      images: (u.images && u.images.length ? u.images : (pdfImageMap.get(normCode(u.code)) || [])).slice(), specs: [], stock: null
     };
   }
 
   async function applyPriceList() {
-    // Önizleme boşsa (sadece fiyat listesi yüklendiyse) listedeki ürünleri doğrudan göster
-    if (!items.length) {
+    // Önizleme boşsa (sadece dosya yüklendiyse) dosyadaki ürünler doğrudan önizlemeye gelir
+    const fromFile = !items.length;
+    if (fromFile) {
       addItems(priceRows.filter(u => u.code || u.name).map(rowToItem));
       await markExisting();
     }
@@ -1306,6 +1527,7 @@
       it.price = row.price;
       if (row.list_price) it.list_price = row.list_price;
       if (row.currency) it.currency = row.currency;
+      if (!it.images.length && row.images && row.images.length) it.images = row.images.slice();
       if (!it.priceEdited) it.newPrice = calcPrice(it, r);
       filled++;
     });
@@ -1330,17 +1552,19 @@
       dbUpdates.push({ id: p.id, name: p.name, code: p.model_code, oldCost: Number(p.supplier_price) || 0, newCost: row.price, oldSale: Number(p.sale_price) || 0, newSale: newSale, cur: cur, selected: true });
     });
 
-    unmatchedRows = priceRows.filter(row => !used.has(row));
-    renderFileResult(filled);
+    unmatchedRows = fromFile ? [] : priceRows.filter(row => !used.has(row));
+    renderFileResult(filled, fromFile);
     renderPreview();
   }
 
-  function renderFileResult(filled) {
+  function renderFileResult(filled, fromFile) {
     const box = document.getElementById('fileResult');
     box.style.display = 'block';
     const withPdfImg = items.filter(i => i.images.some(u => String(u).indexOf('data:') === 0)).length;
-    let h = '<div class="stat-line">' + fmt(t('fileSummary'), { n: HS.number(priceRows.length), p: HS.number(filled || 0), u: HS.number(dbUpdates.length), x: HS.number(unmatchedRows.length) }) +
-      (withPdfImg ? fmt(t('fileImgs'), { n: HS.number(withPdfImg) }) : '') + '</div>';
+    const summary = fromFile
+      ? fmt(t('fileSummaryNew'), { n: HS.number(items.length), u: HS.number(dbUpdates.length) })
+      : fmt(t('fileSummary'), { n: HS.number(priceRows.length), p: HS.number(filled || 0), u: HS.number(dbUpdates.length), x: HS.number(unmatchedRows.length) });
+    let h = '<div class="stat-line">' + summary + (withPdfImg ? fmt(t('fileImgs'), { n: HS.number(withPdfImg) }) : '') + '</div>';
     if (dbUpdates.length) {
       h += '<div style="margin-top:14px;font-weight:600;color:#fff;font-size:14px">' + esc(t('updTitle')) + '</div>' +
         '<div class="table-wrap" style="margin-top:8px"><table class="mini-table"><thead><tr><th></th><th>' + esc(t('thProduct')) + '</th><th>' + esc(t('thCode')) + '</th>' +
