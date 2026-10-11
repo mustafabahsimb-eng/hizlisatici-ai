@@ -605,7 +605,8 @@
       const parts = [];
       Object.entries(d.result || {}).forEach(([k, v]) => {
         if (v && v.listings != null) parts.push(k + ': ' + tv('distListings', { n: v.listings }));
-        else if (v && v.queued != null) parts.push('Instagram: ' + tv('distQueued', { n: v.queued }));
+        else if (v && v.queued != null) parts.push(k + ': ' + tv('distQueued', { n: v.queued }));
+        else if (v && v.synced != null) parts.push(k + ': ✓');
         else if (v && v.error) parts.push(k + ': ' + v.error);
       });
       // WhatsApp kataloğu: Meta kataloğuna gönderim (satıcının oturumuyla)

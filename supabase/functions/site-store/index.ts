@@ -10,6 +10,7 @@
 // HIZ: ürün sayfaları 6'şar paralel okunur, 20'şer kaydedilir; ilan önce açılır, eksik görseller arka planda tamamlanır.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { connectedChannels, distributeProducts } from "../_shared/distribute.ts";
 
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -176,64 +177,15 @@ async function run(jobId: string) {
 }
 
 // ---------------- Diğer kanallara gönder ----------------
-async function connectedChannels(userId: string) {
-  const { data: sc } = await db.from("store_connections").select("id, marketplace_code, label, environment").eq("user_id", userId).eq("status", "connected").is("deleted_at", null);
-  const { data: ig } = await db.from("social_channels").select("id, account_name").eq("user_id", userId).eq("platform", "instagram").neq("active", false);
-  const { data: mc } = await db.from("meta_catalogs").select("catalog_id").eq("user_id", userId).maybeSingle();
-  return {
-    marketplaces: (sc || []).filter((c: any) => c.marketplace_code !== "own_store").map((c: any) => ({ id: c.id, code: c.marketplace_code, label: c.label, test: c.environment === "sandbox" })),
-    instagram: (ig || []).map((c: any) => ({ id: c.id, name: c.account_name })),
-    whatsappCatalog: !!mc?.catalog_id,
-  };
-}
-
 async function distribute(userId: string, b: any) {
   if (!(await featureEnabled(userId, "multi_channel"))) return { ok: false, error: FEATURE_OFF_MSG, feature: "multi_channel" };
   const { data: job } = await db.from("site_import_jobs").select("id, product_ids, status").eq("id", String(b.jobId || "")).eq("user_id", userId).maybeSingle();
   if (!job) return { ok: false, error: "İş bulunamadı" };
-  const { data: mine } = await db.from("products").select("id").eq("user_id", userId).in("id", (job.product_ids || []).map(Number)).is("deleted_at", null);
-  const ids: number[] = (mine || []).map((p: any) => Number(p.id));
-  if (!ids.length) return { ok: false, error: "Gönderilecek ürün yok" };
   const want: string[] = Array.isArray(b.channels) ? b.channels.map(String) : [];
-  const ch = await connectedChannels(userId);
-  const out: Record<string, unknown> = {};
-  const { data: own } = await db.from("listings").select("product_id, title, description, price, currency").eq("user_id", userId).eq("marketplace_code", "own_store").in("product_id", ids).is("deleted_at", null);
-  const ownMap = new Map((own || []).map((l: any) => [Number(l.product_id), l]));
-
-  // Pazaryerleri: her ürüne ilan (yayında) -> senkron kuyruğu (sync-worker hemen çalışır; pazaryeri kuralları ve prova adaptörde)
-  for (const m of ch.marketplaces.filter((m) => want.includes("mp:" + m.id))) {
-    const { data: mk } = await db.from("marketplaces").select("currency, language, default_commission_pct").eq("code", m.code).maybeSingle();
-    const cur = mk?.currency || "TRY";
-    let fx = 1;
-    if (cur !== "TRY") { const { data: r } = await db.rpc("fx_rate", { p_from: "TRY", p_to: cur, p_date: null }); fx = Number(r) || 0; }
-    const rows = ids.map((pid) => ownMap.get(pid)).filter(Boolean).filter(() => fx > 0).map((l: any) => ({
-      user_id: userId, product_id: l.product_id, source_product_id: l.product_id, connection_id: m.id, marketplace_code: m.code,
-      language: mk?.language || "tr", currency: cur, title: l.title, description: l.description,
-      price: Math.round(Number(l.price) * fx * 100) / 100, commission_pct: mk?.default_commission_pct ?? null,
-      price_mode: "manual", status: "published", published_at: new Date().toISOString(),
-    }));
-    // Aynı ürünün bu mağazada ilanı varsa atlanır (listings_one_per_store)
-    const { data: have } = await db.from("listings").select("product_id").eq("connection_id", m.id).in("product_id", ids).is("deleted_at", null);
-    const skip = new Set((have || []).map((x: any) => Number(x.product_id)));
-    const fresh = rows.filter((r) => !skip.has(Number(r.product_id)));
-    let n = 0;
-    for (let i = 0; i < fresh.length; i += 100) {
-      const { data, error } = await db.from("listings").insert(fresh.slice(i, i + 100)).select("id");
-      if (error) throw new Error(m.code + ": " + error.message);
-      n += (data || []).length;
-    }
-    out[m.label || m.code] = { listings: n, existing: skip.size, test: m.test };
-  }
-  // Instagram: paylaşım kuyruğu, 30 dk arayla (Meta günlük sınırı ve takipçiyi boğmamak için)
-  for (const c of ch.instagram.filter((c) => want.includes("ig:" + c.id))) {
-    const start = Date.now();
-    const rows = ids.slice(0, 48).map((pid, i) => ({ user_id: userId, product_id: pid, channel_id: c.id, platform: "instagram", status: "pending", kind: "product",
-      scheduled_at: new Date(start + i * 30 * 60_000).toISOString() }));
-    const { error } = await db.from("social_posts").insert(rows);
-    out["instagram"] = error ? { error: short(error.message) } : { queued: rows.length, note: ids.length > 48 ? "İlk 48 ürün (günlük sınır); kalanlar sonraki günlerde" : undefined };
-  }
-  await db.from("site_import_jobs").update({ distributed: { ...(out as object), at: new Date().toISOString() } }).eq("id", job.id);
-  return { ok: true, result: out, whatsappCatalog: want.includes("wa") && ch.whatsappCatalog };
+  const out = await distributeProducts(db, userId, (job.product_ids || []).map(Number), want);
+  if (!Object.keys(out).length && !want.length) return { ok: false, error: "Gönderilecek ürün yok" };
+  await db.from("site_import_jobs").update({ distributed: { ...out, at: new Date().toISOString() } }).eq("id", job.id);
+  return { ok: true, result: out, whatsappCatalog: false };
 }
 
 Deno.serve(async (req) => {
@@ -252,7 +204,7 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
     if (b.action === "start") return json(await start(userId, b));
     if (b.action === "distribute") return json(await distribute(userId, b));
-    if (b.action === "channels") return json({ ok: true, ...(await connectedChannels(userId)) });
+    if (b.action === "channels") return json({ ok: true, ...(await connectedChannels(db, userId)) });
     return json({ error: "Geçersiz işlem" }, 400);
   } catch (e) {
     return json({ ok: false, error: short((e as Error).message) }, 500);

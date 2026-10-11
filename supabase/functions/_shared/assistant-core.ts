@@ -7,6 +7,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { featureEnabled, FEATURE_OFF_MSG } from "./features.ts";
+import { channelIdsFromDefaults, connectedChannels, distributeProducts } from "./distribute.ts";
 import type { Button, Reply } from "./assistant-channels.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -150,13 +151,35 @@ async function ingest(link: Link, items: any[], opts: { margin?: number; salePri
   });
   if (res?.needAeSource) return { needAe: true } as any;
   if (!res?.ok) throw new Error(res?.error || "Ürün eklenemedi");
-  const notLive = channels.filter((c: string) => c !== "own_store");
-  return { products: res.products as any[], approve, notLive, imageJobs: res.imageJobs };
+  const ids = (res.products || []).map((p: any) => Number(p.id));
+  // Diğer kanallar (Varsayılan kanallar): onay modunda [Yayınla]'ya basılınca gönderilir
+  const dist = approve ? { sent: {}, missing: [] as string[] } : await sendToChannels(link, ids, channels);
+  return { products: res.products as any[], approve, notLive: dist.missing, sent: dist.sent, imageJobs: res.imageJobs };
+}
+// Ürünleri satıcının varsayılan kanallarına gönder (bağlı olanlara); bağlı olmayanlar "missing"
+async function sendToChannels(link: Link, ids: number[], channels: string[]): Promise<{ sent: Record<string, any>; missing: string[] }> {
+  const others = (channels || []).filter((c) => c !== "own_store");
+  if (!ids.length || !others.length) return { sent: {}, missing: [] };
+  if (!(await featureEnabled(link.user_id, "multi_channel"))) return { sent: {}, missing: others };
+  try {
+    const ch = await connectedChannels(db, link.user_id);
+    const { ids: want, missing } = channelIdsFromDefaults(ch, others);
+    const sent = want.length ? await distributeProducts(db, link.user_id, ids, want) : {};
+    return { sent, missing };
+  } catch (e) {
+    console.error("sendToChannels", String(e));
+    return { sent: {}, missing: others };
+  }
+}
+function sentLines(sent: Record<string, any>): string {
+  const parts = Object.entries(sent || {}).map(([k, v]: [string, any]) =>
+    v?.listings != null ? `${k}: ${v.listings} ilan${v.test ? " (test)" : ""}` : v?.queued != null ? `${k}: ${v.queued} paylaşım sıraya alındı` : v?.synced != null ? `${k}: ✓` : v?.error ? `${k}: ${short(v.error, 80)}` : "").filter(Boolean);
+  return parts.length ? `\n📤 Diğer kanallar: ${parts.join(" · ")}` : "";
 }
 function addedReply(r: any): Reply {
   const lines = r.products.slice(0, 15).map((p: any, i: number) => `${i + 1}. ${short(p.name, 60)} — ${money(p.sale_price, p.currency)}`);
   const more = r.products.length > 15 ? `\n… ve ${r.products.length - 15} ürün daha` : "";
-  const notLive = r.notLive?.length ? `\n\nℹ️ ${r.notLive.map((c: string) => CHANNEL_NAMES[c] || c).join(", ")} bağlantın canlı değil; bağlanınca oraya da gönderirim.` : "";
+  const notLive = (r.notLive?.length ? `\n\nℹ️ ${r.notLive.map((c: string) => CHANNEL_NAMES[c] || c).join(", ")} bağlı değil; Hesaplarım'dan bağlayınca oraya da gönderirim.` : "") + sentLines(r.sent);
   const img = r.imageJobs ? `\n🔎 Eksik görseller arka planda tamamlanıyor.` : "";
   if (r.approve) {
     return {
@@ -311,6 +334,22 @@ export async function weeklySummary(userId: string): Promise<Reply> {
   return { text: `📅 Haftalık özet\n${s.count} sipariş, ${money(s.revenue)} ciro, tahmini kâr ${money(s.profit)}.` +
     (s.top.length ? "\nEn çok satanlar:\n" + s.top.slice(0, 3).map((t, i) => `${i + 1}. ${short(t.name, 50)} — ${t.qty} adet`).join("\n") : "") };
 }
+// Pazaryeri kodu -> okunur ad (ör. trendyol_tr -> Trendyol, amazon_de -> Amazon DE)
+const MP_NAMES: Record<string, string> = { trendyol_tr: "Trendyol", hepsiburada_tr: "Hepsiburada", n11_tr: "n11", ciceksepeti_tr: "Çiçeksepeti", pazarama_tr: "Pazarama", pttavm_tr: "PTT AVM",
+  shopify: "Shopify", woocommerce: "WooCommerce", etsy: "Etsy", wix: "Wix", own_store: "Kendi Mağazam" };
+export function mpName(code: string): string {
+  const c = String(code || "");
+  return MP_NAMES[c] || c.replace(/^(amazon|ebay|walmart)_(\w+)$/, (_: string, a: string, x: string) => a[0].toUpperCase() + a.slice(1) + " " + x.toUpperCase());
+}
+// Kaynak sitelerden gelen seçenek adları Türkçe (eski siparişlerde "Size: 31 · Color: blue" -> "Beden: 31 · Renk: blue")
+const OPTION_TR: Record<string, string> = { size: "Beden", color: "Renk", colour: "Renk", material: "Malzeme", style: "Model", pattern: "Desen", capacity: "Kapasite", length: "Uzunluk", "ships from": "Gönderim yeri" };
+export function trVariant(label: string): string {
+  return String(label || "").split(/\s*·\s*/).map((part) => {
+    const m = /^([^:]+):\s*(.*)$/.exec(part);
+    return m ? `${OPTION_TR[m[1].trim().toLowerCase()] || m[1].trim()}: ${m[2]}` : part;
+  }).join(" · ");
+}
+
 async function shipmentsReply(link: Link): Promise<Reply> {
   const { data: so } = await db.from("store_orders").select("id, product_id, quantity, customer_name, customer_city, variant_label, created_at")
     .eq("user_id", link.user_id).is("shipped_at", null).neq("status", "cancelled").order("created_at").limit(50);
@@ -325,7 +364,7 @@ async function shipmentsReply(link: Link): Promise<Reply> {
   const rows = [
     ...(so || []).map((o: any) => ({ key: "s:" + o.id, product_id: o.product_id, qty: o.quantity, name: o.customer_name, city: o.customer_city, variant: o.variant_label, ch: "" })),
     ...mp.map((m: any) => ({ key: "m:" + m.id, product_id: m.product_id, qty: m.quantity, name: m.buyer_name, city: m.buyer_address?.city, variant: null,
-      ch: String(m.marketplace_code).replace(/^amazon_(\w+)$/, (_: string, c: string) => "Amazon " + c.toUpperCase()) })),
+      ch: mpName(m.marketplace_code) })),
   ];
   if (!rows.length) return { text: "📦 Bugün gönderilecek sipariş yok." };
   const ids = [...new Set(rows.map((o) => o.product_id).filter(Boolean))];
@@ -334,7 +373,7 @@ async function shipmentsReply(link: Link): Promise<Reply> {
   const shs: any[] = [];
   if (so?.length) shs.push(...((await db.from("shipments").select("label_path").in("store_order_id", so.map((o: any) => o.id)).not("label_path", "is", null)).data || []));
   if (mp.length) shs.push(...((await db.from("shipments").select("label_path").in("marketplace_order_id", mp.map((m: any) => m.id)).not("label_path", "is", null)).data || []));
-  const lines = rows.map((o, i) => `${i + 1}. ${o.ch ? "[" + o.ch + "] " : ""}${short(pm.get(o.product_id) || "—", 45)}${o.variant ? " (" + o.variant + ")" : ""} ×${o.qty || 1} — ${o.name || ""}, ${o.city || ""}`);
+  const lines = rows.map((o, i) => `${i + 1}. ${o.ch ? "[" + o.ch + "] " : ""}${short(pm.get(o.product_id) || "—", 45)}${o.variant ? " (" + trVariant(o.variant) + ")" : ""} ×${o.qty || 1} — ${o.name || ""}, ${o.city || ""}`);
   let document: Reply["document"];
   if (shs.length) {
     const { PDFDocument } = await import("npm:pdf-lib@1.17.1");
@@ -365,8 +404,8 @@ export async function renderAlert(kind: string, p: any, userId: string): Promise
   if (kind === "new_order") {
     const { data: pr } = await db.from("products").select("generated_title, name").eq("id", p.product_id).maybeSingle();
     // Pazaryeri siparişi (ör. amazon_tr -> "Amazon TR"); Kendi Mağazam siparişinde düğme, diğerlerinde sipariş sayfası bağlantısı
-    const mp = p.marketplace ? String(p.marketplace).replace(/^amazon_(\w+)$/, (_: string, c: string) => "Amazon " + c.toUpperCase()) : "";
-    const text = `🛒 Yeni sipariş${mp ? " (" + mp + ")" : ""}: ${short(pr?.generated_title || pr?.name, 60)}${p.variant ? " (" + p.variant + ")" : ""} ×${p.quantity || 1} — ${money((Number(p.unit_price) || 0) * (p.quantity || 1), p.currency || "TRY")}\n${p.customer || ""}, ${p.city || ""}`;
+    const mp = p.marketplace ? mpName(p.marketplace) : "";
+    const text = `🛒 Yeni sipariş${mp ? " (" + mp + ")" : ""}: ${short(pr?.generated_title || pr?.name, 60)}${p.variant ? " (" + trVariant(p.variant) + ")" : ""} ×${p.quantity || 1} — ${money((Number(p.unit_price) || 0) * (p.quantity || 1), p.currency || "TRY")}\n${p.customer || ""}, ${p.city || ""}`;
     return { need: "orders", reply: p.store_order_id
       ? { text, buttons: [{ id: `order:${p.store_order_id}`, title: "Siparişi gör" }] }
       : { text, link: { title: "Siparişi gör", url: `${SITE}/orders.html` } } };
@@ -403,7 +442,11 @@ async function handleButton(link: Link, id: string): Promise<Reply[]> {
     if (!ids.length) return [{ text: "Yayın bekleyen ürün yok." }];
     await publishProducts(link, ids);
     await setState(link, { ...st, awaitPublish: null, awaitPriceEdit: null });
-    return [{ text: `✅ ${ids.length} ürün Kendi Mağazam'da yayında.`, link: { title: "Ürünlerim", url: `${SITE}/dashboard.html` } }];
+    const stp = await settings(link.user_id);
+    const dist = await sendToChannels(link, ids, stp.default_channels || ["own_store"]);
+    const miss = dist.missing.length ? `
+ℹ️ ${dist.missing.map((c: string) => CHANNEL_NAMES[c] || c).join(", ")} bağlı değil; Hesaplarım'dan bağlayınca oraya da gönderirim.` : "";
+    return [{ text: `✅ ${ids.length} ürün Kendi Mağazam'da yayında.${sentLines(dist.sent)}${miss}`, link: { title: "Ürünlerim", url: `${SITE}/dashboard.html` } }];
   }
   if (act === "edit_prices") {
     await setState(link, { ...st, awaitPriceEdit: st.awaitPublish || [] });

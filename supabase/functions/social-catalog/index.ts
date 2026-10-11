@@ -96,14 +96,21 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { userAccessToken, action } = body;
-    if (!userAccessToken) return json({ error: "Oturum bilgisi gerekli" }, 400);
+    // Sistem çağrısı (asistan / "diğer kanallara gönder"): CRON_SECRET + userId; tablolar servis anahtarıyla, yalnız o satıcının kayıtları
+    const CRON = Deno.env.get("CRON_SECRET") ?? "";
+    const sys = !!CRON && String(body?.cronSecret || "").trim() === CRON.trim() && typeof body?.userId === "string" && action === "sync";
+    if (!sys && !userAccessToken) return json({ error: "Oturum bilgisi gerekli" }, 400);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: "Bearer " + userAccessToken } },
-    });
-    const { data: userData, error: userErr } = await supabase.auth.getUser(userAccessToken);
-    if (userErr || !userData?.user) return json({ error: "Oturum geçersiz" }, 401);
-    const userId = userData.user.id;
+    const supabase = sys
+      ? createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } })
+      : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: "Bearer " + userAccessToken } } });
+    let userId: string;
+    if (sys) userId = String(body.userId);
+    else {
+      const { data: userData, error: userErr } = await supabase.auth.getUser(userAccessToken);
+      if (userErr || !userData?.user) return json({ error: "Oturum geçersiz" }, 401);
+      userId = userData.user.id;
+    }
 
     const { data: row } = await supabase.from("meta_catalogs").select("*").eq("user_id", userId).maybeSingle();
     const token = row?.user_token;
