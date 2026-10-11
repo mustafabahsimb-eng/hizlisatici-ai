@@ -27,6 +27,20 @@
   - Ürün kaynağı (2026-10-12): products.supplier = 'aliexpress' | 'cj' ise sipariş tedarikçiye otomatik gider; 'wholesaler' (Toptancı) ve boş (Kendi stoğum) ürünleri satıcı kendisi gönderir ('printify' ayrı akış). Linkten / dosyadan gelen her ürün varsayılan "Kendi stoğum"; AliExpress linkinde kaynak satıcıya sorulur (AliExpress / Kendi stoğum). Kaynak adları: Kendi stoğum / Toptancı / AliExpress / CJ.
   - AliExpress'te API ile ödeme (API Pay) her alıcı için AliExpress onayı + PayPal istiyor, Türkiye desteklenmiyor → AliExpress ürünleri CJ eşdeğerinden verilip CJ bakiyesinden ödenir.
 
+## HIZ KURALI (2026-10-12; tüm ürün ekleme / yayınlama işlerinde geçerli)
+Ürün listeleme Seltigo'nun ana farkı; aşırı hızlı olmalı.
+- Hedefler: tek ürün (fotoğraf / link / sesli mesaj / katalog satırı) bağlı tüm kanallarda 30 sn altında yayında; 100 ürünlük katalog 10 dk altında yayında (görseller arkadan tamamlanabilir); satıcı en fazla 2 dokunuş.
+- AI başlık, açıklama, kategori eşleme, her pazaryerinin zorunlu nitelikleri ve GTIN/barkod muafiyetini tek seferde doldurur; satıcı form doldurmaz, sadece kontrol eder.
+- Kanallara yayın PARALEL, sıralı değil.
+- Kâr kuralı, kargo, iade ve varsayılan kanallar bir kez girilir; her üründe tekrar sorulmaz.
+- Sistem satıcının önceki ürünlerinden kategori / nitelik seçimlerini öğrenir, benzer ürünü anında doldurur.
+- Ağır işler (görsel arama, çeviri, AI zenginleştirme) arka planda; ilan önce açılır.
+- Süre ölçen otomatik test (tests/e2e/hiz_olcum.py) her ürün ekleme / yayınlama değişikliğinden sonra çalıştırılır ve süreler Mustafa'ya raporlanır.
+
+## Çalışma sırası ve durma koşulları (2026-10-12)
+Sıra: kargo (bitti) → 1 Chrome eklentisi → 2 Seltigo Asistan (WhatsApp tamamı Meta test numarasıyla uçtan uca; Telegram canlı; Instagram DM / Messenger sandbox) → 3 Amazon SP-API (TR + Global, sandbox) → 4 "Link ver, mağazan hazır" → 5 eksik taraması (bulguları kritik / önemli / küçük listele, düzeltmeden önce onay al) → 6 ayrı ürünler için mimari plan (Seltigo Ads, İçerik otomasyonu, İade otomasyonu; kodlamadan önce onay).
+Her adımı bitir, Playwright ile test et, canlıda çalışır halde GitHub'a gönder, kısa özet ver, sonrakine geç. YALNIZ şu durumlarda dur ve sor: yeni düğme / menü adları (topluca göster), Mustafa'nın hesabını gerektiren işler (tek mesajda, adresiyle), para harcayan işler.
+
 ## Güvenli çalışma
 - Canlı sistemi değiştiren işlerden önce (SQL migration, Edge Function deploy, fonksiyon/tablo/veri silme) ne yapacağını Türkçe kısaca anlat ve onay al. Dosya okuma, inceleme ve yerel düzenleme için onay gerekmez.
 - Depo HERKESE AÇIK: koda, commit'lere ve CLAUDE.md'ye asla gizli anahtar, token veya şifre yazma. Gizli değerler Supabase Edge Function secrets veya Vault'ta durur. (sb_publishable_ ile başlayan anahtar herkese açık olacak şekilde tasarlanmıştır, sorun değil.)
@@ -59,5 +73,7 @@
 - Sabit IP: altyapı HAZIR ve denendi, anahtar KAPALI; sunucu alınınca IP girilip açılır (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün"). Ödeme bekliyor.
 - AliExpress yayın başvurusu: şirket kurulunca (Corporation). CJ seviye 3 (toplam 2.000 $ sipariş) gelene kadar CJ eşleştirme anahtar kelimeyle + sourcing.
 - Öncelikli sıradaki işler (2026-10-11, ayrıntı YOL-HARITASI.md "Öncelikli"): 1) Linkten ürün yükleme (tek link + mağaza/site toplu çekme, AI kanal metni, otomatik fiyat/stok güncelleme), 2) PDF'den ürün yükleme (resimli katalog / fiyat listesi / taranmış PDF + OCR; görsel tamamlama sırası: marka resmi sitesi (önce medya kiti) → toptancı → CJ/AliExpress → "Görsel eksik"; rastgele/telifli görsel yok; her görselin kaynağı kaydedilir ve gösterilir; satıcı görsel sorumluluk onayı + kullanım koşulları maddesi), 3) "Link ver, mağazan hazır" (site adresi → ürünler → Seltigo mağazası → diğer kanallara gönder; ücretsiz pakette, çok kanal/otomasyon ücretli; "Web sitem", "Satıcının sitesinde gör", "Satın Al düğmesi kendi siteme gitsin" + dış tıklama kaydı), 4) WhatsApp + Instagram katalog otomasyonu (Meta Catalog API, tek/çoklu ürün mesajı; sandbox, şirketle canlı). Arayüz adları onaylandı (YOL-HARITASI.md tablosu); başka ad uydurma.
+- Kargo (2026-10-12): bizim şirketimizi gerektirmez; 3 yol (pazaryeri etiketi, satıcının kendi kargo hesabı, kargo aracı platformu), hepsi otomatik. shipping-hub + shipping_accounts (Vault) + shipments; Yurtiçi test ortamı uçtan uca çalışıyor; Geliver test modu Mustafa'nın Geliver hesabını bekliyor.
+- Ertelenenler (yol haritasında, şimdi yapılmaz): görsel tamamlama hızlandırma; WhatsApp + Instagram katalog otomasyonu (şirket sonrası canlı); Ölü stok eritici; Kâr kaçağı dedektörü; Trendyol Buybox fiyat otomatı; sabit IP sunucusunun açılması (ödemeyi Mustafa yapar); AliExpress yayın başvurusu (şirket sonrası, Corporation).
 - Yeni büyük özellikler (2026-10-12, ayrıntı YOL-HARITASI.md "Öncelikli" 3 ve 6): Seltigo Asistan ("Mağazanı WhatsApp'tan yönet": PDF/fotoğraf/link/sesle ürün ekleme, kâr kuralı + zarar kontrolü, varsayılan kanallar, onay modu, butonlu uyarılar, soru-cevap, sabah/haftalık rapor, günlük gönderim listesi, güvenlik: kayıtlı numara + kritik işte ikinci onay + sessiz saatler + çalışan yetkisi; Telegram önce canlı, WhatsApp/Instagram/Messenger aynı çekirdekle sandbox, şirketle canlı; Meta 24 saat kuralı) ve Ölü stok eritici (30-60 gün satmayan, kademeli indirim / paket / Instagram, alt fiyatın altına asla inmez, onayla otomatik). Sıra: 2b Chrome eklentisi → 3 Asistan → 4 Link ver mağazan hazır → 5 Meta katalog → 6 Ölü stok. Adlar Mustafa'nın onayında.
 - İzlenecek: CJ sourcing talepleri (test kullanıcısının 84, 85, 86, 88 ürünleri), WhatsApp kargo şablonu Meta onayı, ilk gerçek CJ/AliExpress ödemesi.

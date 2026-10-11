@@ -18,6 +18,20 @@ Yeni fikirler buraya eklenir; buraya eklenmesi hemen yapılacağı anlamına gel
 - [ ] **CJ hesap seviyesi 3** — görselle arama (anında eşdeğer) bu seviyede açılıyor. Şart: CJ'ye toplam 2.000 $ sipariş (LV1 0 $, LV2 500 $, LV3 2.000 $, LV4 100.000 $, LV5 500.000 $; satın alınamaz, sıfırlanmaz, anlaşmazlıklı siparişler sayılmaz). O zamana kadar: anahtar kelimeyle eşleştirme (kuruldu, 11 Ekim) + sourcing talebi.
 - [ ] **WhatsApp kargo şablonu** — Meta onayı bekleniyor; onaydan sonra gerçek bir gönderimle doğrulanmalı.
 
+## Çalışma sırası (Mustafa, 12 Ekim 2026)
+Kargo (bitti) → 1 Chrome eklentisi → 2 Seltigo Asistan → 3 Amazon SP-API (TR + Global, sandbox) → 4 "Link ver, mağazan hazır" → 5 eksik taraması (onaylı düzeltme) → 6 ayrı ürünler mimari planı (Seltigo Ads, İçerik otomasyonu, İade otomasyonu). HIZ KURALI için CLAUDE.md'ye bak; süre testi: tests/e2e/hiz_olcum.py.
+
+## Kargo (12 Ekim 2026) — altyapı kuruldu
+Bizim şirketimizi gerektirmez; üç yol, hepsi otomatik (gönderi, etiket PDF'i, takip numarası -> sipariş + müşteri takip sayfası):
+- [x] Altyapı: shipping-hub, shipping_accounts (bilgiler Vault'ta), shipments, mağaza siparişinden otomatik kuyruk (yalnız Kendi stoğum / Toptancı ürünleri), 10 dk'lık görev, özel etiket deposu, barkodlu kendi etiketimiz.
+- [x] Yurtiçi (satıcının kendi anlaşması): test ortamında uçtan uca (tests/e2e/kargo_yurtici.py 11/11). Canlı web servisi IP izni ister → sabit IP listesinde.
+- [ ] Geliver (anlaşmasız, aracı platform; test modu var): kod hazır, Mustafa'nın Geliver hesabı / API anahtarı ile test edilecek.
+- [ ] Basit Kargo (anlaşmasız; test ortamı yok, hesap onayı gerekir): bağlantı doğrulama hazır, gönderi alanları hesap açılınca belgeden doğrulanacak.
+- [ ] Aras, MNG, PTT, Sürat, HepsiJet (satıcının kendi anlaşması): resmi belge ve test erişimi firmanın şubesi / kurumsal temsilcisinden alınıyor; bilgiler şimdiden saklanabiliyor.
+- [ ] Pazaryeri etiketi: Trendyol createCommonLabel / getCommonLabel (ZPL → PDF) yazıldı; Trendyol canlı bağlantısı ve sipariş çekme gelince devreye girer. Hepsiburada / n11 etiket servisleri sonra.
+- [ ] Ayarlar / Siparişler'de kargo bağlama ve etiket indirme ekranı (adlar onaya sunulacak).
+- [ ] Kendi gönderdiği siparişlerde de kargo çıkınca müşteriye WhatsApp bildirimi (CJ/AliExpress akışındaki gibi).
+
 ## Öncelikli: ürün girişi ve dağıtım (11 Ekim 2026'da eklendi)
 Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome eklentisi (Trendyol TL fiyatı); 3 Seltigo Asistan (Telegram'da canlı, şirket gerekmez; ilk gerçek kullanıcılar buradan başlar; 1-2'deki okuyucuları kullanır); 4 "Link ver, mağazan hazır" (1'in üstüne); 5 WhatsApp + Instagram katalog otomasyonu (Meta; asistanın WhatsApp/Instagram/Messenger sürümleriyle aynı Meta altyapısı, şirketle canlı); 6 Ölü stok eritici (en az 30-60 günlük satış verisi gerekir; uygulama asistan ve panelden). Arayüz adları onaylandı (aşağıdaki tablo).
 
@@ -60,7 +74,8 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
   - Satıcı ürün sayfasındayken tek tıkla Seltigo'ya ekler; eklenti sayfadaki ürün verisini (ad, fiyat, görsel, seçenek, stok) okuyup Seltigo hesabına gönderir.
   - Linkten çekilen ve otomatik takipteki (source_sync) Trendyol ürünlerinde Türkiye fiyatı da eklentiyle güncellenebilmeli (satıcının tarayıcısı açıkken arka planda).
   - Chrome Web Mağazası'na yayın: geliştirici hesabı tek seferlik 5 $ (ödeme gerektirir → altyapı hazırlanır, yayın ödemeden sonra); o zamana kadar "paketlenmemiş eklenti" olarak denenir.
-- [ ] **3. Seltigo Asistan: "Mağazanı WhatsApp'tan yönet"** (12 Ekim 2026'da eklendi; adlar onay bekliyor)
+- [ ] **3. Seltigo Asistan: "Mağazanı WhatsApp'tan yönet"** (12 Ekim 2026'da eklendi; önerilen adlar onaylandı: Seltigo Asistan, 🤖 Asistan, 🤖 Asistan ayarları, Telegram'a bağla, [Hepsini ekle] [Seçerek ekle], Kâr kuralı, Varsayılan kanallar, [Siparişi gör] [Stok ekle] [Bakiye yükle] [Yeniden bağla] [Cevabı gönder] [Cevabı düzenle], Sabah raporu, Haftalık özet, Sessiz saatler, Çalışanlar (Sadece siparişler / Ürün ekleyebilir / Tam yetki))
+  - 12 Ekim kararı: WhatsApp sürümünün TAMAMI şimdi kurulur ve Meta test numarasıyla uçtan uca test edilir; şirket kurulunca yalnız gerçek numara girilip canlıya geçer. 24 saat dışı mesajlar için Meta şablonları hazırlanıp onaya gönderilir. WhatsApp sürümü ayrı ücretli paket, mesaj sınırı konur. Telegram hemen canlı; Instagram DM ve Messenger sandbox.
   Satıcı mağazasını Seltigo'nun numarasıyla / botuyla yazışarak yönetir. Tek çekirdek (komut anlama, ürün ekleme, uyarı, rapor), kanal başına ince bağlayıcı.
   - **Gönder, gerisi otomatik:** toptancı PDF'i iletilince ürünler önizleme listesiyle gelir ("hepsini ekle" / "1-15 ekle"); fotoğraf + "350'ye sat, 20 tane" ile ilan açılır; link gönderilince ürün eklenir; sesli mesajla komut (konuşmadan yazıya). Temel hazır: price-list-parse, product-import, channel-copy, image-complete-worker, voice-product-parse.
   - **Fiyat:** PDF akışında satış fiyatı Ayarlar'daki kâr kuralına göre (ör. "alışın üstüne %40"); mesajda farklı oran söylenebilir ("1-15'i %50 kârla ekle"). Zarar kontrolü (komisyon + kargo) burada da çalışır.
@@ -123,6 +138,18 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 | Ürün düzenleme sayfası (12 Ekim) | düğmeler "💾 Kaydet", "+ Seçenek ekle"; etiketler "Ana görsel", "Satışta"; alan "AliExpress ürün linki" / "CJ ürün linki" |
 | Toplu Ürün Yükleme (12 Ekim) | soru "AliExpress ürünleri için kaynak" (AliExpress / Kendi stoğum) |
 | Panel "Ürün ekle" kartı alt yazısı (12 Ekim) | "Tek ürün, link, katalog ya da fotoğraf" |
+
+## Amazon (TR + Global, SP-API) — sırada 3.
+- Sandbox'ta tam altyapı: mağaza bağlama (OAuth), ilan yükleme, sipariş çekme, stok/fiyat senkronu, etiket. Hedef: bir ürünü Amazon'a 1 dakikanın altında yüklemek; GTIN/barkod muafiyeti, kategori şablonu ve zorunlu nitelikler AI ile otomatik. Geliştirici kaydı için gerekenler Mustafa'ya tek mesajda.
+
+## Ertelenenler (şimdi yapılmaz)
+- Görsel tamamlama hızlandırma
+- WhatsApp + Instagram katalog otomasyonu (şirket sonrası canlı)
+- Ölü stok eritici (satış verisi birikince)
+- Kâr kaçağı dedektörü: aylık gizli kayıp raporu (desi farkı, komisyon değişikliği, iade kargo masrafı, kur farkı, zararına satılan ürünler)
+- Trendyol Buybox fiyat otomatı: satıcının alt sınırına kadar rakibe göre otomatik fiyat (canlı Trendyol bağlantısı gerekir)
+- Sabit IP sunucusunun açılması (ödemeyi Mustafa yapar)
+- AliExpress yayın başvurusu (şirket sonrası, Corporation)
 
 ## Sıradaki işler
 - [x] AliExpress sipariş ve kargo takibi — canlı test: zarar kontrolü, ödemesiz gerçek sipariş, takip, iptal çalıştı
