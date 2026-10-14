@@ -3,6 +3,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.13";
 
 Deno.env.set("ETSY_SHARED_SECRET", "abcde12345");
+Deno.env.set("ETSY_KEYSTRING", "testkeystring123");
 const E = await import("../../supabase/functions/_shared/etsy.ts");
 const L = await import("../../supabase/functions/_shared/etsy-listing.ts");
 
@@ -62,7 +63,7 @@ const base = (over: any = {}) => ({
 });
 
 Deno.test("x-api-key: anahtar:gizli anahtar", () => {
-  assertEquals(E.etsyApiKey(), "1z497h37rk069va5r0xvxqw3:abcde12345");
+  assertEquals(E.etsyApiKey(), "testkeystring123:abcde12345");
 });
 
 Deno.test("Etiket / başlık kuralları", () => {
@@ -96,7 +97,7 @@ Deno.test("Yeni dijital ilan: taslak (download, Digital Prints, i_did, 2020_2026
   assertEquals(f.get("quantity"), "999");
   assertEquals(f.get("description"), "Printable art");
   assert(!f.get("title")!.includes("%  ") && f.get("title")!.split("%").length - 1 <= 1, "başlıkta % en fazla bir kez");
-  assertEquals(create.headers.get("x-api-key"), "1z497h37rk069va5r0xvxqw3:abcde12345");
+  assertEquals(create.headers.get("x-api-key"), "testkeystring123:abcde12345");
   assertEquals(create.headers.get("authorization"), "Bearer tok");
   assertEquals(calls.filter((c) => /\/images$/.test(c.path)).length, 2);
   const fileCalls = calls.filter((c) => /\/files$/.test(c.path));

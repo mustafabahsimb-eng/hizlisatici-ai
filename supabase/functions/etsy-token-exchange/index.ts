@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ETSY_CLIENT_ID, ETSY_REDIRECT, etsyApiKey, etsyShop } from '../_shared/etsy.ts';
+import { ETSY_CLIENT_ID, ETSY_REDIRECT, etsyApiKey, etsyConfigured, etsyShop } from '../_shared/etsy.ts';
 import { featureEnabled, FEATURE_OFF_MSG } from '../_shared/features.ts';
 
 const corsHeaders = {
@@ -59,6 +59,8 @@ Deno.serve(async (req) => {
   }
   try {
     const body = await req.json().catch(() => ({}));
+    // Hesaplarım sayfası Etsy onay adresini kurarken keystring'i buradan alır (herkese açık değer; tek kaynak: secret ETSY_KEYSTRING)
+    if (body.action === 'config') return json({ clientId: ETSY_CLIENT_ID || null, configured: etsyConfigured(), redirectUri: ETSY_REDIRECT });
     const { code, codeVerifier } = body;
     if (!code || !codeVerifier) {
       return json({ error: 'code ve codeVerifier gerekli.' }, 400);
@@ -88,6 +90,7 @@ Deno.serve(async (req) => {
     }
 
     if (!(await featureEnabled(userId, 'etsy'))) return json({ connected: false, error: FEATURE_OFF_MSG }, 403);
+    if (!etsyConfigured()) return json({ connected: false, error: 'Etsy uygulama anahtarı (ETSY_KEYSTRING / ETSY_SHARED_SECRET) tanımlı değil.' }, 503);
     const clientId = ETSY_CLIENT_ID;
     const redirectUri = ETSY_REDIRECT;
 

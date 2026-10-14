@@ -13,7 +13,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { etsyApiKey } from "../_shared/etsy.ts";
+import { ETSY_CLIENT_ID, etsyApiKey } from "../_shared/etsy.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -21,7 +21,6 @@ const AE_APP_KEY = Deno.env.get("ALIEXPRESS_APP_KEY") ?? "";
 const AE_APP_SECRET = Deno.env.get("ALIEXPRESS_APP_SECRET") ?? "";
 const FB_APP_ID = "1650835089949068";
 const FB_APP_SECRET = Deno.env.get("FACEBOOK_CLIENT_SECRET") ?? "";
-const ETSY_CLIENT_ID = "1z497h37rk069va5r0xvxqw3";
 const WIX_CLIENT_ID = "b6cd9721-a09f-4257-b18a-c6d3654aa038";
 
 const HOUR = 3600 * 1000;

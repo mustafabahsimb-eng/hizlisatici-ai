@@ -68,7 +68,11 @@ def main():
         page.evaluate("() => connectEtsy()")
         page.wait_for_timeout(3000)
         u = seen[0] if seen else ""
-        c.check("Etsy onay adresi: PKCE + mağaza izinleri", "oauth/connect" in u and "code_challenge_method=S256" in u and "shops_r" in u and "listings_d" in u, u[:160])
+        cfg = page.evaluate("""async () => (await fetch(HS.SUPABASE_URL + '/functions/v1/etsy-token-exchange', { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': HS.SUPABASE_KEY }, body: JSON.stringify({ action: 'config' }) })).json()""")
+        if cfg.get("configured"):
+            c.check("Etsy onay adresi: tek kaynaktaki keystring + PKCE + mağaza izinleri", "oauth/connect" in u and ("client_id=" + cfg["clientId"]) in u and "code_challenge_method=S256" in u and "shops_r" in u and "listings_d" in u, u[:160])
+        else:
+            c.check("Keystring tanımlı değilken Etsy'ye yanlış anahtarla gidilmez (uyarı)", not u and "henüz hazır değil" in page.inner_text("#toast"), page.inner_text("#toast")[:100])
 
         # 4-5) Dijital ürün
         page.unroute_all() if hasattr(page, "unroute_all") else None

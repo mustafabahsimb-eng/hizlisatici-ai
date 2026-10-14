@@ -5,14 +5,17 @@
 // - Kota: saniyede ~10 istek; 429'da artan beklemeyle tekrar.
 // Kaynak: developer.etsy.com (Authentication, Listing, ListingImage, ListingFile, SellerTaxonomy, Shop) ve resmi OpenAPI tanımı.
 // =========================================================
-// Uygulama anahtarı (keystring; herkese açık, OAuth adresinde de görünür). Değişirse secret ETSY_KEYSTRING ile güncellenir.
-export const ETSY_CLIENT_ID = Deno.env.get("ETSY_KEYSTRING") || "1z497h37rk069va5r0xvxqw3";
+// Uygulama anahtarı (keystring): TEK KAYNAK Supabase secret ETSY_KEYSTRING (herkese açık bir değerdir; OAuth adresinde client_id olarak görünür).
+// Hesaplarım sayfası da değeri buradan alır (etsy-token-exchange action "config"); kodda sabit değer yok.
+export const ETSY_CLIENT_ID = (Deno.env.get("ETSY_KEYSTRING") ?? "").trim();
+export const etsyConfigured = () => !!ETSY_CLIENT_ID && !!(Deno.env.get("ETSY_SHARED_SECRET") ?? "").trim();
 export const ETSY_REDIRECT = "https://mustafabahsimb-eng.github.io/hizlisatici-ai/etsy-callback.html";
 export const ETSY_SCOPES = "listings_r listings_w listings_d shops_r shops_w transactions_r transactions_w email_r";
 const API = "https://api.etsy.com/v3/application";
 
+// Etsy kuralı (9 Şubat 2026'dan beri): her istekte x-api-key = "<keystring>:<shared secret>"
 export const etsyApiKey = () => {
-  const secret = Deno.env.get("ETSY_SHARED_SECRET") ?? "";
+  const secret = (Deno.env.get("ETSY_SHARED_SECRET") ?? "").trim();
   return secret ? `${ETSY_CLIENT_ID}:${secret}` : ETSY_CLIENT_ID;
 };
 

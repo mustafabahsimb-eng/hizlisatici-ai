@@ -34,7 +34,7 @@ Klasörde görseller, indirilebilir dosyalar ve bir `.json` dosyası bulunur:
 - Sınırlar: en fazla 10 görsel, 5 dosya, dosya başı 20 MB. Başlıkta en fazla 140 karakter; Etsy'nin kuralı gereği `%`, `:` ve `&` birer kez. En fazla 13 etiket, her biri en fazla 20 karakter; bunlara kod kendisi uyar.
 
 ## Etsy kuralları ve anahtarlar
-- Etsy 9 Şubat 2026'dan beri her istekte `x-api-key: <keystring>:<shared secret>` istiyor. Gizli anahtar Supabase'de `ETSY_SHARED_SECRET` olarak duruyor. Uygulama anahtarı (keystring) değişirse kod değiştirmeden `ETSY_KEYSTRING` olarak girilebilir.
+- Etsy 9 Şubat 2026'dan beri her istekte `x-api-key: <keystring>:<shared secret>` istiyor. Gizli anahtar Supabase'de `ETSY_SHARED_SECRET` olarak duruyor. Uygulama anahtarının (keystring) TEK kaynağı Supabase secret `ETSY_KEYSTRING`; kodda sabit değer yok. Hesaplarım sayfası değeri `etsy-token-exchange` `{action:"config"}` ile alır. Onay adresinde (`oauth/connect`) ve anahtar isteklerinde `client_id` = keystring; tüm v3 isteklerinde `x-api-key` = `keystring:shared secret`.
 - Teşhis: `etsy-listings` `{action:"ping"}` (sistem çağrısı) anahtarın Etsy'de kabul edilip edilmediğini durum koduyla söyler; değer göstermez.
 - Ücret: Etsy yayınlanan her ilan için ilan ücreti alır. Taslak ücretsizdir.
 

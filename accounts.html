@@ -379,6 +379,7 @@
       cjPrompt: 'CJ Dropshipping API anahtarını yapıştır:',
       cjConfirmRemove: 'CJ Dropshipping bağlantını kaldırmak istediğine emin misin? Aramalar tekrar paylaşımlı hesapla yapılacak.',
       etsyConfirmRemove: 'Etsy bağlantını kaldırmak istediğine emin misin?',
+      etsyNotReady: 'Etsy bağlantısı henüz hazır değil (uygulama anahtarı tanımlanmamış).',
       failConnect: 'Bağlama başarısız: ',
       failRemove: 'Kaldırma başarısız: ',
       failSave: 'Kaydedilemedi: ',
@@ -511,6 +512,7 @@
       cjPrompt: 'Paste your CJ Dropshipping API key:',
       cjConfirmRemove: 'Remove your CJ Dropshipping connection? Searches will use the shared account again.',
       etsyConfirmRemove: 'Remove your Etsy connection?',
+      etsyNotReady: 'Etsy connection is not ready yet (app key not set).',
       failConnect: 'Connection failed: ',
       failRemove: 'Removal failed: ',
       failSave: 'Could not save: ',
@@ -1129,9 +1131,15 @@
     const state = generateRandomString(16);
     sessionStorage.setItem('etsy_code_verifier', codeVerifier);
     sessionStorage.setItem('etsy_oauth_state', state);
+    // Keystring tek kaynaktan (Supabase secret ETSY_KEYSTRING): etsy-token-exchange "config"
+    let cfg = {};
+    try {
+      cfg = await fetch(SUPABASE_URL + '/functions/v1/etsy-token-exchange', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }, body: JSON.stringify({ action: 'config' }) }).then(r => r.json());
+    } catch (e) { cfg = {}; }
+    if (!cfg.clientId || !cfg.configured) { toast(t('etsyNotReady'), true); return; }
     const authUrl = 'https://www.etsy.com/oauth/connect?' + new URLSearchParams({
       response_type: 'code',
-      client_id: '1z497h37rk069va5r0xvxqw3',
+      client_id: cfg.clientId,
       redirect_uri: 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/etsy-callback.html',
       scope: 'listings_r listings_w listings_d shops_r shops_w transactions_r transactions_w email_r',
       state: state,
