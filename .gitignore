@@ -2,3 +2,9 @@ e2e-shots/
 __pycache__/
 supabase/.temp/
 seltigo-chrome-*.zip
+
+# Satılık dijital ürünler (bahsistore Etsy paketi): depoya GİRMEZ
+bahsistore_etsy_paket.zip
+bahsistore_etsy_paket/
+etsy-yukleme/
+*.etsy.zip
