@@ -1296,7 +1296,7 @@
           }
           const li = await db.from('listings').insert({ user_id: userId, product_id: it.productId, source_product_id: it.productId, connection_id: etsyConn.id, marketplace_code: 'etsy',
             language: 'en', currency: 'USD', title: it.title, description: it.description, keywords: it.tags, price: it.price, price_mode: 'manual', status: 'published',
-            attributes: { etsy_publish: publish } }).select('id').single();
+            attributes: { etsy_publish: publish, etsy_shop_currency_price: true } }).select('id').single(); // fiyat mağaza para biriminde; gönderimde ilanın para birimi düzeltilir
           if (li.error) throw li.error;
           it.listingId = li.data.id;
           it.status = t('folderSentWait');

@@ -11,7 +11,7 @@
 // sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { ETSY_CLIENT_ID, etsy, etsyToken } from "../_shared/etsy.ts";
+import { ETSY_CLIENT_ID, convertPrice, etsy, etsyShopCurrency, etsyToken } from "../_shared/etsy.ts";
 import { submitEtsyListing } from "../_shared/etsy-listing.ts";
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 
@@ -52,13 +52,22 @@ async function push(listingId: string, userId?: string) {
   if (!images.length && product.image_url) images.push({ url: product.image_url });
   const { data: files } = await db.from("product_files").select("id, path, name, rank").eq("product_id", product.id).order("rank");
   try {
+    // Fiyat mağazanın para biriminde gider. Klasörden yüklemede fiyat zaten mağaza para birimindedir (attributes.etsy_shop_currency_price).
+    const shopCur = await etsyShopCurrency({ token }, shopId, cred);
+    let price = Number(listing.price) || 0;
+    if (listing.attributes?.etsy_shop_currency_price !== true && listing.currency && listing.currency.toUpperCase() !== shopCur) {
+      const conv = await convertPrice(db, price, listing.currency, shopCur);
+      if (conv == null) return await fail(`Kur bulunamadı (${listing.currency} → ${shopCur}); fiyat çevrilemedi`);
+      price = conv;
+    }
     const r = await submitEtsyListing({
-      db, ctx: { token }, shopId, listing, product, images, files: files || [],
+      db, ctx: { token }, shopId, listing: { ...listing, price }, product, images, files: files || [],
       publish: listing.attributes?.etsy_publish === true,
       download: async (path) => { const { data, error } = await db.storage.from("product-files").download(path); if (error || !data) throw new Error("depodan okunamadı"); return data; },
     });
     await db.from("listings").update({
       external_listing_id: r.listingId, external_url: r.url, validated_at: now,
+      ...(listing.attributes?.etsy_shop_currency_price === true && listing.currency !== shopCur ? { currency: shopCur } : {}),
       last_sync_error: r.ok ? (r.state === "active" ? null : "etsy_draft") : short(r.errors.join(" · "), 300),
       validation: { ok: r.ok, dry_run: false, errors: r.errors.map((m) => ({ code: "etsy", msg: m })), warnings: r.warnings.map((m) => ({ code: "etsy", msg: m })), etsy: r.etsy, checked_at: now },
       ...(r.state === "active" && !listing.published_at ? { published_at: now } : {}),
@@ -73,6 +82,8 @@ async function push(listingId: string, userId?: string) {
 function friendly(e: unknown): string {
   const msg = (e as Error).message || String(e);
   if (/API key not found|not active|shared secret/i.test(msg)) return "Etsy uygulama anahtarı etkin değil ya da gizli anahtar yanlış (Etsy > Your Apps sayfası kontrol edilmeli)";
+  const low = /price_too_low[\s\S]*?min price ([\d.,]+ ?[A-Z]{0,3})/.exec(msg);
+  if (low) return `Etsy'de fiyat çok düşük: mağazan için en düşük fiyat ${low[1].trim()}. Fiyatı yükselt.`;
   if (/Etsy 401|invalid_token|expired/i.test(msg)) return "Etsy oturumu geçersiz; Hesaplarım'dan Etsy'yi yeniden bağla";
   if (/Etsy 403/i.test(msg)) return "Etsy bu işlem için izin vermedi (mağaza izinleri): Etsy'yi yeniden bağla";
   return msg.startsWith("Etsy") ? msg : "Etsy: " + msg;
@@ -102,15 +113,19 @@ async function selftest(userId: string | null, keep: boolean) {
   const steps: Record<string, unknown> = { shop: conn.label };
   const { token, cred } = await etsyToken(db, conn.id);
   const shopId = String(cred.shop_id || conn.external_seller_id);
+  const shopCur = await etsyShopCurrency({ token }, shopId, cred);
+  const testPrice = (await convertPrice(db, 5, "USD", shopCur)) ?? 500;
+  steps.currency = shopCur; steps.price = testPrice;
   const pdf = new TextEncoder().encode("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
-  const r = await submitEtsyListing({
+  let r: Awaited<ReturnType<typeof submitEtsyListing>>;
+  try { r = await submitEtsyListing({
     db, ctx: { token }, shopId, publish: false,
-    listing: { id: "selftest", title: "Seltigo Test Draft - Please Ignore", description: "Automated connection test by Seltigo. This draft is deleted right away.", price: 1.0, keywords: ["seltigo test"], validation: null },
+    listing: { id: "selftest", title: "Seltigo Test Draft - Please Ignore", description: "Automated connection test by Seltigo. This draft is deleted right away.", price: testPrice, keywords: ["seltigo test"], validation: null },
     product: { id: 0, product_type: "digital", name: "Seltigo Test" },
     images: [{ url: "https://mustafabahsimb-eng.github.io/hizlisatici-ai/chrome-extension/icons/icon128.png" }],
     files: [{ id: "t1", path: "-", name: "seltigo-test.pdf", rank: 1 }],
     download: async () => new Blob([pdf], { type: "application/pdf" }),
-  });
+  }); } catch (e) { return { ok: false, steps, error: friendly(e) }; }
   steps.created = { ok: r.ok, listingId: r.listingId, state: r.state, errors: r.errors, warnings: r.warnings, images: r.etsy.images?.length || 0, files: r.etsy.files?.length || 0 };
   if (r.listingId) {
     try {

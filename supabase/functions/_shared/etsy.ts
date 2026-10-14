@@ -84,16 +84,17 @@ export async function etsyToken(db: any, connectionId: string, f: typeof fetch =
 }
 
 // Anahtarın sahibi ve mağazası (getMe + getShopByOwnerUserId)
-export async function etsyShop(ctx: EtsyCtx): Promise<{ userId: string; shopId: string | null; shopName: string | null }> {
+export async function etsyShop(ctx: EtsyCtx): Promise<{ userId: string; shopId: string | null; shopName: string | null; currency: string | null }> {
   const me = await etsy(ctx, "GET", "/users/me");
   const userId = String(me.user_id);
-  let shopId: string | null = me.shop_id ? String(me.shop_id) : null, shopName: string | null = null;
+  let shopId: string | null = me.shop_id ? String(me.shop_id) : null, shopName: string | null = null, currency: string | null = null;
   try {
     const shop = await etsy(ctx, "GET", `/users/${userId}/shops`);
     shopId = String(shop.shop_id || shopId || "") || null;
     shopName = shop.shop_name || null;
+    currency = shop.currency_code || null;
   } catch (e) { if (!(e instanceof EtsyError && e.status === 404)) throw e; }
-  return { userId, shopId, shopName };
+  return { userId, shopId, shopName, currency };
 }
 
 // Satıcı kategori ağacında ada göre düğüm (ör. "Digital Prints"); sonuç veritabanında önbelleğe alınır
@@ -135,4 +136,25 @@ export function cleanTitle(t: string): string {
   let s = String(t || "").replace(/\s+/g, " ").trim();
   for (const ch of ["%", ":", "&"]) { let seen = false; s = s.split("").filter((c) => (c !== ch ? true : (seen ? false : (seen = true)))).join(""); }
   return s.replace(/\s+/g, " ").slice(0, 140).trim();
+}
+
+// Mağazanın para birimi (ör. TRY, USD): bağlantıda kayıtlı değilse Etsy'den okunur
+export async function etsyShopCurrency(ctx: EtsyCtx, shopId: string, cred: Record<string, any>): Promise<string> {
+  if (cred?.shop_currency) return String(cred.shop_currency).toUpperCase();
+  const shop = await etsy(ctx, "GET", `/shops/${shopId}`);
+  return String(shop.currency_code || "USD").toUpperCase();
+}
+
+// Fiyatı mağaza para birimine çevir (kur tablosu dolar bazlı: 1 USD = rate X)
+export async function convertPrice(db: any, amount: number, from: string, to: string): Promise<number | null> {
+  const f = (from || to).toUpperCase(), t = to.toUpperCase();
+  if (f === t) return amount;
+  const rate = async (cur: string) => {
+    if (cur === "USD") return 1;
+    const { data } = await db.from("exchange_rates").select("rate").eq("base_currency", "USD").eq("quote_currency", cur).order("rate_date", { ascending: false }).limit(1).maybeSingle();
+    return data?.rate ? Number(data.rate) : null;
+  };
+  const [rf, rt] = [await rate(f), await rate(t)];
+  if (!rf || !rt) return null;
+  return Math.round((amount / rf) * rt * 100) / 100;
 }

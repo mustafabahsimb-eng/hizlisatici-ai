@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in ?? 3600) * 1000).toISOString();
     // Mağaza numarası ve adı (ilan gönderme / sipariş çekme mağaza numarasıyla çalışır)
-    let shop: { userId: string; shopId: string | null; shopName: string | null };
+    let shop: { userId: string; shopId: string | null; shopName: string | null; currency: string | null };
     try {
       shop = await etsyShop({ token: tokenData.access_token });
     } catch (e) {
@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
           etsy_user_id: shop.userId,
           shop_id: shop.shopId,
           shop_name: shop.shopName,
+          shop_currency: shop.currency,
         },
       });
     } catch (e) {
