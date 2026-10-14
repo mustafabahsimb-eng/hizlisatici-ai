@@ -52,6 +52,13 @@
   .img-src { font-size: 11px; color: #8b93a3; margin-top: 6px; overflow-wrap: anywhere; }
   .img-add { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 150px; border: 2px dashed #2a3040; border-radius: 10px; color: #9aa3b2; cursor: pointer; font-size: 13px; padding: 10px; background: none; }
   .img-add:hover { border-color: #1D9E75; color: #fff; }
+  .type-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .type-opt { display: flex; align-items: center; gap: 8px; border: 1px solid #2a3040; border-radius: 9px; padding: 9px 14px; font-size: 14px; cursor: pointer; }
+  .type-opt input { accent-color: #1D9E75; }
+  .files { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+  .file-row { display: flex; align-items: center; gap: 10px; background: #0d0f16; border: 1px solid #232838; border-radius: 9px; padding: 8px 10px; font-size: 13px; }
+  .file-name { flex: 1; overflow-wrap: anywhere; }
+  .file-size { color: #8b93a3; font-size: 12px; white-space: nowrap; }
   .img-missing { color: #e6c96a; font-size: 13px; margin-bottom: 10px; }
   .save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #141821ee; border-top: 1px solid #232838; padding: 12px 24px; display: flex; justify-content: center; gap: 12px; align-items: center; backdrop-filter: blur(6px); }
   .save-msg { font-size: 13px; color: #9aa3b2; }
@@ -84,6 +91,7 @@
   <button class="btn" id="saveBtn" onclick="save()" data-t="save"></button>
 </div>
 <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="onPhoto(this.files[0]); this.value='';">
+<input type="file" id="fileInput" multiple style="display:none" onchange="onFiles(this.files); this.value='';">
 <div class="toast" id="toast"></div>
 
 <script>
@@ -102,6 +110,18 @@
       stockPh: 'Boş bırakırsan bilinmiyor sayılır',
       source: 'Kaynak',
       srcOwn: 'Kendi stoğum',
+      typeLabel: 'Ürün tipi',
+      typePhysical: 'Fiziksel ürün',
+      typeDigital: 'Dijital ürün',
+      digitalNote: 'Dijital üründe kargo gönderisi açılmaz; müşteri dosyaları satın aldığı yerden (ör. Etsy) indirir.',
+      filesTitle: 'İndirilebilir dosyalar (en fazla 5)',
+      fileAdd: '+ Dosya ekle',
+      fileNone: 'Henüz dosya yok.',
+      fileTooBig: '{n} 20 MB\'tan büyük; eklenmedi.',
+      fileMax: 'En fazla 5 dosya eklenebilir.',
+      fileUploading: '{n} yükleniyor...',
+      fileAdded: 'Dosya eklendi.',
+      fileDelConfirm: '{n} silinsin mi?',
       srcWholesaler: 'Toptancı',
       srcAe: 'AliExpress',
       srcCj: 'CJ',
@@ -150,6 +170,18 @@
       stockPh: 'Leave empty if unknown',
       source: 'Source',
       srcOwn: 'My own stock',
+      typeLabel: 'Product type',
+      typePhysical: 'Physical product',
+      typeDigital: 'Digital product',
+      digitalNote: 'No shipment is created for digital products; customers download the files where they bought (e.g. Etsy).',
+      filesTitle: 'Downloadable files (up to 5)',
+      fileAdd: '+ Add file',
+      fileNone: 'No files yet.',
+      fileTooBig: '{n} is larger than 20 MB; not added.',
+      fileMax: 'You can add up to 5 files.',
+      fileUploading: 'Uploading {n}...',
+      fileAdded: 'File added.',
+      fileDelConfirm: 'Delete {n}?',
       srcWholesaler: 'Wholesaler',
       srcAe: 'AliExpress',
       srcCj: 'CJ',
@@ -195,6 +227,8 @@
   let userId = null;
   let product = null;           // ürün kaydı
   let ownListing = null;        // Kendi Mağazam ilanı
+  let productType = 'physical';
+  let files = [];               // product_files satırları (hemen yüklenir / silinir)
   let variants = [];            // { id?, attributes, stock_qty, is_active, _new, _deleted }
   let images = [];              // { id?, url, source_kind, source_url, _new, _deleted, _changed }
   let source = 'own';
@@ -266,6 +300,20 @@
       '</div>' +
 
       '<div class="card">' +
+        '<h2>' + esc(t('typeLabel')) + '</h2>' +
+        '<div class="type-row">' +
+          '<label class="type-opt"><input type="radio" name="ptype" value="physical"' + (productType !== 'digital' ? ' checked' : '') + '> ' + esc(t('typePhysical')) + '</label>' +
+          '<label class="type-opt"><input type="radio" name="ptype" value="digital"' + (productType === 'digital' ? ' checked' : '') + '> ' + esc(t('typeDigital')) + '</label>' +
+        '</div>' +
+        (productType === 'digital' ? '<div class="note">' + esc(t('digitalNote')) + '</div>' +
+          '<h2 style="margin-top:16px">' + esc(t('filesTitle')) + '</h2>' +
+          '<div class="files" id="fileList">' + (files.length ? files.map(f => '<div class="file-row"><span class="file-name">📎 ' + esc(f.name) + '</span><span class="file-size">' + fmtSize(f.size_bytes) + '</span>' +
+            '<button class="del-btn" onclick="delFile(\'' + f.id + '\')">🗑</button></div>').join('') : '<div class="note">' + esc(t('fileNone')) + '</div>') + '</div>' +
+          (files.length < 5 ? '<button class="btn2" id="fileAddBtn" onclick="document.getElementById(\'fileInput\').click()">' + esc(t('fileAdd')) + '</button>' : '') +
+          '<div class="note" id="fileMsg"></div>' : '') +
+      '</div>' +
+
+      '<div class="card">' +
         '<h2>' + esc(t('source')) + '</h2>' +
         '<select id="fSource"' + (source === 'printify' ? ' disabled' : '') + '>' + srcOptions + '</select>' +
         (auto ? '<label class="f" for="fSrcLink">' + esc(fmt(t('srcLink'), { s: srcName(source) })) + '</label>' +
@@ -306,6 +354,7 @@
 
     // Değişiklik dinleyicileri
     ['fName', 'fDesc', 'fPrice', 'fStock'].forEach(id => document.getElementById(id).addEventListener('input', () => { readForm(); markDirty(); }));
+    document.querySelectorAll('input[name=ptype]').forEach(el => el.addEventListener('change', () => { readForm(); productType = el.value; markDirty(); render(); }));
     const fs = document.getElementById('fSource');
     fs.addEventListener('change', () => { readForm(); source = fs.value; markDirty(); render(); });
     const fl = document.getElementById('fSrcLink');
@@ -340,6 +389,47 @@
     markDirty(); render();
   }
   function delVariant(i) { readForm(); variants[i]._deleted = true; markDirty(); render(); }
+  // ---------- İndirilebilir dosyalar (dijital ürün): hemen yüklenir / silinir ----------
+  const MAX_FILES = 5, MAX_FILE_BYTES = 20 * 1024 * 1024;
+  function fmtSize(b) { b = Number(b) || 0; return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+  function fileMsg(m, err) { const el = document.getElementById('fileMsg'); if (el) { el.textContent = m || ''; el.style.color = err ? '#f28b8b' : ''; } }
+  async function onFiles(list) {
+    readForm();
+    const btn = document.getElementById('fileAddBtn');
+    if (btn) btn.disabled = true;
+    const before = files.length;
+    try {
+      for (const f of Array.from(list || [])) {
+        if (files.length >= MAX_FILES) { toast(t('fileMax'), true); break; }
+        if (f.size > MAX_FILE_BYTES) { toast(fmt(t('fileTooBig'), { n: f.name }), true); continue; }
+        fileMsg(fmt(t('fileUploading'), { n: f.name }));
+        const used = files.map(x => x.rank);
+        const rank = [1, 2, 3, 4, 5].find(r => !used.includes(r));
+        const safe = f.name.replace(/[^\w.\-]+/g, '_').slice(-80);
+        const path = userId + '/' + productId + '/' + rank + '-' + Date.now() + '-' + safe;
+        const up = await db.storage.from('product-files').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+        if (up.error) throw up.error;
+        const r = await db.from('product_files').insert({ user_id: userId, product_id: productId, path, name: f.name.slice(0, 200), size_bytes: f.size, mime: f.type || null, rank }).select('id, path, name, size_bytes, mime, rank').single();
+        if (r.error) { await db.storage.from('product-files').remove([path]); throw r.error; }
+        files.push(r.data);
+        files.sort((a, b) => a.rank - b.rank);
+      }
+      fileMsg('');
+      if (files.length > before) toast(t('fileAdded'));
+    } catch (e) { fileMsg(e.message || String(e), true); }
+    render();
+  }
+  async function delFile(id) {
+    const f = files.find(x => x.id === id);
+    if (!f || !confirm(fmt(t('fileDelConfirm'), { n: f.name }))) return;
+    readForm();
+    const r = await db.from('product_files').delete().eq('id', id);
+    if (r.error) { toast(r.error.message, true); return; }
+    await db.storage.from('product-files').remove([f.path]);
+    files = files.filter(x => x.id !== id);
+    render();
+  }
+
   function delImage(i) { readForm(); images[i]._deleted = true; markDirty(); render(); }
 
   // ---------- Fotoğraf (telefonda kamera açılır); arka plan otomatik temizlenir ----------
@@ -442,7 +532,8 @@
         name: name, generated_title: name, generated_description: p._desc || '',
         sale_price: p._price != null ? p._price : p.sale_price,
         stock_qty: p._stock, stock_status: p._stock != null ? stockStatus(p._stock) : p.stock_status,
-        image_url: mainImg, image_missing: !mainImg
+        image_url: mainImg, image_missing: !mainImg,
+        product_type: productType
       };
       if (source !== 'printify') {
         upd.supplier = source === 'own' ? null : source;
@@ -515,11 +606,12 @@
 
   // ---------- Yükle ----------
   async function load() {
-    const [pr, ls, vr, im] = await Promise.all([
+    const [pr, ls, vr, im, fl] = await Promise.all([
       db.from('products').select('*').eq('id', productId).is('deleted_at', null).maybeSingle(),
       db.from('listings').select('id, title, description, price, currency').eq('product_id', productId).eq('marketplace_code', 'own_store').is('deleted_at', null).limit(1).maybeSingle(),
       db.from('product_variants').select('id, sku, attributes, stock_qty, is_active, created_at').eq('product_id', productId).eq('is_default', false).is('deleted_at', null),
-      db.from('product_images').select('id, url, position, source_kind, source_url').eq('product_id', productId).is('deleted_at', null).order('position')
+      db.from('product_images').select('id, url, position, source_kind, source_url').eq('product_id', productId).is('deleted_at', null).order('position'),
+      db.from('product_files').select('id, path, name, size_bytes, mime, rank').eq('product_id', productId).order('rank')
     ]);
     if (!pr.data) { document.getElementById('content').innerHTML = '<div class="loading">' + esc(t('notFound')) + '</div>'; return; }
     product = pr.data;
@@ -534,6 +626,8 @@
     variants = (vr.data || []).filter(v => v.attributes && Object.keys(v.attributes).length)
       .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : seq(a) - seq(b)));
     images = im.data || [];
+    files = fl.data || [];
+    productType = product.product_type === 'digital' ? 'digital' : 'physical';
     // Eski ürünler: görsel tablosunda kayıt yoksa ana görseli göster
     if (!images.length && product.image_url) images = [{ url: product.image_url, source_kind: null, source_url: product.source_url || null, _new: true }];
     source = product.supplier ? product.supplier : 'own';

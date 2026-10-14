@@ -15,6 +15,8 @@
 //   Walmart   : /v3/orders (WM_SEC.ACCESS_TOKEN; sandbox.walmartapis.com); takip: /v3/orders/{po}/shipping
 //   Wix       : eCommerce /ecom/v1/orders/search; takip: fulfillments
 // =========================================================
+import { etsyApiKey } from "./etsy.ts";
+
 export type NormLine = {
   externalId: string;            // satır bazında benzersiz (sipariş no [+ satır no])
   orderNo: string;               // pazaryeri sipariş / paket numarası (takip bildirimi için)
@@ -342,10 +344,11 @@ const woocommerce: Adapter = {
 };
 
 // ---------------- Etsy ----------------
-const ETSY_KEY = () => Deno.env.get("ETSY_CLIENT_ID") || "1z497h37rk069va5r0xvxqw3";
+// x-api-key "<keystring>:<shared secret>" (Etsy 2026 kuralı)
+const ETSY_KEY = () => etsyApiKey();
 const etsy: Adapter = {
   async fetchOrders(ctx) {
-    const shop = ctx.sellerId || ctx.creds.shop_id;
+    const shop = ctx.creds.shop_id || ctx.sellerId;
     const out: NormLine[] = [];
     for (let offset = 0; offset < 5000; offset += 100) {
       const q = new URLSearchParams({ limit: "100", offset: String(offset), min_last_modified: String(Math.floor(ctx.since.getTime() / 1000)), was_paid: "true" });
@@ -368,7 +371,7 @@ const etsy: Adapter = {
     return out;
   },
   async pushTracking(ctx, mo, tracking, carrier) {
-    const shop = ctx.sellerId || ctx.creds.shop_id;
+    const shop = ctx.creds.shop_id || ctx.sellerId;
     await http(ctx, `https://api.etsy.com/v3/application/shops/${shop}/receipts/${mo.raw?.receiptId}/tracking`, {
       method: "POST", headers: { "x-api-key": ETSY_KEY(), Authorization: `Bearer ${ctx.creds.access_token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ tracking_code: tracking, carrier_name: carrier || "other" }),

@@ -1133,7 +1133,7 @@
       response_type: 'code',
       client_id: '1z497h37rk069va5r0xvxqw3',
       redirect_uri: 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/etsy-callback.html',
-      scope: 'listings_r listings_w transactions_r',
+      scope: 'listings_r listings_w listings_d shops_r shops_w transactions_r transactions_w email_r',
       state: state,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
@@ -1146,11 +1146,16 @@
     try {
       const session = await getSession();
       if (!session) return;
-      const { data, error } = await db.from('store_connections').select('id')
+      const { data, error } = await db.from('store_connections').select('id, label, status')
         .eq('marketplace_code', 'etsy').is('deleted_at', null)
         .order('created_at', { ascending: false }).limit(1);
       if (!error && data && data.length) {
-        el.innerHTML = '<span class="acc-status connected">' + t('stConnected') + '</span><button class="acc-btn secondary" onclick="disconnectEtsy(\'' + data[0].id + '\')">' + t('btnRemove') + '</button>';
+        const c0 = data[0];
+        const st = c0.status === 'expired'
+          ? '<span class="acc-status error">' + t('stExpired') + '</span><button class="acc-btn" onclick="connectEtsy()">' + t('btnReconnect') + '</button>'
+          : '<span class="acc-status connected">' + t('stConnected') + '</span>';
+        el.innerHTML = (c0.label && c0.label !== 'Etsy' ? '<span class="conn-env live">' + esc(c0.label.replace(/^Etsy · /, '')) + '</span>' : '') + st +
+          '<button class="acc-btn secondary" onclick="disconnectEtsy(\'' + c0.id + '\')">' + t('btnRemove') + '</button>';
       } else {
         el.innerHTML = '<span class="acc-status none">' + t('stNone') + '</span><button class="acc-btn" onclick="connectEtsy()">' + t('btnConnect') + '</button>';
       }

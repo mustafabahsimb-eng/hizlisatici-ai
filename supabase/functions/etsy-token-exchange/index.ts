@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { ETSY_CLIENT_ID, ETSY_REDIRECT, etsyApiKey, etsyShop } from '../_shared/etsy.ts';
+import { featureEnabled, FEATURE_OFF_MSG } from '../_shared/features.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +16,7 @@ function json(body: unknown, status = 200) {
 
 // Bağlantıyı store_connections'a yaz (aynısı varsa güncelle), anahtarları şifreli kasaya (Vault) koy
 async function saveConnection(admin: any, c: {
-  userId: string; marketplaceCode: string; externalSellerId: string | null;
+  userId: string; marketplaceCode: string; externalSellerId: string | null; label?: string;
   expiresAt: string | null; credentials: Record<string, unknown>;
 }) {
   const { data: mk } = await admin.from('marketplaces').select('name').eq('code', c.marketplaceCode).maybeSingle();
@@ -25,7 +27,7 @@ async function saveConnection(admin: any, c: {
   const { data: existing } = await q.maybeSingle();
 
   const fields = {
-    label: mk?.name || c.marketplaceCode,
+    label: c.label || mk?.name || c.marketplaceCode,
     status: 'connected',
     token_expires_at: c.expiresAt,
     last_verified_at: new Date().toISOString(),
@@ -85,12 +87,13 @@ Deno.serve(async (req) => {
       return json({ connected: false, error: 'Oturum ile kullanıcı eşleşmiyor.' }, 403);
     }
 
-    const clientId = '1z497h37rk069va5r0xvxqw3';
-    const redirectUri = 'https://mustafabahsimb-eng.github.io/hizlisatici-ai/etsy-callback.html';
+    if (!(await featureEnabled(userId, 'etsy'))) return json({ connected: false, error: FEATURE_OFF_MSG }, 403);
+    const clientId = ETSY_CLIENT_ID;
+    const redirectUri = ETSY_REDIRECT;
 
     const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-api-key': etsyApiKey() },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: clientId,
@@ -108,26 +111,36 @@ Deno.serve(async (req) => {
     }
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in ?? 3600) * 1000).toISOString();
-    // Etsy anahtarı "<kullanıcı no>.<anahtar>" biçimindedir; kullanıcı no mağaza kimliği olarak saklanır
-    const etsyUserId = String(tokenData.access_token).split('.')[0] || null;
+    // Mağaza numarası ve adı (ilan gönderme / sipariş çekme mağaza numarasıyla çalışır)
+    let shop: { userId: string; shopId: string | null; shopName: string | null };
+    try {
+      shop = await etsyShop({ token: tokenData.access_token });
+    } catch (e) {
+      return json({ connected: false, error: 'Etsy mağaza bilgisi okunamadı: ' + (e as Error).message });
+    }
+    if (!shop.shopId) return json({ connected: false, error: "Bu Etsy hesabında açık bir mağaza yok. Önce Etsy'de mağazanı aç." });
 
     try {
       await saveConnection(supabaseAdmin, {
         userId,
         marketplaceCode: 'etsy',
-        externalSellerId: etsyUserId,
+        externalSellerId: shop.shopId,
+        label: shop.shopName ? 'Etsy · ' + shop.shopName : 'Etsy',
         expiresAt,
         credentials: {
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           expires_at: expiresAt,
+          etsy_user_id: shop.userId,
+          shop_id: shop.shopId,
+          shop_name: shop.shopName,
         },
       });
     } catch (e) {
       return json({ connected: false, error: `Veritabanı hatası: ${(e as Error).message}` });
     }
 
-    return json({ connected: true });
+    return json({ connected: true, shopName: shop.shopName });
   } catch (err) {
     return json({ error: (err as Error).message }, 500);
   }

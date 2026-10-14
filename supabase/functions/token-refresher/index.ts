@@ -13,6 +13,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { etsyApiKey } from "../_shared/etsy.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -240,7 +241,7 @@ async function refreshStoreOAuth(out: Record<string, string>) {
       if (c.marketplace_code === "etsy") {
         r = await fetch("https://api.etsy.com/v3/public/oauth/token", {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "x-api-key": etsyApiKey() },
           body: new URLSearchParams({ grant_type: "refresh_token", client_id: ETSY_CLIENT_ID, refresh_token: cred.refresh_token }).toString(),
         });
       } else if (c.marketplace_code === "wix") {

@@ -101,7 +101,8 @@
         return;
       }
 
-      if (savedState && state && savedState !== state) {
+      // Güvenlik kodu (state) zorunlu: yoksa ya da uyuşmuyorsa bağlantı kurulmaz
+      if (!savedState || !state || savedState !== state) {
         showResult(false, 'Güvenlik doğrulaması başarısız oldu (state uyuşmuyor). Lütfen tekrar dene.');
         return;
       }
