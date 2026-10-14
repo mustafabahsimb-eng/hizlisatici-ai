@@ -169,6 +169,28 @@
     <div class="src-tabs">
       <button class="src-tab active" id="tabLinkBtn" onclick="setSrc('link')" data-t="tabLink"></button>
       <button class="src-tab" id="tabFileBtn" onclick="setSrc('file')" data-t="tabFile"></button>
+      <button class="src-tab" id="tabFolderBtn" onclick="setSrc('folder')" data-t="tabFolder"></button>
+    </div>
+    <div id="folderPanel" style="display:none">
+      <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none" onchange="onFolderPicked(this.files); this.value='';">
+      <div class="row">
+        <button class="btn-primary" id="folderPickBtn" onclick="document.getElementById('folderInput').click()" data-t="folderPick"></button>
+        <span class="muted" id="folderName"></span>
+      </div>
+      <div class="hint" data-th="folderHint"></div>
+      <div class="file-result" id="folderMsg"></div>
+      <div id="folderPreview"></div>
+      <div id="folderActions" style="display:none">
+        <div class="row" style="margin-top:12px;gap:14px;flex-wrap:wrap">
+          <label class="chk"><input type="radio" name="etsyMode" value="draft" checked> <span data-t="etsyDraft"></span></label>
+          <label class="chk"><input type="radio" name="etsyMode" value="publish"> <span data-t="etsyPublish"></span></label>
+        </div>
+        <div class="hint" id="folderEtsyNote"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn-primary" id="folderSendBtn" onclick="sendFolder()" data-t="etsySend"></button>
+          <span class="muted" id="folderProgress"></span>
+        </div>
+      </div>
     </div>
     <div id="linkPanel">
       <div class="row">
@@ -305,6 +327,38 @@
       s1Title: 'Kaynak',
       tabLink: '🔗 Link yapıştır',
       tabFile: '📄 Katalog / fiyat listesi yükle',
+      tabFolder: '📁 Klasörden yükle',
+      folderPick: 'Klasör seç',
+      folderHint: 'Klasörde görseller, indirilebilir dosyalar ve bir <b>.json</b> dosyası olsun. JSON: <code>{"products":[{"title":"…","description":"…","tags":["…"],"price":4.99,"images":["kapak.jpg"],"files":["baski-8x10.pdf"]}]}</code>. Fiyat Etsy mağazanın para biriminde. İstersen her ürüne <code>"folder":"alt-klasor"</code> yaz; o klasördeki görseller ve dosyalar alınır. Eksik açıklama ve etiketleri yapay zekâ tamamlar.',
+      folderCount: '{n} dosya',
+      folderNoJson: 'Klasörde .json dosyası bulunamadı.',
+      folderBadJson: 'JSON okunamadı: {e}',
+      folderFound: '{f} içinde {n} ürün bulundu.',
+      folderMissing: 'Bulunamayan: {n}',
+      folderNoTitle: 'Başlık yok',
+      folderNoPrice: 'Fiyat yok',
+      folderNoImage: 'Görsel yok',
+      folderNoFile: 'İndirilebilir dosya yok',
+      fileMax5: 'En fazla 5 dosya',
+      fileTooBig20: '{n} 20 MB\'tan büyük',
+      folderThImg: 'Görsel',
+      folderThFiles: 'Dosya',
+      folderThPrice: 'Fiyat',
+      folderThStatus: 'Durum',
+      folderReady: 'Hazır',
+      etsyDraft: 'Taslak olarak gönder',
+      etsyPublish: 'Gönder ve yayınla',
+      etsySend: "Etsy'ye gönder",
+      folderEtsyTo: '{n} ürün Etsy mağazana ({s}) gönderilecek. Yayınlanan her ilan için Etsy ilan ücreti alır.',
+      folderNoEtsy: 'Etsy mağazan bağlı değil. Hesaplarım > Etsy bölümünden bağla.',
+      folderAi: 'Eksik açıklama ve etiketler tamamlanıyor...',
+      folderSending: 'Ekleniyor: {n} / {t}',
+      folderUploading: 'Yükleniyor...',
+      folderSentWait: "Etsy'ye gönderiliyor...",
+      folderWaitEtsy: 'Etsy sonuçları bekleniyor...',
+      folderLive: "Etsy'de yayında",
+      folderDraft: "Etsy'de taslak",
+      folderDone: 'Etsy: {n} / {t} tamamlandı',
       dropText: '📄 <b>Katalog, fiyat listesi, tablo, fotoğraf ya da ekran görüntüsü</b>: ne varsa buraya sürükle ya da tıklayıp seç. Telefondan sayfaların fotoğrafını çekip birden çok dosya seçebilirsin.',
       imgReading: 'Görüntüler okunuyor... ({d} / {t})',
       photoMatch: 'Ürün fotoğrafları eşleştiriliyor... (sayfa {d} / {t})',
@@ -455,6 +509,38 @@
       s1Title: 'Source',
       tabLink: '🔗 Paste a link',
       tabFile: '📄 Upload catalogue / price list',
+      tabFolder: '📁 Upload from a folder',
+      folderPick: 'Choose folder',
+      folderHint: 'Put images, downloadable files and one <b>.json</b> file in the folder. JSON: <code>{"products":[{"title":"…","description":"…","tags":["…"],"price":4.99,"images":["cover.jpg"],"files":["print-8x10.pdf"]}]}</code>. Price is in your Etsy shop currency. Optionally give each product <code>"folder":"sub-folder"</code> to take that folder\'s images and files. Missing descriptions and tags are completed by AI.',
+      folderCount: '{n} files',
+      folderNoJson: 'No .json file found in the folder.',
+      folderBadJson: 'Could not read JSON: {e}',
+      folderFound: '{n} products found in {f}.',
+      folderMissing: 'Not found: {n}',
+      folderNoTitle: 'No title',
+      folderNoPrice: 'No price',
+      folderNoImage: 'No image',
+      folderNoFile: 'No downloadable file',
+      fileMax5: 'Up to 5 files',
+      fileTooBig20: '{n} is larger than 20 MB',
+      folderThImg: 'Images',
+      folderThFiles: 'Files',
+      folderThPrice: 'Price',
+      folderThStatus: 'Status',
+      folderReady: 'Ready',
+      etsyDraft: 'Send as draft',
+      etsyPublish: 'Send and publish',
+      etsySend: 'Send to Etsy',
+      folderEtsyTo: '{n} products will be sent to your Etsy shop ({s}). Etsy charges a listing fee for every published listing.',
+      folderNoEtsy: 'Your Etsy shop is not connected. Connect it under My Accounts > Etsy.',
+      folderAi: 'Completing missing descriptions and tags...',
+      folderSending: 'Adding: {n} / {t}',
+      folderUploading: 'Uploading...',
+      folderSentWait: 'Sending to Etsy...',
+      folderWaitEtsy: 'Waiting for Etsy results...',
+      folderLive: 'Live on Etsy',
+      folderDraft: 'Draft on Etsy',
+      folderDone: 'Etsy: {n} / {t} done',
       imgReading: 'Reading images... ({d} / {t})',
       photoMatch: 'Matching product photos... (page {d} / {t})',
       sheetAi: 'Reading the table with AI... ({d} / {t} parts)',
@@ -599,6 +685,7 @@
   });
 
   const t = HS.t;
+  const tf = (k, v) => HS.t(k, v);
   const esc = HS.escapeHtml;
   const db = HS.db;
   const PAGE_SIZE = 150;
@@ -1078,6 +1165,164 @@
     document.getElementById('tabFileBtn').classList.toggle('active', m === 'file');
     document.getElementById('linkPanel').style.display = m === 'link' ? '' : 'none';
     document.getElementById('filePanel').style.display = m === 'file' ? '' : 'none';
+    document.getElementById('tabFolderBtn').classList.toggle('active', m === 'folder');
+    document.getElementById('folderPanel').style.display = m === 'folder' ? '' : 'none';
+    // Klasörden yüklemenin kendi önizleme ve gönderimi var; diğer adımlar gizlenir
+    ['step2', 'step3', 'step4'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = m === 'folder' ? 'none' : ''; });
+    if (m === 'folder') loadEtsyConn();
+  }
+
+  // ---------- 📁 Klasörden yükle (görseller + indirilebilir dosyalar + JSON) -> Seltigo + Etsy ----------
+  // JSON: { "products": [ { "title", "description", "tags": [], "price", "quantity", "images": ["a.jpg"], "files": ["a.pdf"], "type": "digital", "folder": "alt-klasor" } ] }
+  // ya da doğrudan dizi. Yollar seçilen klasöre göre; "folder" verilirse o alt klasördeki görseller / dosyalar alınır.
+  const IMG_RE = /\.(jpe?g|png|webp|gif)$/i;
+  let folderItems = [], folderMap = new Map(), etsyConn = null, folderBusy = false;
+  async function loadEtsyConn() {
+    const { data } = await db.from('store_connections').select('id, label, status').eq('marketplace_code', 'etsy').is('deleted_at', null).order('created_at', { ascending: false }).limit(1);
+    etsyConn = data && data[0] && data[0].status === 'connected' ? data[0] : null;
+    renderFolder();
+  }
+  function relPath(f) { const p = (f.webkitRelativePath || f.name).replace(/\\/g, '/'); const i = p.indexOf('/'); return i >= 0 ? p.slice(i + 1) : p; }
+  function lookupFile(name, folder) {
+    const want = String(name || '').replace(/\\/g, '/').replace(/^\.?\//, '').toLowerCase();
+    if (!want) return null;
+    const cands = [want, folder ? (folder.replace(/\/$/, '') + '/' + want).toLowerCase() : null].filter(Boolean);
+    for (const c of cands) if (folderMap.has(c)) return folderMap.get(c);
+    // yalnız dosya adıyla (benzersizse)
+    const hits = [...folderMap.entries()].filter(([k]) => k.split('/').pop() === want.split('/').pop());
+    return hits.length === 1 ? hits[0][1] : null;
+  }
+  async function onFolderPicked(fileList) {
+    const all = Array.from(fileList || []);
+    folderMap = new Map(all.map(f => [relPath(f).toLowerCase(), f]));
+    document.getElementById('folderName').textContent = all.length ? (all[0].webkitRelativePath || '').split('/')[0] + ' · ' + tf('folderCount', { n: all.length }) : '';
+    const jsonFile = all.find(f => /\.json$/i.test(f.name));
+    folderItems = [];
+    const msg = document.getElementById('folderMsg');
+    if (!jsonFile) { msg.textContent = t('folderNoJson'); renderFolder(); return; }
+    let data;
+    try { data = JSON.parse(await jsonFile.text()); } catch (e) { msg.textContent = tf('folderBadJson', { e: e.message }); renderFolder(); return; }
+    const list = Array.isArray(data) ? data : (Array.isArray(data.products) ? data.products : []);
+    msg.textContent = tf('folderFound', { n: list.length, f: jsonFile.name });
+    folderItems = list.map((p, i) => {
+      const folder = p.folder ? String(p.folder) : '';
+      const inFolder = folder ? [...folderMap.entries()].filter(([k]) => k.startsWith(folder.toLowerCase().replace(/\/$/, '') + '/')).map(([, f]) => f) : [];
+      const imgs = (Array.isArray(p.images) && p.images.length ? p.images.map(n => lookupFile(n, folder)) : inFolder.filter(f => IMG_RE.test(f.name)).sort((a, b) => a.name.localeCompare(b.name)));
+      const fls = (Array.isArray(p.files) && p.files.length ? p.files.map(n => lookupFile(n, folder)) : inFolder.filter(f => !IMG_RE.test(f.name) && !/\.json$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name)));
+      const errors = [];
+      const missing = [...(p.images || []).filter((n, k) => !imgs[k]), ...(p.files || []).filter((n, k) => !fls[k])];
+      if (missing.length) errors.push(tf('folderMissing', { n: missing.join(', ') }));
+      const images = imgs.filter(Boolean).slice(0, 10), files = fls.filter(Boolean);
+      if (!String(p.title || '').trim()) errors.push(t('folderNoTitle'));
+      if (!(Number(p.price) > 0)) errors.push(t('folderNoPrice'));
+      if (!images.length) errors.push(t('folderNoImage'));
+      const digital = (p.type || (files.length ? 'digital' : 'physical')) === 'digital';
+      if (digital && !files.length) errors.push(t('folderNoFile'));
+      if (files.length > 5) errors.push(t('fileMax5'));
+      files.filter(f => f.size > 20 * 1024 * 1024).forEach(f => errors.push(tf('fileTooBig20', { n: f.name })));
+      return { i, title: String(p.title || '').trim(), description: String(p.description || '').trim(), tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+        price: Number(p.price) || 0, quantity: p.quantity != null ? Number(p.quantity) : null, digital, images, files: files.slice(0, 5), errors, status: '', link: null, productId: null, listingId: null };
+    });
+    renderFolder();
+  }
+  function renderFolder() {
+    const box = document.getElementById('folderPreview');
+    const act = document.getElementById('folderActions');
+    if (!folderItems.length) { box.innerHTML = ''; act.style.display = 'none'; return; }
+    box.innerHTML = '<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>#</th><th>' + esc(t('thProduct')) + '</th><th>' + esc(t('folderThImg')) + '</th><th>' + esc(t('folderThFiles')) + '</th><th>' + esc(t('folderThPrice')) + '</th><th>' + esc(t('folderThStatus')) + '</th></tr></thead><tbody>' +
+      folderItems.map(it => '<tr data-fi="' + it.i + '"><td>' + (it.i + 1) + '</td><td><b>' + esc(it.title || '—') + '</b>' + (it.tags.length ? '<div class="muted" style="font-size:12px">' + esc(it.tags.slice(0, 13).join(', ')) + '</div>' : '') + '</td>' +
+        '<td>' + it.images.length + '</td><td>' + it.files.length + '</td><td>' + (it.price ? it.price.toFixed(2) : '—') + '</td>' +
+        '<td class="fstat">' + (it.errors.length ? '<span style="color:#f28b8b">' + esc(it.errors.join(' · ')) + '</span>' : esc(it.status || t('folderReady'))) +
+        (it.link ? ' <a href="' + esc(it.link) + '" target="_blank" rel="noopener">Etsy ↗</a>' : '') + '</td></tr>').join('') + '</tbody></table></div>';
+    act.style.display = '';
+    const ok = folderItems.filter(x => !x.errors.length).length;
+    document.getElementById('folderEtsyNote').textContent = etsyConn ? tf('folderEtsyTo', { s: (etsyConn.label || 'Etsy').replace(/^Etsy · /, ''), n: ok }) : t('folderNoEtsy');
+    document.getElementById('folderSendBtn').disabled = folderBusy || !etsyConn || !ok;
+  }
+  async function uploadImg(f) {
+    const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = userId + '/folder/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const up = await db.storage.from('product-images').upload(path, f, { contentType: f.type || 'image/jpeg', upsert: false });
+    if (up.error) throw up.error;
+    return db.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  }
+  async function aiFill(items) {
+    // Eksik açıklama / etiketleri Etsy kurallarına göre tamamla (8'erli)
+    const need = items.filter(it => !it.description || it.tags.length < 5);
+    for (let k = 0; k < need.length; k += 8) {
+      const chunk = need.slice(k, k + 8);
+      try {
+        const { data: { session } } = await db.auth.getSession();
+        const r = await fetch(HS.SUPABASE_URL + '/functions/v1/channel-copy', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ channel: 'etsy', items: chunk.map(it => ({ name: it.title, description: it.description })) }) }).then(x => x.json());
+        (r.items || []).forEach((o, j) => {
+          const it = chunk[j];
+          if (!it.description && o.description) it.description = o.description;
+          if (it.tags.length < 5 && Array.isArray(o.tags)) it.tags = [...it.tags, ...o.tags].slice(0, 13);
+        });
+      } catch (e) { console.warn('aiFill', e); }
+    }
+  }
+  async function sendFolder() {
+    if (folderBusy || !etsyConn) return;
+    folderBusy = true; renderFolder();
+    const publish = document.querySelector('input[name=etsyMode]:checked').value === 'publish';
+    const todo = folderItems.filter(x => !x.errors.length && !x.listingId);
+    const prog = document.getElementById('folderProgress');
+    try {
+      prog.textContent = t('folderAi');
+      await aiFill(todo);
+      let n = 0;
+      for (const it of todo) {
+        n++; prog.textContent = tf('folderSending', { n, t: todo.length });
+        try {
+          it.status = t('folderUploading'); renderFolder();
+          const urls = [];
+          for (const f of it.images) urls.push(await uploadImg(f));
+          const pr = await db.from('products').insert({ user_id: userId, name: it.title, generated_title: it.title, generated_description: it.description, sale_price: it.price,
+            stock_qty: it.digital ? null : it.quantity, product_type: it.digital ? 'digital' : 'physical', image_url: urls[0] || null, image_missing: !urls.length,
+            store_visible: false, source_platform: 'folder', content_language: 'en' }).select('id').single();
+          if (pr.error) throw pr.error;
+          it.productId = pr.data.id;
+          if (urls.length) { const ir = await db.from('product_images').insert(urls.map((u, k) => ({ product_id: it.productId, user_id: userId, url: u, position: k, source: 'upload', source_kind: 'seller_photo' }))); if (ir.error) throw ir.error; }
+          let rank = 0;
+          for (const f of it.files) {
+            rank++;
+            const path = userId + '/' + it.productId + '/' + rank + '-' + Date.now() + '-' + f.name.replace(/[^\w.\-]+/g, '_').slice(-80);
+            const up = await db.storage.from('product-files').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+            if (up.error) throw up.error;
+            const fr = await db.from('product_files').insert({ user_id: userId, product_id: it.productId, path, name: f.name.slice(0, 200), size_bytes: f.size, mime: f.type || null, rank });
+            if (fr.error) throw fr.error;
+          }
+          const li = await db.from('listings').insert({ user_id: userId, product_id: it.productId, source_product_id: it.productId, connection_id: etsyConn.id, marketplace_code: 'etsy',
+            language: 'en', currency: 'USD', title: it.title, description: it.description, keywords: it.tags, price: it.price, price_mode: 'manual', status: 'published',
+            attributes: { etsy_publish: publish } }).select('id').single();
+          if (li.error) throw li.error;
+          it.listingId = li.data.id;
+          it.status = t('folderSentWait');
+        } catch (e) { it.errors.push(e.message || String(e)); }
+        renderFolder();
+      }
+      prog.textContent = t('folderWaitEtsy');
+      await pollFolder();
+    } finally { folderBusy = false; renderFolder(); }
+  }
+  async function pollFolder() {
+    for (let k = 0; k < 120; k++) {
+      const ids = folderItems.filter(x => x.listingId && !x.done).map(x => x.listingId);
+      if (!ids.length) break;
+      const { data } = await db.from('listings').select('id, last_sync_error, external_url, validation').in('id', ids);
+      (data || []).forEach(l => {
+        const it = folderItems.find(x => x.listingId === l.id);
+        const e = l.validation && l.validation.etsy;
+        if (l.validation && l.validation.ok === false && l.last_sync_error && l.last_sync_error !== 'etsy_sending') { it.errors.push(l.last_sync_error); it.done = true; }
+        else if (e && e.state === 'active') { it.status = t('folderLive'); it.link = l.external_url; it.done = true; }
+        else if (e && e.state && l.last_sync_error !== 'etsy_sending') { it.status = t('folderDraft'); it.link = l.external_url; it.done = true; }
+      });
+      renderFolder();
+      document.getElementById('folderProgress').textContent = tf('folderDone', { n: folderItems.filter(x => x.done).length, t: folderItems.filter(x => x.listingId).length });
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
 
   // ---------- Fiyat listesi (PDF / Excel / CSV) ----------

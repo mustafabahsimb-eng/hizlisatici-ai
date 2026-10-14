@@ -73,6 +73,7 @@ Her adımı bitir, Playwright ile test et, canlıda çalışır halde GitHub'a g
 - Seltigo Asistan: _shared/assistant-core.ts + assistant-channels.ts; assistant (kuyruk 1 dk, raporlar), telegram-bot, whatsapp-webhook (ASSISTANT_WA_PHONE_ID -> asistan), meta-dm-webhook (varsayılan kapalı); panel asistan.html. Telegram/WhatsApp canlı testi Mustafa hesapları açınca (ertelendi).
 - Amazon SP-API: _shared/amazon.ts (pazarlar, LWA, sp()), _shared/amazon-listing.ts (ilan), _shared/amazon-orders.ts; amazon-connect (bağlanma, selftest), amazon-orders (15 dk), sync-worker amazon_* adaptörü. Varsayılan SANDBOX (AMAZON_LIVE yok). Ayrıntı docs/amazon-sp-api.md.
 - Müşteri takip sayfası: takip.html?t=<tracking_token> (get_order_tracking RPC).
+- Etsy (doğrudan): _shared/etsy.ts (x-api-key "keystring:shared secret", anahtar yenileme, kategori), _shared/etsy-listing.ts (taslak → görsel → dosya → isteğe bağlı yayınla), etsy-listings (ilan başına), sync-worker etsy adaptörü devreder. Dijital ürün: products.product_type + product_files (en fazla 5 × 20 MB, özel depo product-files). Toplu Yükleme > "📁 Klasörden yükle" (JSON + görseller + dosyalar). Varsayılan TASLAK; "Gönder ve yayınla" seçilirse yayın (Etsy ilan ücreti). Ayrıntı docs/etsy.md.
 
 ## Açık işler ve bulgular (güncel durum: YOL-HARITASI.md "Durum notları")
 - Instagram "süresi doldu" çözüldü (11 Ekim; geçerli, bitiş 9 Aralık 2026). AliExpress test siparişi bizde iptal, AliExpress'te ödenmemiş açık; 31 Ekim'e kadar kendiliğinden kapanır (API iptali yok, para çekilmez).

@@ -457,7 +457,20 @@ async function amazonAdapter(action, listing) {
   };
 }
 
+// 🟠 Etsy: büyük dosyalar (5 × 20 MB) yüzünden her ilan ayrı çağrıda (etsy-listings) arka planda gönderilir
+async function etsyAdapter(action, listing) {
+  const call = fetch(SUPABASE_URL + "/functions/v1/etsy-listings", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (Deno.env.get("SUPABASE_ANON_KEY") ?? "") },
+    body: JSON.stringify({ action: action === "publish" ? "push" : "deactivate", listingId: listing.id, cronSecret: CRON_SECRET }),
+  }).then((r) => r.body?.cancel()).catch((e) => console.error("etsy", String(e)));
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(call); else await call;
+  return { patch: { last_sync_error: action === "publish" ? "etsy_sending" : listing.last_sync_error }, info: { handed_off: "etsy-listings", action } };
+}
+
 const ADAPTERS = {
+  etsy: etsyAdapter,
   own_store: ownStoreAdapter,
   trendyol_tr: trendyolAdapter,
   hepsiburada_tr: genericProvaAdapter,

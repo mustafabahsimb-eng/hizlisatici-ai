@@ -27,7 +27,7 @@ export class EtsyError extends Error {
 export type EtsyCtx = { token: string; fetch?: typeof fetch };
 
 // JSON / form / çok parçalı (dosya) istek
-export async function etsy(ctx: EtsyCtx, method: string, path: string, opts: { form?: Record<string, unknown>; multipart?: FormData; query?: Record<string, string> } = {}): Promise<any> {
+export async function etsy(ctx: EtsyCtx, method: string, path: string, opts: { form?: Record<string, unknown>; multipart?: FormData; json?: unknown; query?: Record<string, string> } = {}): Promise<any> {
   const f = ctx.fetch || fetch;
   const q = opts.query ? "?" + new URLSearchParams(opts.query) : "";
   for (let i = 0; ; i++) {
@@ -42,6 +42,9 @@ export async function etsy(ctx: EtsyCtx, method: string, path: string, opts: { f
       }
       body = p.toString();
       headers["Content-Type"] = "application/x-www-form-urlencoded";
+    } else if (opts.json !== undefined) {
+      body = JSON.stringify(opts.json);
+      headers["Content-Type"] = "application/json";
     } else if (opts.multipart) body = opts.multipart;
     const r = await f(`${API}${path}${q}`, { method, headers, body, signal: AbortSignal.timeout(120000) });
     if (r.status === 204) return {};
@@ -128,5 +131,5 @@ export function cleanTags(tags: unknown[]): string[] {
 export function cleanTitle(t: string): string {
   let s = String(t || "").replace(/\s+/g, " ").trim();
   for (const ch of ["%", ":", "&"]) { let seen = false; s = s.split("").filter((c) => (c !== ch ? true : (seen ? false : (seen = true)))).join(""); }
-  return s.slice(0, 140).trim();
+  return s.replace(/\s+/g, " ").slice(0, 140).trim();
 }

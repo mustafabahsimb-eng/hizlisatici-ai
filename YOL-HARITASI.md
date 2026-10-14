@@ -175,6 +175,11 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - [ ] Trendyol gerçek gönderim (test ortamı sabit IP + şirket bekliyor)
 
 ## Durum notları (11 Ekim 2026)
+**Etsy doğrudan bağlantı (15 Ekim 2026)** — kod bitti, testler geçti; ilk kullanıcı Mustafa'nın mağazası (bahsistore). Ayrıntı docs/etsy.md.
+- Bekleyen: Etsy uygulama anahtarı Etsy'de "bulunamadı / etkin değil" dönüyor (gizli anahtar biçimi doğru). Mustafa Your Apps sayfasında anahtarın durumunu ve değerini kontrol edecek; farklıysa ETSY_KEYSTRING secret'ı girilecek. Sonra: mağazayı bağlama, gerçek taslak testi (oluştur + sil), ilk toplu yükleme ("Gönder ve yayınla").
+- Adlar onaylandı: "Fiziksel ürün" / "Dijital ürün", "İndirilebilir dosyalar (en fazla 5)", "+ Dosya ekle", "📁 Klasörden yükle", "Klasör seç", "Etsy'ye gönder", "Taslak olarak gönder" (varsayılan) / "Gönder ve yayınla".
+- Sonra: İade otomasyonuna dönülecek (tablolar canlıda, fonksiyonlar yerelde).
+
 **Eksik taraması düzeltmeleri (13-14 Ekim 2026 gecesi; hepsi canlıda)**
 - 1 Instagram paylaşım kuyruğu düzeltildi + 10 dk'lık görev kuruldu (kuyruk daha önce hiç çalışmıyordu).
 - 2 Pazaryeri siparişleri: marketplace-orders (15 dk) — Trendyol (v2), n11, Hepsiburada, Çiçeksepeti, Pazarama, Shopify, WooCommerce, Etsy, eBay, Walmart, Wix; takip bildirimi Shopify/Woo/Etsy/eBay/Walmart/Wix. Taklit testler 13/13, tetikleyiciler 5/5. Hepsiburada / Çiçeksepeti / Pazarama alan adları resmi belgeye erişilemediği için esnek okunuyor, satıcı hesabıyla doğrulanacak. PTT AVM: belge satıcı panelinde (hesap gerekli).

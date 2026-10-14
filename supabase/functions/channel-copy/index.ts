@@ -86,18 +86,24 @@ Deno.serve(async (req) => {
     specs: (Array.isArray(it?.specs) ? it.specs : []).slice(0, 30).map((s: any) => `${clean(s?.k, 60)}: ${clean(s?.v, 120)}`),
   }));
   if (!items.length) return json({ error: "Ürün yok" }, 400);
+  // Etsy: başlık / açıklamaya ek olarak 13 arama etiketi
+  const wantTags = String(body?.channel || "") === "etsy" || body?.tags === true;
 
   const system = `You are an e-commerce copywriter. Rewrite product titles and descriptions for the given sales channel.
 Channel rules: ${ch.rules}
 Output language: ${lang === "tr" ? "Turkish (natural, correct Turkish with proper characters)" : "English"}. Translate source text if it is in another language.
 Title max ${ch.titleMax} characters.
 Strict rules: use ONLY facts present in the source (name, brand, specs, description). Never invent materials, sizes, certifications, warranty, origin or health claims. Never add phone numbers, links, prices or shipping promises. Keep model codes and brand names exactly as given. Plain text, no HTML, no markdown headings.
-Answer ONLY with JSON: {"items":[{"title":"","description":""}]} with exactly one entry per input product, in the same order.`;
+Answer ONLY with JSON: {"items":[{"title":"","description":""${wantTags ? ',"tags":[]' : ""}}]} with exactly one entry per input product, in the same order.${wantTags ? `
+For each product also give "tags": exactly 13 Etsy search tags in the output language, each at most 20 characters, only letters, numbers, spaces, - and ', no duplicates, buyer search phrases (multi-word preferred).` : ""}`;
   const user = JSON.stringify({ products: items });
   const ai = await ask(system, user);
   const out = Array.isArray(ai?.items) ? ai.items : null;
   if (!out || out.length !== items.length) return json({ error: "Metin yazılamadı, tekrar dene." }, 502);
   return json({
-    items: out.map((o: any) => ({ title: clean(o?.title, ch.titleMax), description: String(o?.description ?? "").trim().slice(0, 5000) })),
+    items: out.map((o: any) => ({
+      title: clean(o?.title, ch.titleMax), description: String(o?.description ?? "").trim().slice(0, 5000),
+      ...(wantTags ? { tags: (Array.isArray(o?.tags) ? o.tags : []).map((t: unknown) => clean(t, 20).replace(/[^\p{L}\p{Nd}\s\-']/gu, "").trim()).filter(Boolean).slice(0, 13) } : {}),
+    })),
   });
 });

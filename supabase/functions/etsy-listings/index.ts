@@ -1,24 +1,120 @@
 // =========================================================
-// Etsy ilanları (geçici iskelet: anahtar teşhisi). Ayrıntılı ilan gönderme bu dosyada genişletilecek.
-// Sistem (CRON_SECRET): { action: "ping" } -> Etsy anahtarının hangi biçimde kabul edildiğini durum kodlarıyla döndürür (değer döndürmez)
+// Etsy ilanları — bir ilanı Etsy'ye gönderir (büyük dosyalar yüzünden ilan başına ayrı çağrı)
+// Sistem (CRON_SECRET):
+//   { action: "push", listingId }        -> taslak / güncelle + görseller + dosyalar (+ istenirse yayınla); sonuç ilana yazılır
+//   { action: "deactivate", listingId }  -> Etsy'de satıştan kaldır (state=inactive)
+//   { action: "ping" }                   -> anahtar teşhisi (değer döndürmez)
+// Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
+// Yayınlama tercihi: listings.attributes.etsy_publish = true ("Gönder ve yayınla"); yoksa TASLAK ("Taslak olarak gönder", varsayılan)
+// sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
 // =========================================================
-import { ETSY_CLIENT_ID } from "../_shared/etsy.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { ETSY_CLIENT_ID, etsy, etsyToken } from "../_shared/etsy.ts";
+import { submitEtsyListing } from "../_shared/etsy-listing.ts";
+import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
+
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
-const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
+const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+const short = (v: unknown, n = 300) => String(v ?? "").slice(0, n);
+
+async function connFor(listing: any) {
+  let q = db.from("store_connections").select("id, user_id, status, external_seller_id").eq("marketplace_code", "etsy").is("deleted_at", null);
+  q = listing.connection_id ? q.eq("id", listing.connection_id) : q.eq("user_id", listing.user_id).eq("status", "connected");
+  const { data } = await q.limit(1).maybeSingle();
+  return data;
+}
+
+async function push(listingId: string, userId?: string) {
+  let lq = db.from("listings").select("*").eq("id", listingId).eq("marketplace_code", "etsy");
+  if (userId) lq = lq.eq("user_id", userId);
+  const { data: listing } = await lq.maybeSingle();
+  if (!listing) return { ok: false, error: "Etsy ilanı bulunamadı" };
+  const now = new Date().toISOString();
+  const fail = async (msg: string, extra: Record<string, unknown> = {}) => {
+    await db.from("listings").update({ last_sync_error: short(msg, 300), validated_at: now, validation: { ...(listing.validation || {}), ok: false, errors: [msg], checked_at: now, ...extra } }).eq("id", listing.id);
+    return { ok: false, error: msg };
+  };
+  if (!(await featureEnabled(listing.user_id, "etsy"))) return await fail(FEATURE_OFF_MSG);
+  const conn = await connFor(listing);
+  if (!conn || conn.status !== "connected") return await fail("Etsy mağazası bağlı değil (Hesaplarım > Etsy)");
+  let token: string, cred: any;
+  try { ({ token, cred } = await etsyToken(db, conn.id)); } catch (e) { return await fail(friendly(e)); }
+  const shopId = String(cred.shop_id || conn.external_seller_id || "");
+  if (!shopId) return await fail("Etsy mağaza numarası yok; Etsy'yi yeniden bağla");
+  const { data: product } = await db.from("products").select("*").eq("id", listing.product_id).maybeSingle();
+  if (!product) return await fail("Ürün bulunamadı");
+  const { data: imgs } = await db.from("product_images").select("url, position").eq("product_id", product.id).is("deleted_at", null).order("position");
+  const images = (imgs || []).filter((i: any) => /^https?:\/\//.test(i.url)).map((i: any) => ({ url: i.url }));
+  if (!images.length && product.image_url) images.push({ url: product.image_url });
+  const { data: files } = await db.from("product_files").select("id, path, name, rank").eq("product_id", product.id).order("rank");
+  try {
+    const r = await submitEtsyListing({
+      db, ctx: { token }, shopId, listing, product, images, files: files || [],
+      publish: listing.attributes?.etsy_publish === true,
+      download: async (path) => { const { data, error } = await db.storage.from("product-files").download(path); if (error || !data) throw new Error("depodan okunamadı"); return data; },
+    });
+    await db.from("listings").update({
+      external_listing_id: r.listingId, external_url: r.url, validated_at: now,
+      last_sync_error: r.ok ? (r.state === "active" ? null : "etsy_draft") : short(r.errors.join(" · "), 300),
+      validation: { ok: r.ok, dry_run: false, errors: r.errors.map((m) => ({ code: "etsy", msg: m })), warnings: r.warnings.map((m) => ({ code: "etsy", msg: m })), etsy: r.etsy, checked_at: now },
+      ...(r.state === "active" && !listing.published_at ? { published_at: now } : {}),
+    }).eq("id", listing.id);
+    return { ok: r.ok, listingId: r.listingId, state: r.state, url: r.url, errors: r.errors, warnings: r.warnings };
+  } catch (e) {
+    return await fail(friendly(e));
+  }
+}
+
+// Etsy hatalarını satıcının anlayacağı Türkçeye çevir
+function friendly(e: unknown): string {
+  const msg = (e as Error).message || String(e);
+  if (/API key not found|not active|shared secret/i.test(msg)) return "Etsy uygulama anahtarı etkin değil ya da gizli anahtar yanlış (Etsy > Your Apps sayfası kontrol edilmeli)";
+  if (/Etsy 401|invalid_token|expired/i.test(msg)) return "Etsy oturumu geçersiz; Hesaplarım'dan Etsy'yi yeniden bağla";
+  if (/Etsy 403/i.test(msg)) return "Etsy bu işlem için izin vermedi (mağaza izinleri): Etsy'yi yeniden bağla";
+  return msg.startsWith("Etsy") ? msg : "Etsy: " + msg;
+}
+
+async function deactivate(listingId: string) {
+  const { data: listing } = await db.from("listings").select("*").eq("id", listingId).eq("marketplace_code", "etsy").maybeSingle();
+  const eid = listing?.validation?.etsy?.listing_id || listing?.external_listing_id;
+  if (!listing || !eid) return { ok: true, skipped: "Etsy'de ilan yok" };
+  const conn = await connFor(listing);
+  if (!conn) return { ok: false, error: "Etsy bağlı değil" };
+  const { token, cred } = await etsyToken(db, conn.id);
+  const shopId = String(cred.shop_id || conn.external_seller_id);
+  const state = listing.validation?.etsy?.state;
+  if (state === "active") await etsy({ token }, "PATCH", `/shops/${shopId}/listings/${eid}`, { form: { state: "inactive" } });
+  await db.from("listings").update({ validation: { ...(listing.validation || {}), etsy: { ...(listing.validation?.etsy || {}), state: state === "active" ? "inactive" : state } } }).eq("id", listing.id);
+  return { ok: true };
+}
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const b = await req.json().catch(() => ({}));
-  if (!CRON_SECRET || String(b?.cronSecret || "").trim() !== CRON_SECRET.trim()) return json({ error: "unauthorized" }, 401);
-  if (b.action === "ping") {
-    const raw = Deno.env.get("ETSY_SHARED_SECRET") ?? "";
-    const trimmed = raw.trim();
-    const variants: Record<string, string> = { keystring: ETSY_CLIENT_ID, "keystring:secret": `${ETSY_CLIENT_ID}:${raw}`, "keystring:secret(trim)": `${ETSY_CLIENT_ID}:${trimmed}` };
-    const out: Record<string, unknown> = { secretLength: raw.length, secretHasWhitespace: raw !== trimmed, secretLooksLikeKeyPair: raw.includes(":") };
-    for (const [k, v] of Object.entries(variants)) {
-      const r = await fetch("https://api.etsy.com/v3/application/openapi-ping", { headers: { "x-api-key": v } });
-      out[k] = { status: r.status, body: (await r.text()).slice(0, 160) };
+  try {
+    if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
+      if (b.action === "push" && b.listingId) return json(await push(String(b.listingId)));
+      if (b.action === "deactivate" && b.listingId) return json(await deactivate(String(b.listingId)));
+      if (b.action === "ping") {
+        const raw = Deno.env.get("ETSY_SHARED_SECRET") ?? "";
+        const out: Record<string, unknown> = { secretLength: raw.length, keystringLength: ETSY_CLIENT_ID.length };
+        for (const [k, v] of Object.entries({ keystring: ETSY_CLIENT_ID, "keystring:secret": `${ETSY_CLIENT_ID}:${raw.trim()}` })) {
+          const r = await fetch("https://api.etsy.com/v3/application/openapi-ping", { headers: { "x-api-key": v } });
+          out[k] = { status: r.status, body: (await r.text()).slice(0, 160) };
+        }
+        return json(out);
+      }
+      return json({ error: "Geçersiz işlem" }, 400);
     }
-    return json(out);
+    const token = String(b?.userAccessToken || "").trim();
+    const { data } = token ? await db.auth.getUser(token) : { data: { user: null } };
+    const userId = data?.user?.id;
+    if (!userId) return json({ error: "Bu işlem için giriş yapmalısın. / Please log in." }, 401);
+    if (b.action === "push" && b.listingId) return json(await push(String(b.listingId), userId));
+    return json({ error: "Geçersiz işlem" }, 400);
+  } catch (e) {
+    return json({ ok: false, error: short((e as Error).message) }, 500);
   }
-  return json({ error: "Geçersiz işlem" }, 400);
 });
