@@ -89,8 +89,13 @@ Deno.serve(async (req) => {
       return json({ connected: false, error: 'Oturum ile kullanıcı eşleşmiyor.' }, 403);
     }
 
-    if (!(await featureEnabled(userId, 'etsy'))) return json({ connected: false, error: FEATURE_OFF_MSG }, 403);
-    if (!etsyConfigured()) return json({ connected: false, error: 'Etsy uygulama anahtarı (ETSY_KEYSTRING / ETSY_SHARED_SECRET) tanımlı değil.' }, 503);
+    // Son bağlanma denemesinin sonucu (gizli bilgi yok) -> app_cache 'etsy_connect:<user>' (teşhis için)
+    const note = async (ok: boolean, error?: string) => {
+      try { await supabaseAdmin.from('app_cache').upsert({ key: 'etsy_connect:' + userId, value: { ok, error: error || null, at: new Date().toISOString() }, updated_at: new Date().toISOString() }); } catch (_) { /* yok say */ }
+    };
+    const fail = async (error: string, status = 200) => { await note(false, error); return json({ connected: false, error }, status); };
+    if (!(await featureEnabled(userId, 'etsy'))) return await fail(FEATURE_OFF_MSG, 403);
+    if (!etsyConfigured()) return await fail('Etsy uygulama anahtarı (ETSY_KEYSTRING / ETSY_SHARED_SECRET) tanımlı değil.', 503);
     const clientId = ETSY_CLIENT_ID;
     const redirectUri = ETSY_REDIRECT;
 
@@ -110,7 +115,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok || !tokenData || !tokenData.access_token) {
       const msg = tokenData?.error_description || tokenData?.error || 'Etsy token alışverişi başarısız oldu.';
-      return json({ connected: false, error: `Etsy: ${msg}` });
+      return await fail(`Etsy: ${msg}`);
     }
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in ?? 3600) * 1000).toISOString();
@@ -119,9 +124,9 @@ Deno.serve(async (req) => {
     try {
       shop = await etsyShop({ token: tokenData.access_token });
     } catch (e) {
-      return json({ connected: false, error: 'Etsy mağaza bilgisi okunamadı: ' + (e as Error).message });
+      return await fail('Etsy mağaza bilgisi okunamadı: ' + (e as Error).message);
     }
-    if (!shop.shopId) return json({ connected: false, error: "Bu Etsy hesabında açık bir mağaza yok. Önce Etsy'de mağazanı aç." });
+    if (!shop.shopId) return await fail("Bu Etsy hesabında açık bir mağaza yok. Önce Etsy'de mağazanı aç.");
 
     try {
       await saveConnection(supabaseAdmin, {
@@ -140,9 +145,10 @@ Deno.serve(async (req) => {
         },
       });
     } catch (e) {
-      return json({ connected: false, error: `Veritabanı hatası: ${(e as Error).message}` });
+      return await fail(`Veritabanı hatası: ${(e as Error).message}`);
     }
 
+    await note(true);
     return json({ connected: true, shopName: shop.shopName });
   } catch (err) {
     return json({ error: (err as Error).message }, 500);

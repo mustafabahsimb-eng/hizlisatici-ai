@@ -4,6 +4,8 @@
 //   { action: "push", listingId }        -> taslak / güncelle + görseller + dosyalar (+ istenirse yayınla); sonuç ilana yazılır
 //   { action: "deactivate", listingId }  -> Etsy'de satıştan kaldır (state=inactive)
 //   { action: "ping" }                   -> anahtar teşhisi (değer döndürmez)
+//   { action: "selftest", userId?, keep? } -> gerçek mağazada test taslağı (görsel + PDF) aç, geri oku, sil (yayınlamaz)
+//   { action: "connect_status", userId } -> son Etsy bağlanma denemesinin sonucu
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
 // Yayınlama tercihi: listings.attributes.etsy_publish = true ("Gönder ve yayınla"); yoksa TASLAK ("Taslak olarak gönder", varsayılan)
 // sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
@@ -90,6 +92,42 @@ async function deactivate(listingId: string) {
   return { ok: true };
 }
 
+// Gerçek mağazada uçtan uca deneme (Seltigo'da ürün oluşturmaz): test taslağı aç -> görsel + PDF yükle -> Etsy'den geri oku -> sil
+// Yayınlamaz (ücret yok). keep=true verilirse taslak silinmez.
+async function selftest(userId: string | null, keep: boolean) {
+  let q = db.from("store_connections").select("id, user_id, label, external_seller_id").eq("marketplace_code", "etsy").eq("status", "connected").is("deleted_at", null).order("updated_at", { ascending: false });
+  if (userId) q = q.eq("user_id", userId);
+  const { data: conn } = await q.limit(1).maybeSingle();
+  if (!conn) return { ok: false, error: "Bağlı Etsy mağazası yok" };
+  const steps: Record<string, unknown> = { shop: conn.label };
+  const { token, cred } = await etsyToken(db, conn.id);
+  const shopId = String(cred.shop_id || conn.external_seller_id);
+  const pdf = new TextEncoder().encode("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
+  const r = await submitEtsyListing({
+    db, ctx: { token }, shopId, publish: false,
+    listing: { id: "selftest", title: "Seltigo Test Draft - Please Ignore", description: "Automated connection test by Seltigo. This draft is deleted right away.", price: 1.0, keywords: ["seltigo test"], validation: null },
+    product: { id: 0, product_type: "digital", name: "Seltigo Test" },
+    images: [{ url: "https://mustafabahsimb-eng.github.io/hizlisatici-ai/chrome-extension/icons/icon128.png" }],
+    files: [{ id: "t1", path: "-", name: "seltigo-test.pdf", rank: 1 }],
+    download: async () => new Blob([pdf], { type: "application/pdf" }),
+  });
+  steps.created = { ok: r.ok, listingId: r.listingId, state: r.state, errors: r.errors, warnings: r.warnings, images: r.etsy.images?.length || 0, files: r.etsy.files?.length || 0 };
+  if (r.listingId) {
+    try {
+      const got = await etsy({ token }, "GET", `/listings/${r.listingId}`, { query: { includes: "Images" } });
+      steps.readBack = { state: got.state, title: got.title, type: got.listing_type, who_made: got.who_made, when_made: got.when_made, is_supply: got.is_supply, taxonomy_id: got.taxonomy_id, images: (got.images || []).length };
+    } catch (e) { steps.readBack = { error: (e as Error).message }; }
+    try {
+      const fl = await etsy({ token }, "GET", `/shops/${shopId}/listings/${r.listingId}/files`);
+      steps.filesBack = (fl.results || []).map((f: any) => ({ name: f.filename, size: f.filesize }));
+    } catch (e) { steps.filesBack = { error: (e as Error).message }; }
+    if (!keep) {
+      try { await etsy({ token }, "DELETE", `/listings/${r.listingId}`); steps.deleted = true; } catch (e) { steps.deleted = { error: (e as Error).message }; }
+    }
+  }
+  return { ok: r.ok && !!r.listingId, steps };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const b = await req.json().catch(() => ({}));
@@ -97,6 +135,11 @@ Deno.serve(async (req) => {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (b.action === "push" && b.listingId) return json(await push(String(b.listingId)));
       if (b.action === "deactivate" && b.listingId) return json(await deactivate(String(b.listingId)));
+      if (b.action === "selftest") return json(await selftest(b.userId ? String(b.userId) : null, b.keep === true));
+      if (b.action === "connect_status" && b.userId) {
+        const { data } = await db.from("app_cache").select("value").eq("key", "etsy_connect:" + String(b.userId)).maybeSingle();
+        return json({ ok: true, last: data?.value || null });
+      }
       if (b.action === "ping") {
         const raw = Deno.env.get("ETSY_SHARED_SECRET") ?? "";
         const out: Record<string, unknown> = { secretLength: raw.length, keystringLength: ETSY_CLIENT_ID.length };

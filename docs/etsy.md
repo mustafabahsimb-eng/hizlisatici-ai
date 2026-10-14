@@ -36,6 +36,7 @@ Klasörde görseller, indirilebilir dosyalar ve bir `.json` dosyası bulunur:
 ## Etsy kuralları ve anahtarlar
 - Etsy 9 Şubat 2026'dan beri her istekte `x-api-key: <keystring>:<shared secret>` istiyor. Gizli anahtar Supabase'de `ETSY_SHARED_SECRET` olarak duruyor. Uygulama anahtarının (keystring) TEK kaynağı Supabase secret `ETSY_KEYSTRING`; kodda sabit değer yok. Hesaplarım sayfası değeri `etsy-token-exchange` `{action:"config"}` ile alır. Onay adresinde (`oauth/connect`) ve anahtar isteklerinde `client_id` = keystring; tüm v3 isteklerinde `x-api-key` = `keystring:shared secret`.
 - Teşhis: `etsy-listings` `{action:"ping"}` (sistem çağrısı) anahtarın Etsy'de kabul edilip edilmediğini durum koduyla söyler; değer göstermez.
+- Gerçek mağaza denemesi: `etsy-listings` `{action:"selftest", userId}` (sistem çağrısı) Seltigo ürünü açmadan mağazada test taslağı oluşturur (görsel + PDF), Etsy'den geri okur ve siler. Yayınlamaz, ücret yok. Son bağlanma denemesinin sonucu `app_cache` `etsy_connect:<userId>` anahtarında (`{action:"connect_status", userId}`).
 - Ücret: Etsy yayınlanan her ilan için ilan ücreti alır. Taslak ücretsizdir.
 
 ## Testler
