@@ -1196,12 +1196,16 @@
     const all = Array.from(fileList || []);
     folderMap = new Map(all.map(f => [relPath(f).toLowerCase(), f]));
     document.getElementById('folderName').textContent = all.length ? (all[0].webkitRelativePath || '').split('/')[0] + ' · ' + tf('folderCount', { n: all.length }) : '';
-    const jsonFile = all.find(f => /\.json$/i.test(f.name));
+    // Klasörde birden çok .json olabilir: ürün listesi ("products" dizisi ya da dizi) olanı seçilir
+    const jsons = all.filter(f => /\.json$/i.test(f.name));
     folderItems = [];
     const msg = document.getElementById('folderMsg');
-    if (!jsonFile) { msg.textContent = t('folderNoJson'); renderFolder(); return; }
-    let data;
-    try { data = JSON.parse(await jsonFile.text()); } catch (e) { msg.textContent = tf('folderBadJson', { e: e.message }); renderFolder(); return; }
+    if (!jsons.length) { msg.textContent = t('folderNoJson'); renderFolder(); return; }
+    let data, jsonFile, lastErr;
+    for (const f of jsons) {
+      try { const d = JSON.parse(await f.text()); if (Array.isArray(d) || Array.isArray(d && d.products)) { data = d; jsonFile = f; break; } } catch (e) { lastErr = e; }
+    }
+    if (!data) { msg.textContent = lastErr ? tf('folderBadJson', { e: lastErr.message }) : t('folderNoJson'); renderFolder(); return; }
     const list = Array.isArray(data) ? data : (Array.isArray(data.products) ? data.products : []);
     msg.textContent = tf('folderFound', { n: list.length, f: jsonFile.name });
     folderItems = list.map((p, i) => {
@@ -1221,7 +1225,8 @@
       if (files.length > 5) errors.push(t('fileMax5'));
       files.filter(f => f.size > 20 * 1024 * 1024).forEach(f => errors.push(tf('fileTooBig20', { n: f.name })));
       return { i, title: String(p.title || '').trim(), description: String(p.description || '').trim(), tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
-        price: Number(p.price) || 0, quantity: p.quantity != null ? Number(p.quantity) : null, digital, images, files: files.slice(0, 5), errors, status: '', link: null, productId: null, listingId: null };
+        price: Number(p.price) || 0, quantity: p.quantity != null ? Number(p.quantity) : null, digital, images, files: files.slice(0, 5), errors, status: '', link: null, productId: null, listingId: null,
+        autoRenew: typeof p.auto_renew === 'boolean' ? p.auto_renew : null, etsyListingId: /^\d+$/.test(String(p.etsy_listing_id || '')) ? String(p.etsy_listing_id) : null };
     });
     renderFolder();
   }
@@ -1296,7 +1301,9 @@
           }
           const li = await db.from('listings').insert({ user_id: userId, product_id: it.productId, source_product_id: it.productId, connection_id: etsyConn.id, marketplace_code: 'etsy',
             language: 'en', currency: 'USD', title: it.title, description: it.description, keywords: it.tags, price: it.price, price_mode: 'manual', status: 'published',
-            attributes: { etsy_publish: publish, etsy_shop_currency_price: true } }).select('id').single(); // fiyat mağaza para biriminde; gönderimde ilanın para birimi düzeltilir
+            // fiyat mağaza para biriminde; gönderimde ilanın para birimi düzeltilir. etsy_listing_id verilmişse Etsy'deki ilan yeni ilan açılmadan güncellenir (eski görsel/dosyalar değişir)
+            attributes: Object.assign({ etsy_publish: publish, etsy_shop_currency_price: true }, it.autoRenew != null ? { etsy_auto_renew: it.autoRenew } : {}, it.etsyListingId ? { etsy_replace_media: true } : {}),
+            validation: it.etsyListingId ? { etsy: { listing_id: it.etsyListingId, images: [], files: [] } } : null }).select('id').single();
           if (li.error) throw li.error;
           it.listingId = li.data.id;
           it.status = t('folderSentWait');

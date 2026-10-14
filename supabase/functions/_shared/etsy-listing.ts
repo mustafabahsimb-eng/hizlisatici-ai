@@ -6,6 +6,8 @@
 //                Seltigo'da silinen dosya Etsy'den de silinir.
 // Dijital ilan sabitleri (Mustafa, 15 Ekim 2026): kategori Digital Prints, who_made i_did, when_made 2020_2026, is_supply false.
 // Yüklenenler listings.validation.etsy içinde izlenir (tekrar yükleme olmaz).
+// listings.attributes: etsy_publish (yayınla), etsy_auto_renew (Etsy 4 ayda bir kendiliğinden yeniler, yenileme ücretli),
+//   etsy_replace_media (Seltigo dışında açılmış ilanı devralırken Etsy'deki eski görsel ve dosyaları yenileriyle değiştir; bir kez).
 // =========================================================
 import { cleanTags, cleanTitle, etsy, EtsyError, etsyTaxonomyId, type EtsyCtx } from "./etsy.ts";
 
@@ -37,6 +39,8 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
   const price = Number(listing.price) || 0;
   const quantity = digital ? 999 : Math.max(0, Math.min(999, Number(product.stock_qty ?? 1)));
   let tags = cleanTags(Array.isArray(listing.keywords) ? listing.keywords : []);
+  const attrs = listing.attributes || {};
+  const autoRenew = typeof attrs.etsy_auto_renew === "boolean" ? attrs.etsy_auto_renew : undefined;
   if (!title) errors.push("Başlık boş");
   if (price < 0.2) errors.push("Etsy'de fiyat en az 0,20 olmalı");
   if (!p.images.length) errors.push("En az 1 görsel gerekli");
@@ -63,7 +67,7 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
       form: {
         quantity, title, description, price: price.toFixed(2), who_made: "i_did", when_made: "2020_2026", is_supply: false,
         taxonomy_id: taxonomyId, type: digital ? "download" : "physical", tags: tags.length ? tags : undefined,
-        shipping_profile_id: shippingProfileId, should_auto_renew: false,
+        shipping_profile_id: shippingProfileId, should_auto_renew: autoRenew === true,
       },
     });
     listingId = String(d.listing_id);
@@ -72,7 +76,7 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
     etsyState.listing_id = listingId;
     etsyState.created_at = new Date().toISOString();
   } else {
-    await etsy(ctx, "PATCH", `${base}/${listingId}`, { form: { title, description, tags: tags.length ? tags : undefined } });
+    await etsy(ctx, "PATCH", `${base}/${listingId}`, { form: { title, description, tags: tags.length ? tags : undefined, should_auto_renew: autoRenew } });
     try {
       const inv = await etsy(ctx, "GET", `/listings/${listingId}/inventory`);
       const products = (inv.products || []).map((pr: any) => ({
@@ -81,6 +85,19 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
       }));
       if (products.length) await etsy(ctx, "PUT", `/listings/${listingId}/inventory`, { json: { products, price_on_property: inv.price_on_property || [], quantity_on_property: inv.quantity_on_property || [], sku_on_property: inv.sku_on_property || [] } });
     } catch (e) { warnings.push("Fiyat / adet güncellenemedi: " + (e as Error).message); }
+  }
+
+  // Devralınan ilan: Etsy'deki eski görsel ve dosyalar (Seltigo'nun yüklemedikleri) yenileriyle değiştirilecek
+  let oldImages: number[] = [], oldFiles: number[] = [];
+  const replacing = attrs.etsy_replace_media === true && !!prev.listing_id && !prev.media_replaced_at;
+  if (replacing) {
+    if (!state) { const g = await etsy(ctx, "GET", `/listings/${listingId}`); state = g.state || null; url = g.url || url; }  // devralınan ilanın Etsy'deki durumu
+    const im = await etsy(ctx, "GET", `/listings/${listingId}/images`);
+    oldImages = (im.results || []).map((x: any) => x.listing_image_id).filter((id: number) => !etsyState.images.some((y: any) => y.listing_image_id === id));
+    if (digital) {
+      const fl = await etsy(ctx, "GET", `${base}/${listingId}/files`);
+      oldFiles = (fl.results || []).map((x: any) => x.listing_file_id).filter((id: number) => !etsyState.files.some((y: any) => y.listing_file_id === id));
+    }
   }
 
   // 2) Görseller (en fazla 10; yüklenenler atlanır)
@@ -98,6 +115,13 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
     } catch (e) { warnings.push(`Görsel ${i + 1} yüklenemedi: ${(e as Error).message}`); }
   }
 
+  // Eski görseller: yeniler yüklendikten SONRA silinir (yayındaki ilan görselsiz kalmasın)
+  if (replacing && etsyState.images.length) {
+    for (const id of oldImages) {
+      try { await etsy(ctx, "DELETE", `${base}/${listingId}/images/${id}`); } catch (e) { if (!(e instanceof EtsyError && e.status === 404)) warnings.push("Etsy'deki eski görsel silinemedi"); }
+    }
+  }
+
   // 3) Dijital dosyalar (en fazla 5): eksikler yüklenir, Seltigo'da silinenler Etsy'den de silinir
   if (digital) {
     const keep = new Set(p.files.map((f) => f.id));
@@ -109,6 +133,12 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
     }
     for (const f of p.files.slice(0, 5)) {
       if (etsyState.files.some((x: any) => x.product_file_id === f.id)) continue;
+      // Devralınan ilanda: Etsy en fazla 5 dosya alır -> önce bir eski dosyayı sil, sonra yenisini yükle (ilan dosyasız kalmaz)
+      const total = etsyState.files.length + oldFiles.length;
+      if (replacing && oldFiles.length && total >= 5) {
+        const id = oldFiles.shift()!;
+        try { await etsy(ctx, "DELETE", `${base}/${listingId}/files/${id}`); } catch (e) { if (!(e instanceof EtsyError && e.status === 404)) warnings.push("Etsy'deki eski dosya silinemedi"); }
+      }
       try {
         const blob = p.download ? await p.download(f.path) : (() => { throw new Error("dosya okunamadı"); })();
         const fd = new FormData();
@@ -119,6 +149,13 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
         etsyState.files.push({ product_file_id: f.id, listing_file_id: d.listing_file_id, name: f.name });
       } catch (e) { errors.push(`Dosya "${f.name}" yüklenemedi: ${(e as Error).message}`); }
     }
+  }
+
+  if (replacing && !errors.length) {
+    for (const id of oldFiles) {
+      try { await etsy(ctx, "DELETE", `${base}/${listingId}/files/${id}`); } catch (e) { if (!(e instanceof EtsyError && e.status === 404)) warnings.push("Etsy'deki eski dosya silinemedi"); }
+    }
+    etsyState.media_replaced_at = new Date().toISOString();
   }
 
   // 4) Yayınla (istenirse; görsel ve dijitalde dosya şart)

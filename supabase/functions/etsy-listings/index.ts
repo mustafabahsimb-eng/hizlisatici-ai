@@ -6,6 +6,9 @@
 //   { action: "ping" }                   -> anahtar teşhisi (değer döndürmez)
 //   { action: "selftest", userId?, keep? } -> gerçek mağazada test taslağı (görsel + PDF) aç, geri oku, sil (yayınlamaz)
 //   { action: "connect_status", userId } -> son Etsy bağlanma denemesinin sonucu
+//   { action: "stock_photos", query, perPage?, page?, orientation? } -> Pexels arama (ilan kapağı sahnesi için)
+//   { action: "shop_listings", userId }  -> mağazadaki Etsy ilanları (devralma için)
+//   { action: "signed_upload", bucket, path | paths[] } -> depoya imzalı yükleme adresi (sistem toplu yüklemesi)
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
 // Yayınlama tercihi: listings.attributes.etsy_publish = true ("Gönder ve yayınla"); yoksa TASLAK ("Taslak olarak gönder", varsayılan)
 // sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
@@ -154,6 +157,41 @@ Deno.serve(async (req) => {
       if (b.action === "connect_status" && b.userId) {
         const { data } = await db.from("app_cache").select("value").eq("key", "etsy_connect:" + String(b.userId)).maybeSingle();
         return json({ ok: true, last: data?.value || null });
+      }
+      // Mağazadaki ilanlar (Seltigo dışında açılmış ilanları devralmak için)
+      if (b.action === "shop_listings" && b.userId) {
+        const { data: conn } = await db.from("store_connections").select("id, external_seller_id").eq("marketplace_code", "etsy").eq("status", "connected").eq("user_id", String(b.userId)).is("deleted_at", null).limit(1).maybeSingle();
+        if (!conn) return json({ ok: false, error: "Bağlı Etsy mağazası yok" });
+        const { token, cred } = await etsyToken(db, conn.id);
+        const shopId = String(cred.shop_id || conn.external_seller_id);
+        const out: any[] = [];
+        for (const st of ["active", "draft", "inactive"]) {
+          const d = await etsy({ token }, "GET", `/shops/${shopId}/listings`, { query: { state: st, limit: "100" } });
+          for (const l of d.results || []) out.push({ id: l.listing_id, state: l.state, title: l.title, url: l.url, auto_renew: l.should_auto_renew, price: l.price });
+        }
+        return json({ ok: true, shopId, listings: out });
+      }
+      // Dosyayı depoya yüklemek için tek kullanımlık imzalı adres (product-images / product-files)
+      if (b.action === "signed_upload" && b.bucket && (b.path || Array.isArray(b.paths))) {
+        if (!["product-images", "product-files"].includes(String(b.bucket))) return json({ ok: false, error: "depo" }, 400);
+        const urls: Record<string, string> = {};
+        for (const pth of (b.paths || [b.path]).slice(0, 200).map(String)) {
+          const { data, error } = await db.storage.from(String(b.bucket)).createSignedUploadUrl(pth, { upsert: true });
+          if (error) return json({ ok: false, error: error.message, path: pth });
+          urls[pth] = data.signedUrl;
+        }
+        return json({ ok: true, url: b.path ? urls[String(b.path)] : undefined, urls });
+      }
+      // Ticari kullanıma serbest stok fotoğraf (Pexels lisansı) — ilan kapağı (mockup) sahnesi aramak için
+      if (b.action === "stock_photos" && b.query) {
+        const key = Deno.env.get("PEXELS_API_KEY") ?? "";
+        if (!key) return json({ ok: false, error: "PEXELS_API_KEY yok" });
+        const q = new URLSearchParams({ query: String(b.query), per_page: String(Math.min(80, Number(b.perPage) || 40)), page: String(Number(b.page) || 1) });
+        if (b.orientation) q.set("orientation", String(b.orientation));
+        const r = await fetch("https://api.pexels.com/v1/search?" + q, { headers: { Authorization: key } });
+        if (!r.ok) return json({ ok: false, status: r.status });
+        const d = await r.json();
+        return json({ ok: true, query: b.query, photos: (d.photos || []).map((x: any) => ({ id: x.id, w: x.width, h: x.height, alt: x.alt, by: x.photographer, page: x.url, src: x.src?.original, med: x.src?.medium })) });
       }
       if (b.action === "ping") {
         const raw = Deno.env.get("ETSY_SHARED_SECRET") ?? "";

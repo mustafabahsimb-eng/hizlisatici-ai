@@ -34,6 +34,10 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   if ((m = /^\/listings\/(\d+)\/inventory$/.exec(p)) && method === "GET") return j({ products: [{ sku: "", property_values: [], offerings: [{ price: { amount: 500, divisor: 100 }, quantity: 999, is_enabled: true }] }], price_on_property: [], quantity_on_property: [], sku_on_property: [] });
   if (/^\/listings\/\d+\/inventory$/.test(p) && method === "PUT") return j({ products: c.json.products });
   if (/^\/shops\/\d+\/shipping-profiles$/.test(p)) return j({ count: 0, results: [] });
+  if (p === "/listings/777" && method === "GET") return j({ listing_id: 777, state: "active", url: "https://www.etsy.com/listing/777/x" });
+  if (/^\/listings\/777\/images$/.test(p) && method === "GET") return j({ count: 2, results: [{ listing_image_id: 1 }, { listing_image_id: 2 }] });
+  if (/^\/shops\/\d+\/listings\/777\/files$/.test(p) && method === "GET") return j({ count: 5, results: [11, 12, 13, 14, 15].map((id) => ({ listing_file_id: id })) });
+  if (/^\/shops\/\d+\/listings\/\d+\/images\/\d+$/.test(p) && method === "DELETE") return new Response(null, { status: 204 });
   return j({ error: "no route " + p }, 404);
 }) as typeof fetch;
 
@@ -147,6 +151,36 @@ Deno.test("Kota (429): beklenip tekrar denenir", async () => {
   fail429 = 2;
   const r = await L.submitEtsyListing(base({ images: [{ url: "https://img.test/1.jpg" }], files: [files[0]] }));
   assert(r.ok, r.errors.join());
+});
+
+Deno.test("Otomatik yenileme: yeni ilanda should_auto_renew=true; ayar yoksa false", async () => {
+  calls = [];
+  await L.submitEtsyListing(base({ listing: { ...base().listing, attributes: { etsy_auto_renew: true } } }));
+  assertEquals(calls.find((c) => c.method === "POST" && /\/listings$/.test(c.path))!.form!.get("should_auto_renew"), "true");
+  calls = [];
+  await L.submitEtsyListing(base());
+  assertEquals(calls.find((c) => c.method === "POST" && /\/listings$/.test(c.path))!.form!.get("should_auto_renew"), "false");
+});
+
+Deno.test("Devralınan yayındaki ilan: eski 2 görsel ve 5 dosya yenileriyle değişir; ilan hiçbir an görselsiz/dosyasız kalmaz; bir kez", async () => {
+  calls = [];
+  const files5 = [1, 2, 3, 4, 5].map((k) => ({ id: "n" + k, path: "u/" + k, name: `new-${k}.jpg`, rank: k }));
+  const lst = { ...base().listing, attributes: { etsy_replace_media: true, etsy_auto_renew: true }, validation: { etsy: { listing_id: "777", images: [], files: [] } } };  // durum bilinmiyor -> Etsy'den okunur
+  const r = await L.submitEtsyListing(base({ listing: lst, files: files5, publish: true }));
+  assert(r.ok, r.errors.join());
+  const seq = calls.filter((c) => c.method !== "GET").map((c) => `${c.method} ${c.path.replace(/.*\/listings\/777/, "")}`);
+  assert(seq[0].startsWith("PATCH") && calls[0].form!.get("should_auto_renew") === "true", "güncelleme + otomatik yenileme");
+  const firstImgDel = seq.findIndex((x) => /DELETE \/images\//.test(x)), lastImgUp = seq.map((x) => /POST \/images$/.test(x)).lastIndexOf(true);
+  assert(lastImgUp >= 0 && firstImgDel > lastImgUp, "eski görseller yeniler yüklendikten sonra silinir");
+  assertEquals(seq.filter((x) => /DELETE \/images\//.test(x)).length, 2);
+  // dosya sayısı hiçbir an 5'i aşmaz ve 4'ün altına düşmez
+  let n = 5; for (const x of seq) { if (/DELETE \/files\//.test(x)) n--; if (/POST \/files$/.test(x)) n++; assert(n <= 5 && n >= 4, "dosya sayısı " + n); }
+  assertEquals(seq.filter((x) => /DELETE \/files\//.test(x)).length, 5);
+  assert(!seq.some((x) => /state/.test(x)) && r.state === "active", "zaten yayında: tekrar yayınlama yok");
+  assert(r.etsy.media_replaced_at, "bir kez yapıldı olarak işaretlendi");
+  calls = [];
+  await L.submitEtsyListing(base({ listing: { ...lst, validation: { etsy: r.etsy } }, files: files5 }));
+  assert(!calls.some((c) => c.method === "DELETE"), "ikinci gönderimde silme yok");
 });
 
 Deno.test({ name: "son", fn() { globalThis.fetch = real; } });
