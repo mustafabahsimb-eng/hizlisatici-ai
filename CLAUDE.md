@@ -46,6 +46,7 @@ Her adımı bitir, Playwright ile test et, canlıda çalışır halde GitHub'a g
 ## Güvenli çalışma
 - Canlı sistemi değiştiren işlerden önce (SQL migration, Edge Function deploy, fonksiyon/tablo/veri silme) ne yapacağını Türkçe kısaca anlat ve onay al. Dosya okuma, inceleme ve yerel düzenleme için onay gerekmez.
 - Depo HERKESE AÇIK: koda, commit'lere ve CLAUDE.md'ye asla gizli anahtar, token veya şifre yazma. Gizli değerler Supabase Edge Function secrets veya Vault'ta durur. (sb_publishable_ ile başlayan anahtar herkese açık olacak şekilde tasarlanmıştır, sorun değil.)
+- Etsy (ve diğer pazar yerleri) ASLA tarayıcı / scraping ile Mustafa'nın IP'si üzerinden açılmaz (Playwright, curl, sayfa indirme dahil); tüm okuma ve kontrol yalnızca resmi API ile yapılır (Etsy: etsy-listings listing_info / shop_listings). Kişisel ürün bulma aracı da bu kurala uyar. (2026-10-15: Etsy, Playwright ile açılan ilan sayfasını bot sayıp erişimi geçici kısıtladı.)
 - Yeni kütüphane/sürüm seçerken en az 2 haftalık kararlı sürüm seç ve sürümü sabitle.
 - İş bitince commit et ve git push yap; GitHub Pages siteyi kendisi yayınlar. Commit mesajları Türkçe.
 

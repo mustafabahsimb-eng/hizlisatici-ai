@@ -183,4 +183,15 @@ Deno.test("Devralınan yayındaki ilan: eski 2 görsel ve 5 dosya yenileriyle de
   assert(!calls.some((c) => c.method === "DELETE"), "ikinci gönderimde silme yok");
 });
 
+Deno.test("Kapak değişti: yeni kapak rank 1'e yüklenir, eskisi SONRA silinir; diğer görseller dokunulmaz", async () => {
+  const first = await L.submitEtsyListing(base());
+  calls = [];
+  const imgs = [{ url: "https://img.test/kapak-yeni.jpg" }, { url: "https://img.test/2.jpg" }];
+  const r = await L.submitEtsyListing(base({ listing: { ...base().listing, validation: { etsy: first.etsy } }, images: imgs }));
+  const seq = calls.filter((c) => /\/images/.test(c.path)).map((c) => c.method);
+  assertEquals(seq, ["POST", "DELETE"], "önce yükle, sonra sil");
+  assertEquals(calls.find((c) => c.method === "POST" && /\/images$/.test(c.path))!.multipart!.get("rank"), "1");
+  assertEquals(r.etsy.images.map((x: any) => x.src).sort(), imgs.map((x) => x.url).sort());
+});
+
 Deno.test({ name: "son", fn() { globalThis.fetch = real; } });

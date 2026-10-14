@@ -3,7 +3,7 @@
 // Yeni ilan: createDraftListing (type: download | physical) -> uploadListingImage (en fazla 10) -> uploadListingFile (en fazla 5, dijital)
 //            -> isteğe bağlı yayınlama: updateListing state=active (Etsy yayınlanan her ilan için ücret alır; varsayılan TASLAK)
 // Var olan ilan: updateListing (başlık / açıklama / etiketler) + updateListingInventory (fiyat / adet); eksik görsel / dosya eklenir,
-//                Seltigo'da silinen dosya Etsy'den de silinir.
+//                Seltigo'da silinen / değiştirilen görsel ve dosya Etsy'den de silinir (yenisi yüklendikten sonra).
 // Dijital ilan sabitleri (Mustafa, 15 Ekim 2026): kategori Digital Prints, who_made i_did, when_made 2020_2026, is_supply false.
 // Yüklenenler listings.validation.etsy içinde izlenir (tekrar yükleme olmaz).
 // listings.attributes: etsy_publish (yayınla), etsy_auto_renew (Etsy 4 ayda bir kendiliğinden yeniler, yenileme ücretli),
@@ -113,6 +113,16 @@ export async function submitEtsyListing(p: EtsySubmit): Promise<EtsyResult> {
       const d = await etsy(ctx, "POST", `${base}/${listingId}/images`, { multipart: fd });
       etsyState.images.push({ src: im.url, listing_image_id: d.listing_image_id, rank: i + 1 });
     } catch (e) { warnings.push(`Görsel ${i + 1} yüklenemedi: ${(e as Error).message}`); }
+  }
+
+  // Seltigo'da değiştirilen / kaldırılan görsel Etsy'den de silinir (yenisi yüklendikten SONRA; ilan görselsiz kalmaz)
+  const wanted = new Set(p.images.slice(0, 10).map((x) => x.url));
+  const stale = etsyState.images.filter((x: any) => !wanted.has(x.src));
+  if (stale.length && etsyState.images.some((x: any) => wanted.has(x.src))) {
+    for (const x of stale) {
+      try { await etsy(ctx, "DELETE", `${base}/${listingId}/images/${x.listing_image_id}`); etsyState.images = etsyState.images.filter((y: any) => y !== x); }
+      catch (e) { if (e instanceof EtsyError && e.status === 404) etsyState.images = etsyState.images.filter((y: any) => y !== x); else warnings.push("Etsy'deki eski görsel silinemedi"); }
+    }
   }
 
   // Eski görseller: yeniler yüklendikten SONRA silinir (yayındaki ilan görselsiz kalmasın)
