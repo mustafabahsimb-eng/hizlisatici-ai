@@ -8,6 +8,7 @@
 //   { action: "connect_status", userId } -> son Etsy bağlanma denemesinin sonucu
 //   { action: "stock_photos", query, perPage?, page?, orientation? } -> Pexels arama (ilan kapağı sahnesi için)
 //   { action: "shop_listings", userId }  -> mağazadaki Etsy ilanları (devralma için)
+//   { action: "listing_info", userId, etsyListingId } -> Etsy'deki ilanı oku (doğrulama)
 //   { action: "signed_upload", bucket, path | paths[] } -> depoya imzalı yükleme adresi (sistem toplu yüklemesi)
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
 // Yayınlama tercihi: listings.attributes.etsy_publish = true ("Gönder ve yayınla"); yoksa TASLAK ("Taslak olarak gönder", varsayılan)
@@ -170,6 +171,17 @@ Deno.serve(async (req) => {
           for (const l of d.results || []) out.push({ id: l.listing_id, state: l.state, title: l.title, url: l.url, auto_renew: l.should_auto_renew, price: l.price });
         }
         return json({ ok: true, shopId, listings: out });
+      }
+      // Etsy'deki ilanı oku (doğrulama): durum, otomatik yenileme, görseller, dosyalar
+      if (b.action === "listing_info" && b.userId && b.etsyListingId) {
+        const { data: conn } = await db.from("store_connections").select("id, external_seller_id").eq("marketplace_code", "etsy").eq("status", "connected").eq("user_id", String(b.userId)).is("deleted_at", null).limit(1).maybeSingle();
+        if (!conn) return json({ ok: false, error: "Bağlı Etsy mağazası yok" });
+        const { token, cred } = await etsyToken(db, conn.id);
+        const shopId = String(cred.shop_id || conn.external_seller_id); const id = String(b.etsyListingId);
+        const l = await etsy({ token }, "GET", `/listings/${id}`, { query: { includes: "Images" } });
+        const fl = await etsy({ token }, "GET", `/shops/${shopId}/listings/${id}/files`);
+        return json({ ok: true, state: l.state, title: l.title, auto_renew: l.should_auto_renew, price: l.price, tags: l.tags, taxonomy_id: l.taxonomy_id, type: l.listing_type,
+          images: (l.images || []).map((x: any) => ({ rank: x.rank, w: x.full_width, h: x.full_height, url: x.url_570xN })), files: (fl.results || []).map((f: any) => ({ name: f.filename, size: f.filesize, rank: f.rank })) });
       }
       // Dosyayı depoya yüklemek için tek kullanımlık imzalı adres (product-images / product-files)
       if (b.action === "signed_upload" && b.bucket && (b.path || Array.isArray(b.paths))) {

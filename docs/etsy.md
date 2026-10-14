@@ -31,15 +31,19 @@ Klasörde görseller, indirilebilir dosyalar ve bir `.json` dosyası bulunur:
 - Fiyat, Etsy mağazasının para biriminde yazılır.
 - `folder` verilen üründe o alt klasördeki görseller ve dosyalar alınır.
 - Dosyası olan ürün dijitaldir; istenirse `"type": "physical"` yazılabilir (fiziksel ürün için Etsy mağazasında kargo profili gerekir).
+- `"auto_renew": true` → Etsy ilanı 4 ayda bir kendiliğinden yeniler (her yenileme Etsy ilan ücreti). Verilmezse kapalı.
+- `"etsy_listing_id": "4595229456"` → Etsy'de zaten olan ilan yeni ilan açılmadan güncellenir: başlık, açıklama, etiket, fiyat değişir; Etsy'deki eski görseller yenileri yüklendikten sonra, eski dosyalar teker teker yenileriyle değiştirilir (ilan hiçbir an görselsiz / dosyasız kalmaz). Bir kez yapılır (`validation.etsy.media_replaced_at`).
+- Klasörde birden çok `.json` varsa ürün listesi (`products` dizisi) olan kullanılır.
 - Sınırlar: en fazla 10 görsel, 5 dosya, dosya başı 20 MB. Başlıkta en fazla 140 karakter; Etsy'nin kuralı gereği `%`, `:` ve `&` birer kez. En fazla 13 etiket, her biri en fazla 20 karakter; bunlara kod kendisi uyar.
 
 ## Etsy kuralları ve anahtarlar
 - Etsy 9 Şubat 2026'dan beri her istekte `x-api-key: <keystring>:<shared secret>` istiyor. Gizli anahtar Supabase'de `ETSY_SHARED_SECRET` olarak duruyor. Uygulama anahtarının (keystring) TEK kaynağı Supabase secret `ETSY_KEYSTRING`; kodda sabit değer yok. Hesaplarım sayfası değeri `etsy-token-exchange` `{action:"config"}` ile alır. Onay adresinde (`oauth/connect`) ve anahtar isteklerinde `client_id` = keystring; tüm v3 isteklerinde `x-api-key` = `keystring:shared secret`.
 - Teşhis: `etsy-listings` `{action:"ping"}` (sistem çağrısı) anahtarın Etsy'de kabul edilip edilmediğini durum koduyla söyler; değer göstermez.
+- Diğer sistem işlemleri (etsy-listings): `shop_listings` (mağazadaki ilanlar), `listing_info` (Etsy'deki ilanı oku: durum, otomatik yenileme, görseller, dosyalar), `signed_upload` (depoya imzalı yükleme adresi), `stock_photos` (Pexels arama; ilan kapağı sahnesi).
 - Gerçek mağaza denemesi: `etsy-listings` `{action:"selftest", userId}` (sistem çağrısı) Seltigo ürünü açmadan mağazada test taslağı oluşturur (görsel + PDF), Etsy'den geri okur ve siler. Yayınlamaz, ücret yok. Son bağlanma denemesinin sonucu `app_cache` `etsy_connect:<userId>` anahtarında (`{action:"connect_status", userId}`).
 - Ücret: Etsy yayınlanan her ilan için ilan ücreti alır. Taslak ücretsizdir.
 
 ## Testler
-- `tests/etsy/etsy_listing_test.ts`: taklit Etsy ile taslak, görsel, dosya, yayınlama, güncelleme, silinen dosya, eksik kontrolleri ve kota tekrarı (9/9).
+- `tests/etsy/etsy_listing_test.ts`: taklit Etsy ile taslak, görsel, dosya, yayınlama, güncelleme, silinen dosya, eksik kontrolleri ve kota tekrarı (11/11).
 - `tests/e2e/etsy_dijital.py`: bağlantı güvenliği ve dijital ürün dosyaları.
 - `tests/e2e/etsy_klasor.py`: klasörden yüklemeden Etsy'ye devire kadar uçtan uca (15/15).
