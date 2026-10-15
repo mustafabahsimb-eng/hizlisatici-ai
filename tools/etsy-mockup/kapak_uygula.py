@@ -1,4 +1,4 @@
-"""bahsistore: yeni kapakları (görsel 1) Etsy'ye uygula + mağaza bölümleri + öne çıkan setler. Tek komut:
+r"""bahsistore: yeni kapakları (görsel 1) Etsy'ye uygula + mağaza bölümleri + öne çıkan setler. Tek komut:
    %LOCALAPPDATA%\seltigo-mockup\Scripts\python.exe tools\etsy-mockup\kapak_uygula.py
 Kapaklar: %LOCALAPPDATA%\seltigo-etsy-kapak\NN.jpg (satılık tasarım içerdiği için depoda değil).
 Akış: depoya yükle -> product_images (sıra 0) adresini değiştir -> etsy-listings push (yeni görsel önce yüklenir, eskisi sonra silinir; ilan görselsiz kalmaz)

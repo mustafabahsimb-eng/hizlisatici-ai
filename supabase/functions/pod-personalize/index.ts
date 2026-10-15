@@ -8,6 +8,7 @@
 //     (taban tasarım + isim katmanı; "advanced print areas") ve üretime gönderilir
 //  5) Kargo çıkınca takip numarası Etsy siparişine işlenir (createReceiptShipment); her adım asistan kanalından (Telegram) bildirilir
 // Kişiselleştirilmemiş bekleyen siparişler (yalnız Seltigo'nun POD ürünleri) üretime gönderilir; satıcı hiçbir şeye dokunmaz.
+// Token: secret PRINTIFY_TOKEN_<Printify mağaza no> (satıcının kişisel mağazası), yoksa printify_connections.
 // Ön koşul: Printify mağaza ayarında siparişler "elle onay" olmalı (yoksa Printify isimsiz baskıyı hemen üretir).
 // Sistem: { cronSecret } | { cronSecret, dryRun: true } | { cronSecret, action: "render", names: [...], ink?: "dark" | "light", productId } (deneme çizimi)
 // Paket anahtarı: pod_personalize
@@ -168,8 +169,8 @@ async function handleOrder(userId: string, token: string, shopId: string, o: any
 }
 
 // Kargo çıkınca takip numarasını Etsy siparişine işle
-async function syncTracking(userId: string, token: string) {
-  const { data: rows } = await db.from("pod_personal_orders").select("*").eq("user_id", userId).eq("status", "in_production").limit(30);
+async function syncTracking(userId: string, shopId: string, token: string) {
+  const { data: rows } = await db.from("pod_personal_orders").select("*").eq("user_id", userId).eq("provider_shop_id", shopId).eq("status", "in_production").limit(30);
   const out: any[] = [];
   for (const r of rows || []) {
     try {
@@ -195,11 +196,12 @@ async function run(dryRun: boolean) {
   for (const [userId, shopIds] of shops) {
     if (!(await featureEnabled(userId, "pod_personalize"))) { out.push({ userId, skipped: "paket" }); continue; }
     const { data: conn } = await db.from("printify_connections").select("api_token").eq("user_id", userId).maybeSingle();
-    if (!conn?.api_token) { out.push({ userId, error: "Printify bağlı değil" }); continue; }
-    const token = String(conn.api_token).trim();
     const { data: prods } = await db.from("pod_products").select("*").eq("user_id", userId).eq("provider", "printify");
     const pods = new Map<string, any>((prods || []).map((p: any) => [String(p.provider_product_id), p]));
     for (const shopId of shopIds) {
+      // Mağazaya özel token (secret PRINTIFY_TOKEN_<shopId>) önce; yoksa satıcının Seltigo'daki Printify bağlantısı
+      const token = (Deno.env.get(`PRINTIFY_TOKEN_${shopId}`) ?? conn?.api_token ?? "").trim();
+      if (!token) { out.push({ userId, shopId, error: "Printify bağlı değil" }); continue; }
       const list = await pf(token, "GET", `/shops/${shopId}/orders.json?status=on-hold&limit=50`);
       for (const o of list.data || []) {
         if (Date.now() - started > TIME_BUDGET_MS) break;
@@ -213,8 +215,8 @@ async function run(dryRun: boolean) {
           out.push({ id: o.id, error: msg });
         }
       }
+      if (!dryRun) out.push({ userId, shopId, tracking: await syncTracking(userId, shopId, token) });
     }
-    if (!dryRun) out.push({ userId, tracking: await syncTracking(userId, token) });
   }
   return { ok: true, dryRun, ms: Date.now() - started, results: out };
 }

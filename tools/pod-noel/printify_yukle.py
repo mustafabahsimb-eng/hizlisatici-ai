@@ -59,7 +59,7 @@ def pick_blueprint(pf, brand, model):
     hits.sort(key=lambda b: ("youth" in b["title"].lower(), "hood" in b["title"].lower(), len(b["title"])))
     return hits[0]
 
-def pick_provider(pf, bp_id, G):
+def pick_provider(pf, bp_id, G, force=None):
     want_c = [c.lower() for c in G["colors"]]; want_s = G["sizes"]
     provs = pf("GET", f"/catalog/blueprints/{bp_id}/print_providers.json"); cands = []
     for p in provs:
@@ -69,6 +69,7 @@ def pick_provider(pf, bp_id, G):
         have = {(v["options"].get("color", "").lower(), v["options"].get("size", "")): v for v in vs}
         missing = [(c, s) for c in want_c for s in want_s if (c, s) not in have]
         if missing: continue
+        if force and force.lower() != p["title"].lower(): continue
         rank = next((i for i, n in enumerate(G["provider_preference"]) if n.lower() in p["title"].lower()), 99)
         cands.append((rank, p, {k: v for k, v in have.items() if k[0] in want_c and k[1] in want_s}))
     if not cands: raise SystemExit("5 renk x S-3XL'in hepsini basan ABD üreticisi bulunamadı (renk adları farklı olabilir)")
@@ -92,7 +93,12 @@ def hazirla(a):
     if not etsy_shops: raise SystemExit("Printify'da bağlı Etsy mağazası yok. Printify > My stores > Etsy'yi bağla, sonra tekrar çalıştır.")
     shop = etsy_shops[0]; st["shop"] = shop
     gk = a.garment or G["chosen"]; g = G[gk]
-    bp = pick_blueprint(pf, g["brand"], g["model"]); prov, variants, ship, alts = pick_provider(pf, bp["id"], G)
+    bp = pick_blueprint(pf, g["brand"], g["model"]); prov, variants, ship, alts = pick_provider(pf, bp["id"], G, a.provider)
+    if st.get("provider", {}).get("id") not in (None, prov["id"]):  # üretici değişti: eski taslaklar silinir (görseller yeniden kullanılır)
+        for k, S in st.get("products", {}).items():
+            if S.get("product_id") and not S.get("published"):
+                pf("DELETE", f"/shops/{shop['id']}/products/{S['product_id']}.json"); S.pop("product_id"); S.pop("pricing", None)
+        save_state(st)
     st.update({"garment": gk, "blueprint": {"id": bp["id"], "title": bp["title"]}, "provider": {"id": prov["id"], "title": prov["title"], "alternatives": alts}})
     print("Mağaza:", shop["title"], "| Kalıp:", bp["title"], "| Üretici:", prov["title"])
     dark = {c.lower() for c in G["dark_garments"]}
@@ -170,6 +176,7 @@ def yayinla(a):
         time.sleep(10)
     season_of = {"christmas": "christmas", "evergreen": None}
     for k, S in st["products"].items():
+        if a.only and k not in a.only.split(","): continue
         if not S.get("etsy_listing_id"): print(k, "Etsy ilan numarası henüz yok (Printify yayını sürüyor); komutu tekrar çalıştır"); continue
         it = col[k]; season = "christmas" if it["season"] == "christmas" else {"mama-patchwork": "ev_mama", "bookish-soul": "ev_bookish"}.get(k, "ev_beanie_animals")
         perso = None
@@ -189,6 +196,6 @@ on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
         print(k, "yayında:", S["etsy_listing_id"])
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--garment")
+    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--garment"); ap.add_argument("--provider", help="üretici adı (ör. SwiftPOD)")
     ap.add_argument("--only"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
     a = ap.parse_args(); (hazirla if a.adim == "hazirla" else yayinla)(a)

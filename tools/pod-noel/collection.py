@@ -17,7 +17,7 @@ GARMENT = {
     "dark_garments": ["Black", "Forest Green"],     # bunlara 'light' mürekkepli baskı dosyası gider
     "sizes": ["S", "M", "L", "XL", "2XL", "3XL"],
     # Hızlı ABD üretici tercihi (Printify API puan vermez; bilinen yüksek puanlı ABD üreticileri sırayla, hepsi 5 renk + S-3XL'i karşılamalı)
-    "provider_preference": ["Monster Digital", "SwiftPOD", "Print Geek", "Fulfill Engine", "Printify Choice"],
+    "provider_preference": ["SwiftPOD", "Monster Digital", "Print Geek", "Fulfill Engine", "Printify Choice"],
 }
 
 COMMON_DESC = """{hook}

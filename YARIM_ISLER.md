@@ -1,5 +1,12 @@
 # Yarım işler ve sabah soruları (etsy-printify dalı, 15-16 Ekim 2026 gece)
 
+## Güncel durum (16 Ekim, Mustafa'nın kararlarından sonra)
+- Canlıda: migration 20261016_pod_seasons.sql; etsy-listings, marketplace-orders (Etsy anahtar düzeltmesi), season-calendar, pod-personalize, assistant, telegram-bot, whatsapp-webhook, meta-dm-webhook; secret PRINTIFY_TOKEN_11444569; cron season-calendar-daily (03:00 UTC), pod-personalize-5m.
+- Etsy bağlantısı geri açıldı; 25 kapak uygulandı, 6 bölüm kuruldu, 5 set öne çıkan (1-5).
+- Fiyat A (Offsite Ads açık, %35): S-XL 68,99 $ / 2XL 75,99 $ / 3XL 79,99 $; üretici SwiftPOD. 14 sweatshirt Etsy'de yayında (ilan numaraları %LOCALAPPDATA%\seltigo-pod\durum.json).
+- BEKLEYEN: Mama (Printify sipariş onayı "elle" yapılınca `printify_yukle.py yayinla --only mama-patchwork`); numune (Türkiye adresi gelince `numune.py olustur` + `uretime`); Printify ödeme yöntemi.
+- Aşağıdaki eski notların çoğu tamamlandı.
+
 Önizleme sayfası: https://claude.ai/artifact/7iqNtbTPi4NwkBt7LqZsVx
 
 ## Takılan yerler

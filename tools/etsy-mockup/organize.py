@@ -1,4 +1,4 @@
-"""bahsistore mağaza düzeni: bölümler (Sets of 4 en üstte) + 5 adet 4'lü set öne çıkan ürün (featured_rank 1-5). Resmi API (etsy-listings organize).
+r"""bahsistore mağaza düzeni: bölümler (Sets of 4 en üstte) + 5 adet 4'lü set öne çıkan ürün (featured_rank 1-5). Resmi API (etsy-listings organize).
 İlan numaraları %LOCALAPPDATA%\seltigo-etsy-kapak\ids.json (ilan sırası 1-25: 1-20 tekli, 21-25 setler)."""
 import json, os, sys
 from pathlib import Path
