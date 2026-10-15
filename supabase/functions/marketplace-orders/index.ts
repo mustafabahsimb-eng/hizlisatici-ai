@@ -10,6 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { adapterFor, HttpError, type NormLine } from "../_shared/marketplace-orders.ts";
 import { featureEnabled } from "../_shared/features.ts";
+import { etsyToken } from "../_shared/etsy.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -46,8 +47,10 @@ async function resolveProduct(userId: string, code: string, l: NormLine, cache: 
 async function syncConnection(c: any, deadline: number) {
   const ad = adapterFor(c.marketplace_code);
   if (!ad) return { skipped: "okuyucu yok" };
-  const { data: creds } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
+  let { data: creds } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
   if (!creds) throw new Error("Bağlantı bilgileri yok");
+  // Etsy erişim anahtarı 1 saatte biter: süresi dolmuşsa önce yenilenir (yoksa 401 alınıp bağlantı yanlışlıkla "süresi doldu"ya düşer)
+  if (c.marketplace_code === "etsy") creds = (await etsyToken(db, c.id)).cred;
   const startedAt = new Date();
   const since = c.settings?.orders_synced_at ? new Date(new Date(c.settings.orders_synced_at).getTime() - 10 * 60_000) : new Date(Date.now() - 7 * 86400_000);
   const ctx = { code: c.marketplace_code, env: c.environment === "sandbox" ? "sandbox" as const : "live" as const, creds, sellerId: c.external_seller_id, since, until: startedAt };

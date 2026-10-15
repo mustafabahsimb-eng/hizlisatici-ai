@@ -1,0 +1,191 @@
+"""Noel sweatshirt koleksiyonu -> Printify -> Etsy. Yalnız resmi API'ler (Printify Public API, Etsy Open API v3 / etsy-listings).
+
+ADIM 1 (token gelince, tek komut):  python printify_yukle.py hazirla
+   - Token: panelde Printify bağlantısına yapıştırılmış olanı okur (printify_connections). İstenirse --token ile verilir (veritabanına kaydedilir).
+   - Printify'da bağlı Etsy mağazasını bulur; Gildan 18000 kalıbını ve 5 renk x S-3XL'i karşılayan hızlı ABD üreticisini seçer.
+   - 15 tasarımı (koyu/açık mürekkep) yükler, ürünleri TASLAK oluşturur (Etsy'ye henüz gitmez, ücret yok).
+   - Gerçek maliyet + ABD kargo ile fiyatı hesaplar (pricing.py; %35 net kâr, Offsite Ads dahil), ürünlere yazar.
+   - Sonuç: durum.json + onizleme_gercek.html (Printify mockup'ları, gerçek maliyet / fiyat / net kâr).
+ADIM 2 (onaydan sonra, tek komut):   python printify_yukle.py yayinla
+   - Hepsini Etsy'ye yayınlar (Printify publish), Etsy ilan numaralarını bekler; Mama ilanında Etsy kişiselleştirme kutusunu açar
+     (etsy-listings listing_personalization), pod_products + season_listings kayıtlarını yazar (kişiselleştirme ve sezon takvimi için).
+Seçenekler: --garment comfort-colors-1566 (karşılaştırma için), --only kod,kod
+"""
+import argparse, base64, json, math, os, sys, time, urllib.error, urllib.request
+from pathlib import Path
+D = Path(__file__).parent
+sys.path.insert(0, str(D)); sys.path.insert(0, str(D.parent / "etsy-mockup"))
+from pricing import price_for, charm
+from syscall import sql, rows, call
+ROOT = Path(os.environ["LOCALAPPDATA"]) / "seltigo-pod"; DES = ROOT / "designs"; STATE = ROOT / "durum.json"
+UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"  # Mustafa (bahsistore)
+API = "https://api.printify.com/v1"
+
+def q(s): return "'" + str(s).replace("'", "''") + "'"
+def load_state(): return json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+def save_state(s): STATE.write_text(json.dumps(s, indent=1, ensure_ascii=False), encoding="utf-8")
+
+class PF:
+    def __init__(self, token): self.token = token.strip()
+    def __call__(self, method, path, body=None):
+        for i in range(5):
+            req = urllib.request.Request(API + path, method=method, data=None if body is None else json.dumps(body).encode(),
+                                         headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json", "User-Agent": "Seltigo"})
+            try:
+                with urllib.request.urlopen(req, timeout=180) as r: t = r.read().decode(); return json.loads(t) if t else {}
+            except urllib.error.HTTPError as e:
+                t = e.read().decode(errors="replace")
+                if e.code in (429, 500, 502, 503) and i < 4: time.sleep(2 * 2 ** i); continue
+                raise RuntimeError(f"Printify {e.code} {path}: {t[:400]}")
+
+def token_from_db():
+    r = rows(sql(f"select api_token from public.printify_connections where user_id={q(UID)};"))
+    return r[0]["api_token"] if r and r[0].get("api_token") else None
+
+def usd_rate(cur):
+    if cur == "USD": return 1.0
+    r = rows(sql(f"select rate from public.exchange_rates where base_currency='USD' and quote_currency={q(cur)} order by rate_date desc limit 1;"))
+    if not r: raise SystemExit(f"Kur yok: USD->{cur}")
+    return float(r[0]["rate"])
+
+def pick_blueprint(pf, brand, model):
+    bps = pf("GET", "/catalog/blueprints.json")
+    hits = [b for b in bps if b.get("brand", "").lower() == brand.lower() and model.lower() in (b.get("model", "") + " " + b.get("title", "")).lower()]
+    if not hits: raise SystemExit(f"Printify kataloğunda {brand} {model} bulunamadı")
+    hits.sort(key=lambda b: ("youth" in b["title"].lower(), "hood" in b["title"].lower(), len(b["title"])))
+    return hits[0]
+
+def pick_provider(pf, bp_id, G):
+    want_c = [c.lower() for c in G["colors"]]; want_s = G["sizes"]
+    provs = pf("GET", f"/catalog/blueprints/{bp_id}/print_providers.json"); cands = []
+    for p in provs:
+        det = pf("GET", f"/catalog/print_providers/{p['id']}.json")
+        if (det.get("location") or {}).get("country") != "US": continue
+        vs = pf("GET", f"/catalog/blueprints/{bp_id}/print_providers/{p['id']}/variants.json").get("variants", [])
+        have = {(v["options"].get("color", "").lower(), v["options"].get("size", "")): v for v in vs}
+        missing = [(c, s) for c in want_c for s in want_s if (c, s) not in have]
+        if missing: continue
+        rank = next((i for i, n in enumerate(G["provider_preference"]) if n.lower() in p["title"].lower()), 99)
+        cands.append((rank, p, {k: v for k, v in have.items() if k[0] in want_c and k[1] in want_s}))
+    if not cands: raise SystemExit("5 renk x S-3XL'in hepsini basan ABD üreticisi bulunamadı (renk adları farklı olabilir)")
+    cands.sort(key=lambda x: x[0]); r, p, variants = cands[0]
+    ship = pf("GET", f"/catalog/blueprints/{bp_id}/print_providers/{p['id']}/shipping.json")
+    us = {}
+    for prof in ship.get("profiles", []):
+        if "US" in prof.get("countries", []):
+            for vid in prof.get("variant_ids", []): us[vid] = prof["first_item"]["cost"] / 100
+    return p, variants, us, [c[1]["title"] for c in cands]
+
+def upload(pf, path):
+    return pf("POST", "/uploads/images.json", {"file_name": path.name, "contents": base64.b64encode(path.read_bytes()).decode()})
+
+def hazirla(a):
+    col = json.loads((D / "collection.json").read_text(encoding="utf-8")); G = col["garment"]
+    token = a.token or token_from_db()
+    if not token: raise SystemExit("Printify token yok: panelde Printify bağlantısına yapıştır ya da --token ile ver")
+    if a.token:
+        sql(f"insert into public.printify_connections (user_id, api_token, updated_at) values ({q(UID)}, {q(a.token.strip())}, now()) "
+            f"on conflict (user_id) do update set api_token = excluded.api_token, updated_at = now();")
+    pf = PF(token); st = load_state()
+    shops = pf("GET", "/shops.json"); etsy_shops = [s for s in shops if str(s.get("sales_channel", "")).lower() == "etsy"]
+    if not etsy_shops: raise SystemExit("Printify'da bağlı Etsy mağazası yok. Printify > My stores > Etsy'yi bağla, sonra tekrar çalıştır.")
+    shop = etsy_shops[0]; st["shop"] = shop
+    gk = a.garment or G["chosen"]; g = G[gk]
+    bp = pick_blueprint(pf, g["brand"], g["model"]); prov, variants, ship, alts = pick_provider(pf, bp["id"], G)
+    st.update({"garment": gk, "blueprint": {"id": bp["id"], "title": bp["title"]}, "provider": {"id": prov["id"], "title": prov["title"], "alternatives": alts}})
+    print("Mağaza:", shop["title"], "| Kalıp:", bp["title"], "| Üretici:", prov["title"])
+    dark = {c.lower() for c in G["dark_garments"]}
+    vid_dark = [v["id"] for (c, s), v in variants.items() if c in dark]; vid_light = [v["id"] for (c, s), v in variants.items() if c not in dark]
+    # Yerleşim için baskı alanı oranı (ön yüz)
+    ph = next((p for v in variants.values() for p in v.get("placeholders", []) if p["position"] == "front"), None)
+    area_ratio = ph["height"] / ph["width"] if ph else 1.2
+    cur = a.currency.upper(); rate = usd_rate(cur)
+    items = [it for it in col["items"] if not a.only or it["key"] in a.only.split(",")]
+    st.setdefault("products", {})
+    for it in items:
+        k = it["key"]; S = st["products"].setdefault(k, {})
+        if not S.get("uploads"):
+            S["uploads"] = {}
+            for ink in ("dark", "light"):
+                f = DES / f"{k}_{ink}.png"; r = upload(pf, f); S["uploads"][ink] = {"id": r["id"], "url": r.get("preview_url")}
+            if it.get("personalized"):
+                for ink in ("dark", "light"):
+                    r = upload(pf, DES / f"mama-patchwork-base_{ink}.png"); S["uploads"][f"base_{ink}"] = {"id": r["id"], "url": r.get("preview_url")}
+            save_state(st)
+        img = lambda ink: [{"id": S["uploads"][ink]["id"], "x": 0.5, "y": 0.5, "scale": 1, "angle": 0}]
+        body = {"title": it["title"], "description": it["description"], "tags": it["tags"], "blueprint_id": bp["id"], "print_provider_id": prov["id"],
+                "variants": [{"id": v["id"], "price": 9999, "is_enabled": True} for v in variants.values()],
+                "print_areas": [{"variant_ids": vid_light, "placeholders": [{"position": "front", "images": img("dark")}]},
+                                {"variant_ids": vid_dark, "placeholders": [{"position": "front", "images": img("light")}]}]}
+        if not S.get("product_id"):
+            S["product_id"] = pf("POST", f"/shops/{shop['id']}/products.json", body)["id"]; save_state(st)
+        prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
+        # Gerçek maliyet (Printify) + ABD kargo -> fiyat (USD) -> mağaza para birimi
+        prices, rep = [], {}
+        for v in prod["variants"]:
+            if not v.get("is_enabled", True): continue
+            cost = v["cost"] / 100 + ship.get(v["id"], col["garment"]["est_shipping_us"])
+            usd = price_for(cost)["price"]; local = usd if cur == "USD" else (math.ceil(usd * rate / 10) * 10 - 1)
+            prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
+            size = v["title"].split("/")[-1].strip(); rep[size] = {"cost_usd": round(cost, 2), **price_for(cost)}
+        pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", {"variants": prices})
+        prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
+        S.update({"title": it["title"], "pricing": rep, "currency": cur, "mockups": [i["src"] for i in prod.get("images", [])[:4]],
+                  "dark_variant_ids": vid_dark, "area_ratio": area_ratio, "personalized": bool(it.get("personalized")), "season": it["season"]})
+        save_state(st); print(k, "taslak hazır;", {s: r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")})
+    write_report(st, col); print("Bitti. Önizleme:", ROOT / "onizleme_gercek.html")
+
+def write_report(st, col):
+    rowsh = []
+    for it in col["items"]:
+        S = st.get("products", {}).get(it["key"]);
+        if not S or not S.get("pricing"): continue
+        m = S["pricing"].get("M") or next(iter(S["pricing"].values()))
+        imgs = "".join(f'<img src="{u}" loading="lazy">' for u in S.get("mockups", [])[:3])
+        rowsh.append(f'<tr><td>{imgs}</td><td><b>{it["title"]}</b><br><small>{", ".join(it["tags"])}</small></td>'
+                     f'<td>{m["cost_usd"]} $</td><td>{m["price"]} $</td><td>{m["with_ads"]["net"]} $ (%{round(m["with_ads"]["margin"]*100)})</td></tr>')
+    html = ("<!doctype html><meta charset=utf-8><title>Noel koleksiyonu (Printify gerçek)</title><style>body{font-family:sans-serif;background:#0f1724;color:#e6edf3;padding:16px}"
+            "table{border-collapse:collapse;width:100%}td{border-bottom:1px solid #2a3442;padding:8px;vertical-align:top}img{width:110px;margin:2px;border-radius:6px}</style>"
+            f"<h2>Printify taslakları — {st.get('provider', {}).get('title', '')} / {st.get('blueprint', {}).get('title', '')}</h2>"
+            "<table><tr><th>Mockup</th><th>Başlık / etiketler</th><th>Maliyet (M)</th><th>Satış (M)</th><th>Net kâr (Offsite Ads dahil)</th></tr>" + "".join(rowsh) + "</table>")
+    (ROOT / "onizleme_gercek.html").write_text(html, encoding="utf-8")
+
+def yayinla(a):
+    st = load_state(); token = token_from_db(); pf = PF(token); shop = st["shop"]
+    flags = {"title": True, "description": True, "images": True, "variants": True, "tags": True, "keyFeatures": True, "shipping_template": True}
+    col = {it["key"]: it for it in json.loads((D / "collection.json").read_text(encoding="utf-8"))["items"]}
+    for k, S in st["products"].items():
+        if a.only and k not in a.only.split(","): continue
+        if not S.get("published"):
+            pf("POST", f"/shops/{shop['id']}/products/{S['product_id']}/publish.json", flags); S["published"] = time.time(); save_state(st)
+    for _ in range(60):  # Etsy ilan numaraları (Printify yayınlayınca external.id gelir)
+        left = [k for k, S in st["products"].items() if S.get("published") and not S.get("etsy_listing_id")]
+        if not left: break
+        for k in left:
+            p = pf("GET", f"/shops/{shop['id']}/products/{st['products'][k]['product_id']}.json")
+            if (p.get("external") or {}).get("id"): st["products"][k]["etsy_listing_id"] = str(p["external"]["id"]); save_state(st)
+        time.sleep(10)
+    season_of = {"christmas": "christmas", "evergreen": None}
+    for k, S in st["products"].items():
+        if not S.get("etsy_listing_id"): print(k, "Etsy ilan numarası henüz yok (Printify yayını sürüyor); komutu tekrar çalıştır"); continue
+        it = col[k]; season = "christmas" if it["season"] == "christmas" else {"mama-patchwork": "ev_mama", "bookish-soul": "ev_bookish"}.get(k, "ev_beanie_animals")
+        perso = None
+        if S.get("personalized"):
+            L = json.loads((D / "mama_layout.json").read_text())
+            perso = {**L, "area_ratio": S["area_ratio"], "dark_variant_ids": S["dark_variant_ids"],
+                     "base_urls": {"dark": S["uploads"]["base_dark"]["url"], "light": S["uploads"]["base_light"]["url"]}}
+            r = call("etsy-listings", {"action": "listing_personalization", "userId": UID, "etsyListingId": S["etsy_listing_id"],
+                                       "instructions": it["personalization"]["instructions"], "charMax": it["personalization"]["char_max"], "required": True}, 300)
+            print(k, "Etsy kişiselleştirme:", r and r.get("content", "")[:200])
+        sql(f"""insert into public.pod_products (user_id, provider_shop_id, provider_product_id, blueprint_id, print_provider_id, design_key, season_key, external_listing_id, personalized, personalization, status)
+values ({q(UID)}, {q(shop['id'])}, {q(S['product_id'])}, {st['blueprint']['id']}, {st['provider']['id']}, {q(k)}, {q(season)}, {q(S['etsy_listing_id'])}, {str(bool(S.get('personalized'))).lower()},
+        {q(json.dumps(perso)) + '::jsonb' if perso else 'null'}, 'published')
+on conflict (provider, provider_product_id) do update set external_listing_id = excluded.external_listing_id, personalization = excluded.personalization, status = 'published', updated_at = now();
+insert into public.season_listings (user_id, season_key, external_listing_id, title, state) values ({q(UID)}, {q(season)}, {q(S['etsy_listing_id'])}, {q(S['title'])}, 'active')
+on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
+        print(k, "yayında:", S["etsy_listing_id"])
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--token"); ap.add_argument("--garment")
+    ap.add_argument("--only"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
+    a = ap.parse_args(); (hazirla if a.adim == "hazirla" else yayinla)(a)

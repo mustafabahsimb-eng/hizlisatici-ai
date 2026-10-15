@@ -401,6 +401,8 @@ async function questionsReply(link: Link): Promise<Reply> {
 
 // ---------- Bildirim metinleri (kuyruktan) ----------
 export async function renderAlert(kind: string, p: any, userId: string): Promise<{ reply: Reply; need: "orders" | "products" | "owner" } | null> {
+  // Hazır metinli bildirim (sezon takvimi, kişiselleştirilmiş baskı siparişi vb.)
+  if (kind === "notice") return { need: "owner", reply: { text: short(p.text, 900) } };
   if (kind === "new_order") {
     const { data: pr } = await db.from("products").select("generated_title, name").eq("id", p.product_id).maybeSingle();
     // Pazaryeri siparişi (ör. amazon_tr -> "Amazon TR"); Kendi Mağazam siparişinde düğme, diğerlerinde sipariş sayfası bağlantısı

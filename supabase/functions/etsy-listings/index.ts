@@ -10,6 +10,11 @@
 //   { action: "shop_listings", userId }  -> mağazadaki Etsy ilanları (devralma için)
 //   { action: "listing_info", userId, etsyListingId } -> Etsy'deki ilanı oku (doğrulama)
 //   { action: "signed_upload", bucket, path | paths[] } -> depoya imzalı yükleme adresi (sistem toplu yüklemesi)
+//   { action: "organize", userId, sections?: [{ title, listingIds[] }], featured?: [etsyListingId…] }
+//        -> mağaza bölümlerini oluştur (yoksa; verilen sırayla), ilanları bölümlere yerleştir, öne çıkan ilanları sırala (featured_rank)
+//   { action: "listing_personalization", userId, etsyListingId, instructions, charMax?, required? } -> Etsy kişiselleştirme kutusunu aç
+//   { action: "listing_state", userId, etsyListingIds[], state: "active" | "inactive" }
+//        -> ilanları yayına al / pasife al (SİLMEZ; yorum ve satış geçmişi ilanda kalır)
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
 // Yayınlama tercihi: listings.attributes.etsy_publish = true ("Gönder ve yayınla"); yoksa TASLAK ("Taslak olarak gönder", varsayılan)
 // sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
@@ -147,6 +152,50 @@ async function selftest(userId: string | null, keep: boolean) {
   return { ok: r.ok && !!r.listingId, steps };
 }
 
+async function userShop(userId: string) {
+  const { data: conn } = await db.from("store_connections").select("id, external_seller_id").eq("marketplace_code", "etsy").eq("status", "connected").eq("user_id", userId).is("deleted_at", null).limit(1).maybeSingle();
+  if (!conn) throw new Error("Bağlı Etsy mağazası yok");
+  const { token, cred } = await etsyToken(db, conn.id);
+  return { ctx: { token }, shopId: String(cred.shop_id || conn.external_seller_id) };
+}
+
+// Mağaza düzeni: bölümler (Etsy en fazla 20 bölüm, ad en fazla 24 karakter) + öne çıkan ilanlar (featured_rank 1..n)
+async function organize(userId: string, sections: { title: string; listingIds: string[] }[], featured: string[]) {
+  const { ctx, shopId } = await userShop(userId);
+  const have = (await etsy(ctx, "GET", `/shops/${shopId}/sections`)).results || [];
+  const report: Record<string, unknown>[] = [];
+  for (const s of sections) {
+    const title = String(s.title || "").trim().slice(0, 24);
+    if (!title) continue;
+    let sec = have.find((x: any) => String(x.title).toLowerCase() === title.toLowerCase());
+    if (!sec) { sec = await etsy(ctx, "POST", `/shops/${shopId}/sections`, { form: { title } }); have.push(sec); }
+    const placed: string[] = [], failed: string[] = [];
+    for (const id of s.listingIds || []) {
+      try { await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${id}`, { form: { shop_section_id: sec.shop_section_id } }); placed.push(String(id)); }
+      catch (e) { failed.push(`${id}: ${(e as Error).message}`); }
+    }
+    report.push({ section: title, shop_section_id: sec.shop_section_id, placed: placed.length, failed });
+  }
+  const feat: Record<string, unknown>[] = [];
+  for (let i = 0; i < featured.length; i++) {
+    try { await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${featured[i]}`, { form: { featured_rank: i + 1 } }); feat.push({ id: featured[i], rank: i + 1, ok: true }); }
+    catch (e) { feat.push({ id: featured[i], rank: i + 1, ok: false, error: (e as Error).message }); }
+  }
+  return { ok: report.every((r: any) => !r.failed.length) && feat.every((f) => f.ok), sections: report, featured: feat };
+}
+
+// Sezon modülü: ilanı yayına al / pasife al. Pasif ilan Etsy'de silinmez; yeniden açılınca yorum ve satış geçmişi geri gelir.
+// (Etsy pasif ilanı yeniden yayına alırken ilan ücreti alır.)
+async function listingState(userId: string, ids: string[], state: "active" | "inactive") {
+  const { ctx, shopId } = await userShop(userId);
+  const out: Record<string, unknown>[] = [];
+  for (const id of ids) {
+    try { const d = await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${id}`, { form: { state } }); out.push({ id, ok: true, state: d.state }); }
+    catch (e) { out.push({ id, ok: false, error: friendly(e) }); }
+  }
+  return { ok: out.every((x) => x.ok), results: out };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const b = await req.json().catch(() => ({}));
@@ -155,6 +204,18 @@ Deno.serve(async (req) => {
       if (b.action === "push" && b.listingId) return json(await push(String(b.listingId)));
       if (b.action === "deactivate" && b.listingId) return json(await deactivate(String(b.listingId)));
       if (b.action === "selftest") return json(await selftest(b.userId ? String(b.userId) : null, b.keep === true));
+      if (b.action === "organize" && b.userId) return json(await organize(String(b.userId), Array.isArray(b.sections) ? b.sections : [], Array.isArray(b.featured) ? b.featured.map(String) : []));
+      // Kişiselleştirme kutusu (Printify'ın yayınladığı ilanda da): alıcının yazdığı metin pod-personalize ile baskıya girer
+      if (b.action === "listing_personalization" && b.userId && b.etsyListingId) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const d = await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${String(b.etsyListingId)}`, { form: {
+          is_personalizable: true, personalization_is_required: b.required !== false,
+          personalization_char_count_max: Math.min(1024, Number(b.charMax) || 120), personalization_instructions: String(b.instructions || "").slice(0, 1024) } });
+        return json({ ok: true, is_personalizable: d.is_personalizable, required: d.personalization_is_required });
+      }
+      if (b.action === "listing_state" && b.userId && Array.isArray(b.etsyListingIds) && ["active", "inactive"].includes(b.state)) {
+        return json(await listingState(String(b.userId), b.etsyListingIds.map(String), b.state));
+      }
       if (b.action === "connect_status" && b.userId) {
         const { data } = await db.from("app_cache").select("value").eq("key", "etsy_connect:" + String(b.userId)).maybeSingle();
         return json({ ok: true, last: data?.value || null });
