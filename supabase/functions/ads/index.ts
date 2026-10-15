@@ -81,7 +81,8 @@ async function adProducts(userId: string, ids?: number[]): Promise<AdProduct[]> 
   const out: AdProduct[] = [];
   for (const p of data || []) {
     const rawCost = p.supplier_cost ?? p.supplier_price;
-    const cost = rawCost != null ? await convert(Number(rawCost), p.cost_currency || home, home) : null;
+    // Maliyet 0 / boş = bilinmiyor (kâr hesaplanamaz; reklam açılmaz)
+    const cost = rawCost != null && Number(rawCost) > 0 ? await convert(Number(rawCost), p.cost_currency || home, home) : null;
     out.push({ id: p.id, name: p.generated_title || p.name, price: Number(p.sale_price) || 0, cost, commissionPct: Number(p.commission_rate) || 0,
       inStock: p.product_type === "digital" || p.stock_qty == null || Number(p.stock_qty) > 0 && p.stock_status !== "tukendi", hasImage: !!p.image_url, visible: !!p.store_visible });
   }

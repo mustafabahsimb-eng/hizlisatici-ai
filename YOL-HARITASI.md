@@ -152,7 +152,8 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
   5. Amazon Appstore listesi ve yayın onayı -> AMAZON_APP_DRAFT=false; canlıya geçiş AMAZON_LIVE=true.
 
 ## Ayrı ürünler: Seltigo Ads, İçerik otomasyonu, İade otomasyonu (13 Ekim 2026)
-- Mimari plan taslağı: docs/mimari-plan-ads-icerik-iade.md — Mustafa'nın onayını bekliyor; onaydan önce kodlanmaz.
+- Mimari plan: docs/mimari-plan-ads-icerik-iade.md (onaylandı). İade bitti (docs/iade.md). Seltigo Ads A1 + A2 bitti (docs/seltigo-ads.md); bekleyen: Mustafa'nın Meta sandbox reklam hesabı -> uçtan uca sandbox testi; sonra A3 Google, A4 TikTok, A5 pazaryeri reklamları. Sıradaki: İçerik otomasyonu.
+- Seltigo Ads adları ve varsayılanları onaylandı (Mustafa, 18 Ekim 2026): bütçe boş, otomatik aç / artır kapalı, onay modu, ROAS 3, kâr %25, 3 gün; "⚡ Tam otomatik" / "Tam otomatik moda geç" (tek tıkla, sınır girerek).
 
 ## Ertelenenler (şimdi yapılmaz)
 - Görsel tamamlama hızlandırma
