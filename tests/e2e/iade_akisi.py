@@ -135,7 +135,7 @@ def main():
             sysrun = sql("""do $$ declare v text; begin select replace(replace(command, '/functions/v1/cj-alt-match', '/functions/v1/returns'), '{"cronSecret"', '{"action":"run","cronSecret"') into v from cron.job where jobname='cj-alt-match-1h'; execute v; end $$;""")
             import time as _t
             warned = None
-            for _ in range(20):
+            for _ in range(45):  # 30 dk işi tüm adımları (pazaryeri iadeleri dahil) yapar; en fazla ~3 dk
                 _t.sleep(4); warned = get(ret["id"])["refund_warned_at"]
                 if warned: break
             c.check("Para iadesi son günü yaklaşınca satıcı uyarıldı", bool(warned), str(warned))
