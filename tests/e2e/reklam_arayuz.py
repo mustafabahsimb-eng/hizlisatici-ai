@@ -61,7 +61,8 @@ def main():
             # Kuralları kaydet
             page.fill("#rDaily", "200"); page.fill("#rMonthly", "4000"); page.fill("#rRoas", "3.5")
             page.click("#saveBtn")
-            page.wait_for_function("() => document.getElementById('rDaily') && document.getElementById('rDaily').value === '200'", timeout=30000)
+            page.wait_for_function("() => /Kaydedildi/.test(document.getElementById('toast').textContent)", timeout=30000)
+            page.wait_for_function("async () => ((await HS.db.from('ad_rules').select('daily_cap').maybeSingle()).data || {}).daily_cap == 200", timeout=30000)
             rr = page.evaluate("async () => (await HS.db.from('ad_rules').select('daily_cap, monthly_cap, target_roas, auto_launch, approval_mode').maybeSingle()).data")
             c.check("Kurallar kaydedildi", rr and float(rr["daily_cap"]) == 200 and float(rr["monthly_cap"]) == 4000 and float(rr["target_roas"]) == 3.5 and rr["auto_launch"] is False and rr["approval_mode"] == "approve", str(rr))
 
