@@ -97,6 +97,7 @@ const HELP: Reply = {
     "• Ürün linki gönder → ürünü eklerim\n" +
     "• \"bu ay ne kadar kâr ettim\", \"en çok ne satıyor\", \"hangi ürün zarar ediyor\"\n" +
     "• \"bugün gönderilecekler\" → liste + kargo etiketleri PDF\n" +
+    "• \"reklamlar nasıl\", \"reklamı durdur\", \"reklam bütçesini 500 yap\"\n" +
     "• \"müşteri soruları\" → özet + önerilen cevap\n" +
     "• \"sadece Trendyol'a\" gibi kanal da söyleyebilirsin.",
 };
@@ -126,6 +127,10 @@ export function parseCommand(textIn: string): Cmd {
   if (/kendi mağaza|mağazam/.test(t)) chans.push("own_store");
   if (chans.length) c.channels = chans;
   if (/^\/?(start|yardım|help|merhaba|selam)\b/.test(t)) c.intent = "help";
+  else if (/reklam/.test(t) && /(durdur|kapat|dur\b)/.test(t)) c.intent = "ads_pause";
+  else if (/reklam/.test(t) && /bütçe/.test(t) && /(\d[\d.,]*)/.test(t)) { c.intent = "ads_budget"; c.price = Number((t.match(/(\d[\d.]*(?:,\d+)?)/) || [])[1]?.replace(/\./g, "").replace(",", ".")); }
+  else if (/reklam/.test(t) && /(başlat|aç|yayınla|devam)/.test(t)) c.intent = "ads_resume";
+  else if (/reklam/.test(t)) c.intent = "ads_status";
   else if (/(kâr|kar) ettim|kârım|karım|ne kadar kazandım/.test(t)) c.intent = "profit";
   else if (/en çok (ne )?sat/.test(t)) c.intent = "top";
   else if (/zarar (ediyor|eden)/.test(t)) c.intent = "losing";
@@ -326,7 +331,10 @@ export async function morningReport(userId: string): Promise<Reply> {
   const { count: toShip } = await db.from("store_orders").select("id", { count: "exact", head: true }).eq("user_id", userId).is("shipped_at", null).neq("status", "cancelled");
   const { count: low } = await db.from("products").select("id", { count: "exact", head: true }).eq("user_id", userId).in("stock_status", ["az", "tukendi"]).is("deleted_at", null);
   const { count: holds } = await db.from("orders").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "onay_bekliyor");
-  return { text: `☀️ Sabah raporu\nDün: ${s.count} sipariş, ${money(s.revenue)} ciro, tahmini kâr ${money(s.profit)}.\nGönderilecek: ${toShip || 0} · Stoğu azalan/biten: ${low || 0} · Onay bekleyen sipariş: ${holds || 0}.`,
+  const ads = (await adsSummary(userId)).filter((c: any) => c.status === "active");
+  const adSpend = ads.reduce((a: number, c: any) => a + Number(c.spend_7d || 0), 0), adRev = ads.reduce((a: number, c: any) => a + Number(c.revenue_7d || 0), 0);
+  const adLine = ads.length ? `\n📣 Reklam (7 gün): harcama ${money(adSpend, ads[0].currency || "TRY")}, satış ${money(adRev, ads[0].currency || "TRY")}${adSpend > 0 ? ", ROAS " + (adRev / adSpend).toFixed(2) : ""}.` : "";
+  return { text: `☀️ Sabah raporu\nDün: ${s.count} sipariş, ${money(s.revenue)} ciro, tahmini kâr ${money(s.profit)}.\nGönderilecek: ${toShip || 0} · Stoğu azalan/biten: ${low || 0} · Onay bekleyen sipariş: ${holds || 0}.` + adLine,
     buttons: toShip ? [{ id: "shipments", title: "Gönderilecekler" }] : undefined };
 }
 export async function weeklySummary(userId: string): Promise<Reply> {
@@ -400,6 +408,41 @@ async function questionsReply(link: Link): Promise<Reply> {
 }
 
 // ---------- Bildirim metinleri (kuyruktan) ----------
+// ---------- Seltigo Ads ----------
+async function adsSummary(userId: string) {
+  const { data: cs } = await db.from("ad_campaigns").select("id, name, status, daily_budget, currency, spend_7d, revenue_7d, roas_7d").eq("user_id", userId).in("status", ["active", "paused", "pending_approval"]).order("created_at", { ascending: false }).limit(10);
+  return cs || [];
+}
+const ADS_ST: Record<string, string> = { active: "yayında", paused: "durdu", pending_approval: "onay bekliyor" };
+async function adsAlert(p: any): Promise<Reply> {
+  const { data: c } = await db.from("ad_campaigns").select("id, status, daily_budget, currency, product_ids, paused_reason").eq("id", p.campaign_id).maybeSingle();
+  if (!c) return { text: "📣 Reklam bildirimi", link: { title: "Reklamları gör", url: `${SITE}/ads.html` } };
+  const b = money(c.daily_budget, c.currency || "TRY");
+  if (p.event === "pending_approval" && c.status === "pending_approval")
+    return { text: `📣 Yeni reklam hazır: ${(c.product_ids || []).length} kârlı ürün, günlük ${b}. Yayına alayım mı?`, buttons: [{ id: `ads_ok:${c.id}`, title: "Onayla" }, { id: `ads_stop:${c.id}`, title: "Durdur" }] };
+  if (p.event === "active") return { text: `📣 Reklam yayında: ${(c.product_ids || []).length} ürün, günlük ${b}.`, buttons: [{ id: `ads_stop:${c.id}`, title: "Durdur" }] };
+  if (p.event === "scaled") return { text: `📈 Reklam iyi gidiyor; ${short(p.reason, 160)}.`, buttons: [{ id: `ads_stop:${c.id}`, title: "Durdur" }] };
+  if (p.event === "cap") return { text: `⛔ Aylık reklam bütçe sınırına ulaşıldı; reklamlar durduruldu.`, link: { title: "Reklamları gör", url: `${SITE}/ads.html` } };
+  return { text: `⏸️ Reklam durduruldu: ${short(p.reason || c.paused_reason, 200)}.`, link: { title: "Reklamları gör", url: `${SITE}/ads.html` } };
+}
+async function adsCommand(link: Link, cmd: Cmd): Promise<Reply> {
+  const cs = await adsSummary(link.user_id);
+  if (cmd.intent === "ads_status") {
+    if (!cs.length) return { text: "📣 Açık reklamın yok.", link: { title: "Reklamları gör", url: `${SITE}/ads.html` } };
+    return { text: "📣 Reklamlar (son 7 gün):\n" + cs.map((c: any) => `• ${ADS_ST[c.status] || c.status}: harcama ${money(c.spend_7d || 0, c.currency || "TRY")}, satış ${money(c.revenue_7d || 0, c.currency || "TRY")}${c.roas_7d != null ? ", ROAS " + c.roas_7d : ""} · günlük ${money(c.daily_budget, c.currency || "TRY")}`).join("\n") };
+  }
+  const target = cmd.intent === "ads_resume" ? cs.find((c: any) => ["paused", "pending_approval"].includes(c.status)) : cs.find((c: any) => c.status === "active") || cs[0];
+  if (!target) return { text: "Uygun reklam bulunamadı." };
+  if (cmd.intent === "ads_pause") { const r = await fn("ads", link.user_id, { action: "pause", campaignId: target.id, reason: "Asistandan durduruldu" }); return { text: r?.ok ? "⏸️ Reklam durduruldu." : "İşlem yapılamadı: " + short(r?.error, 200) }; }
+  if (cmd.intent === "ads_resume") { const r = await fn("ads", link.user_id, { action: target.status === "pending_approval" ? "approve" : "resume", campaignId: target.id }); return { text: r?.ok ? `▶️ Reklam yayında (günlük ${money(r.budget, target.currency || "TRY")}).` : "İşlem yapılamadı: " + short(r?.error, 200) }; }
+  if (cmd.intent === "ads_budget") {
+    if (!(Number(cmd.price) > 0)) return { text: "Bütçeyi sayıyla yaz (örn. \"reklam bütçesini 500 yap\")." };
+    const r = await fn("ads", link.user_id, { action: "budget", campaignId: target.id, amount: cmd.price });
+    return { text: r?.ok ? `✅ Günlük reklam bütçesi ${money(r.budget, target.currency || "TRY")} oldu${r.capped ? " (bütçe sınırın nedeniyle)" : ""}.` : "İşlem yapılamadı: " + short(r?.error, 200) };
+  }
+  return { text: "Anlamadım." };
+}
+
 // İade bildirimleri: karar bekleyen talep [Onayla] [Reddet], para iadesi [Parayı iade ettim]
 const RET_REASON: Record<string, string> = { size: "Beden / ölçü uymadı", changed_mind: "Vazgeçtim", defective: "Ürün kusurlu", damaged: "Hasarlı geldi", wrong_item: "Yanlış ürün geldi",
   not_as_described: "Açıklamayla uyuşmuyor", late: "Geç geldi", other: "Diğer" };
@@ -443,6 +486,7 @@ export async function renderAlert(kind: string, p: any, userId: string): Promise
     link: { title: "Mağazayı aç", url: `${SITE}/magaza.html?slug=${encodeURIComponent(p.slug || "")}` } } };
   if (kind === "connection") return { need: "owner", reply: { text: `🔌 ${short(p.name, 40)} bağlantının süresi doluyor${p.expires ? " (" + p.expires + ")" : ""}.`, buttons: [{ id: "reconnect", title: "Yeniden bağla" }] } };
   if (kind === "return") return { need: "orders", reply: await returnAlert(p) };
+  if (kind === "ads") return { need: "owner", reply: await adsAlert(p) };
   if (kind === "competitor") return { need: "owner", reply: {
     text: `📉 Rakip fiyat düşürdü: ${short(p.name, 50)} — rakip ${money(p.competitor_price)}, senin ${money(p.my_price)}. Önerilen: ${money(p.suggested)} (alt sınırının altına inmez).`,
     buttons: [{ id: `price_drop:${p.product_id}:${p.suggested}`, title: "Fiyatı düşür" }, { id: "keep_price", title: "Böyle kalsın" }] } };
@@ -500,6 +544,11 @@ async function handleButton(link: Link, id: string): Promise<Reply[]> {
     return [{ text: `Fiyat ${money(a2)} olacak. Emin misin?`, buttons: [{ id: "confirm", title: "Evet" }, { id: "deny", title: "Vazgeç" }] }];
   }
   if (act === "keep_price") return [{ text: "Tamam, fiyat aynı kaldı." }];
+  if (act === "ads_ok" || act === "ads_stop") {
+    if (!can(link, "owner")) return [NO_PERM];
+    const r = await fn("ads", link.user_id, act === "ads_ok" ? { action: "approve", campaignId: a1 } : { action: "pause", campaignId: a1, reason: "Asistandan durduruldu" });
+    return [{ text: r?.ok ? (act === "ads_ok" ? `▶️ Reklam yayında (günlük ${money(r.budget)}).` : "⏸️ Reklam durduruldu.") : "İşlem yapılamadı: " + short(r?.error, 200) }];
+  }
   if (act === "ret_ok") {
     if (!can(link, "orders")) return [NO_PERM];
     const r = await fn("returns", link.user_id, { action: "decide", returnId: a1, approve: true, note: "Satıcı onayladı (asistan)" });
@@ -716,6 +765,7 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
     }
     if (cmd.intent === "help" || !text) return { link, replies: [HELP] };
     if (cmd.intent === "profit") return { link, replies: [can(link, "owner") ? await profitReply(link) : NO_PERM] };
+    if (cmd.intent?.startsWith("ads_")) return { link, replies: [can(link, "owner") ? await adsCommand(link, cmd) : NO_PERM] };
     if (cmd.intent === "top") return { link, replies: [can(link, "owner") ? await topReply(link) : NO_PERM] };
     if (cmd.intent === "losing") return { link, replies: [can(link, "owner") ? await losingReply(link) : NO_PERM] };
     if (cmd.intent === "shipments") return { link, replies: [can(link, "orders") ? await shipmentsReply(link) : NO_PERM] };

@@ -50,6 +50,10 @@ Deno.serve(async (req) => {
     const city = clean(body.customer_city, 60);
     const district = clean(body.customer_district, 60);
     const zip = clean(body.customer_zip, 12);
+    // Reklam kaynağı (vitrin bağlantısındaki UTM, Meta tıklama kimliği fbclid / _fbc, piksel çerezi _fbp)
+    const src = body.ad_source && typeof body.ad_source === "object" ? body.ad_source : null;
+    const adSource = src ? Object.fromEntries(["utm_source", "utm_medium", "utm_campaign", "utm_content", "fbclid", "fbc", "fbp"]
+      .map((k) => [k, clean(src[k], 300)]).filter(([, v]) => v)) : null;
     let qty = parseInt(body.quantity, 10);
     if (!Number.isFinite(qty) || qty < 1) qty = 1;
     if (qty > 99) qty = 99;
@@ -149,10 +153,19 @@ Deno.serve(async (req) => {
         unit_price: Number.isFinite(price) && price > 0 ? price : null,
         currency: cur,
         status: "pending",
+        ad_source: adSource && Object.keys(adSource).length ? adSource : null,
       })
       .select("id, status, tracking_token")
       .single();
     if (iErr) throw iErr;
+
+    // Meta Dönüşüm API: satıcının reklam pikseli bağlıysa satın alma olayı sunucudan (beklemeden; tarayıcı pikseliyle event_id = sipariş no)
+    const CRON = Deno.env.get("CRON_SECRET") ?? "", ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const conv = fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ads`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}`, apikey: ANON },
+      body: JSON.stringify({ action: "conversion", orderId: order.id, cronSecret: CRON, url: clean(body.page_url, 500) || null,
+        ip: (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || null, ua: clean(req.headers.get("user-agent"), 300) || null }) }).catch(() => null);
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(conv);
 
     return json({ success: true, order: { id: order.id, status: order.status, tracking_token: order.tracking_token } });
   } catch (err) {
