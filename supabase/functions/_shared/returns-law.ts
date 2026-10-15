@@ -8,7 +8,7 @@ export type Law = {
 };
 export type SellerRules = {
   auto_approve: boolean; max_auto_amount: number; window_days: number; policy_days?: number; restock: boolean; supplier_claim: boolean;
-  customer_pays?: boolean; refund_warn_days?: number;
+  customer_pays?: boolean; refund_warn_days?: number; auto_reasons?: string[];
 };
 export const REASONS = ["size", "changed_mind", "defective", "damaged", "wrong_item", "not_as_described", "late", "other"] as const;
 // Ayıplı mal: kusurlu / hasarlı / yanlış / açıklamayla uyuşmayan — tüm masraf satıcıda, fotoğraf yalnız bunlarda istenir
@@ -31,6 +31,7 @@ export function effective(law: Law, seller: Partial<SellerRules>) {
     refundDays: law.refund_days,
     autoApprove: s.auto_approve, maxAuto: Number(s.max_auto_amount) || 0, restock: s.restock, supplierClaim: s.supplier_claim,
     warnDays: Math.max(1, Number(s.refund_warn_days) || 3),
+    autoReasons: Array.isArray(s.auto_reasons) ? s.auto_reasons : ["size", "changed_mind", "wrong_item", "not_as_described", "late"],   // yalnız yasal cayma olmayan yerde
   };
 }
 export type Eff = ReturnType<typeof effective>;
@@ -57,6 +58,7 @@ export function decide(eff: Eff, x: DecideIn): Decision {
     if (!inWindow) return { auto: false, approve: false, rejectable: true, withdrawal, note: `İade süresi (${eff.windowDays} gün) geçmiş` };
     // Yasal cayma yok (ABD vb.): mağaza politikası
     if (!eff.autoApprove) return { auto: false, approve: false, rejectable: true, withdrawal, note: "Otomatik onay kapalı" };
+    if (!eff.autoReasons.includes(x.reason)) return { auto: false, approve: false, rejectable: true, withdrawal, note: "Neden satıcı kararı gerektiriyor" };
     if (x.amount != null && eff.maxAuto && x.amount > eff.maxAuto) return { auto: false, approve: false, rejectable: true, withdrawal, note: `Tutar otomatik onay sınırının üstünde (${eff.maxAuto})` };
     if (x.fraud.length) return { auto: false, approve: false, rejectable: true, withdrawal, note: "Şüpheli: " + x.fraud.join(", ") };
     return { auto: true, approve: true, rejectable: true, withdrawal, note: "Mağaza iade politikasına uygun" };

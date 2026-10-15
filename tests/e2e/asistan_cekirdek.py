@@ -113,6 +113,8 @@ def main():
             store.wait_for_selector("#orderModalOverlay.open")
             store.fill("#orderName", "E2E Asistan Alıcı"); store.fill("#orderPhone", "05551112233")
             store.fill("#orderAddress", "Test Mah. No 1"); store.fill("#orderCity", "İstanbul"); store.fill("#orderDistrict", "Kadıköy")
+            store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+            store.check("#orderPreinfo")
             store.click("#orderSubmitBtn")
             store.wait_for_selector("#orderDone", state="visible", timeout=30000)
             note = None

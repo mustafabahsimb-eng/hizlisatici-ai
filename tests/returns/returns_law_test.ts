@@ -76,6 +76,7 @@ Deno.test("ABD: yasal cayma yok -> mağaza politikası (30 gün, sınır ve şü
   assert(!L.decide(e, x({ amount: 5000 })).auto);
   assert(!L.decide(e, x({ fraud: ["son 90 günde 3 iade"] })).auto);
   assert(L.policyText(e, { seller: "Shop", lang: "en" }).includes("within 30 days of delivery"));
+  assert(!L.decide(L.effective(US as any, { auto_reasons: ["size"] }), x({ reason: "changed_mind" })).auto, "satıcının seçmediği neden -> satıcıya");
 });
 
 Deno.test("Ön bilgilendirme (TR): iade taşıyıcısı, ücretsiz iade, adresten alım, ilk kargo ücreti dahil, istisnalar", () => {

@@ -69,6 +69,8 @@ def main():
             store.fill("#orderAddress", "Caferağa Mah. Test Sok. No 5")
             store.fill("#orderCity", "İstanbul")
             store.fill("#orderDistrict", "Kadıköy")
+            store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+            store.check("#orderPreinfo")
             store.click("#orderSubmitBtn")
             store.wait_for_selector("#orderDone", state="visible", timeout=30000)
             track_href = store.get_attribute("#orderTrackLink", "href")
@@ -121,6 +123,8 @@ def main():
             store.fill("#orderAddress", "Caferağa Mah. Test Sok. No 5")
             store.fill("#orderCity", "İstanbul")
             store.fill("#orderDistrict", "Kadıköy")
+            store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+            store.check("#orderPreinfo")
             store.click("#orderSubmitBtn")
             store.wait_for_selector("#orderDone", state="visible", timeout=30000)
             n = page.evaluate("""async (pid) => { const so = (await HS.db.from('store_orders').select('id').eq('product_id', pid).order('created_at', {ascending:false}).limit(1)).data[0];

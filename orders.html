@@ -116,6 +116,23 @@
 
   .chip { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #1c2130; color: #c3c9d4; border: 1px solid #2a3040; font-weight: 500; }
   .chip.test { background: #1b2540; color: #93b4ff; border-color: #2b3b66; }
+  .chip.warn { background: #2e1f0e; color: #f5b041; border-color: #4a3315; }
+  .chip.danger { background: #2a1414; color: #f28b8b; border-color: #4a2020; }
+  .status-ret_requested { background: #2e1f0e; color: #f5b041; }
+  .status-ret_approved, .status-ret_label_ready { background: #142230; color: #7db8e6; }
+  .status-ret_in_transit { background: #1a2a40; color: #6ea8f2; }
+  .status-ret_received, .status-ret_refund_pending { background: #2a2410; color: #e6c96a; }
+  .status-ret_refunded, .status-ret_closed { background: #123222; color: #6ee7b7; }
+  .status-ret_rejected, .status-ret_cancelled { background: #232838; color: #9aa3b2; }
+  .ret-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .ret-actions button { font-size: 12px; padding: 7px 12px; border-radius: 8px; border: 1px solid #2a3040; background: #1c212c; color: #e6e8ee; cursor: pointer; }
+  .ret-actions button.primary { background: #1D9E75; border-color: #1D9E75; color: #04150f; font-weight: 600; }
+  .ret-actions button:disabled { opacity: .55; cursor: default; }
+  .ret-note { font-size: 12px; color: #c3c9d4; margin-top: 6px; line-height: 1.5; }
+  .ret-due { font-size: 12px; margin-top: 4px; color: #e6c96a; }
+  .ret-due.late { color: #f28b8b; font-weight: 600; }
+  .ret-photos { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .ret-photos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #2a3040; }
 
   .status-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
   .status-beklemede { background: #2a2410; color: #e6c96a; }
@@ -190,6 +207,7 @@
     <button class="tab" data-tab="sales" onclick="showTab('sales')"><span data-t="tabSales"></span> <span class="tab-count" id="countSales">0</span></button>
     <button class="tab" data-tab="supplier" onclick="showTab('supplier')"><span data-t="tabSupplier"></span> <span class="tab-count" id="countSupplier">0</span></button>
     <button class="tab" data-tab="printify" onclick="showTab('printify')"><span data-t="tabPrintify"></span> <span class="tab-count" id="countPrintify">–</span></button>
+    <button class="tab" data-tab="returns" onclick="showTab('returns')"><span data-t="tabReturns"></span> <span class="tab-count" id="countReturns">0</span></button>
   </div>
 
   <!-- ============ 1) GELEN SİPARİŞLER (marketplace_orders) ============ -->
@@ -208,6 +226,17 @@
       <button class="btn-secondary" id="msRefreshBtn" onclick="loadSales()" data-t="refresh"></button>
     </div>
     <div class="order-list" id="msList"><div class="empty-state"><p data-t="loading"></p></div></div>
+  </div>
+
+  <!-- ============ İADELER (returns) ============ -->
+  <div class="tab-panel" id="panel-returns">
+    <div class="toolbar">
+      <label class="chk"><input type="checkbox" id="rtPending" onchange="renderReturns()"> <span data-t="rtPending"></span></label>
+      <div class="spacer"></div>
+      <button class="btn-secondary" id="rtRefreshBtn" onclick="loadReturns()" data-t="refresh"></button>
+    </div>
+    <div class="msg" id="rtMsg"></div>
+    <div class="order-list" id="rtList"><div class="empty-state"><p data-t="loading"></p></div></div>
   </div>
 
   <!-- ============ 2) TEDARİKÇİ (orders - CJ / elle) ============ -->
@@ -419,6 +448,16 @@
       'pf_in-production': 'Üretimde', 'pf_partially-fulfilled': 'Kısmen kargolandı', pf_fulfilled: 'Kargoya verildi',
       pf_canceled: 'İptal', 'pf_payment-not-received': 'Ödeme alınamadı', 'pf_action-required': 'İşlem gerekli',
       'pf_has-issues': 'Sorun var', pf_delivered: 'Teslim edildi',
+      tabReturns: '↩️ İadeler', rtPending: 'Karar bekleyenler',
+      rtApprove: 'Onayla', rtReject: 'Reddet', rtReceived: 'Teslim aldım', rtRefunded: 'Parayı iade ettim', rtPhotos: 'Fotoğrafları gör', rtLabel: 'Etiketi tekrar dene',
+      ret_requested: 'Karar bekliyor', ret_approved: 'Onaylandı', ret_label_ready: 'Etiket hazır', ret_in_transit: 'Yolda', ret_received: 'Teslim alındı',
+      ret_refund_pending: 'Para iadesi bekliyor', ret_refunded: 'İade edildi', ret_closed: 'İade edildi', ret_rejected: 'Reddedildi', ret_cancelled: 'İptal',
+      rr_size: 'Beden / ölçü uymadı', rr_changed_mind: 'Vazgeçtim', rr_defective: 'Ürün kusurlu', rr_damaged: 'Hasarlı geldi', rr_wrong_item: 'Yanlış ürün geldi',
+      rr_not_as_described: 'Açıklamayla uyuşmuyor', rr_late: 'Geç geldi', rr_other: 'Diğer',
+      rtDue: 'Para iadesi son günü: {d}', rtDueLate: 'Para iadesi yasal süresi geçti ({d})', rtLegal: 'Yasal cayma — reddedilemez',
+      rtEmptyTitle: 'Henüz iade yok', rtEmptyText: 'Müşterilerin takip sayfasından açtığı ve pazaryerlerinden gelen iadeler burada görünür.', rtFilterEmpty: 'Karar bekleyen iade yok.',
+      rtRejectNote: 'Red nedeni (müşteriye gösterilir)', rtDone: 'Tamam', rtFail: 'İşlem yapılamadı: {e}', rtCode: 'İade kodu: {c}', rtPickup: 'Adresten alım istendi', rtCustomerPays: 'Kargo müşteriden',
+      rtSrcOwn: '🏪 Kendi Mağazam',
     },
     en: {
       pageTitle: 'Seltigo - Orders',
@@ -539,6 +578,16 @@
       'pf_in-production': 'In production', 'pf_partially-fulfilled': 'Partially shipped', pf_fulfilled: 'Shipped',
       pf_canceled: 'Cancelled', 'pf_payment-not-received': 'Payment not received', 'pf_action-required': 'Action required',
       'pf_has-issues': 'Has issues', pf_delivered: 'Delivered',
+      tabReturns: '↩️ Returns', rtPending: 'Awaiting decision',
+      rtApprove: 'Approve', rtReject: 'Decline', rtReceived: 'I received it', rtRefunded: 'I refunded the money', rtPhotos: 'View photos', rtLabel: 'Retry label',
+      ret_requested: 'Awaiting decision', ret_approved: 'Approved', ret_label_ready: 'Label ready', ret_in_transit: 'In transit', ret_received: 'Received',
+      ret_refund_pending: 'Refund pending', ret_refunded: 'Refunded', ret_closed: 'Refunded', ret_rejected: 'Declined', ret_cancelled: 'Cancelled',
+      rr_size: 'Size / fit', rr_changed_mind: 'Changed mind', rr_defective: 'Faulty', rr_damaged: 'Arrived damaged', rr_wrong_item: 'Wrong item',
+      rr_not_as_described: 'Not as described', rr_late: 'Arrived late', rr_other: 'Other',
+      rtDue: 'Refund deadline: {d}', rtDueLate: 'Legal refund deadline passed ({d})', rtLegal: 'Statutory withdrawal — cannot be declined',
+      rtEmptyTitle: 'No returns yet', rtEmptyText: 'Returns opened from the order tracking page and returns from marketplaces appear here.', rtFilterEmpty: 'No returns awaiting a decision.',
+      rtRejectNote: 'Reason for declining (shown to the customer)', rtDone: 'Done', rtFail: 'Could not complete: {e}', rtCode: 'Return code: {c}', rtPickup: 'Pickup from address requested', rtCustomerPays: 'Customer pays shipping',
+      rtSrcOwn: '🏪 My Store',
     }
   };
 
@@ -591,6 +640,110 @@
     try { localStorage.setItem('hs_orders_tab', name); } catch (e) {}
     if (history.replaceState) history.replaceState(null, '', '#' + name);
     if (name === 'printify' && !pfLoaded) loadPrintifyOrders(1);
+    if (name === 'returns' && !rtLoaded) loadReturns();
+  }
+
+  // ================= İADELER =================
+  let returnsList = [], rtLoaded = false, rtProducts = {};
+  async function loadReturns() {
+    const btn = document.getElementById('rtRefreshBtn'); btn.disabled = true;
+    try {
+      const { data, error } = await db.from('returns').select('*').order('created_at', { ascending: false }).limit(300);
+      if (error) throw error;
+      returnsList = data || [];
+      const ids = [...new Set(returnsList.map(r => r.product_id).filter(Boolean))];
+      if (ids.length) { const { data: ps } = await db.from('products').select('id, name, generated_title, supplier').in('id', ids); (ps || []).forEach(p => { rtProducts[p.id] = p; }); }
+      rtLoaded = true;
+    } catch (e) { console.error(e); returnsList = []; }
+    btn.disabled = false;
+    renderReturns();
+  }
+  function retStatusKey(r) {
+    if (r.status === 'received' && r.refund_status === 'pending') return 'refund_pending';
+    if (r.status === 'approved' && r.refund_status === 'pending') return 'refund_pending';
+    return r.status;
+  }
+  // Süre içindeki yasal cayma: reddedilemez (sunucu da engeller)
+  const legalLocked = (r) => r.status === 'requested' && r.withdrawal && /^Yasal cayma/.test(r.decision_note || '');
+  function renderReturns() {
+    const onlyPending = document.getElementById('rtPending').checked;
+    document.getElementById('countReturns').textContent = returnsList.filter(r => r.status === 'requested').length;
+    const el = document.getElementById('rtList');
+    if (!returnsList.length) { el.innerHTML = '<div class="empty-state"><h3>' + tt('rtEmptyTitle') + '</h3><p>' + tt('rtEmptyText') + '</p></div>'; return; }
+    const rows = returnsList.filter(r => !onlyPending || r.status === 'requested');
+    if (!rows.length) { el.innerHTML = '<div class="empty-state"><p>' + tt('rtFilterEmpty') + '</p></div>'; return; }
+    el.innerHTML = rows.map(r => {
+      const p = rtProducts[r.product_id] || {};
+      const drop = ['cj', 'aliexpress'].includes(p.supplier);
+      const key = retStatusKey(r);
+      const meta = [fmtDate(r.created_at)];
+      if (r.customer_name) meta.push(escapeHtml(r.customer_name));
+      if (r.quantity > 1) meta.push(tt('qty', { n: r.quantity }));
+      if (r.return_code) meta.push(escapeHtml(tt('rtCode', { c: r.return_code })) + (r.carrier ? ' · ' + escapeHtml(r.carrier) : ''));
+      const chips = [];
+      if (r.withdrawal && r.law && r.law !== 'US' && r.law !== 'OTHER' && r.status === 'requested' && legalLocked(r)) chips.push('<span class="chip warn">' + tt('rtLegal') + '</span>');
+      if (r.pickup) chips.push('<span class="chip">' + tt('rtPickup') + '</span>');
+      if (r.shipping_payer === 'customer') chips.push('<span class="chip">' + tt('rtCustomerPays') + '</span>');
+      (r.fraud || []).forEach(f => chips.push('<span class="chip danger">' + escapeHtml(f) + '</span>'));
+      let due = '';
+      if (r.refund_due_at && !['refunded', 'closed', 'rejected', 'cancelled'].includes(r.status) && !['done', 'marketplace'].includes(r.refund_status)) {
+        const late = new Date(r.refund_due_at) < new Date();
+        due = '<div class="ret-due' + (late ? ' late' : '') + '">' + escapeHtml(tt(late ? 'rtDueLate' : 'rtDue', { d: fmtDate(r.refund_due_at) })) + '</div>';
+      }
+      const note = [r.reason_text, r.ai && r.ai.summary ? '🤖 ' + r.ai.summary : '', r.decision_note].filter(Boolean).map(escapeHtml).join(' · ');
+      const own = r.source === 'own_store';
+      const b = [];
+      if (r.status === 'requested') {
+        b.push('<button class="primary" onclick="retAct(this, \'' + r.id + '\', \'decide\', true)">' + tt('rtApprove') + '</button>');
+        if (!legalLocked(r)) b.push('<button onclick="retReject(this, \'' + r.id + '\')">' + tt('rtReject') + '</button>');
+      }
+      if (own && !drop && ['approved', 'label_ready', 'in_transit'].includes(r.status)) b.push('<button class="primary" onclick="retAct(this, \'' + r.id + '\', \'received\')">' + tt('rtReceived') + '</button>');
+      if (own && !drop && r.status === 'approved' && !r.return_code) b.push('<button onclick="retAct(this, \'' + r.id + '\', \'label\')">' + tt('rtLabel') + '</button>');
+      if (r.refund_status === 'pending') b.push('<button class="primary" onclick="retAct(this, \'' + r.id + '\', \'refunded\')">' + tt('rtRefunded') + '</button>');
+      if ((r.photos || []).length) b.push('<button onclick="retPhotos(this, \'' + r.id + '\')">' + tt('rtPhotos') + '</button>');
+      const src = own ? tt('rtSrcOwn') : marketplaceName(r.source);
+      return '<div class="order-row" data-ret="' + r.id + '">' +
+        '<div class="order-top"><div>' +
+          '<div class="order-name">' + escapeHtml(src) + ' <span class="chip">' + escapeHtml(p.generated_title || p.name || '–') + '</span> <span class="chip">' + escapeHtml(tt('rr_' + r.reason_code)) + '</span> ' + chips.join(' ') + '</div>' +
+          '<div class="order-meta">' + meta.join(' · ') + '</div>' +
+          (note ? '<div class="ret-note">' + note + '</div>' : '') + due +
+          '<div class="ret-photos" id="rp-' + r.id + '"></div>' +
+          (b.length ? '<div class="ret-actions">' + b.join('') + '</div>' : '') +
+        '</div>' +
+        '<div class="order-right">' +
+          '<div class="money-box"><div class="money-main">' + (r.amount != null ? fmtMoney(r.amount, r.currency || homeCurrency) : '–') + '</div></div>' +
+          '<span class="status-badge status-ret_' + key + '">' + escapeHtml(tt('ret_' + key)) + '</span>' +
+        '</div></div></div>';
+    }).join('');
+  }
+  async function retCall(body) {
+    const session = await getSession();
+    const r = await fetch(SUPABASE_URL + '/functions/v1/returns', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify(Object.assign(body, { userAccessToken: session.access_token })) });
+    return await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+  }
+  function retMsg(text, ok) { const m = document.getElementById('rtMsg'); m.className = 'msg ' + (ok ? 'success' : 'error'); m.textContent = text; }
+  async function retAct(btn, id, action, approve) {
+    btn.disabled = true;
+    const r = await retCall({ action, returnId: id, approve: !!approve });
+    if (!r || r.ok === false) retMsg(tt('rtFail', { e: (r && r.error) || '' }), false);
+    else if (r.error) retMsg(tt('rtFail', { e: r.error }), false);
+    else retMsg(tt('rtDone'), true);
+    await loadReturns();
+  }
+  async function retReject(btn, id) {
+    const note = prompt(tt('rtRejectNote'));
+    if (note === null) return;
+    btn.disabled = true;
+    const r = await retCall({ action: 'decide', returnId: id, approve: false, note });
+    retMsg(r && r.ok ? tt('rtDone') : tt('rtFail', { e: (r && r.error) || '' }), !!(r && r.ok));
+    await loadReturns();
+  }
+  async function retPhotos(btn, id) {
+    btn.disabled = true;
+    const r = await retCall({ action: 'photos', returnId: id });
+    document.getElementById('rp-' + id).innerHTML = ((r && r.urls) || []).map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" alt=""></a>').join('');
   }
 
   // ================= ORTAK VERİ =================
@@ -1233,15 +1386,16 @@
     document.getElementById('msChannel').innerHTML = '<option value="">' + tt('allChannels') + '</option>';
 
     let startTab = (location.hash || '').replace('#', '');
-    if (['sales', 'supplier', 'printify'].indexOf(startTab) === -1) {
+    if (['sales', 'supplier', 'printify', 'returns'].indexOf(startTab) === -1) {
       try { startTab = localStorage.getItem('hs_orders_tab') || 'sales'; } catch (e) { startTab = 'sales'; }
-      if (['sales', 'supplier', 'printify'].indexOf(startTab) === -1) startTab = 'sales';
+      if (['sales', 'supplier', 'printify', 'returns'].indexOf(startTab) === -1) startTab = 'sales';
     }
     showTab(startTab);
 
     await loadCommon();
     await Promise.all([loadSales(), loadProducts().then(loadOrders)]);
     if (!pfLoaded) loadPrintifyOrders(1);
+    if (!rtLoaded) loadReturns();
   }
 
   function onLangChange() { renderAllTexts(); }

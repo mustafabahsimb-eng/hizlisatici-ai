@@ -113,6 +113,11 @@
       typeLabel: 'Ürün tipi',
       typePhysical: 'Fiziksel ürün',
       typeDigital: 'Dijital ürün',
+      noWithdrawal: 'Cayma hakkı yok',
+      noWdHint: 'Bu üründe müşteri yalnız kusurlu / yanlış ürün iadesi açabilir. Telefon, bilgisayar, tablet ve akıllı saat istisna DEĞİLDİR.',
+      noWdAuto: 'Dijital / kişiye özel ürün olduğu için otomatik işaretlendi.',
+      wd_personalized: 'Kişiye özel / isme özel ürün', wd_digital: 'Anında teslim dijital içerik', wd_hygiene: 'Hijyen ürünü (ambalajı açılınca: iç giyim, kozmetik)',
+      wd_perishable: 'Çabuk bozulan ürün', wd_market_price: 'Fiyatı piyasaya bağlı (altın vb.)', wd_sealed_media: 'Kitap / yazılım (ambalajı açılınca)',
       digitalNote: 'Dijital üründe kargo gönderisi açılmaz; müşteri dosyaları satın aldığı yerden (ör. Etsy) indirir.',
       filesTitle: 'İndirilebilir dosyalar (en fazla 5)',
       fileAdd: '+ Dosya ekle',
@@ -173,6 +178,11 @@
       typeLabel: 'Product type',
       typePhysical: 'Physical product',
       typeDigital: 'Digital product',
+      noWithdrawal: 'No right of withdrawal',
+      noWdHint: 'Customers can only return this product if it is faulty or wrong. Phones, computers, tablets and smartwatches are NOT exempt.',
+      noWdAuto: 'Marked automatically because it is a digital / personalised product.',
+      wd_personalized: 'Personalised / made to order', wd_digital: 'Instantly delivered digital content', wd_hygiene: 'Hygiene product (once unsealed: underwear, cosmetics)',
+      wd_perishable: 'Perishable', wd_market_price: 'Price depends on the market (e.g. gold)', wd_sealed_media: 'Book / software (once unsealed)',
       digitalNote: 'No shipment is created for digital products; customers download the files where they bought (e.g. Etsy).',
       filesTitle: 'Downloadable files (up to 5)',
       fileAdd: '+ Add file',
@@ -228,6 +238,7 @@
   let product = null;           // ürün kaydı
   let ownListing = null;        // Kendi Mağazam ilanı
   let productType = 'physical';
+  let wdExempt = false, wdReason = null, wdManual = false;   // cayma hakkı istisnası (ürün)
   let files = [];               // product_files satırları (hemen yüklenir / silinir)
   let variants = [];            // { id?, attributes, stock_qty, is_active, _new, _deleted }
   let images = [];              // { id?, url, source_kind, source_url, _new, _deleted, _changed }
@@ -311,6 +322,9 @@
             '<button class="del-btn" onclick="delFile(\'' + f.id + '\')">🗑</button></div>').join('') : '<div class="note">' + esc(t('fileNone')) + '</div>') + '</div>' +
           (files.length < 5 ? '<button class="btn2" id="fileAddBtn" onclick="document.getElementById(\'fileInput\').click()">' + esc(t('fileAdd')) + '</button>' : '') +
           '<div class="note" id="fileMsg"></div>' : '') +
+        '<label class="type-opt" style="margin-top:14px; display:inline-flex"><input type="checkbox" id="fNoWd"' + (wdExempt ? ' checked' : '') + '> ' + esc(t('noWithdrawal')) + '</label>' +
+        (wdExempt ? '<select id="fWdReason" style="margin-top:8px">' + ['personalized', 'digital', 'hygiene', 'perishable', 'market_price', 'sealed_media'].map(k => '<option value="' + k + '"' + (wdReason === k ? ' selected' : '') + '>' + esc(t('wd_' + k)) + '</option>').join('') + '</select>' : '') +
+        '<div class="note">' + esc(t('noWdHint')) + (wdExempt && !wdManual && ['digital', 'personalized'].includes(wdReason) ? ' ' + esc(t('noWdAuto')) : '') + '</div>' +
       '</div>' +
 
       '<div class="card">' +
@@ -355,6 +369,10 @@
     // Değişiklik dinleyicileri
     ['fName', 'fDesc', 'fPrice', 'fStock'].forEach(id => document.getElementById(id).addEventListener('input', () => { readForm(); markDirty(); }));
     document.querySelectorAll('input[name=ptype]').forEach(el => el.addEventListener('change', () => { readForm(); productType = el.value; markDirty(); render(); }));
+    const nw = document.getElementById('fNoWd');
+    if (nw) nw.addEventListener('change', () => { readForm(); wdExempt = nw.checked; wdManual = true; if (wdExempt && !wdReason) wdReason = productType === 'digital' ? 'digital' : 'personalized'; markDirty(); render(); });
+    const wr = document.getElementById('fWdReason');
+    if (wr) wr.addEventListener('change', () => { wdReason = wr.value; wdManual = true; markDirty(); });
     const fs = document.getElementById('fSource');
     fs.addEventListener('change', () => { readForm(); source = fs.value; markDirty(); render(); });
     const fl = document.getElementById('fSrcLink');
@@ -533,7 +551,8 @@
         sale_price: p._price != null ? p._price : p.sale_price,
         stock_qty: p._stock, stock_status: p._stock != null ? stockStatus(p._stock) : p.stock_status,
         image_url: mainImg, image_missing: !mainImg,
-        product_type: productType
+        product_type: productType,
+        ...(wdManual ? { withdrawal_exempt: wdExempt, withdrawal_exempt_reason: wdExempt ? (wdReason || null) : null, withdrawal_exempt_manual: true } : {})
       };
       if (source !== 'printify') {
         upd.supplier = source === 'own' ? null : source;
@@ -628,6 +647,7 @@
     images = im.data || [];
     files = fl.data || [];
     productType = product.product_type === 'digital' ? 'digital' : 'physical';
+    wdExempt = !!product.withdrawal_exempt; wdReason = product.withdrawal_exempt_reason || null; wdManual = false;
     // Eski ürünler: görsel tablosunda kayıt yoksa ana görseli göster
     if (!images.length && product.image_url) images = [{ url: product.image_url, source_kind: null, source_url: product.source_url || null, _new: true }];
     source = product.supplier ? product.supplier : 'own';

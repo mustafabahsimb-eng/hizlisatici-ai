@@ -304,6 +304,10 @@
           <textarea id="ret_address" maxlength="500"></textarea>
         </div>
         <div class="field">
+          <label for="ret_district" data-t="lDistrict"></label>
+          <input type="text" id="ret_district" maxlength="100">
+        </div>
+        <div class="field">
           <label for="ret_city" data-t="lCity"></label>
           <input type="text" id="ret_city" maxlength="100">
         </div>
@@ -320,6 +324,53 @@
           <input type="tel" id="ret_phone" maxlength="40">
         </div>
       </div>
+    </div>
+
+    <!-- ========== İADE KURALLARI ========== -->
+    <div class="section-title" id="iade-kurallari" data-t="secReturnRules"></div>
+    <div class="card">
+      <div class="card-desc" id="rrLaw"></div>
+      <div class="check-row">
+        <input type="checkbox" id="rr_auto_approve">
+        <div>
+          <label for="rr_auto_approve" data-t="lRrAuto"></label>
+          <div class="hint" id="rrAutoHint"></div>
+        </div>
+      </div>
+      <div class="grid" style="margin-top: 12px;">
+        <div class="field">
+          <label for="rr_max" data-t="lRrMax"></label>
+          <input type="number" id="rr_max" min="0" step="1">
+          <div class="hint" data-t="hRrMax"></div>
+        </div>
+        <div class="field">
+          <label for="rr_window" data-t="lRrWindow"></label>
+          <input type="number" id="rr_window" min="1" max="365" step="1">
+          <div class="hint" id="rrWindowHint"></div>
+        </div>
+      </div>
+      <div class="ship-sub" data-t="lRrAutoReasons"></div>
+      <div id="rrAutoReasons" class="epr-list"></div>
+      <div class="hint" id="rrAutoReasonsHint" style="margin-top: 6px;"></div>
+      <div class="ship-sub" data-t="lRrPhotoReasons"></div>
+      <div id="rrPhotoReasons" class="epr-list"></div>
+      <div class="hint" data-t="hRrPhoto" style="margin-top: 6px;"></div>
+      <div class="check-row" style="margin-top: 14px;">
+        <input type="checkbox" id="rr_customer_pays">
+        <div>
+          <label for="rr_customer_pays" data-t="lRrCustomerPays"></label>
+          <div class="hint" id="rrPaysHint"></div>
+        </div>
+      </div>
+      <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="rr_restock">
+        <div><label for="rr_restock" data-t="lRrRestock"></label></div>
+      </div>
+      <div class="check-row" style="margin-top: 12px;">
+        <input type="checkbox" id="rr_supplier_claim">
+        <div><label for="rr_supplier_claim" data-t="lRrSupplier"></label></div>
+      </div>
+      <details style="margin-top: 14px;"><summary class="hint" style="cursor:pointer" data-t="rrPolicy"></summary><pre id="rrPolicyText" class="hint" style="white-space:pre-wrap; font-family:inherit; line-height:1.5;"></pre></details>
     </div>
 
     <!-- ========== KARGO ========== -->
@@ -511,6 +562,29 @@ const T = {
     nBasit: 'Kargo anlaşması gerekmez. basitkargo.com hesabındaki API anahtarı.',
     nPendingCarrier: 'Bilgilerin şifreli kasada saklanır; firmanın web servis belgesi ve test erişimi tamamlanınca gönderiler otomatik başlar.',
     secReturn: '📦 İade Adresi',
+    lDistrict: 'İlçe',
+    secReturnRules: '↩️ İade Kuralları',
+    rrLaw: 'Yasal çerçeve: {law} ({c}). Yasal en düşük koşulların altına inilemez; yalnız müşteri lehine değiştirebilirsin.',
+    lRrAuto: 'İadeleri otomatik onayla',
+    hRrAutoStat: 'Süre içindeki cayma talepleri (Vazgeçtim, Beden uymadı vb.) yasal olarak reddedilemez; her durumda onaylanır.',
+    hRrAutoPolicy: 'Kurala uyan iadeler beklemeden onaylanır; diğerleri onayına düşer.',
+    lRrMax: 'Otomatik onay sınırı (TL)',
+    hRrMax: 'Yalnız kusurlu ürün iddiaları ve şüpheli talepler için kullanılır; cayma taleplerinde onay / red kararı vermez.',
+    lRrWindow: 'İade süresi (gün)',
+    hRrWindowStat: 'Yasal en az {n} gün; yalnız uzatabilirsin.',
+    hRrWindowPolicy: 'Mağaza iade politikandaki süre.',
+    lRrAutoReasons: 'Otomatik onaylanan nedenler',
+    hRrAutoReasonsStat: 'Yasal: cayma nedenleri süre içinde her zaman onaylanır (kilitli).',
+    lRrPhotoReasons: 'Fotoğraf istenen nedenler',
+    hRrPhoto: 'Yasal: fotoğraf yalnız kusurlu / yanlış ürün iadelerinde istenebilir (kilitli).',
+    lRrCustomerPays: 'Kargo ücretini müşteri öder',
+    hRrPaysTR: 'Yasal zorunluluk: Türkiye\'de iade kargo ücreti müşteriden alınamaz (kilitli).',
+    hRrPaysDisclose: 'Yalnız cayma iadelerinde; kusurlu ürünlerde masraf her zaman sende. Açarsan ön bilgilendirme ve iade politikasına otomatik yazılır.',
+    lRrRestock: 'Teslim alınca stoğa geri ekle',
+    lRrSupplier: 'Kusurlu dropshipping ürününde tedarikçiden otomatik iade iste',
+    rrPolicy: 'İade Politikası',
+    rr_size: 'Beden / ölçü uymadı', rr_changed_mind: 'Vazgeçtim', rr_defective: 'Ürün kusurlu', rr_damaged: 'Hasarlı geldi', rr_wrong_item: 'Yanlış ürün geldi',
+    rr_not_as_described: 'Açıklamayla uyuşmuyor', rr_late: 'Geç geldi', rr_other: 'Diğer',
     secAutoOrder: '🤖 Otomatik sipariş',
     dAutoOrder: 'Mağazana gelen tedarikçili (CJ, AliExpress) siparişler kendiliğinden tedarikçiye gönderilir. Zararlı siparişler (ürün + kargo + komisyon) her zaman ödenmeden onayına düşer.',
     lAeAutoPay: 'AliExpress siparişlerini kayıtlı kartımla otomatik öde',
@@ -648,6 +722,29 @@ const T = {
     nBasit: 'No carrier contract needed. The API key from your basitkargo.com account.',
     nPendingCarrier: 'Your details are stored in the encrypted vault; shipments start automatically once the carrier\'s web service documents and test access are complete.',
     secReturn: '📦 Return Address',
+    lDistrict: 'District',
+    secReturnRules: '↩️ Return Rules',
+    rrLaw: 'Legal framework: {law} ({c}). You cannot go below the legal minimum; you can only change it in the customer\'s favour.',
+    lRrAuto: 'Approve returns automatically',
+    hRrAutoStat: 'Withdrawal requests within the period (changed mind, wrong size etc.) cannot legally be declined; they are always approved.',
+    hRrAutoPolicy: 'Returns that match your rules are approved right away; others wait for you.',
+    lRrMax: 'Auto-approval limit (TL)',
+    hRrMax: 'Only used for faulty-item claims and suspicious requests; it does not decide withdrawal requests.',
+    lRrWindow: 'Return period (days)',
+    hRrWindowStat: 'Legal minimum {n} days; you can only extend it.',
+    hRrWindowPolicy: 'The period in your store return policy.',
+    lRrAutoReasons: 'Reasons approved automatically',
+    hRrAutoReasonsStat: 'Legal: withdrawal reasons are always approved within the period (locked).',
+    lRrPhotoReasons: 'Reasons that require a photo',
+    hRrPhoto: 'Legal: photos can only be requested for faulty / wrong items (locked).',
+    lRrCustomerPays: 'Customer pays return shipping',
+    hRrPaysTR: 'Legal requirement: in Türkiye return shipping cannot be charged to the customer (locked).',
+    hRrPaysDisclose: 'Withdrawals only; for faulty items you always pay. If enabled, it is written into your pre-contract information and return policy automatically.',
+    lRrRestock: 'Add back to stock when received',
+    lRrSupplier: 'Automatically claim from the supplier for faulty dropshipping items',
+    rrPolicy: 'Return Policy',
+    rr_size: 'Size / fit', rr_changed_mind: 'Changed mind', rr_defective: 'Faulty', rr_damaged: 'Arrived damaged', rr_wrong_item: 'Wrong item',
+    rr_not_as_described: 'Not as described', rr_late: 'Arrived late', rr_other: 'Other',
     secAutoOrder: '🤖 Automatic orders',
     dAutoOrder: 'Supplier (CJ, AliExpress) orders from your store are sent to the supplier automatically. Loss-making orders (product + shipping + commission) always wait for your approval unpaid.',
     lAeAutoPay: 'Pay AliExpress orders with my saved card automatically',
@@ -1016,6 +1113,7 @@ function fillForm(p) {
   $('ret_name').value = r.name || '';
   $('ret_address').value = r.address || '';
   $('ret_city').value = r.city || '';
+  $('ret_district').value = r.district || '';
   $('ret_postal').value = r.postal_code || '';
   if (r.country) ensureOption('ret_country', r.country);
   $('ret_country').value = r.country || '';
@@ -1124,7 +1222,7 @@ async function saveProfile() {
     epr_registrations: epr,
     return_address: buildJson({
       name: $('ret_name').value.trim(), address: $('ret_address').value.trim(),
-      city: $('ret_city').value.trim(), postal_code: $('ret_postal').value.trim(),
+      city: $('ret_city').value.trim(), district: $('ret_district').value.trim(), postal_code: $('ret_postal').value.trim(),
       country: $('ret_country').value, phone: $('ret_phone').value.trim()
     }),
     onboarding_completed: !!businessType
@@ -1147,6 +1245,7 @@ async function saveProfile() {
       }).eq('user_id', currentUserId);
       if (brandError) throw brandError;
     }
+    await saveReturnRules();
     setStatus('saved', 'ok');
   } catch (err) {
     console.error(err);
@@ -1155,6 +1254,57 @@ async function saveProfile() {
     btn.disabled = false;
     btn.textContent = t('save');
   }
+}
+
+// ---------- İade Kuralları (yasal çerçeve: my_return_law; kilitli ayarlar) ----------
+const RR_ALL = ['size', 'changed_mind', 'late', 'other', 'defective', 'damaged', 'wrong_item', 'not_as_described'];
+const RR_DEFECT = ['defective', 'damaged', 'wrong_item', 'not_as_described'];
+let RR_LAW = null;
+async function loadReturnRules() {
+  const [{ data: law }, { data: rr }] = await Promise.all([db.rpc('my_return_law'), db.from('return_rules').select('*').eq('user_id', currentUserId).maybeSingle()]);
+  RR_LAW = law || { region: 'TR', statutory: true, window_days: 14, customer_may_pay: false, law_name_tr: 'Mesafeli Sözleşmeler Yönetmeliği', law_name_en: 'Turkish Distance Contracts Regulation', country: 'TR' };
+  const r = rr || {};
+  const en = (document.documentElement.lang === 'en');
+  $('rrLaw').textContent = t('rrLaw').replace('{law}', en ? RR_LAW.law_name_en : RR_LAW.law_name_tr).replace('{c}', RR_LAW.country || RR_LAW.region);
+  $('rr_auto_approve').checked = r.auto_approve !== false;
+  $('rrAutoHint').textContent = t(RR_LAW.statutory ? 'hRrAutoStat' : 'hRrAutoPolicy');
+  $('rr_max').value = r.max_auto_amount != null ? r.max_auto_amount : 1000;
+  const win = RR_LAW.statutory ? Math.max(RR_LAW.window_days, r.window_days || 0) : (r.policy_days || RR_LAW.window_days);
+  $('rr_window').value = win;
+  $('rr_window').min = RR_LAW.statutory ? RR_LAW.window_days : 1;
+  $('rrWindowHint').textContent = RR_LAW.statutory ? t('hRrWindowStat').replace('{n}', RR_LAW.window_days) : t('hRrWindowPolicy');
+  const auto = r.auto_reasons || ['size', 'changed_mind', 'wrong_item', 'not_as_described', 'late'];
+  const withdrawal = RR_ALL.filter(x => !RR_DEFECT.includes(x));
+  $('rrAutoReasons').innerHTML = withdrawal.map(x => '<label class="check-row"><input type="checkbox" data-rr-auto="' + x + '"' + (RR_LAW.statutory || auto.includes(x) ? ' checked' : '') + (RR_LAW.statutory ? ' disabled' : '') + '> <span>' + t('rr_' + x) + '</span></label>').join('');
+  $('rrAutoReasonsHint').textContent = RR_LAW.statutory ? t('hRrAutoReasonsStat') : '';
+  $('rrPhotoReasons').innerHTML = RR_DEFECT.map(x => '<label class="check-row"><input type="checkbox" checked disabled> <span>' + t('rr_' + x) + '</span></label>').join('');
+  const locked = !RR_LAW.customer_may_pay;
+  $('rr_customer_pays').checked = !locked && !!r.customer_pays;
+  $('rr_customer_pays').disabled = locked;
+  $('rrPaysHint').textContent = t(locked ? 'hRrPaysTR' : 'hRrPaysDisclose');
+  $('rr_restock').checked = r.restock !== false;
+  $('rr_supplier_claim').checked = r.supplier_claim !== false;
+  loadReturnPolicy();
+}
+async function loadReturnPolicy() {
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const r = await fetch(SUPABASE_URL + '/functions/v1/returns', { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ action: 'policy', userId: session.user.id, country: RR_LAW && RR_LAW.country }) }).then(x => x.json());
+    $('rrPolicyText').textContent = r && r.ok ? (document.documentElement.lang === 'en' ? r.en : r.tr) : '';
+  } catch (e) { console.warn('policy', e); }
+}
+async function saveReturnRules() {
+  if (!RR_LAW) return;
+  const win = Math.max(RR_LAW.statutory ? RR_LAW.window_days : 1, Number($('rr_window').value) || RR_LAW.window_days);
+  const row = { user_id: currentUserId, auto_approve: $('rr_auto_approve').checked, max_auto_amount: Math.max(0, Number($('rr_max').value) || 0),
+    restock: $('rr_restock').checked, supplier_claim: $('rr_supplier_claim').checked, customer_pays: RR_LAW.customer_may_pay ? $('rr_customer_pays').checked : false,
+    updated_at: new Date().toISOString() };
+  if (RR_LAW.statutory) row.window_days = win; else { row.policy_days = win; row.auto_reasons = [...document.querySelectorAll('[data-rr-auto]')].filter(x => x.checked).map(x => x.dataset.rrAuto).concat(RR_DEFECT); }
+  $('rr_window').value = win;
+  const { error } = await db.from('return_rules').upsert(row, { onConflict: 'user_id' });
+  if (error) throw error;
+  loadReturnPolicy();
 }
 
 async function init() {
@@ -1176,6 +1326,7 @@ async function init() {
     loadWaTemplate();
     await loadShipping();
     applyTexts();
+    await loadReturnRules();
     $('loading').classList.add('hidden');
     $('settingsForm').classList.remove('hidden');
     $('saveBar').classList.remove('hidden');

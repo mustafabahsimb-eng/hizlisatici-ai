@@ -400,6 +400,29 @@ async function questionsReply(link: Link): Promise<Reply> {
 }
 
 // ---------- Bildirim metinleri (kuyruktan) ----------
+// İade bildirimleri: karar bekleyen talep [Onayla] [Reddet], para iadesi [Parayı iade ettim]
+const RET_REASON: Record<string, string> = { size: "Beden / ölçü uymadı", changed_mind: "Vazgeçtim", defective: "Ürün kusurlu", damaged: "Hasarlı geldi", wrong_item: "Yanlış ürün geldi",
+  not_as_described: "Açıklamayla uyuşmuyor", late: "Geç geldi", other: "Diğer" };
+async function returnAlert(p: any): Promise<Reply> {
+  const { data: r } = await db.from("returns").select("id, status, reason_code, reason_text, amount, currency, withdrawal, decision_note, refund_status, refund_due_at, product_id, source").eq("id", p.return_id).maybeSingle();
+  if (!r) return { text: `↩️ İade: ${short(p.text, 300)}`, link: { title: "İadeleri gör", url: `${SITE}/orders.html#returns` } };
+  const { data: pr } = r.product_id ? await db.from("products").select("generated_title, name").eq("id", r.product_id).maybeSingle() : { data: null };
+  const head = `${short(pr?.generated_title || pr?.name || "", 60)} — ${RET_REASON[r.reason_code] || r.reason_code}${r.amount != null ? " · " + money(r.amount, r.currency || "TRY") : ""}`;
+  if (p.status === "refund_due" || p.status === "refund_pending" || (r.refund_status === "pending" && p.status !== "requested")) {
+    const due = r.refund_due_at ? ` Son gün: ${String(r.refund_due_at).slice(0, 10)}.` : "";
+    return { text: `💸 ${p.status === "refund_due" ? short(p.text, 80) : "Müşteriye para iadesi yap"}: ${head}.${due}`, buttons: [{ id: `ret_paid:${r.id}`, title: "Parayı iade ettim" }] };
+  }
+  if (r.status === "requested") {
+    const legal = r.withdrawal && /^Yasal cayma/.test(r.decision_note || "");
+    const quote = r.reason_text ? "\n“" + short(r.reason_text, 200) + "”" : "";
+    const why = r.decision_note ? "\n" + short(r.decision_note, 160) : "";
+    return { text: `↩️ İade talebi: ${head}${quote}${why}`,
+      buttons: legal ? [{ id: `ret_ok:${r.id}`, title: "Onayla" }] : [{ id: `ret_ok:${r.id}`, title: "Onayla" }, { id: `ret_no:${r.id}`, title: "Reddet" }] };
+  }
+  if (r.status === "received") return { text: `📦 İade ürünü geri geldi: ${head}.`, link: { title: "İadeleri gör", url: `${SITE}/orders.html#returns` } };
+  return { text: `↩️ İade: ${head} (${r.status})`, link: { title: "İadeleri gör", url: `${SITE}/orders.html#returns` } };
+}
+
 export async function renderAlert(kind: string, p: any, userId: string): Promise<{ reply: Reply; need: "orders" | "products" | "owner" } | null> {
   if (kind === "new_order") {
     const { data: pr } = await db.from("products").select("generated_title, name").eq("id", p.product_id).maybeSingle();
@@ -417,7 +440,7 @@ export async function renderAlert(kind: string, p: any, userId: string): Promise
     text: `🌐 ${short(p.site, 60)} sitendeki ${p.count} ürün Kendi Mağazam'da yayında.`,
     link: { title: "Mağazayı aç", url: `${SITE}/magaza.html?slug=${encodeURIComponent(p.slug || "")}` } } };
   if (kind === "connection") return { need: "owner", reply: { text: `🔌 ${short(p.name, 40)} bağlantının süresi doluyor${p.expires ? " (" + p.expires + ")" : ""}.`, buttons: [{ id: "reconnect", title: "Yeniden bağla" }] } };
-  if (kind === "return") return { need: "orders", reply: { text: `↩️ İade talebi: ${short(p.text, 300)}`, buttons: [{ id: `order:${p.store_order_id || ""}`, title: "Siparişi gör" }] } };
+  if (kind === "return") return { need: "orders", reply: await returnAlert(p) };
   if (kind === "competitor") return { need: "owner", reply: {
     text: `📉 Rakip fiyat düşürdü: ${short(p.name, 50)} — rakip ${money(p.competitor_price)}, senin ${money(p.my_price)}. Önerilen: ${money(p.suggested)} (alt sınırının altına inmez).`,
     buttons: [{ id: `price_drop:${p.product_id}:${p.suggested}`, title: "Fiyatı düşür" }, { id: "keep_price", title: "Böyle kalsın" }] } };
@@ -475,6 +498,17 @@ async function handleButton(link: Link, id: string): Promise<Reply[]> {
     return [{ text: `Fiyat ${money(a2)} olacak. Emin misin?`, buttons: [{ id: "confirm", title: "Evet" }, { id: "deny", title: "Vazgeç" }] }];
   }
   if (act === "keep_price") return [{ text: "Tamam, fiyat aynı kaldı." }];
+  if (act === "ret_ok") {
+    if (!can(link, "orders")) return [NO_PERM];
+    const r = await fn("returns", link.user_id, { action: "decide", returnId: a1, approve: true, note: "Satıcı onayladı (asistan)" });
+    return [{ text: r?.ok ? "✅ İade onaylandı." + (r.label ? " İade etiketi müşteriye iletildi." : "") : "İşlem yapılamadı: " + short(r?.error, 200) }];
+  }
+  if (act === "ret_no" || act === "ret_paid") {
+    if (!can(link, "owner")) return [NO_PERM];
+    // İkinci onay (kritik iş: red / para)
+    await setState(link, { ...st, confirm: { action: act, returnId: a1, at: Date.now() } });
+    return [{ text: act === "ret_no" ? "İade talebi reddedilecek. Emin misin?" : "Müşteriye parayı iade ettiğini kaydediyorum. Emin misin?", buttons: [{ id: "confirm", title: "Evet" }, { id: "deny", title: "Vazgeç" }] }];
+  }
   if (act === "confirm") return await runConfirmed(link, st);
   if (act === "deny") { await setState(link, { ...st, confirm: null }); return [{ text: "Vazgeçildi." }]; }
   if (act === "balance") return [{ text: "CJ bakiyeni yükledikten sonra bekleyen siparişler otomatik ödenir.", link: { title: "CJ'ye git", url: "https://cjdropshipping.com/myCJ.html#/wallet" } }];
@@ -507,6 +541,10 @@ async function runConfirmed(link: Link, st: any): Promise<Reply[]> {
     await db.from("products").update({ sale_price: c.price }).eq("id", p.id);
     await db.from("listings").update({ price: c.price }).eq("product_id", p.id).eq("marketplace_code", "own_store");
     return [{ text: `✅ Fiyat ${money(c.price)} oldu.` }];
+  }
+  if (c.action === "ret_no" || c.action === "ret_paid") {
+    const r = await fn("returns", link.user_id, c.action === "ret_no" ? { action: "decide", returnId: c.returnId, approve: false, note: "Satıcı reddetti" } : { action: "refunded", returnId: c.returnId });
+    return [{ text: r?.ok ? (c.action === "ret_no" ? "✅ İade talebi reddedildi." : "✅ Para iadesi kaydedildi.") : "İşlem yapılamadı: " + short(r?.error, 200) }];
   }
   if (c.action === "delete") {
     await db.from("products").update({ deleted_at: new Date().toISOString() }).in("id", c.ids).eq("user_id", link.user_id);
