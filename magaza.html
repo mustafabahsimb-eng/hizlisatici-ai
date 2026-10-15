@@ -512,6 +512,7 @@ async function loadStore(){
   try {
     const data = await fetchPage(0);
     currentStore = data.store;
+    if (currentStore && currentStore.meta_pixel_id) initPixel(currentStore.meta_pixel_id);
     currentProducts = data.products || [];
     storeTotal = data.total ?? currentProducts.length;
     nextOffset = data.next_offset ?? null;
@@ -614,6 +615,7 @@ function openOrderModal(product){
   document.getElementById('orderForm').style.display = '';
   document.getElementById('orderDone').style.display = 'none';
   document.getElementById('orderModalOverlay').classList.add('open');
+  track('InitiateCheckout', { content_ids: ['seltigo_' + product.id], content_type: 'product', currency: product.currency || 'TRY', value: Number(product.sale_price) || 0 });
 }
 // Sipariş alındı: formun yerine müşterinin takip bağlantısını göster
 function showOrderDone(trackingToken){
@@ -667,11 +669,16 @@ document.getElementById('orderForm').addEventListener('submit', async (e) => {
         customer_district: document.getElementById('orderDistrict').value.trim(),
         customer_zip: document.getElementById('orderZip').value.trim(),
         quantity: parseInt(document.getElementById('orderQty').value, 10) || 1,
-        language: LANG
+        language: LANG,
+        ad_source: Object.assign({}, AD_SRC, { fbp: cookie('_fbp') || undefined, fbc: AD_SRC.fbc || cookie('_fbc') || undefined }),
+        page_url: location.href.slice(0, 500)
       })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) throw new Error(data.error || t('orderFail'));
+    // Satın alma: event_id = sipariş no (sunucudaki Dönüşüm API olayıyla tekilleşir)
+    if (data.order) track('Purchase', { content_ids: ['seltigo_' + selectedProduct.id], content_type: 'product', currency: selectedProduct.currency || 'TRY',
+      value: (Number(selectedProduct.sale_price) || 0) * (parseInt(document.getElementById('orderQty').value, 10) || 1) }, { eventID: data.order.id });
     showOrderDone(data.order && data.order.tracking_token);
   } catch (err) {
     console.error(err);
@@ -779,6 +786,27 @@ document.getElementById('askContactBtn').addEventListener('click', async () => {
     btn.textContent = t('contactBtn');
   }
 });
+
+/* ============== Reklam ölçümü (Seltigo Ads): kaynak + Meta Pixel ============== */
+// Bağlantıdaki UTM / fbclid oturum boyunca saklanır; sipariş bunlarla gönderilir (hangi reklamdan geldi)
+const AD_SRC = (() => {
+  let s = {};
+  try { s = JSON.parse(sessionStorage.getItem('slt_ad_src') || '{}') || {}; } catch (e) {}
+  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'fbclid'].forEach(k => { const v = params.get(k); if (v) s[k] = v.slice(0, 300); });
+  if (params.get('fbclid')) s.fbc = 'fb.1.' + Date.now() + '.' + params.get('fbclid');
+  try { sessionStorage.setItem('slt_ad_src', JSON.stringify(s)); } catch (e) {}
+  return s;
+})();
+function cookie(n){ const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : null; }
+let pixelOn = false;
+function initPixel(id){
+  if (!id || pixelOn || !/^\d{5,20}$/.test(String(id))) return;
+  pixelOn = true;
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', String(id));
+  fbq('track', 'PageView');
+}
+function track(ev, data, opts){ try { if (pixelOn && window.fbq) fbq('track', ev, data || {}, opts || {}); } catch (e) {} }
 
 /* ============== Ön bilgilendirme / iade politikası (yasal çerçeveye göre otomatik) ============== */
 async function loadPolicy(){

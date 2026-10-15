@@ -170,7 +170,10 @@ serve(async (req) => {
     }
 
     // Mağazadan da yalnız vitrinde gereken alanlar (vergi no, adres, kullanıcı kimliği vb. çıkmaz)
+    // Reklam pikseli (herkese açık numara; satıcının bağlı reklam hesabından)
+    const { data: adAcc } = await supabase.from("ad_accounts").select("pixel_id").eq("user_id", store.user_id).eq("is_default", true).eq("status", "connected").not("pixel_id", "is", null).maybeSingle();
     const publicStore = {
+      meta_pixel_id: adAcc?.pixel_id || null,
       store_slug: store.store_slug, store_name: store.store_name,
       business_name: store.business_name || null, business_logo_url: store.business_logo_url || null,
       website_url: store.website_url || null, buy_on_website: store.buy_on_website === true,
