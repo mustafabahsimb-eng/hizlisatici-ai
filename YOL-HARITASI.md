@@ -179,7 +179,12 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 - Durum (15 Ekim 2026): anahtar etkin (ETSY_KEYSTRING), bahsistore bağlı; gerçek mağazada taslak testi geçti. İlk toplu yükleme: 25 dijital ilan (20 tekli + 5 set) "Gönder ve yayınla" + otomatik yenileme açık; 1 ve 2 numaralı mevcut ilanlar yeni ilan açılmadan güncellendi (eski görsel/dosyalar değişti).
 - Fikir (sonra): **Otomatik ilan kapağı (mockup)** — dijital baskı ürünlerinde tasarımı gerçek oda fotoğrafındaki çerçeveye perspektifle yerleştirme, setlerde galeri duvarı, stile uygun "5 Print Sizes Included" görseli. İlk sürüm elle çalıştırılan araç olarak tools/etsy-mockup/ altında (Pexels, ticari kullanım serbest). Panel özelliği olunca anahtarı feature_flags'e eklenecek; adlar Mustafa'nın onayında.
 - Adlar onaylandı: "Fiziksel ürün" / "Dijital ürün", "İndirilebilir dosyalar (en fazla 5)", "+ Dosya ekle", "📁 Klasörden yükle", "Klasör seç", "Etsy'ye gönder", "Taslak olarak gönder" (varsayılan) / "Gönder ve yayınla".
-- Sonra: İade otomasyonuna dönülecek (tablolar canlıda, fonksiyonlar yerelde).
+- İade otomasyonu (15 Ekim 2026): canlıda; yasal çerçeve (TR / AB / GB / ABD), takip sayfası formu, Siparişler > İadeler, Ayarlar > İade Kuralları, Cayma hakkı yok, vitrin ön bilgilendirme, asistan düğmeleri. Ayrıntı docs/iade.md.
+**İade — sıradaki (otomasyona giden yol)**
+- Etsy AB cayma talebi: API vermiyor. Yol: Etsy'nin satıcıya gönderdiği "help request / withdrawal" e-postalarını Seltigo'ya yönlendirme (satıcı başına gelen kutusu adresi + e-posta alma servisi, ör. Cloudflare Email Routing ücretsiz) -> AI ile ayrıştır -> iade akışına + 14 gün sayacı. Etsy API'ye ilgili uç gelirse doğrudan bağlanır.
+- Adresten alım: returns.pickup işaretleniyor; kargo firmasının "adresten alım" servisine otomatik talep (Yurtiçi alım talebi / Geliver) firma belgesi ve test erişimiyle eklenecek.
+- Kendi Mağazam ödeme altyapısı gelince para iadesi otomatik (şimdilik satıcı "Parayı iade ettim" der). Mağaza siparişine kargo ücreti alanı (caymada ilk gönderim ücreti iadesi için).
+- Hepsiburada / Amazon iade servisleri canlı bağlantılarla.
 
 **Eksik taraması düzeltmeleri (13-14 Ekim 2026 gecesi; hepsi canlıda)**
 - 1 Instagram paylaşım kuyruğu düzeltildi + 10 dk'lık görev kuruldu (kuyruk daha önce hiç çalışmıyordu).
