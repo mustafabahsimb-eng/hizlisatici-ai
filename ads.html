@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo - Reklamlar</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 8px; background: #1D9E75; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn { background: transparent; border: 1px solid #2a3040; color: #9aa3b2; padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  main { max-width: 900px; margin: 0 auto; padding: 28px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .lead { color: #9aa3b2; font-size: 14px; margin-bottom: 18px; line-height: 1.55; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 12px; }
+  .card.hero { border-color: #1D9E75; background: linear-gradient(180deg, #13261f, #141821); }
+  label.f { display: block; font-size: 12px; color: #9aa3b2; margin: 12px 0 6px; }
+  input[type=number], select { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid #2a3040; background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: #1D9E75; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } main { padding: 20px 16px 80px; } }
+  .note { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.55; }
+  .note.warn { color: #e6c96a; }
+  .btn { background: #1D9E75; color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn2 { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 7px 12px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .btn2:hover { border-color: #3a4258; color: #fff; }
+  .btn2:disabled { opacity: .5; cursor: not-allowed; }
+  .chk { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; padding: 6px 0; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; margin-top: 2px; accent-color: #1D9E75; flex-shrink: 0; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .chip { font-size: 11px; padding: 3px 9px; border-radius: 10px; background: #1c2130; color: #c3c9d4; border: 1px solid #2a3040; }
+  .chip.test { background: #1b2540; color: #93b4ff; border-color: #2b3b66; }
+  .chip.ok { background: #123222; color: #6ee7b7; border-color: #1d5c40; }
+  .chip.warn { background: #2e1f0e; color: #f5b041; border-color: #4a3315; }
+  .chip.err { background: #2a1414; color: #f28b8b; border-color: #4a2020; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #232838; vertical-align: top; }
+  th { color: #9aa3b2; font-weight: 500; font-size: 12px; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .camp { border: 1px solid #232838; border-radius: 12px; padding: 12px 14px; margin-top: 10px; background: #0d0f16; }
+  .camp-top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .camp-name { font-weight: 600; color: #fff; font-size: 14px; }
+  .kpis { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: #c3c9d4; }
+  .kpis b { color: #fff; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  details summary { cursor: pointer; color: #9aa3b2; font-size: 13px; margin-top: 10px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #123222; color: #6ee7b7; border: 1px solid #1D9E75; padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; z-index: 99; max-width: 90vw; }
+  .toast.err { background: #2a1416; color: #f28b8b; border-color: #6b2a2f; }
+  .loading { color: #9aa3b2; padding: 40px 0; text-align: center; }
+  .muted { color: #9aa3b2; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div class="logo-text">Seltigo</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+<main>
+  <div class="top-row">
+    <h1 data-t="title"></h1>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+  <p class="lead" data-t="lead"></p>
+  <div id="content"><div class="loading" data-t="loading"></div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'Seltigo - Reklamlar', logout: 'Çıkış yap', title: '📣 Reklamlar', back: '← Panele dön', loading: 'Yükleniyor…',
+      lead: 'Bütçe sınırını ve hedefini bir kez gir; Seltigo kârlı ürünlerine Facebook ve Instagram reklamı açar, sonuçları izler, kötü gideni durdurur. Sınırlar hiçbir zaman aşılmaz.',
+      testNote: 'Test hesabı: reklam yayınlanmaz, para harcanmaz',
+      liveOff: 'Canlı reklam henüz kapalı; şimdilik Meta test (sandbox) reklam hesabıyla çalışır.',
+      autoTitle: '⚡ Tam otomatik', autoText: 'Bütçe sınırını gir, gerisini Seltigo yapsın: kârlı ürünlere reklamı kendisi açar, iyi gidenin bütçesini sınır içinde artırır, kötü gideni durdurur.',
+      autoBtn: 'Tam otomatik moda geç', autoOn: 'Tam otomatik mod açık', autoNeed: 'Önce reklam hesabını bağla.', autoCaps: 'Günlük ve aylık bütçe sınırı gir.',
+      accTitle: 'Reklam hesabı', connectFb: 'Facebook\'u reklam izniyle bağla', fbNeed: 'Reklam için Facebook bağlantısında reklam yönetimi izni gerekli.',
+      account: 'Reklam hesabı', pixel: 'Piksel', noPixel: '— Piksel yok (tıklama hedefi) —', connect: 'Bağla', connected: 'Bağlı', change: 'Değiştir',
+      needPage: 'Reklam için bir Facebook Sayfası bağlı olmalı (Sosyal medya).', needCatalog: 'Meta ürün kataloğu yok (Sosyal medya > Katalog).',
+      rulesTitle: 'Reklam kuralları', dailyCap: 'Günlük bütçe sınırı', monthlyCap: 'Aylık bütçe sınırı', targetRoas: 'Hedef ROAS (satış / harcama)',
+      minMargin: 'En düşük kâr oranı (%)', autoLaunch: 'Kârlı ürünlere otomatik reklam aç', autoScale: 'İyi giden reklamın bütçesini otomatik artır',
+      pauseDays: 'Hedefin altında kalırsa durdur (gün)', approval: 'Yeni reklamı yayından önce onayıma sun', save: 'Kaydet', saved: 'Kaydedildi',
+      capsNote: 'Sınırlar boşken (0) hiç reklam açılmaz. Zarar ettiren reklam her zaman durdurulur (kapatılamaz).',
+      prodTitle: 'Önerilen ürünler', launch: 'Reklam aç', thProduct: 'Ürün', thMargin: 'Kâr', thBreakeven: 'Başabaş ROAS', skipped: 'Reklama uygun olmayanlar ({n})',
+      budgetLine: 'Günlük bütçe: {b}', noPicked: 'Reklama uygun kârlı ürün yok.',
+      campTitle: 'Kampanyalar', noCamp: 'Henüz reklam yok.', st_pending_approval: 'Onay bekliyor', st_active: 'Yayında', st_paused: 'Durdu', st_error: 'Hata', st_draft: 'Hazırlanıyor',
+      approve: 'Onayla', pause: 'Durdur', resume: 'Devam ettir', budget: 'Bütçeyi değiştir', budgetAsk: 'Yeni günlük bütçe:',
+      spend: 'Harcama', sales: 'Satış', roas: 'ROAS', daily: 'Günlük', last7: 'Son 7 gün', products: '{n} ürün', thisMonth: 'Bu ay harcanan: {m}',
+      done: 'Tamam', fail: 'İşlem yapılamadı: {e}', errGeneric: 'Bir sorun oldu, tekrar dene.',
+    },
+    en: {
+      pageTitle: 'Seltigo - Ads', logout: 'Log out', title: '📣 Ads', back: '← Back to dashboard', loading: 'Loading…',
+      lead: 'Set your budget limit and goal once; Seltigo runs Facebook and Instagram ads for your profitable products, tracks results and stops what does not work. Limits are never exceeded.',
+      testNote: 'Test account: ads are not delivered, no money is spent',
+      liveOff: 'Live ads are not enabled yet; for now it works with a Meta test (sandbox) ad account.',
+      autoTitle: '⚡ Fully automatic', autoText: 'Enter your budget limit and let Seltigo do the rest: it launches ads for profitable products, grows winners within your limit and stops losers.',
+      autoBtn: 'Switch to fully automatic', autoOn: 'Fully automatic mode is on', autoNeed: 'Connect your ad account first.', autoCaps: 'Enter daily and monthly budget limits.',
+      accTitle: 'Ad account', connectFb: 'Connect Facebook with ads permission', fbNeed: 'Ads need the ads management permission on your Facebook connection.',
+      account: 'Ad account', pixel: 'Pixel', noPixel: '— No pixel (link clicks goal) —', connect: 'Connect', connected: 'Connected', change: 'Change',
+      needPage: 'A Facebook Page must be connected for ads (Social media).', needCatalog: 'No Meta product catalogue (Social media > Catalogue).',
+      rulesTitle: 'Ad rules', dailyCap: 'Daily budget limit', monthlyCap: 'Monthly budget limit', targetRoas: 'Target ROAS (sales / spend)',
+      minMargin: 'Minimum profit margin (%)', autoLaunch: 'Automatically advertise profitable products', autoScale: 'Automatically increase the budget of winning ads',
+      pauseDays: 'Pause if below target for (days)', approval: 'Ask for my approval before a new ad goes live', save: 'Save', saved: 'Saved',
+      capsNote: 'While limits are empty (0) no ads are launched. Loss-making ads are always paused (cannot be turned off).',
+      prodTitle: 'Suggested products', launch: 'Launch ad', thProduct: 'Product', thMargin: 'Profit', thBreakeven: 'Break-even ROAS', skipped: 'Not suitable for ads ({n})',
+      budgetLine: 'Daily budget: {b}', noPicked: 'No profitable products suitable for ads.',
+      campTitle: 'Campaigns', noCamp: 'No ads yet.', st_pending_approval: 'Awaiting approval', st_active: 'Live', st_paused: 'Paused', st_error: 'Error', st_draft: 'Preparing',
+      approve: 'Approve', pause: 'Pause', resume: 'Resume', budget: 'Change budget', budgetAsk: 'New daily budget:',
+      spend: 'Spend', sales: 'Sales', roas: 'ROAS', daily: 'Daily', last7: 'Last 7 days', products: '{n} products', thisMonth: 'Spent this month: {m}',
+      done: 'Done', fail: 'Could not complete: {e}', errGeneric: 'Something went wrong, please try again.',
+    },
+  });
+  const t = HS.t;
+  const tf = (k, v) => String(t(k)).replace(/\{(\w+)\}/g, (m, x) => v[x] != null ? v[x] : m);
+  const META_APP_ID = '1650835089949068';
+  const ADS_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,catalog_management,ads_management,ads_read';
+  let S = null, PLAN = null, ACCS = null, userId = null;
+
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function toast(msg, isErr) { const el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (isErr ? ' err' : ''); el.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { el.style.display = 'none'; }, 3800); }
+  function applyStatic() { document.title = t('pageTitle'); document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); }); }
+  const money = (v, cur) => (window.HS && HS.money) ? HS.money(Number(v) || 0, cur || 'TRY') : (Number(v) || 0).toFixed(2) + ' ' + (cur || 'TRY');
+  async function api(body) {
+    const { data: { session } } = await HS.db.auth.getSession();
+    const r = await fetch(HS.SUPABASE_URL + '/functions/v1/ads', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ ...body, userAccessToken: session.access_token }) });
+    return await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+  }
+  function connectFb() {
+    const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { sessionStorage.setItem('meta_oauth_state', state); sessionStorage.setItem('meta_return', 'ads.html'); } catch (e) {}
+    const redirect = new URL('meta-callback.html', location.href); redirect.search = '';
+    location.href = 'https://www.facebook.com/v21.0/dialog/oauth?client_id=' + META_APP_ID + '&redirect_uri=' + encodeURIComponent(redirect.href) +
+      '&state=' + encodeURIComponent(state) + '&response_type=code&scope=' + encodeURIComponent(ADS_SCOPES);
+  }
+
+  async function load() {
+    S = await api({ action: 'status' });
+    if (!S || !S.ok) { document.getElementById('content').innerHTML = '<div class="card">' + esc(S && S.error || t('errGeneric')) + '</div>'; return; }
+    PLAN = S.account ? await api({ action: 'plan' }) : null;
+    if (S.ready.meta && !S.account && !ACCS) ACCS = await api({ action: 'accounts' });
+    render();
+  }
+
+  function render() {
+    const r = S.rules, acc = S.account, cur = acc ? acc.currency : 'TRY';
+    const full = r.auto_launch && r.auto_scale && r.approval_mode === 'direct' && r.daily_cap > 0 && r.monthly_cap > 0;
+    let h = '';
+    if (!S.live) h += '<div class="card"><span class="chip test">🧪 ' + esc(t('testNote')) + '</span><div class="note">' + esc(t('liveOff')) + '</div></div>';
+    // Tam otomatik
+    h += '<div class="card hero" id="autoCard"><h2>' + esc(t('autoTitle')) + '</h2><div class="note" style="margin-top:0">' + esc(t('autoText')) + '</div>' +
+      (full ? '<div class="row"><span class="chip ok">✓ ' + esc(t('autoOn')) + '</span></div>' :
+      '<div class="grid"><div><label class="f" for="qDaily">' + esc(t('dailyCap')) + ' (' + esc(cur) + ')</label><input type="number" id="qDaily" min="0" step="1" value="' + (r.daily_cap || '') + '"></div>' +
+      '<div><label class="f" for="qMonthly">' + esc(t('monthlyCap')) + ' (' + esc(cur) + ')</label><input type="number" id="qMonthly" min="0" step="1" value="' + (r.monthly_cap || '') + '"></div></div>' +
+      '<div class="row"><button class="btn" id="autoBtn">' + esc(t('autoBtn')) + '</button>' + (!acc ? '<span class="note warn" style="margin:0">' + esc(t('autoNeed')) + '</span>' : '') + '</div>') + '</div>';
+    // Hesap
+    h += '<div class="card" id="accCard"><h2>' + esc(t('accTitle')) + '</h2>';
+    if (acc) {
+      h += '<div class="row" style="margin-top:0"><b>' + esc(acc.name || acc.external_id) + '</b> <span class="chip ok">' + esc(t('connected')) + '</span>' + (acc.sandbox ? ' <span class="chip test">🧪 ' + esc(t('testNote')) + '</span>' : '') +
+        (acc.pixel_id ? ' <span class="chip">' + esc(t('pixel')) + ' ' + esc(acc.pixel_id) + '</span>' : '') + '</div>' +
+        (!S.ready.page ? '<div class="note warn">' + esc(t('needPage')) + '</div>' : '') + (!S.ready.catalog ? '<div class="note warn">' + esc(t('needCatalog')) + '</div>' : '') +
+        '<div class="note">' + esc(tf('thisMonth', { m: money(S.spentThisMonth, cur) })) + '</div>';
+    } else if (!S.ready.meta || (ACCS && !ACCS.ok)) {
+      h += '<div class="note" style="margin-top:0">' + esc(ACCS && !ACCS.ok ? ACCS.error : t('fbNeed')) + '</div><div class="row"><button class="btn" id="fbBtn">' + esc(t('connectFb')) + '</button></div>';
+    } else {
+      const list = (ACCS && ACCS.accounts) || [];
+      h += '<div class="grid"><div><label class="f" for="accSel">' + esc(t('account')) + '</label><select id="accSel">' + list.map(a => '<option value="' + esc(a.id) + '">' + esc(a.name + ' · ' + a.currency + (a.sandbox ? ' · 🧪' : '')) + '</option>').join('') + '</select></div>' +
+        '<div><label class="f" for="pxSel">' + esc(t('pixel')) + '</label><select id="pxSel"></select></div></div>' +
+        '<div class="row"><button class="btn" id="accBtn"' + (list.length ? '' : ' disabled') + '>' + esc(t('connect')) + '</button><button class="btn2" id="fbBtn">' + esc(t('connectFb')) + '</button></div>';
+    }
+    h += '</div>';
+    // Kurallar
+    h += '<div class="card" id="rulesCard"><h2>' + esc(t('rulesTitle')) + '</h2><div class="grid">' +
+      '<div><label class="f" for="rDaily">' + esc(t('dailyCap')) + ' (' + esc(cur) + ')</label><input type="number" id="rDaily" min="0" step="1" value="' + r.daily_cap + '"></div>' +
+      '<div><label class="f" for="rMonthly">' + esc(t('monthlyCap')) + ' (' + esc(cur) + ')</label><input type="number" id="rMonthly" min="0" step="1" value="' + r.monthly_cap + '"></div>' +
+      '<div><label class="f" for="rRoas">' + esc(t('targetRoas')) + '</label><input type="number" id="rRoas" min="1" step="0.1" value="' + r.target_roas + '"></div>' +
+      '<div><label class="f" for="rMargin">' + esc(t('minMargin')) + '</label><input type="number" id="rMargin" min="0" max="95" step="1" value="' + r.min_margin_pct + '"></div>' +
+      '<div><label class="f" for="rPause">' + esc(t('pauseDays')) + '</label><input type="number" id="rPause" min="1" max="30" step="1" value="' + r.pause_after_days + '"></div></div>' +
+      '<label class="chk"><input type="checkbox" id="rAuto"' + (r.auto_launch ? ' checked' : '') + '> <span>' + esc(t('autoLaunch')) + '</span></label>' +
+      '<label class="chk"><input type="checkbox" id="rScale"' + (r.auto_scale ? ' checked' : '') + '> <span>' + esc(t('autoScale')) + '</span></label>' +
+      '<label class="chk"><input type="checkbox" id="rApproval"' + (r.approval_mode !== 'direct' ? ' checked' : '') + '> <span>' + esc(t('approval')) + '</span></label>' +
+      '<div class="note">' + esc(t('capsNote')) + '</div><div class="row"><button class="btn" id="saveBtn">' + esc(t('save')) + '</button></div></div>';
+    // Önerilen ürünler
+    if (PLAN && PLAN.ok) {
+      h += '<div class="card" id="prodCard"><h2>' + esc(t('prodTitle')) + '</h2>';
+      if (PLAN.picked.length) {
+        h += '<table><thead><tr><th>' + esc(t('thProduct')) + '</th><th class="num">' + esc(t('thMargin')) + '</th><th class="num">' + esc(t('thBreakeven')) + '</th></tr></thead><tbody>' +
+          PLAN.picked.slice(0, 20).map(p => '<tr><td>' + esc(p.name) + '</td><td class="num">%' + Math.round(p.marginPct) + '</td><td class="num">' + p.breakevenRoas.toFixed(2) + '</td></tr>').join('') + '</tbody></table>';
+        h += '<div class="row"><button class="btn" id="launchBtn"' + (PLAN.budget > 0 ? '' : ' disabled') + '>' + esc(t('launch')) + '</button><span class="note" style="margin:0">' +
+          esc(PLAN.budget > 0 ? tf('budgetLine', { b: money(PLAN.budget, cur) }) : (PLAN.budgetReason || '')) + '</span></div>';
+      } else h += '<div class="note" style="margin-top:0">' + esc(t('noPicked')) + '</div>';
+      if (PLAN.skipped.length) h += '<details><summary>' + esc(tf('skipped', { n: PLAN.skipped.length })) + '</summary><table><tbody>' +
+        PLAN.skipped.slice(0, 50).map(p => '<tr><td>' + esc(p.name) + '</td><td class="muted">' + esc(p.reason || '') + '</td></tr>').join('') + '</tbody></table></details>';
+      h += '</div>';
+    }
+    // Kampanyalar
+    h += '<div class="card" id="campCard"><h2>' + esc(t('campTitle')) + '</h2>';
+    if (!S.campaigns.length) h += '<div class="note" style="margin-top:0">' + esc(t('noCamp')) + '</div>';
+    for (const c of S.campaigns) {
+      const cls = { active: 'ok', pending_approval: 'warn', paused: '', error: 'err' }[c.status] || '';
+      const b = [];
+      if (c.status === 'pending_approval') b.push('<button class="btn2" data-act="approve" data-id="' + c.id + '">' + esc(t('approve')) + '</button>');
+      if (c.status === 'active') b.push('<button class="btn2" data-act="pause" data-id="' + c.id + '">' + esc(t('pause')) + '</button>');
+      if (c.status === 'paused') b.push('<button class="btn2" data-act="resume" data-id="' + c.id + '">' + esc(t('resume')) + '</button>');
+      if (['active', 'paused', 'pending_approval'].includes(c.status)) b.push('<button class="btn2" data-act="budget" data-id="' + c.id + '">' + esc(t('budget')) + '</button>');
+      h += '<div class="camp" data-camp="' + c.id + '"><div class="camp-top"><span class="camp-name">' + esc(c.name) + '</span><span class="chip ' + cls + '">' + esc(t('st_' + c.status)) + '</span></div>' +
+        '<div class="kpis"><span>' + esc(t('daily')) + ': <b>' + money(c.daily_budget, c.currency) + '</b></span><span>' + esc(tf('products', { n: (c.product_ids || []).length })) + '</span>' +
+        '<span>' + esc(t('last7')) + ' — ' + esc(t('spend')) + ': <b>' + money(c.spend_7d || 0, c.currency) + '</b></span><span>' + esc(t('sales')) + ': <b>' + money(c.revenue_7d || 0, c.currency) + '</b></span>' +
+        '<span>' + esc(t('roas')) + ': <b>' + (c.roas_7d != null ? c.roas_7d : '–') + '</b></span></div>' +
+        (c.paused_reason || c.last_error ? '<div class="note">' + esc(c.last_error || c.paused_reason) + '</div>' : '') +
+        (b.length ? '<div class="acts">' + b.join('') + '</div>' : '') + '</div>';
+    }
+    h += '</div>';
+    document.getElementById('content').innerHTML = h;
+    bind();
+  }
+
+  function bind() {
+    const q = (id) => document.getElementById(id);
+    if (q('fbBtn')) q('fbBtn').onclick = connectFb;
+    if (q('accSel')) {
+      const fill = () => { const a = (ACCS.accounts || []).find(x => x.id === q('accSel').value); q('pxSel').innerHTML = '<option value="">' + esc(t('noPixel')) + '</option>' + ((a && a.pixels) || []).map(p => '<option value="' + esc(p.id) + '">' + esc(p.name + ' · ' + p.id) + '</option>').join(''); if (a && a.pixels && a.pixels[0]) q('pxSel').value = a.pixels[0].id; };
+      q('accSel').onchange = fill; fill();
+      q('accBtn').onclick = async () => { q('accBtn').disabled = true; const r = await api({ action: 'connect', externalId: q('accSel').value, pixelId: q('pxSel').value || null }); if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(t('done')); ACCS = null; await load(); };
+    }
+    q('saveBtn').onclick = async () => {
+      q('saveBtn').disabled = true;
+      const row = { user_id: userId, daily_cap: Math.max(0, Number(q('rDaily').value) || 0), monthly_cap: Math.max(0, Number(q('rMonthly').value) || 0), target_roas: Math.max(1, Number(q('rRoas').value) || 3),
+        min_margin_pct: Math.min(95, Math.max(0, Number(q('rMargin').value) || 0)), pause_after_days: Math.max(1, parseInt(q('rPause').value, 10) || 3), auto_launch: q('rAuto').checked, auto_scale: q('rScale').checked,
+        approval_mode: q('rApproval').checked ? 'approve' : 'direct', updated_at: new Date().toISOString() };
+      const { error } = await HS.db.from('ad_rules').upsert(row, { onConflict: 'user_id' });
+      if (error) toast(tf('fail', { e: error.message }), true); else toast(t('saved'));
+      await load();
+    };
+    if (q('autoBtn')) q('autoBtn').onclick = async () => {
+      const d = Number(q('qDaily').value) || 0, m = Number(q('qMonthly').value) || 0;
+      if (!(d > 0) || !(m > 0)) { toast(t('autoCaps'), true); return; }
+      q('autoBtn').disabled = true;
+      const { error } = await HS.db.from('ad_rules').upsert({ user_id: userId, daily_cap: d, monthly_cap: m, auto_launch: true, auto_scale: true, approval_mode: 'direct', updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (error) { toast(tf('fail', { e: error.message }), true); q('autoBtn').disabled = false; return; }
+      toast(t('autoOn'));
+      // Hesap hazırsa ilk reklam hemen açılır (beklemeden)
+      if (S.account && !S.campaigns.some(c => ['active', 'pending_approval'].includes(c.status))) { const r = await api({ action: 'launch' }); if (!r.ok) toast(tf('fail', { e: r.error }), true); }
+      await load();
+    };
+    if (q('launchBtn')) q('launchBtn').onclick = async () => { q('launchBtn').disabled = true; const r = await api({ action: 'launch' }); if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(t('done')); await load(); };
+    document.querySelectorAll('[data-act]').forEach(btn => btn.onclick = async () => {
+      const act = btn.dataset.act, id = btn.dataset.id;
+      const body = { action: act, campaignId: id };
+      if (act === 'budget') { const v = prompt(t('budgetAsk')); if (v === null) return; body.amount = Number(String(v).replace(',', '.')); }
+      btn.disabled = true;
+      const r = await api(body);
+      if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(t('done'));
+      await load();
+    });
+  }
+
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    await load();
+  })();
+  window.addEventListener('hs:langchange', () => { applyStatic(); if (S) render(); });
+</script>
+</body>
+</html>

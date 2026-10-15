@@ -116,6 +116,9 @@ async function run() {
     let html = esc(t('mc.okText')) + '<div class="list">' + rows.join('') + '</div>';
     if (!(d.instagram || []).length) html += '<p style="margin-top:10px;color:#f2d16b;">' + esc(t('mc.noIg')) + '</p>';
     done(true, t('mc.okTitle'), html);
+    // Bağlantıyı başlatan sayfaya dön (ör. Reklamlar)
+    let ret = null; try { ret = sessionStorage.getItem('meta_return'); sessionStorage.removeItem('meta_return'); } catch (e) {}
+    if (ret && /^[a-z-]+\.html$/.test(ret)) { const b = document.getElementById('back'); if (b) b.href = ret; setTimeout(() => { location.href = ret; }, 1500); }
   } catch (e) {
     done(false, t('mc.failTitle'), esc(e.message || String(e)));
   }
