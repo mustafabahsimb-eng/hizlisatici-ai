@@ -599,7 +599,10 @@ function connect(key) {
 // Instagram + Facebook: Facebook'un kendi giriş penceresi
 const META_APP_ID = '1650835089949068';
 const META_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,catalog_management,whatsapp_business_management,whatsapp_business_messaging';
-function connectMeta() {
+async function connectMeta() {
+  // Reklam hesabı bağlıysa reklam izinleri de istenir (yeniden bağlanınca Seltigo Ads izni kaybolmasın)
+  let scopes = META_SCOPES;
+  try { const { count } = await HS.db.from('ad_accounts').select('id', { count: 'exact', head: true }); if (count) scopes += ',ads_management,ads_read'; } catch (e) {}
   const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
   try { sessionStorage.setItem('meta_oauth_state', state); } catch (e) {}
   const redirect = new URL('meta-callback.html', location.href);
@@ -609,7 +612,7 @@ function connectMeta() {
     + '&redirect_uri=' + encodeURIComponent(redirect.href)
     + '&state=' + encodeURIComponent(state)
     + '&response_type=code'
-    + '&scope=' + encodeURIComponent(META_SCOPES);
+    + '&scope=' + encodeURIComponent(scopes);
 }
 
 async function disconnect(key) {
