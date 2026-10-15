@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo - İçerik Takvimi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #232838; background: #141821; gap: 12px; flex-wrap: wrap; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 8px; background: #1D9E75; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  .logo-text { font-size: 16px; font-weight: 600; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .user-email { font-size: 13px; color: #9aa3b2; }
+  .logout-btn { background: transparent; border: 1px solid #2a3040; color: #9aa3b2; padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  main { max-width: 960px; margin: 0 auto; padding: 28px 24px 80px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .lead { color: #9aa3b2; font-size: 14px; margin-bottom: 18px; line-height: 1.55; }
+  .back-link { color: #9aa3b2; font-size: 14px; text-decoration: none; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 12px; }
+  label.f { display: block; font-size: 12px; color: #9aa3b2; margin: 12px 0 6px; }
+  input[type=number], input[type=time], select, textarea { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid #2a3040; background: #0d0f16; color: #e6e8ee; font-size: 14px; font-family: inherit; }
+  textarea { min-height: 110px; resize: vertical; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 16px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } main { padding: 20px 16px 80px; } }
+  .note { font-size: 12px; color: #9aa3b2; margin-top: 8px; line-height: 1.55; }
+  .note.warn { color: #e6c96a; }
+  .btn { background: #1D9E75; color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:disabled, .btn2:disabled { opacity: .5; cursor: not-allowed; }
+  .btn2 { background: transparent; border: 1px solid #2a3040; color: #c3c9d4; padding: 7px 12px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .btn2:hover { border-color: #3a4258; color: #fff; }
+  .chk { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; padding: 6px 0; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; margin-top: 2px; accent-color: #1D9E75; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .chip { font-size: 11px; padding: 3px 9px; border-radius: 10px; background: #1c2130; color: #c3c9d4; border: 1px solid #2a3040; white-space: nowrap; }
+  .chip.ok { background: #123222; color: #6ee7b7; border-color: #1d5c40; }
+  .chip.warn { background: #2e1f0e; color: #f5b041; border-color: #4a3315; }
+  .chip.err { background: #2a1414; color: #f28b8b; border-color: #4a2020; }
+  .chip.blue { background: #142230; color: #7db8e6; border-color: #1f3a52; }
+  .day { font-size: 13px; color: #9aa3b2; margin: 18px 0 8px; font-weight: 600; }
+  .item { display: flex; gap: 14px; background: #141821; border: 1px solid #232838; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .item img { width: 110px; height: 138px; object-fit: cover; border-radius: 9px; background: #0d0f16; flex-shrink: 0; }
+  .item.story img { width: 78px; }
+  .item .body { flex: 1; min-width: 0; }
+  .item .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: #9aa3b2; }
+  .item .cap { font-size: 13px; color: #d4d9e3; margin-top: 8px; white-space: pre-wrap; line-height: 1.5; max-height: 6em; overflow: hidden; }
+  .item .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .item .err { color: #f28b8b; font-size: 12px; margin-top: 6px; }
+  .item .mx { font-size: 12px; color: #c3c9d4; margin-top: 6px; }
+  .pending-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: #2e1f0e; border: 1px solid #4a3315; color: #f5b041; border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 14px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #123222; color: #6ee7b7; border: 1px solid #1D9E75; padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; z-index: 99; max-width: 90vw; }
+  .toast.err { background: #2a1416; color: #f28b8b; border-color: #6b2a2f; }
+  .loading { color: #9aa3b2; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div class="logo-text">Seltigo</div></div>
+  <div class="header-right">
+    <span id="langSwitcherHost"></span>
+    <span class="user-email" id="userEmail"></span>
+    <button class="logout-btn" onclick="HS.logout()" data-t="logout"></button>
+  </div>
+</header>
+<main>
+  <div class="top-row">
+    <h1 data-t="title"></h1>
+    <a class="back-link" href="dashboard.html" data-t="back"></a>
+  </div>
+  <p class="lead" data-t="lead"></p>
+  <div id="content"><div class="loading" data-t="loading"></div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+  HS.i18n.add({
+    tr: {
+      pageTitle: 'Seltigo - İçerik Takvimi', logout: 'Çıkış yap', title: '🗓️ İçerik Takvimi', back: '← Panele dön', loading: 'Yükleniyor…',
+      lead: 'Seltigo her hafta ürünlerinden Instagram ve Facebook için gönderi ve hikâye hazırlar, zamanında paylaşır, sonuçlara bakıp iyi gideni daha sık yapar.',
+      setTitle: 'Ayarlar', enabled: 'Otomatik içerik', enabledNote: 'Açıkken her hafta plan kendiliğinden hazırlanır.', perDay: 'Günde gönderi', perWeek: 'Haftada hikâye', hour: 'Paylaşım saati',
+      channels: 'Kanallar', approval: 'Yayından önce onayıma sun', save: 'Kaydet', saved: 'Kaydedildi', planNow: 'Planı şimdi oluştur', planning: 'Hazırlanıyor…',
+      notConnected: 'bağlı değil', connectHint: 'Instagram ya da Facebook bağlı değil; Sosyal medya sayfasından bağla.', tokenBad: 'bağlantı yenilenmeli',
+      best: 'En iyi giden: {t} · {h}', pending: '{n} içerik onay bekliyor', approveAll: 'Hepsini onayla', empty: 'Henüz plan yok. "Planı şimdi oluştur"a bas.',
+      approve: 'Onayla', skip: 'Atla', edit: 'Metni düzenle', saveCap: 'Metni kaydet', publishNow: 'Şimdi paylaş', open: 'Gönderiyi aç',
+      st_pending_approval: 'Onay bekliyor', st_scheduled: 'Zamanlandı', st_publishing: 'Paylaşılıyor', st_published: 'Paylaşıldı', st_error: 'Hata', st_skipped: 'Atlandı', st_draft: 'Taslak',
+      tp_photo: 'Ürün fotoğrafı', tp_price: 'Fiyat etiketi', tp_collage: 'Kolaj', tp_season: 'Özel gün', tp_story: 'Hikâye',
+      post: 'Gönderi', story: 'Hikâye', likes: 'beğeni', comments: 'yorum', reach: 'erişim', saves: 'kaydetme',
+      done: 'Tamam', fail: 'İşlem yapılamadı: {e}', created: '{n} içerik hazırlandı', errGeneric: 'Bir sorun oldu, tekrar dene.',
+    },
+    en: {
+      pageTitle: 'Seltigo - Content Calendar', logout: 'Log out', title: '🗓️ Content Calendar', back: '← Back to dashboard', loading: 'Loading…',
+      lead: 'Every week Seltigo prepares Instagram and Facebook posts and stories from your products, publishes them on time and does more of what performs well.',
+      setTitle: 'Settings', enabled: 'Automatic content', enabledNote: 'When on, the plan is prepared automatically every week.', perDay: 'Posts per day', perWeek: 'Stories per week', hour: 'Posting time',
+      channels: 'Channels', approval: 'Ask for my approval before publishing', save: 'Save', saved: 'Saved', planNow: 'Create plan now', planning: 'Preparing…',
+      notConnected: 'not connected', connectHint: 'Instagram or Facebook is not connected; connect it on the Social media page.', tokenBad: 'needs reconnecting',
+      best: 'Best performing: {t} · {h}', pending: '{n} items awaiting approval', approveAll: 'Approve all', empty: 'No plan yet. Press "Create plan now".',
+      approve: 'Approve', skip: 'Skip', edit: 'Edit text', saveCap: 'Save text', publishNow: 'Publish now', open: 'Open post',
+      st_pending_approval: 'Awaiting approval', st_scheduled: 'Scheduled', st_publishing: 'Publishing', st_published: 'Published', st_error: 'Error', st_skipped: 'Skipped', st_draft: 'Draft',
+      tp_photo: 'Product photo', tp_price: 'Price tag', tp_collage: 'Collage', tp_season: 'Special day', tp_story: 'Story',
+      post: 'Post', story: 'Story', likes: 'likes', comments: 'comments', reach: 'reach', saves: 'saves',
+      done: 'Done', fail: 'Could not complete: {e}', created: '{n} items prepared', errGeneric: 'Something went wrong, please try again.',
+    },
+  });
+  const t = HS.t;
+  const tf = (k, v) => String(t(k)).replace(/\{(\w+)\}/g, (m, x) => v[x] != null ? v[x] : m);
+  let S = null, userId = null, editing = null;
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function toast(msg, isErr) { const el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (isErr ? ' err' : ''); el.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { el.style.display = 'none'; }, 3800); }
+  function applyStatic() { document.title = t('pageTitle'); document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.getAttribute('data-t')); }); }
+  async function api(body) {
+    const { data: { session } } = await HS.db.auth.getSession();
+    const r = await fetch(HS.SUPABASE_URL + '/functions/v1/content', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+      body: JSON.stringify({ ...body, userAccessToken: session.access_token }) });
+    return await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+  }
+  const locale = () => (document.documentElement.lang === 'en' ? 'en-GB' : 'tr-TR');
+  const dayLabel = (iso) => new Date(iso).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeLabel = (iso) => new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+
+  async function load() { S = await api({ action: 'status' }); if (!S || !S.ok) { document.getElementById('content').innerHTML = '<div class="card">' + esc((S && S.error) || t('errGeneric')) + '</div>'; return; } render(); }
+
+  function render() {
+    const s = S.settings, chs = S.channels || [];
+    const has = (p) => chs.find(c => c.platform === p);
+    let h = '<div class="card" id="setCard"><h2>' + esc(t('setTitle')) + '</h2>' +
+      '<label class="chk"><input type="checkbox" id="cEnabled"' + (s.enabled ? ' checked' : '') + '> <span><b>' + esc(t('enabled')) + '</b><br><span class="note" style="margin:0">' + esc(t('enabledNote')) + '</span></span></label>' +
+      '<div class="grid"><div><label class="f" for="cPerDay">' + esc(t('perDay')) + '</label><input type="number" id="cPerDay" min="0" max="5" value="' + s.posts_per_day + '"></div>' +
+      '<div><label class="f" for="cPerWeek">' + esc(t('perWeek')) + '</label><input type="number" id="cPerWeek" min="0" max="21" value="' + s.stories_per_week + '"></div>' +
+      '<div><label class="f" for="cHour">' + esc(t('hour')) + '</label><input type="time" id="cHour" value="' + esc((s.post_hours || ['19:30'])[0]) + '"></div></div>' +
+      '<label class="f">' + esc(t('channels')) + '</label>' +
+      ['instagram', 'facebook'].map(p => { const c = has(p); return '<label class="chk"><input type="checkbox" data-ch="' + p + '"' + ((s.channels || []).includes(p) ? ' checked' : '') + (c ? '' : ' disabled') + '> <span>' + (p === 'instagram' ? 'Instagram' : 'Facebook') +
+        (c ? ' <span class="chip">' + esc(c.name || '') + '</span>' + (c.status && c.status !== 'ok' ? ' <span class="chip err">' + esc(t('tokenBad')) + '</span>' : '') : ' <span class="chip warn">' + esc(t('notConnected')) + '</span>') + '</span></label>'; }).join('') +
+      (!chs.length ? '<div class="note warn">' + esc(t('connectHint')) + '</div>' : '') +
+      '<label class="chk"><input type="checkbox" id="cApproval"' + (s.approval_mode !== 'direct' ? ' checked' : '') + '> <span>' + esc(t('approval')) + '</span></label>' +
+      (S.best ? '<div class="note">' + esc(tf('best', { t: t('tp_' + S.best.template), h: S.best.hour })) + '</div>' : '') +
+      '<div class="row"><button class="btn" id="saveBtn">' + esc(t('save')) + '</button><button class="btn2" id="planBtn"' + (chs.length ? '' : ' disabled') + '>' + esc(t('planNow')) + '</button></div></div>';
+    const items = S.items || [];
+    const pend = items.filter(i => i.status === 'pending_approval').length;
+    if (pend) h += '<div class="pending-bar" id="pendBar"><span>' + esc(tf('pending', { n: pend })) + '</span><button class="btn" id="approveAll">' + esc(t('approveAll')) + '</button></div>';
+    if (!items.length) h += '<div class="card"><div class="note" style="margin:0">' + esc(t('empty')) + '</div></div>';
+    let lastDay = '';
+    for (const it of items) {
+      const d = dayLabel(it.scheduled_at);
+      if (d !== lastDay) { h += '<div class="day">' + esc(d) + '</div>'; lastDay = d; }
+      const cls = { published: 'ok', pending_approval: 'warn', error: 'err', scheduled: 'blue', publishing: 'blue' }[it.status] || '';
+      const m = it.metrics || {};
+      const b = [];
+      if (it.status === 'pending_approval') b.push('<button class="btn2" data-act="approve" data-id="' + it.id + '">' + esc(t('approve')) + '</button>');
+      if (['pending_approval', 'scheduled', 'error'].includes(it.status)) {
+        if (it.kind !== 'story') b.push('<button class="btn2" data-act="edit" data-id="' + it.id + '">' + esc(t('edit')) + '</button>');
+        b.push('<button class="btn2" data-act="publish_now" data-id="' + it.id + '">' + esc(t('publishNow')) + '</button>');
+        b.push('<button class="btn2" data-act="skip" data-id="' + it.id + '">' + esc(t('skip')) + '</button>');
+      }
+      if (it.external_url) b.push('<a class="btn2" style="text-decoration:none" target="_blank" rel="noopener" href="' + esc(it.external_url) + '">' + esc(t('open')) + '</a>');
+      h += '<div class="item' + (it.kind === 'story' ? ' story' : '') + '" data-item="' + it.id + '">' + (it.media_urls && it.media_urls[0] ? '<img src="' + esc(it.media_urls[0]) + '" alt="" loading="lazy">' : '') +
+        '<div class="body"><div class="meta"><b style="color:#fff">' + esc(timeLabel(it.scheduled_at)) + '</b> <span class="chip">' + (it.channel === 'instagram' ? 'Instagram' : 'Facebook') + '</span>' +
+        '<span class="chip">' + esc(t(it.kind)) + ' · ' + esc(t('tp_' + it.template)) + '</span><span class="chip ' + cls + '">' + esc(t('st_' + it.status)) + '</span>' + (it.reason ? '<span>' + esc(it.reason) + '</span>' : '') + '</div>' +
+        (editing === it.id ? '<textarea id="capEdit">' + esc(it.caption || '') + '</textarea><div class="acts"><button class="btn" data-act="saveCap" data-id="' + it.id + '">' + esc(t('saveCap')) + '</button></div>' : (it.caption ? '<div class="cap">' + esc(it.caption) + '</div>' : '')) +
+        (it.error && it.status === 'error' ? '<div class="err">' + esc(it.error) + '</div>' : '') +
+        (it.status === 'published' && it.metrics ? '<div class="mx">' + [m.reach != null ? m.reach + ' ' + t('reach') : '', (m.likes || 0) + ' ' + t('likes'), (m.comments || 0) + ' ' + t('comments'), m.saves ? m.saves + ' ' + t('saves') : ''].filter(Boolean).map(esc).join(' · ') + '</div>' : '') +
+        (b.length && editing !== it.id ? '<div class="acts">' + b.join('') + '</div>' : '') + '</div></div>';
+    }
+    document.getElementById('content').innerHTML = h;
+    bind();
+  }
+
+  function bind() {
+    const q = (id) => document.getElementById(id);
+    q('saveBtn').onclick = async () => {
+      q('saveBtn').disabled = true;
+      const row = { user_id: userId, enabled: q('cEnabled').checked, posts_per_day: Math.min(5, Math.max(0, parseInt(q('cPerDay').value, 10) || 0)), stories_per_week: Math.min(21, Math.max(0, parseInt(q('cPerWeek').value, 10) || 0)),
+        post_hours: [q('cHour').value || '19:30'], channels: [...document.querySelectorAll('[data-ch]')].filter(x => x.checked).map(x => x.dataset.ch), approval_mode: q('cApproval').checked ? 'approve' : 'direct', updated_at: new Date().toISOString() };
+      const { error } = await HS.db.from('content_settings').upsert(row, { onConflict: 'user_id' });
+      if (error) toast(tf('fail', { e: error.message }), true); else toast(t('saved'));
+      await load();
+    };
+    q('planBtn').onclick = async () => { q('planBtn').disabled = true; q('planBtn').textContent = t('planning'); const r = await api({ action: 'plan' }); if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(tf('created', { n: r.created })); await load(); };
+    if (q('approveAll')) q('approveAll').onclick = async () => { q('approveAll').disabled = true; const r = await api({ action: 'approve', all: true }); if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(t('done')); await load(); };
+    document.querySelectorAll('[data-act]').forEach(btn => btn.onclick = async () => {
+      const act = btn.dataset.act, id = btn.dataset.id;
+      if (act === 'edit') { editing = id; render(); return; }
+      btn.disabled = true;
+      const r = act === 'saveCap' ? await api({ action: 'caption', id, caption: document.getElementById('capEdit').value }) : await api({ action: act, id });
+      if (act === 'saveCap') editing = null;
+      if (!r.ok) toast(tf('fail', { e: r.error }), true); else toast(t('done'));
+      await load();
+    });
+  }
+
+  (async function start() {
+    applyStatic();
+    const ctx = await HS.init();
+    if (!ctx) return;
+    userId = ctx.user.id;
+    document.getElementById('userEmail').textContent = ctx.user.email || '';
+    await load();
+  })();
+  window.addEventListener('hs:langchange', () => { applyStatic(); if (S) render(); });
+</script>
+</body>
+</html>

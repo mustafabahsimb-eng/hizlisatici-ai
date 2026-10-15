@@ -487,6 +487,8 @@ export async function renderAlert(kind: string, p: any, userId: string): Promise
   if (kind === "connection") return { need: "owner", reply: { text: `🔌 ${short(p.name, 40)} bağlantının süresi doluyor${p.expires ? " (" + p.expires + ")" : ""}.`, buttons: [{ id: "reconnect", title: "Yeniden bağla" }] } };
   if (kind === "return") return { need: "orders", reply: await returnAlert(p) };
   if (kind === "ads") return { need: "owner", reply: await adsAlert(p) };
+  if (kind === "content") return { need: "owner", reply: { text: `🗓️ Önümüzdeki günler için ${p.count || 0} gönderi / hikâye hazır; onayını bekliyor.`,
+    buttons: [{ id: "ct_all", title: "Hepsini onayla" }], link: { title: "İçerik Takvimi", url: `${SITE}/content.html` } } };
   if (kind === "competitor") return { need: "owner", reply: {
     text: `📉 Rakip fiyat düşürdü: ${short(p.name, 50)} — rakip ${money(p.competitor_price)}, senin ${money(p.my_price)}. Önerilen: ${money(p.suggested)} (alt sınırının altına inmez).`,
     buttons: [{ id: `price_drop:${p.product_id}:${p.suggested}`, title: "Fiyatı düşür" }, { id: "keep_price", title: "Böyle kalsın" }] } };
@@ -544,6 +546,11 @@ async function handleButton(link: Link, id: string): Promise<Reply[]> {
     return [{ text: `Fiyat ${money(a2)} olacak. Emin misin?`, buttons: [{ id: "confirm", title: "Evet" }, { id: "deny", title: "Vazgeç" }] }];
   }
   if (act === "keep_price") return [{ text: "Tamam, fiyat aynı kaldı." }];
+  if (act === "ct_all") {
+    if (!can(link, "owner")) return [NO_PERM];
+    const r = await fn("content", link.user_id, { action: "approve", all: true });
+    return [{ text: r?.ok ? `✅ ${r.approved} içerik onaylandı; zamanı gelince paylaşılacak.` : "İşlem yapılamadı: " + short(r?.error, 200) }];
+  }
   if (act === "ads_ok" || act === "ads_stop") {
     if (!can(link, "owner")) return [NO_PERM];
     const r = await fn("ads", link.user_id, act === "ads_ok" ? { action: "approve", campaignId: a1 } : { action: "pause", campaignId: a1, reason: "Asistandan durduruldu" });

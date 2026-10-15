@@ -132,25 +132,27 @@ Deno.serve(async (req) => {
       const { data: token } = await supabase.rpc("social_channel_get_token", { p_channel_id: ch.id });
       if (!token) throw new Error("Erişim anahtarı yok");
 
-      const { data: p } = await supabase.from("products")
+      // İçerik otomasyonu: ürüne bağlı olmayan görsel (kolaj / özel gün) ya da hikâye; görsel ve metin hazır gelir
+      const { data: p } = job.product_id ? await supabase.from("products")
         .select("id, name, generated_title, generated_description, sale_price, image_url, content_language, deleted_at")
-        .eq("id", job.product_id).maybeSingle();
-      if (!p || p.deleted_at) {
+        .eq("id", job.product_id).maybeSingle() : { data: null };
+      if (job.product_id && (!p || p.deleted_at)) {
         await supabase.from("social_posts").update({
           status: "error", error: "İptal: ürün silinmiş", updated_at: new Date().toISOString(),
         }).eq("id", job.id);
         continue;
       }
 
-      const image = job.image_url || p.image_url;
+      const image = job.image_url || p?.image_url;
       if (!image || !/^https?:\/\//i.test(image)) throw new Error("Ürünün herkese açık görseli henüz yok");
 
-      const caption = job.caption || await makeCaption(p);
+      const story = job.kind === "story";
+      const caption = story ? "" : (job.caption || (p ? await makeCaption(p) : ""));
 
       const cRes = await fetch(`${GRAPH}/${ch.account_id}/media`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ image_url: image, caption, access_token: token }),
+        body: new URLSearchParams(story ? { image_url: image, media_type: "STORIES", access_token: token } : { image_url: image, caption, access_token: token }),
       });
       const created = await cRes.json();
       if (!cRes.ok || !created?.id) throw new Error(created?.error?.message || "Instagram görseli kabul etmedi");
