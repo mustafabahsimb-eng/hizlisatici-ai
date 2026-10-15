@@ -102,6 +102,7 @@ Deno.test("Kampanya zinciri: OUTCOME_SALES katalog kampanyası -> reklam seti (k
   assertEquals([camp.path, camp.params.get("objective"), camp.params.get("status")], ["/act_77/campaigns", "OUTCOME_SALES", "PAUSED"]);
   assertEquals(JSON.parse(camp.params.get("promoted_object")!), { product_catalog_id: "CAT1" });
   assertEquals(camp.params.get("special_ad_categories"), "[]");
+  assertEquals(camp.params.get("is_adset_budget_sharing_enabled"), "false", "Meta zorunlu alan (gerçek API'de doğrulandı)");
   assertEquals([adset.path, adset.params.get("daily_budget"), adset.params.get("status"), adset.params.get("optimization_goal")], ["/act_77/adsets", "15050", "PAUSED", "OFFSITE_CONVERSIONS"]);
   assertEquals(JSON.parse(adset.params.get("promoted_object")!), { product_set_id: set, pixel_id: "PX1", custom_event_type: "PURCHASE" });
   assertEquals(JSON.parse(adset.params.get("targeting")!).geo_locations.countries, ["TR"]);
@@ -110,6 +111,15 @@ Deno.test("Kampanya zinciri: OUTCOME_SALES katalog kampanyası -> reklam seti (k
   assertEquals(cr.params.get("product_set_id"), set);
   assertEquals([ad.path, ad.params.get("status"), JSON.parse(ad.params.get("creative")!).creative_id], ["/act_77/ads", "PAUSED", ids.creative]);
   assertEquals(calls.every((c) => c.params.get("access_token") === "tok"), true);
+});
+
+Deno.test("Zincir yarıda kalırsa (reklam metni reddi) Meta'da açılan kampanya silinir", async () => {
+  const { f, calls } = meta((c) => c.path.endsWith("/adcreatives") ? { error: { code: 100, error_subcode: 1885183, message: "app in development mode" } } : undefined);
+  let err: unknown;
+  try { await M.launchCatalogCampaign({ token: "t", account: "act_1", currency: "TRY", catalogId: "C", productSetId: "S", name: "n", dailyBudget: 10, countries: ["TR"], pageId: "P", link: "l", message: "m" }, f); } catch (e) { err = e; }
+  assert(err instanceof M.MetaAdsError && (err as M.MetaAdsError).sub === 1885183);
+  const del = calls.find((c) => c.method === "DELETE");
+  assertEquals(del?.path, "/100", "ilk açılan kampanya (id 100) silindi");
 });
 
 Deno.test("Piksel yoksa bağlantı tıklaması hedefi; ondalıksız para birimi (JPY)", async () => {

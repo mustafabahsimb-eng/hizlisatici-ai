@@ -51,7 +51,17 @@
 - Bundan sonra sandbox'ta uçtan uca test yapılacak: kampanya aç, onayla, durdur, bütçe değiştir, ölçüm.
 - Not: Meta, geliştirme modundaki uygulamada reklam metni oluşturmaya izin vermeyebilir (hata 1885183). O durumda uygulamanın Live moda alınması gerekir.
 
+## Gerçek Meta API doğrulaması (19 Ekim 2026)
+- **Yöntem:** Para harcamadan, satıcının kişisel reklam hesabında `paused_probe` ile denendi: her şey DURAKLATILMIŞ açılıp hemen silindi. Bu yol yayına alma çağrısı içermiyor.
+- **Çalışan adımlar:** ürün seti (`seltigo_81`, 1 ürün), OUTCOME_SALES katalog kampanyası, reklam seti.
+- **Bulunan ve düzeltilen:**
+  - Meta kampanyada `is_adset_budget_sharing_enabled` alanını zorunlu kılmış; kodda `false` gönderiliyor.
+  - Katalogda olmayan ürünle ürün seti açılamıyor; reklam açılmadan önce katalog eşitleniyor.
+  - Zincir yarıda kalırsa açılan kampanya otomatik siliniyor.
+- **Engel:** Reklam metni (creative), uygulama geliştirme modundayken açılamıyor (hata 1885183). Uygulamanın Live moda alınması gerekiyor.
+- **Sandbox hesabı:** "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermemiş: "Ad account owner has NOT grant". Hesap Seltigo işletmesinde değil; Tools anahtarı da hesaba erişemiyor.
+
 ## Testler
-- `tests/ads/ads_test.ts`: kural motoru ve Meta istekleri (taklit) 14/14
+- `tests/ads/ads_test.ts`: kural motoru ve Meta istekleri (taklit) 15/15
 - `tests/e2e/reklam_akisi.py`: canlı arka uç 16/16
 - `tests/e2e/reklam_arayuz.py`: Reklamlar sayfası 15/15

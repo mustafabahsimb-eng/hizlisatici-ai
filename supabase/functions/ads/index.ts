@@ -52,7 +52,9 @@ function friendly(e: unknown) {
   const m = (e as Error).message || String(e);
   if (/ads_management|permission|not authorized|\(#200\)|\(#10\)/i.test(m)) return "Meta reklam izni yok: Sosyal medya sayfasından Facebook'u yeniden bağla (reklam yönetimi izni).";
   if (/expired|session has been invalidated|validating access token/i.test(m)) return "Facebook bağlantısının süresi dolmuş; yeniden bağla.";
-  if (/development mode|1885183/i.test(m)) return "Meta uygulaması geliştirme modunda; reklam metni için uygulamanın yayında (Live) olması gerekiyor.";
+  if (/development mode|1885183|geliştirme modundaki|insanların kullanımına açılmış/i.test(m)) return "Meta uygulaması geliştirme modunda; reklam metni için uygulamanın yayında (Live) olması gerekiyor.";
+  if (/is_adset_budget_sharing_enabled|bütçelerinin %20/i.test(m)) return "Meta kampanya ayarı reddedildi (bütçe paylaşımı); Seltigo güncellemesi gerekiyor.";
+  if (/Boş ürün seti|empty product set/i.test(m)) return "Ürünler Meta kataloğunda henüz yok; katalog eşitlenince tekrar dene.";
   if (/payment|funding|billing/i.test(m)) return "Reklam hesabında ödeme yöntemi yok (Meta Reklam Yöneticisi > Faturalama).";
   return "Meta: " + short(m, 250);
 }
@@ -462,6 +464,70 @@ Deno.serve(async (req) => {
         }
         return json({ ok: true, ...out });
       }
+      // Gerçek Meta API doğrulaması, PARA HARCAMADAN: her şey DURAKLATILMIŞ açılır, kontrol edilir, bütçe değiştirilir ve SİLİNİR.
+      // Bu yol yayına alma (ACTIVE) çağrısı içermez. Yalnız sistem çağrısı + açık onay bayrağı.
+      if (b.action === "paused_probe" && b.userId && b.account && b.iUnderstandNoActivation === true) {
+        if (b.cleanupOnly) {
+          const { token } = await metaToken(String(b.userId));
+          const list = ((await graph(token!, "GET", `/${b.account}/campaigns`, { fields: "id,name,status", limit: 100 })).data || []).filter((x: any) => x.name === "Seltigo API probe (silinecek)");
+          const out: unknown[] = [];
+          for (const x of list) { try { await graph(token!, "DELETE", `/${x.id}`); out.push({ id: x.id, status: x.status, deleted: true }); } catch (e) { out.push({ id: x.id, error: String((e as Error).message) }); } }
+          const left = ((await graph(token!, "GET", `/${b.account}/campaigns`, { fields: "id,name", limit: 100 })).data || []).filter((x: any) => x.name === "Seltigo API probe (silinecek)").length;
+          return json({ ok: true, deleted: out, remaining: left });
+        }
+        const { token, catalogId } = await metaToken(String(b.userId));
+        if (!token || !catalogId) return json({ ok: false, error: "anahtar / katalog yok" });
+        const steps: Record<string, unknown> = {};
+        const created: string[] = [];
+        let setId: string | null = null;
+        try {
+          const acct = await graph(token, "GET", `/${b.account}`, { fields: "id,name,currency,account_status" });
+          steps.account = { name: acct.name, currency: acct.currency, status: acct.account_status };
+          const pid = Number(b.productId) || 81;
+          setId = await createProductSet(token, catalogId, "Seltigo API probe (silinecek)", [pid]);
+          steps.productSet = await graph(token, "GET", `/${setId}`, { fields: "id,product_count,filter" });
+          const ids = await launchCatalogCampaign({ token, account: String(b.account), currency: acct.currency, catalogId, productSetId: setId, name: "Seltigo API probe (silinecek)", dailyBudget: 50,
+            countries: ["TR"], pixelId: null, pageId: String(b.pageId), link: SITE, message: "Seltigo API testi" });
+          created.push(ids.campaign);
+          steps.ids = ids;
+          const f = "id,status,effective_status";
+          steps.campaign = await graph(token, "GET", `/${ids.campaign}`, { fields: f + ",objective" });
+          steps.adset = await graph(token, "GET", `/${ids.adset}`, { fields: f + ",daily_budget,optimization_goal" });
+          steps.ad = await graph(token, "GET", `/${ids.ad}`, { fields: f });
+          await setDailyBudget(token, ids.adset, 40, acct.currency);
+          steps.adsetAfterBudget = await graph(token, "GET", `/${ids.adset}`, { fields: "daily_budget,status" });
+          await setStatus(token, { campaign: ids.campaign, adset: ids.adset, ad: ids.ad }, "PAUSED");
+          steps.pauseCall = "ok";
+        } catch (e) { steps.error = String((e as Error).message); }
+        finally {
+          // Yarıda kalan denemeler: bu adla açılmış tüm kampanyalar (setleri ve reklamlarıyla) silinir
+          try {
+            const list = ((await graph(token, "GET", `/${b.account}/campaigns`, { fields: "id,name,status", limit: 100 })).data || []).filter((x: any) => x.name === "Seltigo API probe (silinecek)");
+            for (const x of list) if (!created.includes(String(x.id))) created.push(String(x.id));
+          } catch (e) { steps.listErr = String((e as Error).message); }
+          for (const id of created) { try { await graph(token, "DELETE", `/${id}`); steps[`deleted_${id}`] = true; } catch (e) { steps[`delete_err_${id}`] = String((e as Error).message); } }
+          if (setId) { try { await graph(token, "DELETE", `/${setId}`); steps.deletedProductSet = true; } catch (e) { steps.deleteSetErr = String((e as Error).message); } }
+        }
+        return json({ ok: !steps.error, steps });
+      }
+      // Sosyal bağlantıların sağlığı (Facebook / Instagram / WhatsApp): anahtar geçerli mi, izinler, basit okuma (değer döndürmez)
+      if (b.action === "channels_health" && b.userId) {
+        const appTok = `1650835089949068|${Deno.env.get("FACEBOOK_CLIENT_SECRET") ?? ""}`;
+        const { data: chs } = await db.from("social_channels").select("id, platform, account_id, account_name, access_token, token_secret_id, token_status, extra").eq("user_id", String(b.userId)).eq("active", true).in("platform", ["facebook", "instagram", "whatsapp"]);
+        const res: unknown[] = [];
+        for (const c of chs || []) {
+          const tok = c.access_token as string | null;
+          const row: Record<string, unknown> = { platform: c.platform, account: c.account_name, status: c.token_status, hasToken: !!tok };
+          if (tok) {
+            try { const d = (await graph(appTok, "GET", "/debug_token", { input_token: tok })).data || {}; row.valid = d.is_valid; row.expires = d.expires_at; row.scopes = d.scopes; } catch (e) { row.debug = String((e as Error).message).slice(0, 160); }
+            const path = c.platform === "facebook" ? `/${c.account_id}` : c.platform === "instagram" ? `/${c.account_id}` : `/${c.account_id}`;
+            const fields = c.platform === "facebook" ? "id,name" : c.platform === "instagram" ? "id,username" : "id,display_phone_number,verified_name";
+            try { await graph(tok, "GET", path, { fields }); row.read = "ok"; } catch (e) { row.read = String((e as Error).message).slice(0, 200); }
+          }
+          res.push(row);
+        }
+        return json({ ok: true, channels: res });
+      }
       // Teşhis: Meta izinleri, reklam hesapları, sayfalar (anahtar değeri döndürmez)
       if (b.action === "diag" && b.userId) {
         const { token, catalogId } = await metaToken(String(b.userId));
@@ -471,6 +537,17 @@ Deno.serve(async (req) => {
         try { out.accounts = await adAccounts(token); } catch (e) { out.accounts = String((e as Error).message); }
         try { out.pages = ((await graph(token, "GET", "/me/accounts", { fields: "id,name", limit: 25 })).data || []).map((x: any) => ({ id: x.id, name: x.name })); } catch (e) { out.pages = String((e as Error).message); }
         out.sandboxToken = !!SANDBOX_TOKEN;
+        // Uygulama anahtarıyla hesap var mı / kime ait (yalnız sandbox listesindeki hesap)
+        if (b.account && SANDBOX_IDS.has(String(b.account))) {
+          const appTok = `1650835089949068|${Deno.env.get("FACEBOOK_CLIENT_SECRET") ?? ""}`;
+          try { out.appView = await graph(appTok, "GET", `/${b.account}`, { fields: "id,name,account_status,owner,business,currency" }); } catch (e) { out.appView = String((e as Error).message); }
+        }
+        if (SANDBOX_TOKEN) {
+          try { out.sbMe = await graph(SANDBOX_TOKEN, "GET", "/me", { fields: "id,name" }); } catch (e) { out.sbMe = String((e as Error).message); }
+          try { out.sbPerms = ((await graph(SANDBOX_TOKEN, "GET", "/me/permissions")).data || []).filter((x: any) => x.status === "granted").map((x: any) => x.permission); } catch (e) { out.sbPerms = String((e as Error).message); }
+          try { out.sbAccounts = ((await graph(SANDBOX_TOKEN, "GET", "/me/adaccounts", { fields: "id,name,currency", limit: 50 })).data || []).map((a: any) => a.id + " " + a.name); } catch (e) { out.sbAccounts = String((e as Error).message); }
+          try { out.sbDebug = await graph(SANDBOX_TOKEN, "GET", "/debug_token", { input_token: SANDBOX_TOKEN }); } catch (e) { out.sbDebug = String((e as Error).message); }
+        }
         if (b.account && SANDBOX_TOKEN) { try { out.sandboxAccount = await graph(SANDBOX_TOKEN, "GET", `/${b.account}`, { fields: "id,name,currency,account_status,timezone_name" }); } catch (e) { out.sandboxAccount = String((e as Error).message); } }
         if (b.account) { try { out.account = await graph(token, "GET", `/${b.account}`, { fields: "id,name,currency,account_status,timezone_name,business" }); } catch (e) { out.account = String((e as Error).message); } }
         return json({ ok: true, ...out });

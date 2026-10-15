@@ -55,9 +55,19 @@ export type LaunchIn = {
 };
 export async function launchCatalogCampaign(x: LaunchIn, f?: Fetch) {
   const ids: Record<string, string> = {};
+  try { return await launchSteps(x, ids, f); }
+  catch (e) {
+    // Yarıda kaldıysa Meta'da açılan kampanya (setleri ve reklamlarıyla) silinir; hesapta yetim kayıt kalmaz
+    if (ids.campaign) { try { await graph(x.token, "DELETE", `/${ids.campaign}`, {}, f); } catch (_) { /* en iyi çaba */ } }
+    throw e;
+  }
+}
+async function launchSteps(x: LaunchIn, ids: Record<string, string>, f?: Fetch) {
   const c = await graph(x.token, "POST", `/${x.account}/campaigns`, {
     name: x.name, objective: "OUTCOME_SALES", status: "PAUSED", special_ad_categories: [], buying_type: "AUCTION",
     promoted_object: { product_catalog_id: x.catalogId },
+    // Reklam seti bütçesi kullanılıyor; setler arası %20 paylaşım kapalı (bütçe sınırı kesin kalsın). Meta 2026'da bu alanı zorunlu kıldı.
+    is_adset_budget_sharing_enabled: false,
   }, f);
   ids.campaign = String(c.id);
   const optimization = x.pixelId ? { optimization_goal: "OFFSITE_CONVERSIONS", promoted_object: { product_set_id: x.productSetId, pixel_id: x.pixelId, custom_event_type: "PURCHASE" } }
