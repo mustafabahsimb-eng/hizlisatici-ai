@@ -48,6 +48,8 @@ def order_and_count(store, page, prod):
     store.fill("#orderAddress", "Test Mah. Deneme Sok. No 1")
     store.fill("#orderCity", "Istanbul")
     store.fill("#orderDistrict", "Kadikoy")
+    store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+    store.check("#orderPreinfo")
     store.click("#orderSubmitBtn")
     store.wait_for_selector("#orderDone", state="visible", timeout=30000)
     return page.evaluate("""async (pid) => ({

@@ -96,6 +96,13 @@
   .modal-actions{display:flex; gap:8px; margin-top:18px;}
   .modal-actions button{flex:1;}
   .privacy-note{font-size:11px; color:var(--text-dim); margin-top:12px; line-height:1.5;}
+  .preinfo{margin-top:12px; font-size:13px;}
+  .preinfo label{display:flex; gap:8px; align-items:flex-start; cursor:pointer;}
+  .preinfo input{margin-top:2px; accent-color:var(--accent);}
+  .preinfo a{color:var(--accent); cursor:pointer; text-decoration:underline;}
+  .preinfo pre, .policy-foot pre{white-space:pre-wrap; font-family:inherit; font-size:12px; color:var(--text-dim); line-height:1.5; max-height:240px; overflow:auto; background:rgba(255,255,255,.03); border-radius:8px; padding:10px; margin:8px 0 0;}
+  .policy-foot{max-width:1100px; margin:10px auto 40px; padding:0 16px; font-size:13px;}
+  .policy-foot summary{cursor:pointer; color:var(--text-dim);}
   .toast{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     background:var(--bg-panel-2); border:1px solid var(--accent); color:var(--text);
@@ -122,6 +129,7 @@
 <div class="wrap">
   <div id="content" class="loading"></div>
 </div>
+<details class="policy-foot" id="policyFoot" style="display:none"><summary data-t="returnPolicy"></summary><pre id="policyFootText"></pre></details>
 
 <div class="modal-overlay" id="orderModalOverlay">
   <div class="modal">
@@ -148,6 +156,10 @@
       <label for="orderQty" data-t="fQty"></label>
       <input type="number" id="orderQty" value="1" min="1" max="999">
       <div class="privacy-note" data-t="privacy"></div>
+      <div class="preinfo" id="preinfoBox" style="display:none">
+        <label><input type="checkbox" id="orderPreinfo" required> <span><a id="preinfoLink" data-t="preinfoName"></a><span data-t="preinfoAccept"></span></span></label>
+        <pre id="preinfoText" style="display:none"></pre>
+      </div>
       <div class="modal-actions">
         <button type="button" id="orderCancelBtn" data-t="cancel"></button>
         <button type="submit" class="primary" id="orderSubmitBtn" data-t="send"></button>
@@ -216,6 +228,9 @@ const T = {
     orderDoneTitle: 'Siparişini aldık!',
     trackMyOrder: 'Siparişimi takip et',
     privacy: 'Bilgilerin sadece bu siparişin teslimatı için satıcıyla paylaşılır.',
+    preinfoName: 'Ön Bilgilendirme Formu',
+    preinfoAccept: '\'nu ve iade koşullarını okudum, onaylıyorum.',
+    returnPolicy: 'İade Politikası',
     cancel: 'Vazgeç',
     send: 'Siparişi Gönder',
     choose: 'Seç',
@@ -267,6 +282,9 @@ const T = {
     orderDoneTitle: 'We received your order!',
     trackMyOrder: 'Track my order',
     privacy: 'Your details are shared with the seller only to deliver this order.',
+    preinfoName: 'Pre-contract information',
+    preinfoAccept: ' and return conditions: I have read and accept them.',
+    returnPolicy: 'Return Policy',
     cancel: 'Cancel',
     send: 'Send Order',
     choose: 'Choose',
@@ -762,11 +780,27 @@ document.getElementById('askContactBtn').addEventListener('click', async () => {
   }
 });
 
+/* ============== Ön bilgilendirme / iade politikası (yasal çerçeveye göre otomatik) ============== */
+async function loadPolicy(){
+  try {
+    const r = await fetch(SUPABASE_URL + '/functions/v1/returns', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ action: 'policy', slug }) }).then(x => x.json());
+    if (!r || !r.ok) return;
+    const txt = LANG === 'en' ? r.en : r.tr;
+    document.getElementById('preinfoText').textContent = txt;
+    document.getElementById('policyFootText').textContent = txt;
+    document.getElementById('preinfoBox').style.display = '';
+    document.getElementById('policyFoot').style.display = '';
+    document.getElementById('preinfoLink').onclick = (e) => { e.preventDefault(); const p = document.getElementById('preinfoText'); p.style.display = p.style.display === 'none' ? '' : 'none'; };
+  } catch (e) { console.warn('policy', e); }
+}
+
 /* ============== Başlat ============== */
 applyStatic();
 document.getElementById('storeName').textContent = t('loadingStore');
 document.getElementById('content').textContent = t('loading');
 loadStore();
+loadPolicy();
 </script>
 </body>
 </html>

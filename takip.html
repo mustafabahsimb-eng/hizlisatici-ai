@@ -44,6 +44,27 @@
   .btn:hover{background:var(--accent-hover);}
   .cancelled{color:var(--danger); font-weight:600; margin-bottom:16px;}
   .msg{color:var(--text-dim); text-align:center; padding:40px 0;}
+  /* İade */
+  .ret{margin-top:18px;}
+  .ret h2{font-size:17px; margin:0 0 12px;}
+  .ret .lines{display:grid; gap:6px; font-size:14px; color:var(--text-dim); margin-bottom:12px;}
+  .ret .lines b{color:var(--text); font-weight:600;}
+  .ret label{display:block; font-size:13px; color:var(--text-dim); margin:12px 0 6px;}
+  .ret select, .ret textarea, .ret input[type=number]{width:100%; background:var(--bg-panel-2); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:11px; font:inherit;}
+  .ret textarea{min-height:80px; resize:vertical;}
+  .ret .chk{display:flex; gap:8px; align-items:flex-start; font-size:14px; color:var(--text); margin-top:12px;}
+  .ret .chk input{margin-top:3px;}
+  .ret button{margin-top:16px; padding:12px 20px; border-radius:10px; border:0; background:var(--accent); color:#04150f; font-weight:600; font-size:15px; cursor:pointer;}
+  .ret button.ghost{background:transparent; color:var(--accent); border:1px solid var(--accent);}
+  .ret button:disabled{opacity:.6; cursor:default;}
+  .ret .status{font-size:15px; font-weight:600; margin-bottom:8px;}
+  .ret .status.bad{color:var(--danger);}
+  .ret .err{color:var(--danger); font-size:14px; margin-top:10px;}
+  .ret .thumbs{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .ret .thumbs img{width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--border);}
+  .policy{margin-top:14px; font-size:13px;}
+  .policy summary{cursor:pointer; color:var(--accent);}
+  .policy pre{white-space:pre-wrap; font-family:inherit; color:var(--text-dim); line-height:1.5; margin:10px 0 0;}
 </style>
 </head>
 <body>
@@ -72,6 +93,23 @@ const T = {
     track: 'Kargomu takip et',
     qty: '{n} adet',
     orderedAt: 'Sipariş tarihi: {d}',
+    retTitle: '↩️ İade talebi',
+    retOpen: 'İade talebi oluştur',
+    retReason: 'İade nedeni',
+    retText: 'Açıklama (isteğe bağlı)',
+    retQty: 'Adet',
+    retPhotos: 'Fotoğraf ekle (en fazla 4)',
+    retPickup: 'Yakınımda kargo şubesi yok, ürün adresimden alınsın',
+    retSend: 'Talebi gönder',
+    retSending: 'Gönderiliyor...',
+    r_size: 'Beden / ölçü uymadı', r_changed_mind: 'Vazgeçtim', r_defective: 'Ürün kusurlu', r_damaged: 'Hasarlı geldi',
+    r_wrong_item: 'Yanlış ürün geldi', r_not_as_described: 'Açıklamayla uyuşmuyor', r_late: 'Geç geldi', r_other: 'Diğer',
+    st_requested: 'Talebin alındı, satıcı inceliyor', st_approved: 'İaden onaylandı', st_label_ready: 'İaden onaylandı', st_in_transit: 'Ürün yolda',
+    st_received: 'Ürün satıcıya ulaştı', st_refunded: 'Paran iade edildi', st_closed: 'Paran iade edildi', st_rejected: 'Talebin reddedildi: {n}', st_cancelled: 'Talep iptal edildi',
+    retCode: 'İade kodun: {c}', retLabel: 'İade etiketini indir', retExpired: 'İade süren doldu',
+    daysLeft: 'İade için {n} gün kaldı', freeReturn: 'İade kargo ücretsiz', carrierLine: 'İade taşıyıcısı: {c}',
+    exemptNote: 'Bu üründe yalnızca kusurlu veya yanlış ürün iadesi yapılabilir.',
+    policy: 'İade Politikası', retFail: 'Talep gönderilemedi. Biraz sonra tekrar dene.',
   },
   en: {
     pageTitle: 'Order Tracking',
@@ -89,6 +127,23 @@ const T = {
     track: 'Track my package',
     qty: '{n} pcs',
     orderedAt: 'Ordered on: {d}',
+    retTitle: '↩️ Return request',
+    retOpen: 'Request a return',
+    retReason: 'Reason for return',
+    retText: 'Details (optional)',
+    retQty: 'Quantity',
+    retPhotos: 'Add photos (up to 4)',
+    retPickup: 'There is no carrier branch near me, please collect from my address',
+    retSend: 'Send request',
+    retSending: 'Sending...',
+    r_size: 'Size / fit', r_changed_mind: 'Changed my mind', r_defective: 'Item is faulty', r_damaged: 'Arrived damaged',
+    r_wrong_item: 'Wrong item received', r_not_as_described: 'Not as described', r_late: 'Arrived late', r_other: 'Other',
+    st_requested: 'Request received, the seller is reviewing it', st_approved: 'Your return is approved', st_label_ready: 'Your return is approved', st_in_transit: 'Item on its way back',
+    st_received: 'The seller received the item', st_refunded: 'You have been refunded', st_closed: 'You have been refunded', st_rejected: 'Request declined: {n}', st_cancelled: 'Request cancelled',
+    retCode: 'Your return code: {c}', retLabel: 'Download return label', retExpired: 'Your return period has ended',
+    daysLeft: '{n} days left to return', freeReturn: 'Free returns', carrierLine: 'Return carrier: {c}',
+    exemptNote: 'Only faulty or wrong items can be returned for this product.',
+    policy: 'Return Policy', retFail: 'Could not send the request. Please try again later.',
   }
 };
 const params = new URLSearchParams(location.search);
@@ -158,7 +213,93 @@ function render(d){
       '<div class="meta">' + esc(t('qty', { n: d.quantity || 1 })) + (date ? ' · ' + esc(t('orderedAt', { d: date })) : '') + '</div>' +
       (cancelled ? '<div class="cancelled">' + esc(t('cancelled')) + '</div>' : '<ul class="steps">' + steps + '</ul>') +
       info +
-    '</div>';
+    '</div>' +
+    '<div class="card ret" id="retBox" style="display:none"></div>';
+  loadReturn();
+}
+
+// ---------- İade ----------
+const FN = SUPABASE_URL + '/functions/v1/returns';
+const fn = (body) => fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }, body: JSON.stringify(body) }).then(r => r.json());
+let RI = null;
+async function loadReturn(){
+  const token = params.get('t') || '';
+  try {
+    const [i, pol] = await Promise.all([fn({ action: 'info', token }), fn({ action: 'policy', token })]);
+    if (!i || !i.ok) return;
+    RI = i; RI.policy = pol && pol.ok ? pol[LANG] : '';
+    renderReturn();
+  } catch (e) { console.error(e); }
+}
+function renderReturn(formOpen){
+  const box = document.getElementById('retBox'); if (!box || !RI) return;
+  box.style.display = '';
+  const r = RI.return;
+  const lines = [];
+  if (RI.returnCarrier) lines.push(esc(t('carrierLine', { c: RI.returnCarrier })));
+  if (RI.freeReturn) lines.push(esc(t('freeReturn')));
+  let h = '<h2>' + esc(t('retTitle')) + '</h2>';
+  if (r) {
+    const bad = r.status === 'rejected' || r.status === 'cancelled';
+    h += '<div class="status' + (bad ? ' bad' : '') + '">' + esc(t('st_' + r.status, { n: r.note || '' })) + '</div>';
+    if (r.returnCode && !bad && !['received', 'refunded', 'closed'].includes(r.status)) lines.unshift('<b>' + esc(t('retCode', { c: r.returnCode })) + '</b>');
+    h += '<div class="lines">' + lines.map(x => '<div>' + x + '</div>').join('') + '</div>';
+    if (r.label && ['label_ready', 'approved'].includes(r.status)) h += '<a class="btn" id="retLabel" target="_blank" rel="noopener" href="' + esc(r.label) + '">' + esc(t('retLabel')) + '</a>';
+  } else if (RI.canRequest) {
+    const expired = RI.statutory && RI.daysLeft <= 0;
+    const reasons = (RI.reasons || []).filter(x => !expired || (RI.photoReasons || []).includes(x));
+    if (!expired) lines.unshift(esc(t('daysLeft', { n: RI.daysLeft })));
+    else lines.unshift('<b>' + esc(t('retExpired')) + '</b>');
+    if (RI.exempt) lines.push(esc(t('exemptNote')));
+    h += '<div class="lines">' + lines.map(x => '<div>' + x + '</div>').join('') + '</div>';
+    if (!formOpen) h += '<button class="ghost" id="retOpenBtn">' + esc(t('retOpen')) + '</button>';
+    else {
+      h += '<label for="retReason">' + esc(t('retReason')) + '</label><select id="retReason">' + reasons.map(x => '<option value="' + x + '">' + esc(t('r_' + x)) + '</option>').join('') + '</select>' +
+        '<label for="retText">' + esc(t('retText')) + '</label><textarea id="retText" maxlength="1000"></textarea>' +
+        (RI.maxQuantity > 1 ? '<label for="retQty">' + esc(t('retQty')) + '</label><input type="number" id="retQty" min="1" max="' + RI.maxQuantity + '" value="1">' : '') +
+        '<div id="retPhotoBox" style="display:none"><label for="retPhotos">' + esc(t('retPhotos')) + '</label><input type="file" id="retPhotos" accept="image/*" multiple><div class="thumbs" id="retThumbs"></div></div>' +
+        (RI.pickupAllowed ? '<label class="chk"><input type="checkbox" id="retPickup"> <span>' + esc(t('retPickup')) + '</span></label>' : '') +
+        '<button id="retSendBtn">' + esc(t('retSend')) + '</button><div class="err" id="retErr"></div>';
+    }
+  } else return void (box.style.display = 'none');
+  if (RI.policy) h += '<details class="policy"><summary>' + esc(t('policy')) + '</summary><pre>' + esc(RI.policy) + '</pre></details>';
+  box.innerHTML = h;
+  const ob = document.getElementById('retOpenBtn'); if (ob) ob.onclick = () => renderReturn(true);
+  const sel = document.getElementById('retReason');
+  if (sel) {
+    const sync = () => { document.getElementById('retPhotoBox').style.display = (RI.photoReasons || []).includes(sel.value) ? '' : 'none'; };
+    sel.onchange = sync; sync();
+    document.getElementById('retPhotos').onchange = async (e) => {
+      PHOTOS = [];
+      for (const f of Array.from(e.target.files || []).slice(0, 4)) PHOTOS.push(await shrink(f));
+      document.getElementById('retThumbs').innerHTML = PHOTOS.map(u => '<img src="' + u + '" alt="">').join('');
+    };
+    document.getElementById('retSendBtn').onclick = sendReturn;
+  }
+}
+let PHOTOS = [];
+// Fotoğrafı küçült (en uzun kenar 1600 px, JPEG)
+function shrink(file){
+  return new Promise((ok) => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.85)); };
+    img.onerror = () => ok(null); img.src = url;
+  }).then(x => x);
+}
+async function sendReturn(){
+  const btn = document.getElementById('retSendBtn'), err = document.getElementById('retErr');
+  const reason = document.getElementById('retReason').value;
+  btn.disabled = true; btn.textContent = t('retSending'); err.textContent = '';
+  try {
+    const q = document.getElementById('retQty');
+    const pk = document.getElementById('retPickup');
+    const r = await fn({ action: 'request', token: params.get('t') || '', reasonCode: reason, text: document.getElementById('retText').value.trim(),
+      quantity: q ? Number(q.value) || 1 : 1, photos: (RI.photoReasons || []).includes(reason) ? PHOTOS.filter(Boolean) : [], pickup: !!(pk && pk.checked) });
+    if (!r || !r.ok) { err.textContent = (r && r.error) || t('retFail'); btn.disabled = false; btn.textContent = t('retSend'); return; }
+    await loadReturn();
+  } catch (e) { console.error(e); err.textContent = t('retFail'); btn.disabled = false; btn.textContent = t('retSend'); }
 }
 
 load();

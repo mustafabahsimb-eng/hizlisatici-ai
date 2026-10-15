@@ -100,6 +100,8 @@ def main():
         summary, labels, _ = order(store, title_woo, fill_variant=False)
         c.check("Kartta seçenek özeti var", "Beden" in summary, summary)
         c.check("Sipariş penceresinde 'Beden' ve 'Renk' kutuları", labels == ["Beden", "Renk"], str(labels))
+        store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+        store.check("#orderPreinfo")
         store.click("#orderSubmitBtn")
         store.wait_for_timeout(1500)
         c.check("Seçenek seçmeden sipariş gönderilmiyor", store.is_visible("#orderForm"))
@@ -108,6 +110,8 @@ def main():
         # 2) Seçip gönder (WooCommerce ürünü)
         summary, labels, chosen = order(store, title_woo)
         store.screenshot(path=str(shots / "vitrin_secenek_secildi.png"))
+        store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+        store.check("#orderPreinfo")
         store.click("#orderSubmitBtn")
         store.wait_for_selector("#orderDone", state="visible", timeout=30000)
         so = page.evaluate("""async (pid) => {
@@ -121,6 +125,8 @@ def main():
         # 3) AliExpress ürünü: tedarikçi siparişine seçenek geçer
         title_ae = (ae["generated_title"] or ae["name"])[:20]
         summary, labels, chosen = order(store, title_ae)
+        store.wait_for_selector("#preinfoBox", state="visible", timeout=15000)
+        store.check("#orderPreinfo")
         store.click("#orderSubmitBtn")
         store.wait_for_selector("#orderDone", state="visible", timeout=30000)
         o = page.evaluate("""async (pid) => {

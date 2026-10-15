@@ -146,9 +146,11 @@ const yurtici = {
   async create(x: Ctx): Promise<Created> {
     const key = ("SLT" + x.shipment.id.replace(/-/g, "").slice(0, 14)).toUpperCase();
     const o = x.order;
+    // Yurtiçi açık adresi en az 10 karakter ister; kısa adreste ilçe / il eklenir ("Test Mah. 1 Kadıköy/İstanbul")
+    const fullAddr = String(o.customer_address || "").trim().length < 20 ? [o.customer_address, [o.customer_district, o.customer_city].filter(Boolean).join("/")].filter(Boolean).join(" ") : o.customer_address;
     const inner = `<wsUserName>${esc(x.creds.wsUserName)}</wsUserName><wsPassword>${esc(x.creds.wsPassword)}</wsPassword><userLanguage>TR</userLanguage>` +
       `<ShippingOrderVO><cargoKey>${key}</cargoKey><invoiceKey>${key}</invoiceKey>` +
-      `<receiverCustName>${esc(o.customer_name)}</receiverCustName><receiverAddress>${esc(o.customer_address)}</receiverAddress>` +
+      `<receiverCustName>${esc(o.customer_name)}</receiverCustName><receiverAddress>${esc(fullAddr)}</receiverAddress>` +
       `<cityName>${esc(o.customer_city)}</cityName><townName>${esc(o.customer_district)}</townName>` +
       `<receiverPhone1>${esc(String(o.customer_phone || "").replace(/\D/g, ""))}</receiverPhone1>` +
       `<desi>${x.parcel.desi}</desi><kg>${x.parcel.kg}</kg><cargoCount>1</cargoCount>` +
@@ -338,7 +340,50 @@ async function createAmazonShipment(sh: any, mo: any) {
   return { created: true, ref: label.shipmentId, amazon: true };
 }
 
+// İade gönderisi: müşteri gönderen, satıcının iade adresi (Ayarlar > İade Adresi; yoksa kargo hesabındaki gönderen) alıcı
+async function createReturnShipment(sh: any) {
+  const { data: ret } = await db.from("returns").select("*").eq("id", sh.return_id).maybeSingle();
+  if (!ret) throw new Error("İade bulunamadı");
+  if (["cancelled", "rejected"].includes(ret.status)) { await db.from("shipments").update({ status: "cancelled" }).eq("id", sh.id); return { cancelled: true }; }
+  const { data: account } = await db.from("shipping_accounts").select("*").eq("id", sh.account_id).maybeSingle();
+  if (!account) throw new Error("Kargo hesabı bulunamadı");
+  const provider = PROVIDERS[account.provider];
+  const { data: so } = ret.store_order_id ? await db.from("store_orders").select("*").eq("id", ret.store_order_id).maybeSingle() : { data: null };
+  const { data: mo } = !so && ret.marketplace_order_id ? await db.from("marketplace_orders").select("*").eq("id", ret.marketplace_order_id).maybeSingle() : { data: null };
+  const cust: any = so || (mo ? mpOrderShape(mo) : null);
+  if (!cust) throw new Error("İadenin siparişi bulunamadı");
+  const { data: prof } = await db.from("user_profiles").select("return_address").eq("user_id", sh.user_id).maybeSingle();
+  const ra = prof?.return_address || {};
+  const own = account.settings?.sender || {};
+  const recv = { name: ra.name || own.name, address: ra.address || own.address, city: ra.city || own.city, district: ra.district || own.district, zip: ra.postal_code || own.zip, phone: ra.phone || own.phone };
+  if (!recv.address || !recv.city) throw new Error("İade adresi eksik (Ayarlar > İade Adresi)");
+  // Sağlayıcıya "sipariş" olarak satıcının adresi, "gönderen" olarak müşteri verilir
+  const order = { id: ret.id, product_id: ret.product_id, quantity: ret.quantity, customer_name: recv.name, customer_phone: recv.phone, customer_address: recv.address,
+    customer_city: recv.city, customer_district: recv.district || "", customer_zip: recv.zip || "", customer_country: "TR" };
+  const sender = { name: cust.customer_name, phone: cust.customer_phone, address: cust.customer_address, district: cust.customer_district, city: cust.customer_city };
+  const { data: product } = await db.from("products").select("name, weight_kg").eq("id", ret.product_id).maybeSingle();
+  const kg = Math.max(0.5, Number(product?.weight_kg || 1) * (ret.quantity || 1));
+  const ctx: Ctx = { shipment: sh, account, creds: await creds(account.id), order, product, sender, parcel: { desi: Math.max(1, Math.ceil(kg)), kg: Math.round(kg * 10) / 10, count: ret.quantity || 1 } };
+  const r: Created = await provider.create(ctx);
+  const pdf = r.labelPdf || await makeLabelPdf({
+    barcode: r.ref, carrier: r.carrier || CARRIER_NAMES[account.provider] || account.provider, orderNo: "IADE-" + String(ret.id).slice(0, 6),
+    senderName: sender.name || "", senderAddr: [sender.address, sender.district, sender.city].filter(Boolean).join(", "), senderPhone: sender.phone || "",
+    recvName: recv.name || "", recvAddr: [recv.address, recv.district, recv.city, recv.zip].filter(Boolean).join(", "), recvPhone: recv.phone || "",
+    product: (product?.name || "") + " (İADE)", qty: ret.quantity || 1, test: account.mode === "test",
+  });
+  const path = await saveLabel(sh, pdf);
+  await db.from("shipments").update({
+    status: "created", provider_ref: r.ref, tracking_number: r.tracking || null, tracking_url: r.trackingUrl || null, carrier: r.carrier || CARRIER_NAMES[account.provider],
+    label_path: path, cost: r.cost ?? null, currency: r.currency ?? null, raw: r.raw ?? null, last_error: null,
+    next_attempt_at: new Date(Date.now() + 30 * 60000).toISOString(), updated_at: new Date().toISOString(),
+  }).eq("id", sh.id);
+  const ev = [...(ret.events || []), { at: new Date().toISOString(), status: "label_ready", note: (r.carrier || CARRIER_NAMES[account.provider]) + " " + r.ref }];
+  await db.from("returns").update({ status: "label_ready", return_code: r.ref, tracking_number: r.tracking || null, carrier: r.carrier || CARRIER_NAMES[account.provider], events: ev, updated_at: new Date().toISOString() }).eq("id", ret.id);
+  return { created: true, ref: r.ref, return: true };
+}
+
 async function createShipment(sh: any) {
+  if (sh.return_id) return await createReturnShipment(sh);
   let mo: any = null;
   if (sh.marketplace_order_id) {
     const r = await db.from("marketplace_orders").select("*").eq("id", sh.marketplace_order_id).maybeSingle();
@@ -404,6 +449,14 @@ async function trackShipment(sh: any) {
   if (t.carrier) upd.carrier = t.carrier;
   if (t.status !== "created") upd.status = t.status;
   await db.from("shipments").update(upd).eq("id", sh.id);
+  if (sh.return_id) {
+    const { data: ret } = await db.from("returns").select("id, status, events").eq("id", sh.return_id).maybeSingle();
+    const next = t.status === "delivered" ? "received" : (t.status === "shipped" ? "in_transit" : null);
+    if (ret && next && ret.status !== next && ["label_ready", "in_transit"].includes(ret.status)) {
+      await db.from("returns").update({ status: next, ...(t.tracking ? { tracking_number: t.tracking } : {}), ...(next === "received" ? { received_at: now } : {}),
+        events: [...(ret.events || []), { at: now, status: next }], updated_at: now }).eq("id", ret.id);
+    }
+  }
   if (sh.marketplace_order_id) {
     const { data: mo } = await db.from("marketplace_orders").select("id, status, tracking_number, shipped_at, delivered_at").eq("id", sh.marketplace_order_id).maybeSingle();
     if (mo) {
@@ -468,6 +521,7 @@ Deno.serve(async (req) => {
     // Sistem
     if (CRON_SECRET && String(body?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (body?.action === "connect" && body?.userId) return json(await connect(String(body.userId), body));
+      if (body?.action === "create_return" && body?.userId && body?.returnId) return json(await enqueueReturn(String(body.userId), String(body.returnId)));
       if (body?.action === "create" && body?.userId && body?.marketplaceOrderId) return json(await enqueueMp(String(body.userId), String(body.marketplaceOrderId), body?.accountId));
       if (body?.action === "create" && body?.userId && body?.storeOrderId) return json(await enqueue(String(body.userId), String(body.storeOrderId), body?.accountId));
       const results = await runQueue(body?.shipmentId ? String(body.shipmentId) : undefined);
@@ -613,9 +667,27 @@ async function enqueueMp(userId: string, moId: string, accountId?: string) {
   return { ok: true, shipmentId: sh.id, result: results[0] ?? null };
 }
 
+// İade gönderisi aç ve hemen oluştur (varsayılan kargo hesabıyla)
+async function enqueueReturn(userId: string, returnId: string) {
+  const { data: ret } = await db.from("returns").select("id").eq("id", returnId).eq("user_id", userId).maybeSingle();
+  if (!ret) return { ok: false, error: "İade bulunamadı" };
+  const { data: a } = await db.from("shipping_accounts").select("id, provider, mode").eq("user_id", userId).eq("is_default", true).eq("status", "connected").maybeSingle();
+  if (!a) return { ok: false, error: "Kargo hesabı bağlı değil" };
+  let { data: sh } = await db.from("shipments").select("*").eq("return_id", returnId).neq("status", "cancelled").maybeSingle();
+  if (sh?.status === "error") { await db.from("shipments").update({ status: "pending", attempts: 0, last_error: null }).eq("id", sh.id); sh = { ...sh, status: "pending" }; }
+  if (!sh) {
+    const ins = await db.from("shipments").insert({ user_id: userId, return_id: returnId, kind: "return", account_id: a.id, provider: a.provider, test: a.mode === "test" }).select("*").single();
+    if (ins.error) throw ins.error;
+    sh = ins.data;
+  }
+  const results = await runQueue(sh.id);
+  const r: any = results[0] || {};
+  return { ok: !r.error, shipmentId: sh.id, error: r.error, result: r };
+}
+
 // Henüz kargoya teslim edilmemiş gönderilerin etiketleri tek PDF'te (yazıcıya tek seferde)
 async function mergedLabels(userId: string) {
-  const { data: shs } = await db.from("shipments").select("id, label_path").eq("user_id", userId).eq("status", "created").not("label_path", "is", null).order("created_at").limit(200);
+  const { data: shs } = await db.from("shipments").select("id, label_path").eq("user_id", userId).eq("status", "created").eq("kind", "outbound").not("label_path", "is", null).order("created_at").limit(200);
   if (!shs?.length) return { ok: false, error: "Bekleyen etiket yok" };
   const { PDFDocument } = await import("npm:pdf-lib@1.17.1");
   const merged = await PDFDocument.create();
