@@ -4,7 +4,7 @@
 - Canlıda: migration 20261016_pod_seasons.sql; etsy-listings, marketplace-orders (Etsy anahtar düzeltmesi), season-calendar, pod-personalize, assistant, telegram-bot, whatsapp-webhook, meta-dm-webhook; secret PRINTIFY_TOKEN_11444569; cron season-calendar-daily (03:00 UTC), pod-personalize-5m.
 - Etsy bağlantısı geri açıldı; 25 kapak uygulandı, 6 bölüm kuruldu, 5 set öne çıkan (1-5).
 - Fiyat A (Offsite Ads açık, %35): S-XL 68,99 $ / 2XL 75,99 $ / 3XL 79,99 $; üretici SwiftPOD. 14 sweatshirt Etsy'de yayında (ilan numaraları %LOCALAPPDATA%\seltigo-pod\durum.json).
-- BEKLEYEN: Mama (Printify sipariş onayı "elle" yapılınca `printify_yukle.py yayinla --only mama-patchwork`); Printify ödeme yöntemi. Numune İPTAL (16 Ekim, Mustafa): ilanlarda Printify mockup'ları kullanılır; ilk satışlardan sonra en çok satan tasarım için yeniden sorulacak (`numune.py` hazır bekliyor).
+- Mama yayında (16 Ekim). Printify kartı, sipariş onayı Manual ve Etsy Offsite Ads kapalı (Mustafa, 16 Ekim; API bu ayarları göstermiyor, doğrulanamadı). Numune YOK: alınmayacak, bir daha sorulmayacak; numune.py kaldırıldı. Telegram botu: TELEGRAM_BOT_TOKEN bekleniyor.
 - Aşağıdaki eski notların çoğu tamamlandı.
 
 Önizleme sayfası: https://claude.ai/artifact/7iqNtbTPi4NwkBt7LqZsVx
@@ -23,7 +23,6 @@
    - Eski 3 ürün (21 Eylül): yaz tişörtleri. İkisi Etsy'de pasif; Printify fiyatı 2999 (29,99) Etsy'ye **29,99 TL** olarak gitmiş (Printify para birimi çevirmiyor). Üçüncüsü Etsy'ye hiç gönderilmemiş.
    - Kişiselleştirme işçisi (`pod-personalize`) sunucuda bu token'a ihtiyaç duyar: canlıya alırken Supabase secret olarak (`PRINTIFY_TOKEN_BAHSISTORE`) eklenmeli; HizliSatici kaydı ayrı kalır.
    - Noel son sipariş tarihi: Printify 2026 tarihlerini henüz açıklamadı. `season-calendar` her gün Printify sayfalarını okur; açıklanınca tüm sweatshirt ilanlarının açıklamasına ve mağaza duyurusuna "🎄 Order by … for Christmas delivery in the US." ekler, tarih geçince "⚠️ Orders placed now may arrive after Christmas." yapar, 26 Aralık'ta kaldırır. 1 Aralık'a kadar açıklanmazsa tahmin: 10 Aralık (USPS 17 Aralık − 5 iş günü üretim).
-   - Numune: `tools/pod-noel/numune.py` (fiyat → olustur (taslak) → uretime). Adres `%LOCALAPPDATA%\seltigo-pod\numune.json`'da durur, depoya girmez.
 3. **Canlıya alınmayı bekleyenler (onay):** migration `supabase/migrations/20261016_pod_seasons.sql`; yeni fonksiyonlar `season-calendar`, `pod-personalize`; `etsy-listings` (listing_personalization işlemi), `marketplace-orders` (Etsy anahtar düzeltmesi), `_shared/assistant-core.ts` ("notice" bildirimi → `assistant` ve `telegram-bot` yeniden yayın); zamanlanmış işler: `season-calendar` günde 1 (06:00 TR), `pod-personalize` 5 dakikada 1.
    - Bu gece yayınlanan tek şey: `etsy-listings` içine `organize` ve `listing_state` işlemleri (yalnız ekleme; açılış denendi, çalışıyor).
 
