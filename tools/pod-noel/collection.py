@@ -2,7 +2,7 @@
 Çıktı: collection.json (yükleyici printify_yukle.py ve önizleme sayfası bunu okur)."""
 import json
 from pathlib import Path
-from pricing import price_for, FEES, MIN_MARGIN
+from pricing import choose, FEES, MIN_NET
 
 GARMENT = {
     "chosen": "gildan-18000",
@@ -33,14 +33,18 @@ PRODUCT DETAILS
 
 PRINTING & SHIPPING
 • Printed on demand in the USA with direct-to-garment printing
+• FREE shipping within the United States (we currently ship to US addresses only)
 • Production 2–5 business days, then shipped with tracking
-• Order by early December for Christmas delivery in the US
+• Order by early December for Christmas delivery
 
 CARE
 • Machine wash cold, inside out, gentle cycle
 • Tumble dry low or hang dry; do not iron directly on the print
 
-Every piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."""
+RETURNS & EXCHANGES
+• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).
+• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the "Problem with your order?" link in your Etsy order message.
+• Personalized items cannot be returned or exchanged."""
 
 def desc(hook, body): return COMMON_DESC.format(hook=hook, body=body)
 
@@ -119,13 +123,13 @@ def build():
 def estimate_prices(garment_key, premium=False):
     g = GARMENT[garment_key]; base = g["est_base_premium" if premium else "est_base"]; out = {}
     for tier, b in base.items():
-        cost = round(b + GARMENT["est_shipping_us"], 2); out[tier] = {"cost": cost, **price_for(cost)}
+        out[tier] = choose(b, GARMENT["est_shipping_us"])
     return out
 
 if __name__ == "__main__":
     items = build()
     comp = {k: {"standard": estimate_prices(k), "premium": estimate_prices(k, True), "name": GARMENT[k]["name"]} for k in ("gildan-18000", "comfort-colors-1566")}
-    data = {"garment": GARMENT, "fees": FEES, "min_margin": MIN_MARGIN, "comparison": comp, "items": items}
+    data = {"garment": GARMENT, "fees": FEES, "min_net": MIN_NET, "comparison": comp, "items": items}
     Path(__file__).with_name("collection.json").write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
     print(len(items), "ürün")
-    for k, v in comp.items(): print(k, {t: (x["cost"], x["price"], x["with_ads"]["net"]) for t, x in v["standard"].items()})
+    for k, v in comp.items(): print(k, {t: (x["cost"], x["price"], x["net"]) for t, x in v["standard"].items()})

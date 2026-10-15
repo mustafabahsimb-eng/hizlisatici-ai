@@ -15,7 +15,7 @@ import argparse, base64, json, math, os, sys, time, urllib.error, urllib.request
 from pathlib import Path
 D = Path(__file__).parent
 sys.path.insert(0, str(D)); sys.path.insert(0, str(D.parent / "etsy-mockup"))
-from pricing import price_for, charm
+from pricing import choose, to_try
 from syscall import sql, rows, call
 ROOT = Path(os.environ["LOCALAPPDATA"]) / "seltigo-pod"; DES = ROOT / "designs"; STATE = ROOT / "durum.json"
 UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"  # Mustafa (bahsistore)
@@ -127,16 +127,7 @@ def hazirla(a):
         if not S.get("product_id"):
             S["product_id"] = pf("POST", f"/shops/{shop['id']}/products.json", body)["id"]; save_state(st)
         prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
-        # Gerçek maliyet (Printify) + ABD kargo -> fiyat (USD) -> mağaza para birimi
-        prices, rep = [], {}
-        for v in prod["variants"]:
-            if not v.get("is_enabled", True): continue
-            cost = v["cost"] / 100 + ship.get(v["id"], col["garment"]["est_shipping_us"])
-            usd = price_for(cost)["price"]; local = usd if cur == "USD" else (math.ceil(usd * rate / 10) * 10 - 1)
-            prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
-            parts = [x.strip() for x in v["title"].split("/")]  # Printify: "S / Light Pink"
-            size = next((x for x in parts if x in G["sizes"]), parts[0])
-            if cost >= rep.get(size, {}).get("cost_usd", 0): rep[size] = {"cost_usd": round(cost, 2), **price_for(cost)}  # renkler arasında en yüksek maliyet
+        prices, rep = price_variants(prod, ship, G, col, cur, rate)
         pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", {"variants": prices})
         prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
         S.update({"title": it["title"], "pricing": rep, "currency": cur, "mockups": [i["src"] for i in prod.get("images", [])[:4]],
@@ -144,12 +135,42 @@ def hazirla(a):
         save_state(st); print(k, "taslak hazır;", {s: r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")})
     write_report(st, col); print("Bitti. Önizleme:", ROOT / "onizleme_gercek.html")
 
+def price_variants(prod, ship, G, col, cur, rate):
+    """Gerçek Printify ürün maliyeti + ABD kargo -> pricing.choose (net en az 10 $, ,99) -> mağaza para birimi (TL ,99)."""
+    prices, rep = [], {}
+    for v in prod["variants"]:
+        if not v.get("is_enabled", True): continue
+        c, sh = v["cost"] / 100, ship.get(v["id"], col["garment"]["est_shipping_us"])
+        r = choose(c, sh); local = r["price"] if cur == "USD" else to_try(r["price"], rate)
+        prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
+        parts = [x.strip() for x in v["title"].split("/")]  # Printify: "S / Light Pink"
+        size = next((x for x in parts if x in G["sizes"]), parts[0])
+        if c >= rep.get(size, {}).get("cost", 0): rep[size] = {**r, "price_local": local, "currency": cur}  # renkler arasında en yüksek maliyet
+    return prices, rep
+
+def guncelle(a):
+    """Fiyat (pricing.py) ve açıklamayı (collection.json) Printify'a yazar; yayındaki ürünlerde yalnız fiyat + açıklama Etsy'ye gider
+    (başlık, görsel, etiket ve kargo profiline dokunulmaz)."""
+    col = json.loads((D / "collection.json").read_text(encoding="utf-8")); G = col["garment"]; items = {it["key"]: it for it in col["items"]}
+    st = load_state(); pf = PF(bahsistore_token()); shop = st["shop"]
+    _, _, ship, _ = pick_provider(pf, st["blueprint"]["id"], G, st["provider"]["title"])
+    cur = a.currency.upper(); rate = usd_rate(cur)
+    flags = {"title": False, "description": True, "images": False, "variants": True, "tags": False, "keyFeatures": False, "shipping_template": False}
+    for k, S in st["products"].items():
+        if a.only and k not in a.only.split(","): continue
+        prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
+        prices, rep = price_variants(prod, ship, G, col, cur, rate)
+        pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", {"variants": prices, "description": items[k]["description"]})
+        if S.get("published"): pf("POST", f"/shops/{shop['id']}/products/{S['product_id']}/publish.json", flags)
+        S["pricing"] = rep; S["currency"] = cur; save_state(st)
+        print(k, "güncellendi" + (" + Etsy'ye gönderildi" if S.get("published") else ""), {s: r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")})
+
 def write_report(st, col):
     rowsh = []
     for it in col["items"]:
         S = st.get("products", {}).get(it["key"]);
         if not S or not S.get("pricing"): continue
-        m = S["pricing"].get("M") or next(iter(S["pricing"].values()))
+        m = S["pricing"].get("M") or next(iter(S["pricing"].values())); m = {"cost_usd": m.get("cost"), "price": m["price"], "with_ads": {"net": m["net"], "margin": m["margin"]}}
         imgs = "".join(f'<img src="{u}" loading="lazy">' for u in S.get("mockups", [])[:3])
         rowsh.append(f'<tr><td>{imgs}</td><td><b>{it["title"]}</b><br><small>{", ".join(it["tags"])}</small></td>'
                      f'<td>{m["cost_usd"]} $</td><td>{m["price"]} $</td><td>{m["with_ads"]["net"]} $ (%{round(m["with_ads"]["margin"]*100)})</td></tr>')
@@ -185,7 +206,7 @@ def yayinla(a):
             perso = {**L, "area_ratio": S["area_ratio"], "dark_variant_ids": S["dark_variant_ids"],
                      "base_urls": {"dark": S["uploads"]["base_dark"]["url"], "light": S["uploads"]["base_light"]["url"]}}
             r = call("etsy-listings", {"action": "listing_personalization", "userId": UID, "etsyListingId": S["etsy_listing_id"],
-                                       "instructions": it["personalization"]["instructions"], "charMax": it["personalization"]["char_max"], "required": True}, 300)
+                                       "question": "Personalization (kids' names)", "instructions": it["personalization"]["instructions"], "charMax": it["personalization"]["char_max"], "required": True}, 300)
             print(k, "Etsy kişiselleştirme:", r and r.get("content", "")[:200])
         sql(f"""insert into public.pod_products (user_id, provider_shop_id, provider_product_id, blueprint_id, print_provider_id, design_key, season_key, external_listing_id, personalized, personalization, status)
 values ({q(UID)}, {q(shop['id'])}, {q(S['product_id'])}, {st['blueprint']['id']}, {st['provider']['id']}, {q(k)}, {q(season)}, {q(S['etsy_listing_id'])}, {str(bool(S.get('personalized'))).lower()},
@@ -196,6 +217,6 @@ on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
         print(k, "yayında:", S["etsy_listing_id"])
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--garment"); ap.add_argument("--provider", help="üretici adı (ör. SwiftPOD)")
+    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla", "guncelle"]); ap.add_argument("--garment"); ap.add_argument("--provider", help="üretici adı (ör. SwiftPOD)")
     ap.add_argument("--only"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
-    a = ap.parse_args(); (hazirla if a.adim == "hazirla" else yayinla)(a)
+    a = ap.parse_args(); {"hazirla": hazirla, "yayinla": yayinla, "guncelle": guncelle}[a.adim](a)

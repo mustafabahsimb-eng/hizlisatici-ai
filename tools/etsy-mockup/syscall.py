@@ -12,7 +12,8 @@ def rows(out):
     except Exception: return []
 def start(fn, body):
     tag = "syscall:" + uuid.uuid4().hex
-    frag = json.dumps(body)[1:-1].replace("'", "''")
+    # Gövde iki kez SQL metnine girer (bu blok + cron komutundaki body:='...'): kesme işareti iki katmanlı kaçılır; ';' komuttan silindiği için kaçılır
+    frag = json.dumps(body or {"_": 0})[1:-1].replace(";", "\\u003b").replace("'", "\\u0027")  # JSON kaçışı: SQL metninde tırnak / ; sorun çıkarmaz
     sql(f"""do $$ declare v text; rid bigint; begin
   select replace(replace(command, '/functions/v1/cj-alt-match', '/functions/v1/{fn}'), '{{"cronSecret"', '{{{frag},"cronSecret"') into v from cron.job where jobname='cj-alt-match-1h';
   v := replace(replace(v, 'timeout_milliseconds := 120000', 'timeout_milliseconds := 600000'), ';', '');
@@ -29,7 +30,12 @@ def result(rid, wait=600):
         time.sleep(5)
     return None
 def call(fn, body, wait=600):
-    rid = start(fn, body)
+    rid = None
+    for i in range(4):  # Supabase CLI ara sıra boş döner: kısa bekleyip yeniden dene
+        try: rid = start(fn, body)
+        except Exception: rid = None
+        if rid is not None: break
+        time.sleep(3 * (i + 1))
     if rid is None: raise RuntimeError("istek başlatılamadı")
     return result(rid, wait)
 if __name__ == "__main__":

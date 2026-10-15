@@ -64,121 +64,61 @@
   "payment_pct": 0.03,
   "payment_fixed": 0.25,
   "listing": 0.2,
-  "offsite_ads": 0.15
+  "offsite_ads": 0.0
  },
- "min_margin": 0.35,
+ "min_net": 10.0,
  "comparison": {
   "gildan-18000": {
    "standard": {
     "S-XL": {
-     "cost": 23.23,
-     "price": 58.99,
-     "with_ads": {
-      "price": 58.99,
-      "cost": 23.23,
-      "etsy_fees": 14.9,
-      "net": 20.86,
-      "margin": 0.3536
-     },
-     "without_ads": {
-      "price": 58.99,
-      "cost": 23.23,
-      "etsy_fees": 6.05,
-      "net": 29.71,
-      "margin": 0.5036
-     }
+     "price": 37.99,
+     "cost": 15.24,
+     "ship": 7.99,
+     "etsy_fees": 4.06,
+     "net": 10.7,
+     "margin": 0.2817
     },
     "2XL": {
-     "cost": 25.73,
-     "price": 64.99,
-     "with_ads": {
-      "price": 64.99,
-      "cost": 25.73,
-      "etsy_fees": 16.37,
-      "net": 22.89,
-      "margin": 0.3522
-     },
-     "without_ads": {
-      "price": 64.99,
-      "cost": 25.73,
-      "etsy_fees": 6.62,
-      "net": 32.64,
-      "margin": 0.5022
-     }
+     "price": 39.99,
+     "cost": 17.74,
+     "ship": 7.99,
+     "etsy_fees": 4.25,
+     "net": 10.01,
+     "margin": 0.2503
     },
     "3XL": {
-     "cost": 27.73,
-     "price": 69.99,
-     "with_ads": {
-      "price": 69.99,
-      "cost": 27.73,
-      "etsy_fees": 17.6,
-      "net": 24.66,
-      "margin": 0.3524
-     },
-     "without_ads": {
-      "price": 69.99,
-      "cost": 27.73,
-      "etsy_fees": 7.1,
-      "net": 35.16,
-      "margin": 0.5024
-     }
+     "price": 42.99,
+     "cost": 19.74,
+     "ship": 7.99,
+     "etsy_fees": 4.53,
+     "net": 10.73,
+     "margin": 0.2495
     }
    },
    "premium": {
     "S-XL": {
-     "cost": 19.21,
-     "price": 48.99,
-     "with_ads": {
-      "price": 48.99,
-      "cost": 19.21,
-      "etsy_fees": 12.45,
-      "net": 17.33,
-      "margin": 0.3537
-     },
-     "without_ads": {
-      "price": 48.99,
-      "cost": 19.21,
-      "etsy_fees": 5.1,
-      "net": 24.68,
-      "margin": 0.5037
-     }
+     "price": 32.99,
+     "cost": 11.22,
+     "ship": 7.99,
+     "etsy_fees": 3.58,
+     "net": 10.2,
+     "margin": 0.3091
     },
     "2XL": {
-     "cost": 21.71,
-     "price": 54.99,
-     "with_ads": {
-      "price": 54.99,
-      "cost": 21.71,
-      "etsy_fees": 13.92,
-      "net": 19.36,
-      "margin": 0.352
-     },
-     "without_ads": {
-      "price": 54.99,
-      "cost": 21.71,
-      "etsy_fees": 5.67,
-      "net": 27.61,
-      "margin": 0.502
-     }
+     "price": 35.99,
+     "cost": 13.72,
+     "ship": 7.99,
+     "etsy_fees": 3.87,
+     "net": 10.41,
+     "margin": 0.2893
     },
     "3XL": {
-     "cost": 23.71,
-     "price": 59.99,
-     "with_ads": {
-      "price": 59.99,
-      "cost": 23.71,
-      "etsy_fees": 15.15,
-      "net": 21.13,
-      "margin": 0.3523
-     },
-     "without_ads": {
-      "price": 59.99,
-      "cost": 23.71,
-      "etsy_fees": 6.15,
-      "net": 30.13,
-      "margin": 0.5023
-     }
+     "price": 37.99,
+     "cost": 15.72,
+     "ship": 7.99,
+     "etsy_fees": 4.06,
+     "net": 10.22,
+     "margin": 0.269
     }
    },
    "name": "Gildan 18000 Heavy Blend Crewneck Sweatshirt"
@@ -186,114 +126,54 @@
   "comfort-colors-1566": {
    "standard": {
     "S-XL": {
-     "cost": 39.28,
-     "price": 98.99,
-     "with_ads": {
-      "price": 98.99,
-      "cost": 39.28,
-      "etsy_fees": 24.7,
-      "net": 35.01,
-      "margin": 0.3536
-     },
-     "without_ads": {
-      "price": 98.99,
-      "cost": 39.28,
-      "etsy_fees": 9.85,
-      "net": 49.86,
-      "margin": 0.5036
-     }
+     "price": 54.99,
+     "cost": 31.29,
+     "ship": 7.99,
+     "etsy_fees": 5.67,
+     "net": 10.04,
+     "margin": 0.1825
     },
     "2XL": {
-     "cost": 42.28,
-     "price": 105.99,
-     "with_ads": {
-      "price": 105.99,
-      "cost": 42.28,
-      "etsy_fees": 26.42,
-      "net": 37.29,
-      "margin": 0.3518
-     },
-     "without_ads": {
-      "price": 105.99,
-      "cost": 42.28,
-      "etsy_fees": 10.52,
-      "net": 53.19,
-      "margin": 0.5018
-     }
+     "price": 58.99,
+     "cost": 34.29,
+     "ship": 7.99,
+     "etsy_fees": 6.05,
+     "net": 10.66,
+     "margin": 0.1806
     },
     "3XL": {
-     "cost": 44.28,
-     "price": 110.99,
-     "with_ads": {
-      "price": 110.99,
-      "cost": 44.28,
-      "etsy_fees": 27.64,
-      "net": 39.07,
-      "margin": 0.352
-     },
-     "without_ads": {
-      "price": 110.99,
-      "cost": 44.28,
-      "etsy_fees": 10.99,
-      "net": 55.72,
-      "margin": 0.502
-     }
+     "price": 60.99,
+     "cost": 36.29,
+     "ship": 7.99,
+     "etsy_fees": 6.24,
+     "net": 10.47,
+     "margin": 0.1716
     }
    },
    "premium": {
     "S-XL": {
-     "cost": 31.84,
-     "price": 79.99,
-     "with_ads": {
-      "price": 79.99,
-      "cost": 31.84,
-      "etsy_fees": 20.05,
-      "net": 28.1,
-      "margin": 0.3513
-     },
-     "without_ads": {
-      "price": 79.99,
-      "cost": 31.84,
-      "etsy_fees": 8.05,
-      "net": 40.1,
-      "margin": 0.5013
-     }
+     "price": 46.99,
+     "cost": 23.85,
+     "ship": 7.99,
+     "etsy_fees": 4.91,
+     "net": 10.24,
+     "margin": 0.2178
     },
     "2XL": {
-     "cost": 34.84,
-     "price": 87.99,
-     "with_ads": {
-      "price": 87.99,
-      "cost": 34.84,
-      "etsy_fees": 22.01,
-      "net": 31.14,
-      "margin": 0.3539
-     },
-     "without_ads": {
-      "price": 87.99,
-      "cost": 34.84,
-      "etsy_fees": 8.81,
-      "net": 44.34,
-      "margin": 0.5039
-     }
+     "price": 50.99,
+     "cost": 26.85,
+     "ship": 7.99,
+     "etsy_fees": 5.29,
+     "net": 10.86,
+     "margin": 0.2129
     },
     "3XL": {
-     "cost": 36.84,
-     "price": 92.99,
-     "with_ads": {
-      "price": 92.99,
-      "cost": 36.84,
-      "etsy_fees": 23.23,
-      "net": 32.92,
-      "margin": 0.354
-     },
-     "without_ads": {
-      "price": 92.99,
-      "cost": 36.84,
-      "etsy_fees": 9.28,
-      "net": 46.87,
-      "margin": 0.504
-     }
+     "price": 52.99,
+     "cost": 28.85,
+     "ship": 7.99,
+     "etsy_fees": 5.48,
+     "net": 10.67,
+     "margin": 0.2013
     }
    },
    "name": "Comfort Colors 1566 Garment-Dyed Crewneck Sweatshirt"
@@ -321,7 +201,7 @@
     "cookie lover gift",
     "gift for mom"
    ],
-   "description": "Most likely to eat all the cookies? Tag the cookie monster of the family (we all know who) with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to eat all the cookies? Tag the cookie monster of the family (we all know who) with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-movies",
@@ -344,7 +224,7 @@
     "holiday movie fan",
     "gift for mom"
    ],
-   "description": "Most likely to watch holiday movies all day? Tag the one who never leaves the couch in December with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to watch holiday movies all day? Tag the one who never leaves the couch in December with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-naughty",
@@ -367,7 +247,7 @@
     "naughty list shirt",
     "gift for mom"
    ],
-   "description": "Most likely to be on the naughty list? Tag the family troublemaker with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to be on the naughty list? Tag the family troublemaker with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-burn",
@@ -390,7 +270,7 @@
     "baking gift",
     "gift for mom"
    ],
-   "description": "Most likely to burn the cookies? Tag the baker whose cookies come out a little too crispy with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to burn the cookies? Tag the baker whose cookies come out a little too crispy with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-presents",
@@ -413,7 +293,7 @@
     "gift shaker shirt",
     "gift for mom"
    ],
-   "description": "Most likely to shake every present? Tag the one who can't wait until Christmas morning with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to shake every present? Tag the one who can't wait until Christmas morning with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-asleep",
@@ -436,7 +316,7 @@
     "cozy christmas",
     "gift for mom"
    ],
-   "description": "Most likely to fall asleep by the fire? Tag the first one asleep after dinner with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to fall asleep by the fire? Tag the first one asleep after dinner with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-snowball",
@@ -459,7 +339,7 @@
     "snowball fight",
     "gift for mom"
    ],
-   "description": "Most likely to throw the first snowball? Tag the one who always starts it with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to throw the first snowball? Tag the one who always starts it with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mlt-carols",
@@ -482,7 +362,7 @@
     "christmas carols",
     "gift for mom"
    ],
-   "description": "Most likely to sing carols off key? Tag the loudest (and most off-key) singer at the party with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Most likely to sing carols off key? Tag the loudest (and most off-key) singer at the party with this cozy Christmas crewneck.\n\nPart of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\nPerfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "gingerbread-season",
@@ -505,7 +385,7 @@
     "winter sweatshirt",
     "vintage christmas"
    ],
-   "description": "Gingerbread season is the best season. A cozy retro Christmas crewneck with a hand-drawn style gingerbread man.\n\nBring warm cookie vibes to cookie swaps, holiday baking days and Christmas markets. A sweet Christmas gift for her, for mom, for your best friend or for any baking lover.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Gingerbread season is the best season. A cozy retro Christmas crewneck with a hand-drawn style gingerbread man.\n\nBring warm cookie vibes to cookie swaps, holiday baking days and Christmas markets. A sweet Christmas gift for her, for mom, for your best friend or for any baking lover.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "pink-merry",
@@ -528,7 +408,7 @@
     "winter sweatshirt",
     "preppy christmas"
    ],
-   "description": "Merry Christmas, the pink way. A vintage-inspired pink Christmas tree with retro lettering.\n\nMade for pink Christmas lovers, holiday parties, cookie exchanges and cozy nights in. A cute Christmas gift for her, your sister, daughter or best friend.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "Merry Christmas, the pink way. A vintage-inspired pink Christmas tree with retro lettering.\n\nMade for pink Christmas lovers, holiday parties, cookie exchanges and cozy nights in. A cute Christmas gift for her, your sister, daughter or best friend.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "mama-patchwork",
@@ -557,7 +437,7 @@
     "mama with names",
     "grandma gift"
    ],
-   "description": "A cozy Mama crewneck with a faux patchwork quilt look — personalized with your kids' names.\n\nHOW TO PERSONALIZE\n1. Choose size and color\n2. In the personalization box, type the kids' names separated by commas\n3. We print the names exactly as written, in a soft script under the Mama letters\n\nThe patchwork is a printed design (not real fabric). A heartfelt gift for Christmas, Mother's Day, birthdays or new moms.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "A cozy Mama crewneck with a faux patchwork quilt look — personalized with your kids' names.\n\nHOW TO PERSONALIZE\n1. Choose size and color\n2. In the personalization box, type the kids' names separated by commas\n3. We print the names exactly as written, in a soft script under the Mama letters\n\nThe patchwork is a printed design (not real fabric). A heartfelt gift for Christmas, Mother's Day, birthdays or new moms.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "animal-frog",
@@ -580,7 +460,7 @@
     "trendy sweatshirt",
     "fall sweatshirt"
    ],
-   "description": "A cute retro frog in a cozy knit beanie — stay cozy all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any frog lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "A cute retro frog in a cozy knit beanie — stay cozy all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any frog lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "animal-cat",
@@ -603,7 +483,7 @@
     "trendy sweatshirt",
     "fall sweatshirt"
    ],
-   "description": "A cute retro cat in a cozy knit beanie — nap season all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any cat lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "A cute retro cat in a cozy knit beanie — nap season all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any cat lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "animal-bird",
@@ -626,7 +506,7 @@
     "trendy sweatshirt",
     "fall sweatshirt"
    ],
-   "description": "A cute retro robin bird in a cozy knit beanie — cozy mode all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any robin lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "A cute retro robin bird in a cozy knit beanie — cozy mode all year long.\n\nSoft, warm and a little bit funny. A sweet gift for any robin lover, for cozy weekends, coffee runs and chilly evenings.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   },
   {
    "key": "bookish-soul",
@@ -649,7 +529,7 @@
     "book crewneck",
     "literary gift"
    ],
-   "description": "For the bookish soul who is always reading. A retro stack of books with a cozy mug on top.\n\nPerfect for book club nights, library days and lazy weekends with a good story. A thoughtful gift for readers, librarians, teachers and bookworms.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery in the US\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nEvery piece is made just for you, so returns are not accepted — but if anything arrives damaged or misprinted, message us and we will make it right."
+   "description": "For the bookish soul who is always reading. A retro stack of books with a cozy mug on top.\n\nPerfect for book club nights, library days and lazy weekends with a good story. A thoughtful gift for readers, librarians, teachers and bookworms.\n\nPRODUCT DETAILS\n• Gildan 18000 Heavy Blend unisex crewneck sweatshirt\n• 50% cotton, 50% polyester — soft, warm, medium-heavy fabric\n• Classic loose fit, ribbed collar, cuffs and waistband\n• Unisex sizing S–3XL (see the size chart in the photos; size up for an oversized look)\n• Colors: Sand, Black, White, Light Pink, Forest Green\n\nPRINTING & SHIPPING\n• Printed on demand in the USA with direct-to-garment printing\n• FREE shipping within the United States (we currently ship to US addresses only)\n• Production 2–5 business days, then shipped with tracking\n• Order by early December for Christmas delivery\n\nCARE\n• Machine wash cold, inside out, gentle cycle\n• Tumble dry low or hang dry; do not iron directly on the print\n\nRETURNS & EXCHANGES\n• Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).\n• Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the \"Problem with your order?\" link in your Etsy order message.\n• Personalized items cannot be returned or exchanged."
   }
  ]
 }

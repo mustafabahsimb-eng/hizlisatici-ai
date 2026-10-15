@@ -13,6 +13,12 @@
 //   { action: "organize", userId, sections?: [{ title, listingIds[] }], featured?: [etsyListingId…] }
 //        -> mağaza bölümlerini oluştur (yoksa; verilen sırayla), ilanları bölümlere yerleştir, öne çıkan ilanları sırala (featured_rank)
 //   { action: "listing_personalization", userId, etsyListingId, instructions, charMax?, required? } -> Etsy kişiselleştirme kutusunu aç
+//   { action: "shipping_profile_fx", userId, profileId, rate } -> Printify kargo profilini mağaza para birimine çevir
+//   { action: "listing_shipping", userId, etsyListingId } -> ilanın kargo profili
+//   { action: "us_shipping_profile", userId, title, listingIds[], sourceProfileId?, primary?, … } -> yalnız ABD kargo profili + ilanlara ata
+//   { action: "return_policy", userId, listingIds[] } -> iade / değişim yok politikası + ilanlara ata
+//   { action: "shop_texts", userId, saleMessage?, policyAdditional? } -> satış sonrası mesaj, ek politika metni
+//   { action: "market_prices", queries[] } -> rakip fiyat ortancası (USD; resmi arama)
 //   { action: "holiday_notice", userId, etsyListingIds[], line | null, announcement? } -> açıklama + mağaza duyurusunda Noel teslim satırı
 //   { action: "listing_state", userId, etsyListingIds[], state: "active" | "inactive" }
 //        -> ilanları yayına al / pasife al (SİLMEZ; yorum ve satış geçmişi ilanda kalır)
@@ -21,7 +27,7 @@
 // sync-worker Etsy ilanlarını buraya devreder (beklemeden, arka planda).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { ETSY_CLIENT_ID, convertPrice, etsy, etsyShopCurrency, etsyToken } from "../_shared/etsy.ts";
+import { ETSY_CLIENT_ID, convertPrice, etsy, etsyApiKey, etsyShopCurrency, etsyToken } from "../_shared/etsy.ts";
 import { submitEtsyListing } from "../_shared/etsy-listing.ts";
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 
@@ -239,10 +245,104 @@ Deno.serve(async (req) => {
       // Kişiselleştirme kutusu (Printify'ın yayınladığı ilanda da): alıcının yazdığı metin pod-personalize ile baskıya girer
       if (b.action === "listing_personalization" && b.userId && b.etsyListingId) {
         const { ctx, shopId } = await userShop(String(b.userId));
-        const d = await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${String(b.etsyListingId)}`, { form: {
-          is_personalizable: true, personalization_is_required: b.required !== false,
-          personalization_char_count_max: Math.min(1024, Number(b.charMax) || 120), personalization_instructions: String(b.instructions || "").slice(0, 1024) } });
-        return json({ ok: true, is_personalizable: d.is_personalizable, required: d.personalization_is_required });
+        // Etsy'nin yeni kişiselleştirme uç noktası (updateListingPersonalization; eski is_personalizable alanları artık işlemiyor).
+        // Soru başlığı "Personalization" içerir: siparişte variations.formatted_name olarak gelir, pod-personalize bununla bulur.
+        const d = await etsy(ctx, "POST", `/shops/${shopId}/listings/${String(b.etsyListingId)}/personalization`, { json: { personalization_questions: [{
+          question_text: String(b.question || "Personalization").slice(0, 45), question_type: "text_input", required: b.required !== false,
+          instructions: String(b.instructions || "").slice(0, 1024) || null, max_allowed_characters: Math.min(1024, Number(b.charMax) || 120) }] } });
+        const back = await etsy(ctx, "GET", `/listings/${String(b.etsyListingId)}/personalization`).catch(() => d);
+        return json({ ok: true, personalization: back });
+      }
+      // İlanın kargo profili (alıcıdan alınan kargo ücreti): Printify'ın Etsy'de kurduğu profil dahil
+      if (b.action === "listing_shipping" && b.userId && b.etsyListingId) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const l = await etsy(ctx, "GET", `/listings/${String(b.etsyListingId)}`);
+        const sp = l.shipping_profile_id ? await etsy(ctx, "GET", `/shops/${shopId}/shipping-profiles/${l.shipping_profile_id}`) : null;
+        return json({ ok: true, price: l.price, shipping_profile_id: l.shipping_profile_id, title: sp?.title, processing: [sp?.min_processing_days, sp?.max_processing_days],
+          destinations: (sp?.shipping_profile_destinations || []).map((d: any) => ({ to: d.destination_country_iso || d.destination_region, first: d.primary_cost, additional: d.secondary_cost, days: [d.min_delivery_days, d.max_delivery_days] })) });
+      }
+      // Printify, kargo profilini mağaza para birimine ÇEVİRMEDEN yazar (TRY mağazada 8,79 $ -> 8,79 TL). Çevrilmemiş tutarları kurla düzelt.
+      // Koruma: yalnız maxUnconverted (varsayılan 100) altındaki tutarlar çevrilir; iki kez çalışsa da tutarlar ikinci kez çarpılmaz.
+      if (b.action === "shipping_profile_fx" && b.userId && b.profileId && Number(b.rate) > 1) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const base = `/shops/${shopId}/shipping-profiles/${String(b.profileId)}`;
+        const sp = await etsy(ctx, "GET", base); const lim = Number(b.maxUnconverted) || 100; const out: any[] = [];
+        const amt = (m: any) => (m ? Number(m.amount) / (Number(m.divisor) || 100) : 0);
+        for (const d of sp.shipping_profile_destinations || []) {
+          const p = amt(d.primary_cost), s = amt(d.secondary_cost);
+          if (p >= lim) { out.push({ id: d.shipping_profile_destination_id, skipped: "zaten çevrilmiş", primary: p }); continue; }
+          const np = Math.round(p * Number(b.rate) * 100) / 100, ns = Math.round(s * Number(b.rate) * 100) / 100;
+          try {
+            await etsy(ctx, "PUT", `${base}/destinations/${d.shipping_profile_destination_id}`, { form: { primary_cost: np.toFixed(2), secondary_cost: ns.toFixed(2) } });
+            out.push({ to: d.destination_country_iso || d.destination_region, from: p, primary: np, secondary: ns });
+          } catch (e) { out.push({ id: d.shipping_profile_destination_id, error: friendly(e) }); }
+        }
+        return json({ ok: out.every((x) => !x.error), title: sp.title, destinations: out });
+      }
+      // Yalnız ABD'ye kargo profili (yoksa oluşturulur; başlıkla bulunur) + ilanlara atanır. Gönderim yeri kaynak profilden (Printify'ın) alınır.
+      if (b.action === "us_shipping_profile" && b.userId && b.title && Array.isArray(b.listingIds)) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const list = (await etsy(ctx, "GET", `/shops/${shopId}/shipping-profiles`)).results || [];
+        let sp = list.find((p: any) => p.title === String(b.title));
+        if (!sp) {
+          const src = b.sourceProfileId ? await etsy(ctx, "GET", `/shops/${shopId}/shipping-profiles/${String(b.sourceProfileId)}`) : null;
+          sp = await etsy(ctx, "POST", `/shops/${shopId}/shipping-profiles`, { form: {
+            title: String(b.title).slice(0, 100), origin_country_iso: src?.origin_country_iso || "US", origin_postal_code: src?.origin_postal_code || b.originPostal || undefined,
+            destination_country_iso: "US", primary_cost: Number(b.primary || 0).toFixed(2), secondary_cost: Number(b.secondary || 0).toFixed(2),
+            min_processing_time: Number(b.minProcessing) || 2, max_processing_time: Number(b.maxProcessing) || 5, processing_time_unit: "business_days",
+            min_delivery_days: Number(b.minDelivery) || 2, max_delivery_days: Number(b.maxDelivery) || 5 } });
+        }
+        const assigned: any[] = [];
+        for (const id of b.listingIds.map(String)) {
+          try { await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${id}`, { form: { shipping_profile_id: sp.shipping_profile_id } }); assigned.push({ id, ok: true }); }
+          catch (e) { assigned.push({ id, ok: false, error: friendly(e) }); }
+        }
+        const full = await etsy(ctx, "GET", `/shops/${shopId}/shipping-profiles/${sp.shipping_profile_id}`);
+        return json({ ok: assigned.every((x) => x.ok), profileId: sp.shipping_profile_id, destinations: (full.shipping_profile_destinations || []).map((d: any) => ({ to: d.destination_country_iso || d.destination_region, first: d.primary_cost })), assigned });
+      }
+      // İade politikası (Etsy return policy): iade / değişim yok (siparişe özel basım) — kusurlu ürüne ücretsiz yeniden gönderim açıklamada ve mağaza politikasında
+      if (b.action === "return_policy" && b.userId && Array.isArray(b.listingIds)) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const pols = (await etsy(ctx, "GET", `/shops/${shopId}/policies/return`)).results || [];
+        let pol = pols.find((p: any) => p.accepts_returns === false && p.accepts_exchanges === false);
+        if (!pol) pol = await etsy(ctx, "POST", `/shops/${shopId}/policies/return`, { form: { accepts_returns: false, accepts_exchanges: false } });
+        const assigned: any[] = [];
+        for (const id of b.listingIds.map(String)) {
+          try { await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${id}`, { form: { return_policy_id: pol.return_policy_id } }); assigned.push({ id, ok: true }); }
+          catch (e) { assigned.push({ id, ok: false, error: friendly(e) }); }
+        }
+        return json({ ok: assigned.every((x) => x.ok), returnPolicyId: pol.return_policy_id, assigned });
+      }
+      // Mağaza metinleri: satış sonrası mesaj (her alıcıya Etsy gönderir) ve ek politika metni
+      if (b.action === "shop_texts" && b.userId) {
+        const { ctx, shopId } = await userShop(String(b.userId));
+        const form: Record<string, unknown> = {};
+        if (typeof b.saleMessage === "string") form.sale_message = b.saleMessage.slice(0, 2000);
+        if (typeof b.policyAdditional === "string") form.policy_additional = b.policyAdditional.slice(0, 5000);
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(form)) {   // alan alan: biri reddedilirse diğeri yine yazılır
+          try { await etsy(ctx, "PUT", `/shops/${shopId}`, { form: { [k]: v } }); out[k] = "ok"; } catch (e) { out[k] = friendly(e); }
+        }
+        return json({ ok: Object.values(out).every((x) => x === "ok"), fields: out });
+      }
+      // Rakip fiyatları (resmi findAllListingsActive): arama başına ilk 100 ilanın USD fiyatı ve ortancası
+      if (b.action === "market_prices" && Array.isArray(b.queries)) {
+        const out: Record<string, unknown> = {};
+        for (const kw of b.queries.slice(0, 20).map(String)) {
+          const q = new URLSearchParams({ keywords: kw, limit: "100", sort_on: "score" });
+          const r = await fetch("https://api.etsy.com/v3/application/listings/active?" + q, { headers: { "x-api-key": etsyApiKey() } });
+          if (!r.ok) { out[kw] = { error: r.status }; continue; }
+          const d = await r.json(); const usd: number[] = [];
+          for (const l of d.results || []) {
+            const amt = Number(l.price?.amount) / (Number(l.price?.divisor) || 100); const cur = String(l.price?.currency_code || "USD");
+            const v = cur === "USD" ? amt : await convertPrice(db, amt, cur, "USD");
+            if (v && v > 0) usd.push(v);
+          }
+          usd.sort((a, z) => a - z);
+          const med = usd.length ? (usd.length % 2 ? usd[(usd.length - 1) / 2] : (usd[usd.length / 2 - 1] + usd[usd.length / 2]) / 2) : null;
+          out[kw] = { count: d.count, sample: usd.length, median_usd: med && Math.round(med * 100) / 100, p25: usd[Math.floor(usd.length * 0.25)] ?? null, p75: usd[Math.floor(usd.length * 0.75)] ?? null };
+        }
+        return json({ ok: true, prices: out });
       }
       if (b.action === "holiday_notice" && b.userId && Array.isArray(b.etsyListingIds)) {
         return json(await holidayNotice(String(b.userId), b.etsyListingIds.map(String), b.line ? String(b.line).slice(0, 200) : null, b.announcement !== false));

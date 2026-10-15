@@ -102,7 +102,10 @@ async function receiptPersonalizations(e: { ctx: any; shopId: string }, receiptI
   const r = await etsy(e.ctx, "GET", `/shops/${e.shopId}/receipts/${receiptId}`);
   const out = new Map<string, string[]>();
   for (const t of r.transactions || []) {
-    const v = (t.variations || []).find((x: any) => /personali[sz]ation/i.test(String(x.formatted_name || "")));
+    // Kişiselleştirme sorusu: başlık "Personalization …" ya da eski sistemde property_id 54; yoksa renk / beden dışındaki varyasyon
+    const vs = t.variations || [];
+    const v = vs.find((x: any) => /personali[sz]ation/i.test(String(x.formatted_name || ""))) || vs.find((x: any) => Number(x.property_id) === 54)
+      || vs.find((x: any) => !/^(colou?r|size|primary color|secondary color)$/i.test(String(x.formatted_name || "").trim()));
     const text = v ? String(v.formatted_value || "") : "";
     for (let q = 0; q < Math.max(1, Number(t.quantity) || 1); q++) out.set(String(t.listing_id), [...(out.get(String(t.listing_id)) || []), text]);
   }

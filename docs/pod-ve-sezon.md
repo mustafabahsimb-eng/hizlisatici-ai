@@ -26,3 +26,12 @@ Kişiselleştirilmemiş ve tümü Seltigo POD ürünü olan bekleyen siparişler
 - `organize`: bölümleri oluşturur (yoksa, verilen sırayla), ilanları yerleştirir, öne çıkanları sıralar (`featured_rank`).
 - `listing_state`: yayına al / pasife al. `listing_personalization`: kişiselleştirme kutusu.
 - bahsistore için: `tools/etsy-mockup/kapak_uygula.py` (25 kapak) ve `organize.py` (bölümler + 5 set öne çıkan).
+
+## 16 Ekim 2026 kararları (Mustafa)
+- **Fiyat:** her satıştan net en az 10 $; Offsite Ads kapalı (hesaba katılmaz). net = fiyat − fiyat × %9,5 − 0,45 $ − Printify ürün − ABD kargo; ,99 ile biter. Mağaza TL: `to_try` ile ,99 TL. Uygulama: `printify_yukle.py guncelle` (yayındaki ilanlarda yalnız fiyat + açıklama Etsy'ye gider).
+- **Üretici:** SwiftPOD (Gildan 18000).
+- **Kargo:** sweatshirt'ler yalnız ABD'ye, ücretsiz ("Sweatshirts - US only - Free shipping", etsy-listings `us_shipping_profile`). Printify'ın kendi profili kurla düzeltildi (`shipping_profile_fx`): Printify tutarları mağaza para birimine çevirmeden yazar.
+- **İade:** fikir değiştirme iadesi / değişim yok (Etsy iade politikası `return_policy`); kusur, hasar, yanlış ürün fotoğrafla bildirilirse ücretsiz yeniden gönderim; isimli ürün iade edilmez. Metin ilan açıklamasında ve satış sonrası mesajda. Etsy, ek mağaza politikası metnini (policy_additional) bu mağazada kabul etmiyor ("EU Terms").
+- **Sorun bildirimi → Printify yeniden gönderim:** satış sonrası mesajdaki bağlantı `order-help.html?shop=<Etsy mağaza no>` → `pod-reprint` (Etsy siparişi + e-posta / posta kodu doğrulanır, fotoğraflar depoya, Printify `support-requests/reprint`, Telegram bildirimi; açılamazsa cron `pod-reprint-30m` 6 kez dener). Tablo `pod_reprints`, paket anahtarı `pod_reprint`.
+- **Etsy kişiselleştirme:** yeni uç nokta `updateListingPersonalization` (eski is_personalizable alanları işlemiyor); soru başlığı "Personalization (kids' names)", siparişte `variations.formatted_name`.
+- **Rakip fiyatları:** etsy-listings `market_prices` (resmi arama, USD ortanca).
