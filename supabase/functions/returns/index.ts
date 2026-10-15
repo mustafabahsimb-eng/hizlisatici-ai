@@ -2,7 +2,9 @@
 // İade otomasyonu
 // Müşteri (giriş yok, takip anahtarıyla — takip.html):
 //   { action: "info", token }                                  -> sipariş, iade hakkı (süre), varsa iade durumu + iade etiketi
-//   { action: "request", token, reasonCode, text, quantity, photos: [base64...] } -> talep; AI kontrol + satıcı kuralları -> otomatik onay / satıcıya
+//   { action: "request", token, reasonCode, text, quantity, photos: [base64...], pickup } -> talep; yasal çerçeve + AI + satıcı kuralları -> onay / satıcıya
+//   { action: "policy", slug | token | userId, country? }        -> ön bilgilendirme / iade politikası metni (TR + EN), otomatik
+// Yasal çerçeve: _shared/returns-law.ts + return_laws (TR / AB / GB / ABD / diğer). Süre içindeki yasal cayma reddedilemez; fotoğraf yalnız ayıplı malda.
 // Satıcı (userAccessToken):
 //   { action: "decide", returnId, approve, note }  { action: "received", returnId }  { action: "refunded", returnId }
 //   { action: "photos", returnId } -> imzalı fotoğraf adresleri   { action: "label", returnId } -> iade etiketini tekrar dene
@@ -15,6 +17,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { featureEnabled } from "../_shared/features.ts";
 import { cjAccessToken, cjCall, cjKeyForUser, openCjDispute } from "../_shared/cj.ts";
 import { returnsAdapterFor } from "../_shared/marketplace-returns.ts";
+import { etsyApiKey, etsyToken } from "../_shared/etsy.ts";
+import { allowedReasons, decide as decideLaw, DEFECT_REASONS, effective, FALLBACK_LAW, fraudFlags, isDefect, type Law, policyText, REASONS as LAW_REASONS, refundDue, shippingPayer } from "../_shared/returns-law.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -24,14 +28,35 @@ const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const short = (v: unknown, n = 300) => String(v ?? "").slice(0, n);
-const REASONS = ["size", "changed_mind", "defective", "damaged", "wrong_item", "not_as_described", "late", "other"];
-const DEFAULT_RULES = { auto_approve: true, max_auto_amount: 1000, window_days: 14, auto_reasons: ["size", "changed_mind", "wrong_item", "not_as_described", "late"],
-  photo_reasons: ["defective", "damaged"], restock: true, customer_pays_reasons: ["size", "changed_mind"], supplier_claim: true };
+const REASONS: string[] = [...LAW_REASONS];
 
 async function rulesFor(userId: string) {
   const { data } = await db.from("return_rules").select("*").eq("user_id", userId).maybeSingle();
-  return { ...DEFAULT_RULES, ...(data || {}) };
+  return data || {};
 }
+// Hangi hukuk: alıcının ülkesi (yoksa satıcının ana ülkesi) -> return_laws bölgesi
+const lawCache = new Map<string, Law>();
+async function lawFor(country: string | null | undefined, userId: string): Promise<Law> {
+  let c = country;
+  if (!c) { const { data } = await db.from("user_profiles").select("home_country").eq("user_id", userId).maybeSingle(); c = data?.home_country || "TR"; }
+  const { data: region } = await db.rpc("return_law_region", { p_country: c });
+  const key = String(region || "OTHER");
+  if (!lawCache.has(key)) { const { data } = await db.from("return_laws").select("*").eq("region", key).maybeSingle(); lawCache.set(key, (data as Law) || FALLBACK_LAW); }
+  return lawCache.get(key)!;
+}
+async function lawByRegion(region: string | null | undefined, userId: string): Promise<Law> {
+  if (!region) return await lawFor(null, userId);
+  if (!lawCache.has(region)) { const { data } = await db.from("return_laws").select("*").eq("region", region).maybeSingle(); lawCache.set(region, (data as Law) || FALLBACK_LAW); }
+  return lawCache.get(region)!;
+}
+async function effFor(userId: string, country?: string | null) { return effective(await lawFor(country, userId), await rulesFor(userId)); }
+const daysFrom = (iso: string) => (Date.now() - new Date(iso).getTime()) / 86400000;
+async function recentReturns(userId: string, phone: string | null) {
+  if (!phone) return 0;
+  const { count } = await db.from("returns").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("customer_phone", phone).gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString());
+  return count || 0;
+}
+
 const ev = (r: any, status: string, note?: string) => [...(r.events || []), { at: new Date().toISOString(), status, ...(note ? { note } : {}) }];
 
 // ---------- AI: neden + fotoğraf kontrolü ----------
@@ -54,21 +79,6 @@ async function aiCheck(reasonCode: string, text: string, productName: string, ph
   return null;
 }
 
-// ---------- Karar ----------
-function decide(rules: any, ret: { reason_code: string; amount: number | null; photos: number; ai: any; inWindow: boolean; dropship: boolean }) {
-  if (!rules.auto_approve) return { auto: false, note: "Otomatik onay kapalı" };
-  if (!ret.inWindow) return { auto: false, note: `İade süresi (${rules.window_days} gün) geçmiş` };
-  if (ret.amount != null && ret.amount > Number(rules.max_auto_amount)) return { auto: false, note: `Tutar otomatik onay sınırının üstünde (${rules.max_auto_amount})` };
-  if ((rules.photo_reasons || []).includes(ret.reason_code)) {
-    if (!ret.photos) return { auto: false, note: "Kusur için fotoğraf yok" };
-    if (ret.ai && ret.ai.defect_visible && Number(ret.ai.confidence || 0) >= 0.6) return { auto: true, note: "Fotoğrafta kusur görüldü (AI)" };
-    if (!ret.ai) return { auto: false, note: "Fotoğraf kontrol edilemedi" };
-    return { auto: false, note: "Fotoğrafta kusur net görülmedi (AI)" };
-  }
-  if ((rules.auto_reasons || []).includes(ret.reason_code)) return { auto: true, note: "Kurala uygun" };
-  return { auto: false, note: "Neden satıcı kararı gerektiriyor" };
-}
-
 async function isDropship(productId: number | null) {
   if (!productId) return false;
   const { data } = await db.from("products").select("supplier").eq("id", productId).maybeSingle();
@@ -78,7 +88,10 @@ async function isDropship(productId: number | null) {
 // Onaylandı: dropshipping ise ürün geri gelmez (doğrudan para iadesi + CJ talebi); değilse iade etiketi
 async function approve(ret: any, decision: "auto" | "seller" | "marketplace", note: string) {
   const drop = await isDropship(ret.product_id);
-  await db.from("returns").update({ status: "approved", decision, decision_note: note, events: ev(ret, "approved", note), updated_at: new Date().toISOString() }).eq("id", ret.id);
+  const now = new Date().toISOString();
+  const eff = effective(await lawByRegion(ret.law, ret.user_id), await rulesFor(ret.user_id));
+  const due = refundDue(eff, { requestedAt: ret.created_at, approvedAt: now, dropship: drop });
+  await db.from("returns").update({ status: "approved", decision, decision_note: note, events: ev(ret, "approved", note), updated_at: now, ...(due ? { refund_due_at: due } : {}) }).eq("id", ret.id);
   if (drop) {
     // Ürün geri gönderilmez; para iadesi hemen
     const { data: r2 } = await db.from("returns").select("*").eq("id", ret.id).single();
@@ -103,7 +116,7 @@ async function reject(ret: any, decision: "auto" | "seller", note: string) {
 
 // Teslim alındı / dropship onayı: stok + para iadesi (Kendi Mağazam: ödeme altyapısı gelene kadar satıcı onayıyla; pazaryeri: pazaryeri iade eder)
 async function refundStep(ret: any, note?: string) {
-  const rules = await rulesFor(ret.user_id);
+  const rules: any = { restock: true, ...(await rulesFor(ret.user_id)) };
   const now = new Date().toISOString();
   const drop = await isDropship(ret.product_id);
   if (!drop && rules.restock && !ret.restocked && ret.product_id && ret.status === "received") {
@@ -115,11 +128,17 @@ async function refundStep(ret: any, note?: string) {
     if (p && p.stock_qty != null) await db.from("products").update({ stock_qty: Number(p.stock_qty) + ret.quantity, stock_status: null }).eq("id", ret.product_id);
     await db.from("returns").update({ restocked: true }).eq("id", ret.id);
   }
-  // Müşteri öder: iade kargo ücreti tutardan düşülür
   let amount = Number(ret.amount) || 0;
-  if ((rules.customer_pays_reasons || []).includes(ret.reason_code)) {
+  // Müşteri öder (yalnız yasanın izin verdiği yerde ve ön bilgilendirmede yazılıysa; TR'de hiçbir zaman): iade kargo ücreti düşülür
+  if (ret.shipping_payer === "customer" && !isDefect(ret.reason_code)) {
     const { data: sh } = await db.from("shipments").select("cost").eq("return_id", ret.id).maybeSingle();
     if (sh?.cost) amount = Math.max(0, Math.round((amount - Number(sh.cost)) * 100) / 100);
+  }
+  // Cayma (TR / AB / GB) ve ayıp: ilk gönderim kargo ücreti de iade edilir (sipariş kaydında varsa)
+  const law = await lawByRegion(ret.law, ret.user_id);
+  if ((law.refund_original_shipping || isDefect(ret.reason_code)) && ret.marketplace_order_id && !(ret.events || []).some((e: any) => /refund/.test(e.status))) {
+    const { data: mo } = await db.from("marketplace_orders").select("shipping_charged").eq("id", ret.marketplace_order_id).maybeSingle();
+    if (mo?.shipping_charged) amount = Math.round((amount + Number(mo.shipping_charged)) * 100) / 100;
   }
   const marketplace = ret.source !== "own_store";
   const { data: led } = await db.from("refund_ledger").select("id").eq("return_id", ret.id).maybeSingle();
@@ -135,8 +154,8 @@ async function refundStep(ret: any, note?: string) {
 
 // Kusurlu dropshipping ürünü: CJ'den bakiyeye iade talebi
 async function supplierClaim(ret: any) {
-  const rules = await rulesFor(ret.user_id);
-  if (!rules.supplier_claim || ret.supplier_claim || !["defective", "damaged", "wrong_item", "not_as_described"].includes(ret.reason_code)) return null;
+  const rules: any = { supplier_claim: true, ...(await rulesFor(ret.user_id)) };
+  if (!rules.supplier_claim || ret.supplier_claim || !isDefect(ret.reason_code)) return null;
   const { data: o } = await db.from("orders").select("id, supplier, supplier_order_id, fulfilled_via").eq("user_id", ret.user_id)
     .or(ret.store_order_id ? `store_order_id.eq.${ret.store_order_id}` : `id.eq.${ret.supplier_order_id || "00000000-0000-0000-0000-000000000000"}`).limit(1).maybeSingle();
   const viaCj = o && (o.supplier === "cj" || o.fulfilled_via === "cj") && o.supplier_order_id;
@@ -166,18 +185,40 @@ async function publicReturn(r: any) {
   const { data: sh } = await db.from("shipments").select("label_path").eq("return_id", r.id).maybeSingle();
   if (sh?.label_path) { const { data } = await db.storage.from("shipping-labels").createSignedUrl(sh.label_path, 3600); label = data?.signedUrl || null; }
   return { id: r.id, status: r.status, reason: r.reason_code, carrier: r.carrier, returnCode: r.return_code, tracking: r.tracking_number, label, amount: r.amount, currency: r.currency,
-    refund: r.refund_status, note: r.status === "rejected" ? r.decision_note : null, createdAt: r.created_at };
+    refund: r.refund_status, refundDueAt: r.refund_due_at, pickup: r.pickup, note: r.status === "rejected" ? r.decision_note : null, createdAt: r.created_at };
+}
+
+async function productInfo(id: number | null) {
+  if (!id) return null;
+  const { data } = await db.from("products").select("name, generated_title, withdrawal_exempt, withdrawal_exempt_reason, supplier").eq("id", id).maybeSingle();
+  return data;
+}
+
+// Süre içindeki yasal cayma talebi reddedilemez
+async function withdrawalLocked(ret: any) {
+  if (!ret.withdrawal || ret.status !== "requested") return false;
+  const law = await lawByRegion(ret.law, ret.user_id);
+  if (!law.statutory) return false;
+  if ((await productInfo(ret.product_id))?.withdrawal_exempt) return false;
+  const { data: so } = ret.store_order_id ? await db.from("store_orders").select("delivered_at, shipped_at, created_at").eq("id", ret.store_order_id).maybeSingle() : { data: null };
+  const eff = effective(law, await rulesFor(ret.user_id));
+  const base = so ? (so.delivered_at || so.shipped_at || so.created_at) : ret.created_at;
+  return daysFrom(base) - daysFrom(ret.created_at) <= eff.windowDays;   // talep, süre içinde açılmışsa
 }
 
 async function info(token: string) {
   const so = await orderByToken(token);
   if (!so) return { ok: false, error: "Sipariş bulunamadı" };
-  const rules = await rulesFor(so.user_id);
+  const eff = await effFor(so.user_id, so.customer_country);
+  const prod = await productInfo(so.product_id);
+  const exempt = !!prod?.withdrawal_exempt;
   const base = so.delivered_at || so.shipped_at || so.created_at;
-  const daysLeft = Math.ceil(rules.window_days - (Date.now() - new Date(base).getTime()) / 86400000);
+  const daysLeft = Math.ceil(eff.windowDays - daysFrom(base));
   const { data: rs } = await db.from("returns").select("*").eq("store_order_id", so.id).not("status", "in", "(cancelled)").order("created_at", { ascending: false }).limit(1);
-  return { ok: true, canRequest: so.status !== "cancelled" && !rs?.length, daysLeft, windowDays: rules.window_days, maxQuantity: so.quantity || 1, reasons: REASONS,
-    photoReasons: rules.photo_reasons, return: await publicReturn(rs?.[0]) };
+  return { ok: true, canRequest: so.status !== "cancelled" && !rs?.length, daysLeft, windowDays: eff.windowDays, statutory: eff.law.statutory, law: eff.law.region,
+    exempt, exemptReason: prod?.withdrawal_exempt_reason || null, maxQuantity: so.quantity || 1, reasons: allowedReasons(exempt), photoReasons: DEFECT_REASONS,
+    returnCarrier: so.return_carrier || null, returnCode: so.return_code || null, freeReturn: !eff.customerPays, pickupAllowed: eff.law.region === "TR",
+    return: await publicReturn(rs?.[0]) };
 }
 
 async function request(b: any) {
@@ -186,17 +227,25 @@ async function request(b: any) {
   const reasonCode = REASONS.includes(b.reasonCode) ? b.reasonCode : "other";
   const { data: exists } = await db.from("returns").select("id").eq("store_order_id", so.id).not("status", "in", "(cancelled,rejected)").maybeSingle();
   if (exists) return { ok: false, error: "Bu sipariş için zaten bir iade talebi var" };
-  const rules = await rulesFor(so.user_id);
+  const eff = await effFor(so.user_id, so.customer_country);
+  const prod = await productInfo(so.product_id);
+  const exempt = !!prod?.withdrawal_exempt;
+  if (!allowedReasons(exempt).includes(reasonCode)) return { ok: false, error: "Bu ürün cayma hakkı kapsamında değil; yalnız kusurlu, hasarlı veya yanlış ürün iadesi yapılabilir" };
+  const defect = isDefect(reasonCode);
   const qty = Math.max(1, Math.min(Number(so.quantity || 1), Number(b.quantity) || 1));
   const amount = so.unit_price != null ? Math.round(Number(so.unit_price) * qty * 100) / 100 : null;
-  const photos = (Array.isArray(b.photos) ? b.photos : []).slice(0, 4).map((x: string) => String(x)).filter((x: string) => x.length < 7_000_000);
+  // Fotoğraf yalnız ayıplı mal nedenlerinde (caymada istenemez)
+  const photos = defect ? (Array.isArray(b.photos) ? b.photos : []).slice(0, 4).map((x: string) => String(x)).filter((x: string) => x.length < 7_000_000) : [];
+  const base = so.delivered_at || so.shipped_at || so.created_at;
+  const daysSince = daysFrom(base);
+  const fraud = fraudFlags({ amount, maxAuto: eff.maxAuto, recentReturns: await recentReturns(so.user_id, so.customer_phone), daysSince, reason: reasonCode });
   const { data: ret, error } = await db.from("returns").insert({
     user_id: so.user_id, source: "own_store", external_id: "store-" + so.id, store_order_id: so.id, product_id: so.product_id, variant_id: so.variant_id, quantity: qty,
     reason_code: reasonCode, reason_text: short(b.text, 1000), customer_name: so.customer_name, customer_phone: so.customer_phone, amount, currency: so.currency || "TRY",
-    shipping_payer: (rules.customer_pays_reasons || []).includes(reasonCode) ? "customer" : "seller", events: [{ at: new Date().toISOString(), status: "requested" }],
+    shipping_payer: shippingPayer(eff, reasonCode), law: eff.law.region, withdrawal: !defect, fraud: fraud.length ? fraud : null, pickup: !!b.pickup && eff.law.region === "TR",
+    events: [{ at: new Date().toISOString(), status: "requested" }],
   }).select("*").single();
   if (error) throw error;
-  // Fotoğraflar (özel depo)
   const paths: string[] = [], imgs: { b64: string; mime: string }[] = [];
   for (let i = 0; i < photos.length; i++) {
     const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(photos[i]);
@@ -208,24 +257,47 @@ async function request(b: any) {
       if (!up.error) { paths.push(path); imgs.push({ b64, mime }); }
     } catch (_) { /* bozuk fotoğraf atlanır */ }
   }
-  const { data: prod } = await db.from("products").select("name, generated_title").eq("id", so.product_id).maybeSingle();
-  const ai = await aiCheck(reasonCode, b.text, prod?.generated_title || prod?.name || "", imgs);
+  const ai = defect ? await aiCheck(reasonCode, b.text, prod?.generated_title || prod?.name || "", imgs) : null;
   await db.from("returns").update({ photos: paths, ai }).eq("id", ret.id);
-  const base = so.delivered_at || so.shipped_at || so.created_at;
-  const inWindow = Date.now() - new Date(base).getTime() <= rules.window_days * 86400000;
   const full = { ...ret, photos: paths, ai };
+  const d = decideLaw(eff, { reason: reasonCode, amount, photos: paths.length, ai, daysSince, exempt, fraud });
+  // Paket anahtarı kapalıysa otomatik işlem yok (yasal cayma yine reddedilemez; satıcı onaylar)
   if (!(await featureEnabled(so.user_id, "returns_auto"))) {
-    return { ok: true, return: await publicReturn(full), waiting: true };
+    await db.from("returns").update({ decision_note: d.note }).eq("id", ret.id);
+    return { ok: true, return: await publicReturn({ ...full, decision_note: d.note }), waiting: true };
   }
-  const d = decide(rules, { reason_code: reasonCode, amount, photos: paths.length, ai, inWindow, dropship: await isDropship(so.product_id) });
-  if (d.auto) {
+  if (d.auto && d.approve) {
     const a = await approve(full, "auto", d.note);
     if (a.dropship) await supplierClaim({ ...full, status: "approved" });
   } else {
     await db.from("returns").update({ decision_note: d.note }).eq("id", ret.id);
   }
   const { data: now } = await db.from("returns").select("*").eq("id", ret.id).single();
-  return { ok: true, return: await publicReturn(now), waiting: !d.auto };
+  return { ok: true, return: await publicReturn(now), waiting: !(d.auto && d.approve) };
+}
+
+const CARRIER_NAMES: Record<string, string> = { yurtici: "Yurtiçi Kargo", aras: "Aras Kargo", mng: "MNG Kargo", ptt: "PTT Kargo", surat: "Sürat Kargo", geliver: "Geliver", hepsijet: "HepsiJet", sendeo: "Sendeo" };
+
+// Ön bilgilendirme / iade politikası metni (mağaza adresi, takip anahtarı ya da satıcı); otomatik üretilir
+async function policy(b: any) {
+  let userId: string | null = null, country: string | null = b.country ? String(b.country) : null, carrier: string | null = null;
+  if (b.token) { const so = await orderByToken(String(b.token)); if (so) { userId = so.user_id; country = so.customer_country || country; carrier = so.return_carrier; } }
+  if (!userId && b.slug) { const { data } = await db.from("store_settings").select("user_id").eq("store_slug", String(b.slug)).maybeSingle(); userId = data?.user_id || null; }
+  if (!userId && b.userId) userId = String(b.userId);
+  if (!userId) return { ok: false, error: "Mağaza bulunamadı" };
+  if (!carrier) {
+    const { data: a } = await db.from("shipping_accounts").select("provider").eq("user_id", userId).eq("is_default", true).in("status", ["connected", "verify_pending"]).maybeSingle();
+    carrier = a ? (CARRIER_NAMES[a.provider] || a.provider) : null;
+  }
+  const { data: ss } = await db.from("store_settings").select("store_name, business_name, business_address").eq("user_id", userId).maybeSingle();
+  const { data: up } = await db.from("user_profiles").select("company_name, return_address").eq("user_id", userId).maybeSingle();
+  const ra = up?.return_address || {};
+  const retAddr = [ra.name, ra.address, ra.district, ra.city, ra.postal_code].filter(Boolean).join(", ") || null;
+  const seller = ss?.business_name || up?.company_name || ss?.store_name || "Satıcı";
+  const eff = await effFor(userId, country);
+  const o = { seller, address: ss?.business_address, returnCarrier: carrier, returnAddress: retAddr };
+  return { ok: true, law: eff.law.region, statutory: eff.law.statutory, windowDays: eff.windowDays, freeReturn: !eff.customerPays, returnCarrier: carrier,
+    tr: policyText(eff, { ...o, lang: "tr" }), en: policyText(eff, { ...o, lang: "en" }) };
 }
 
 // ---------- Satıcı ----------
@@ -240,6 +312,7 @@ async function sellerAction(userId: string, b: any) {
       if (a.dropship) await supplierClaim({ ...ret, status: "approved" });
       return { ok: true, ...a };
     }
+    if (await withdrawalLocked(ret)) return { ok: false, error: "Yasal cayma hakkı: süre içindeki cayma talebi reddedilemez" };
     await reject(ret, "seller", short(b.note || "Satıcı reddetti", 300));
     return { ok: true };
   }
@@ -286,30 +359,33 @@ async function marketplaceApprove(ret: any) {
 }
 
 async function syncMarketplaceReturns(deadline: number) {
-  const { data: conns } = await db.from("store_connections").select("id, user_id, marketplace_code, environment, settings").eq("status", "connected").is("deleted_at", null).in("marketplace_code", ["trendyol_tr", "n11_tr"]);
+  const { data: conns } = await db.from("store_connections").select("id, user_id, marketplace_code, environment, settings").eq("status", "connected").is("deleted_at", null).in("marketplace_code", ["trendyol_tr", "n11_tr", "etsy"]);
   const out: unknown[] = [];
   for (const c of conns || []) {
     if (Date.now() > deadline) break;
     if (!(await featureEnabled(c.user_id, "returns_auto"))) continue;
     const ad = returnsAdapterFor(c.marketplace_code)!;
     try {
-      const { data: creds } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
+      let { data: creds } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
+      if (c.marketplace_code === "etsy") { const t = await etsyToken(db, c.id); creds = { access_token: t.token, shop_id: t.cred.shop_id, apiKey: etsyApiKey() }; }
       const since = c.settings?.returns_synced_at ? new Date(new Date(c.settings.returns_synced_at).getTime() - 3600_000) : new Date(Date.now() - 30 * 86400_000);
       const ctx = { env: c.environment === "sandbox" ? "sandbox" as const : "live" as const, creds, since };
       const list = await ad.list(ctx);
-      const rules = await rulesFor(c.user_id);
       let added = 0, approved = 0;
       for (const r of list) {
         const { data: ex } = await db.from("returns").select("*").eq("user_id", c.user_id).eq("source", c.marketplace_code).eq("external_id", r.externalId).maybeSingle();
         // Sipariş eşleme: sipariş numarası ham kayıtta (Trendyol orderNumber, n11 orderNo)
-        const { data: mo } = r.orderNo ? await db.from("marketplace_orders").select("id, product_id, variant_id").eq("user_id", c.user_id).eq("marketplace_code", c.marketplace_code)
+        const { data: mo } = r.orderNo ? await db.from("marketplace_orders").select("id, product_id, variant_id, buyer_country").eq("user_id", c.user_id).eq("marketplace_code", c.marketplace_code)
           .or(`raw->>orderNumber.eq.${r.orderNo},raw->>orderNo.eq.${r.orderNo}`).limit(1).maybeSingle() : { data: null };
         let row = ex;
+        const eff = await effFor(c.user_id, mo?.buyer_country || (r.raw as any)?.buyerCountry || (c.marketplace_code.endsWith("_tr") ? "TR" : null));
         if (!ex) {
           const ins = await db.from("returns").insert({
+            law: eff.law.region, withdrawal: !isDefect(r.reasonCode), shipping_payer: shippingPayer(eff, r.reasonCode),
             user_id: c.user_id, source: c.marketplace_code, external_id: r.externalId, marketplace_order_id: mo?.id || null, product_id: mo?.product_id || null, variant_id: mo?.variant_id || null,
             quantity: r.quantity, reason_code: r.reasonCode, reason_text: r.reasonText, customer_name: r.customerName, amount: r.amount, currency: "TRY",
             status: r.status === "received" ? "received" : r.status, decision: ["refunded", "rejected"].includes(r.status) ? "marketplace" : null,
+            ...(r.status === "refunded" ? { refund_status: "marketplace", refunded_at: new Date().toISOString() } : {}),
             ...(r.status === "received" ? { received_at: new Date().toISOString() } : {}), events: [{ at: r.createdAt, status: "requested", note: c.marketplace_code }],
             raw: { claimRef: r.claimRef, lineRefs: r.lineRefs, orderNo: r.orderNo },
           }).select("*").single();
@@ -322,8 +398,8 @@ async function syncMarketplaceReturns(deadline: number) {
         }
         // Ürün satıcıya ulaştı (Trendyol WaitingInAction): kurala uygunsa pazaryerinde onayla (müşteriye para iadesi pazaryerinden)
         if (row && r.status === "received" && row.status !== "refunded") {
-          const d = decide(rules, { reason_code: r.reasonCode, amount: r.amount, photos: 1, ai: { defect_visible: true, confidence: 1 }, inWindow: true, dropship: false });
-          if (d.auto) {
+          const d = decideLaw(eff, { reason: r.reasonCode, amount: r.amount, photos: 1, ai: { defect_visible: true, confidence: 1 }, daysSince: 0, exempt: false, fraud: [] });
+          if (d.auto && d.approve) {
             try { await ad.approve(ctx, { claimRef: r.claimRef, lineRefs: r.lineRefs } as any); await db.from("returns").update({ status: "refunded", decision: "auto", refund_status: "marketplace", refunded_at: new Date().toISOString(), restocked: false, events: ev(row, "refunded", "Kurala uygun, pazaryerinde onaylandı") }).eq("id", row.id); approved++;
               const { data: r2 } = await db.from("returns").select("*").eq("id", row.id).single(); if (r2) await refundStep({ ...r2, status: "received" });
             } catch (e) { await db.from("returns").update({ decision_note: "Onay hatası: " + short((e as Error).message, 150) }).eq("id", row.id); }
@@ -344,6 +420,29 @@ async function run() {
   const { data: rec } = await db.from("returns").select("*").eq("status", "received").eq("refund_status", "none").eq("source", "own_store").limit(50);
   for (const r of rec || []) { if (Date.now() > deadline) break; if (await featureEnabled(r.user_id, "returns_auto")) await refundStep(r); }
   out.received = (rec || []).length;
+  // 1b) TR: para iadesi süresi ürünün iade kargosuna verilmesinden başlar
+  const { data: nodue } = await db.from("returns").select("*").is("refund_due_at", null).in("status", ["in_transit", "received"]).neq("refund_status", "done").limit(100);
+  for (const r of nodue || []) {
+    const handed = (r.events || []).find((e: any) => e.status === "in_transit")?.at || r.received_at;
+    const eff = effective(await lawByRegion(r.law, r.user_id), await rulesFor(r.user_id));
+    const due = refundDue(eff, { requestedAt: r.created_at, approvedAt: (r.events || []).find((e: any) => e.status === "approved")?.at, handedAt: handed });
+    if (due) await db.from("returns").update({ refund_due_at: due }).eq("id", r.id);
+  }
+  // 1c) Para iadesi son günü yaklaşan / geçen iadeler: satıcıya uyarı (bir kez)
+  const { data: soon } = await db.from("returns").select("id, user_id, amount, currency, refund_due_at, customer_name").is("refund_warned_at", null).not("refund_due_at", "is", null)
+    .not("status", "in", "(refunded,rejected,cancelled,closed)").neq("refund_status", "done").neq("refund_status", "marketplace").limit(100);
+  let warned = 0;
+  for (const r of soon || []) {
+    const rules: any = await rulesFor(r.user_id);
+    const warnDays = Math.max(1, Number(rules.refund_warn_days) || 3);
+    const left = (new Date(r.refund_due_at).getTime() - Date.now()) / 86400000;
+    if (left > warnDays) continue;
+    await db.rpc("assistant_enqueue", { p_user: r.user_id, p_kind: "return", p_payload: { return_id: r.id, status: "refund_due", amount: r.amount, currency: r.currency, due_at: r.refund_due_at,
+      text: left < 0 ? "Para iadesi yasal süresi geçti" : `Para iadesi için son ${Math.max(0, Math.ceil(left))} gün` }, p_dedupe: "refund_due:" + r.id });
+    await db.from("returns").update({ refund_warned_at: new Date().toISOString() }).eq("id", r.id);
+    warned++;
+  }
+  out.refundWarned = warned;
   // 2) Pazaryeri iadeleri
   out.marketplaces = await syncMarketplaceReturns(deadline);
   // 3) CJ anlaşmazlıkları: açık olanların durumu
@@ -373,6 +472,7 @@ Deno.serve(async (req) => {
     }
     if (b.action === "info") return json(await info(String(b.token || "")));
     if (b.action === "request") return json(await request(b));
+    if (b.action === "policy") return json(await policy(b));
     const token = String(b?.userAccessToken || "").trim();
     const { data } = token ? await db.auth.getUser(token) : { data: { user: null } };
     const userId = data?.user?.id;

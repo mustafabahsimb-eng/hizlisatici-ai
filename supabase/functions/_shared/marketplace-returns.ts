@@ -3,6 +3,8 @@
 //   Trendyol: GET /integration/order/sellers/{id}/claims (claimItemStatus), PUT .../claims/{claimId}/items/approve { claimLineItemIdList, params }
 //             Kaynak: developers.trendyol.com getClaims / approveClaimLineItems (stage: stageapigw)
 //   n11     : SOAP https://api.n11.com/ws/ReturnService.wsdl  ClaimReturnList / ClaimReturnApprove (developer.n11.com İade Talepleri Servisi)
+//   Etsy    : Open API v3 cayma / iade talebi vermiyor (webhook'lar yalnız order.paid / canceled / shipped / delivered). Etsy'de yapılan
+//             para iadeleri ve iptaller siparişten (ShopReceipt: status, refunds[]) okunur ve iade akışına "pazaryeri iade etti" olarak girer.
 // Onay = pazaryeri müşteriye parayı iade eder; ürün satıcıya geri döndükten sonra (Trendyol "WaitingInAction") yapılır.
 // =========================================================
 export type NormReturn = {
@@ -114,8 +116,46 @@ export const n11Returns = {
   },
 };
 
+// Etsy: ctx.creds = { access_token, shop_id, apiKey } (anahtar yenileme çağıran tarafta: etsyToken)
+export const etsyReturns = {
+  async list(ctx: Ctx): Promise<NormReturn[]> {
+    const f = ctx.fetch || fetch;
+    const out: NormReturn[] = [];
+    for (let offset = 0; offset < 2000; offset += 100) {
+      const q = new URLSearchParams({ limit: "100", offset: String(offset), min_last_modified: String(Math.floor(ctx.since.getTime() / 1000)) });
+      const r = await f(`https://api.etsy.com/v3/application/shops/${encodeURIComponent(ctx.creds.shop_id)}/receipts?${q}`, {
+        headers: { "x-api-key": ctx.creds.apiKey, Authorization: `Bearer ${ctx.creds.access_token}` }, signal: AbortSignal.timeout(30000),
+      });
+      if (!r.ok) throw Object.assign(new Error(`etsy receipts ${r.status}`), { status: r.status });
+      const d = await r.json();
+      for (const rc of d?.results || []) {
+        const refunds: any[] = Array.isArray(rc.refunds) ? rc.refunds : [];
+        const st = String(rc.status || "");
+        if (!refunds.length && !/refund|cancel/i.test(st)) continue;
+        const money = (m: any) => (m && m.amount != null ? Number(m.amount) / Number(m.divisor || 100) : 0);
+        const amount = refunds.length ? refunds.reduce((a, x) => a + money(x.amount), 0) : money(rc.grandtotal);
+        const reasonText = refunds.map((x) => [x.reason, x.note_from_issuer].filter(Boolean).join(" — ")).filter(Boolean).join(" · ") || st;
+        out.push({
+          externalId: `etsy-${rc.receipt_id}`, claimRef: String(rc.receipt_id), lineRefs: [], orderNo: String(rc.receipt_id),
+          status: refunds.length || /refund/i.test(st) ? "refunded" : "cancelled", reasonCode: reasonOf(reasonText), reasonText,
+          quantity: (rc.transactions || []).reduce((a: number, t: any) => a + (Number(t.quantity) || 1), 0) || 1, amount: Math.round(amount * 100) / 100,
+          productName: rc.transactions?.[0]?.title || null, customerName: rc.name || null,
+          createdAt: iso(refunds[0]?.created_timestamp ? refunds[0].created_timestamp * 1000 : (rc.updated_timestamp || rc.update_timestamp || 0) * 1000),
+          raw: { receiptId: rc.receipt_id, status: st, buyerCountry: rc.country_iso || null },
+        });
+      }
+      if ((d?.results || []).length < 100) break;
+    }
+    return out;
+  },
+  async approve(_ctx: Ctx, _r: { claimRef: string }) {
+    throw new Error("Etsy'de para iadesi Etsy üzerinden yapılır (API izin vermiyor)");
+  },
+};
+
 export function returnsAdapterFor(code: string) {
   if (code === "trendyol_tr") return trendyolReturns;
   if (code === "n11_tr") return n11Returns;
+  if (code === "etsy") return etsyReturns;
   return null;
 }

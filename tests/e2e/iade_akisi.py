@@ -2,7 +2,8 @@
 
 Kendi Mağazam siparişleri SQL ile hazırlanır (teslim edilmiş); müşteri tarafı takip anahtarıyla, satıcı tarafı oturumla çağrılır.
  1) info: iade hakkı ve kalan gün
- 2) "Beden uymadı": kurala uygun -> otomatik onay -> Yurtiçi TEST ortamında iade etiketi; kargo ücretini müşteri öder; aynı siparişe ikinci talep reddedilir
+ 2) "Beden uymadı" (TR yasal cayma): otomatik onay -> Yurtiçi TEST ortamında iade etiketi; iade kargosu ücretsiz (yasal); aynı siparişe ikinci talep reddedilir
+    Yasal çerçeve: iade taşıyıcısı + iade kodu siparişe atanır, ön bilgilendirme metni otomatik, cayma reddedilemez, "Cayma hakkı yok" ürünler, para iadesi son günü + uyarı
  3) "Kusurlu" ama fotoğraf yok -> satıcı onayına düşer; satıcı onaylar -> iade etiketi
  4) Satıcı "teslim aldım" -> stok geri eklenir, para iadesi defteri (bekliyor); "parayı iade ettim" -> tamam
  5) Dropshipping (CJ) ürünü: ürün geri gelmez, etiket açılmaz, para iadesi bekler
@@ -53,6 +54,7 @@ def main():
         own, cj = ids[0], ids[1]
         sql(f"update public.products set supplier='cj' where id={cj};")
         tokens = {}
+        png = page.evaluate("() => { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); x.fillStyle = '#c0392b'; x.fillRect(0, 0, 256, 256); return c.toDataURL('image/png'); }")
 
         def order(name, pid, days=2, price=100):
             t = secrets.token_hex(16)
@@ -66,6 +68,11 @@ def main():
             t1 = order("o1", own)
             i = call("returns", {"action": "info", "token": t1})["body"]
             c.check("İade hakkı: talep açılabilir, kalan gün 12", i.get("ok") and i["canRequest"] and i["daysLeft"] == 12 and "size" in i["reasons"], str(i)[:200])
+            c.check("TR yasal çerçeve: cayma, ücretsiz iade, adresten alım; fotoğraf yalnız ayıpta", i["law"] == "TR" and i["statutory"] and i["freeReturn"] and i["pickupAllowed"]
+                    and set(i["photoReasons"]) == {"defective", "damaged", "wrong_item", "not_as_described"}, str(i)[:200])
+            c.check("Siparişe iade taşıyıcısı ve iade kodu otomatik atandı", i["returnCarrier"] == "Yurtiçi Kargo" and (i["returnCode"] or "").startswith("IADE-"), f"{i['returnCarrier']} {i['returnCode']}")
+            pol = call("returns", {"action": "policy", "token": t1})["body"]
+            c.check("Ön bilgilendirme metni otomatik (taşıyıcı, ücretsiz iade, 14 gün)", pol.get("ok") and "İade taşıyıcısı: Yurtiçi Kargo." in pol["tr"] and "İade kargo ücreti alınmaz" in pol["tr"] and "14 gün" in pol["tr"], pol.get("tr", "")[:160])
 
             # 2) Beden -> otomatik onay -> iade etiketi (Yurtiçi test)
             r = call("returns", {"action": "request", "token": t1, "reasonCode": "size", "text": "Küçük geldi", "quantity": 1})["body"]
@@ -78,7 +85,7 @@ def main():
             c.check("Beden uymadı: otomatik onaylandı", r.get("ok") and r.get("waiting") is False and ret.get("decision") == "auto", str(r)[:200])
             c.check("İade etiketi Yurtiçi test ortamında oluştu (iade kodu + etiket)", ret.get("status") == "label_ready" and ret.get("return_code") and (r["return"] or {}).get("label"),
                     f"{ret.get('status')} {ret.get('return_code')} {str(ret.get('events'))[-160:]}")
-            c.check("Kargo ücretini müşteri öder (beden)", ret.get("shipping_payer") == "customer")
+            c.check("TR: iade kargosunu müşteri ödemez (yasal)", ret.get("shipping_payer") == "seller" and ret.get("law") == "TR" and ret.get("withdrawal") is True)
             sh = page.evaluate("async (id) => (await HS.db.from('shipments').select('kind, provider, test, status').eq('return_id', id).maybeSingle()).data", rid1)
             c.check("Gönderi kaydı: iade türünde, test", sh and sh["kind"] == "return" and sh["test"] is True, str(sh))
             dup = call("returns", {"action": "request", "token": t1, "reasonCode": "size"})["body"]
@@ -122,10 +129,19 @@ def main():
             ret = get(r["return"]["id"])
             shc = page.evaluate("async (id) => (await HS.db.from('shipments').select('id').eq('return_id', id)).data.length", ret["id"])
             c.check("Dropshipping: otomatik onay, ürün geri gelmez (etiket yok), para iadesi bekliyor", ret["status"] == "approved" and shc == 0 and ret["refund_status"] == "pending", f"{ret['status']} {shc} {ret['refund_status']}")
+            c.check("Para iadesi son günü sayılıyor (onaydan 14 gün)", ret["refund_due_at"] is not None, str(ret["refund_due_at"]))
+            # Son gün yaklaşınca uyarı (30 dk işi): son günü 1 gün sonraya çek
+            sql(f"update public.returns set refund_due_at = now() + interval '1 day', refund_warned_at = null where id = '{ret['id']}';")
+            sysrun = sql("""do $$ declare v text; begin select replace(replace(command, '/functions/v1/cj-alt-match', '/functions/v1/returns'), '{"cronSecret"', '{"action":"run","cronSecret"') into v from cron.job where jobname='cj-alt-match-1h'; execute v; end $$;""")
+            import time as _t
+            warned = None
+            for _ in range(20):
+                _t.sleep(4); warned = get(ret["id"])["refund_warned_at"]
+                if warned: break
+            c.check("Para iadesi son günü yaklaşınca satıcı uyarıldı", bool(warned), str(warned))
 
             # 6) Kusurlu + fotoğraf: AI kontrol eder
             t4 = order("o4", own)
-            png = page.evaluate("() => { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); x.fillStyle = '#c0392b'; x.fillRect(0, 0, 256, 256); return c.toDataURL('image/png'); }")
             r = call("returns", {"action": "request", "token": t4, "reasonCode": "damaged", "text": "Kutu ezik geldi", "photos": [png]})["body"]
             ret = get(r["return"]["id"])
             c.check("Fotoğraf özel depoya kaydedildi", len(ret["photos"]) == 1 and ret["photos"][0].startswith(uid + "/"), str(ret["photos"]))
@@ -136,7 +152,11 @@ def main():
             # 7) Sınır üstü tutar ve süresi geçmiş
             t5 = order("o5", own, price=5000)
             r = call("returns", {"action": "request", "token": t5, "reasonCode": "size"})["body"]
-            c.check("Otomatik onay sınırı üstü (5000 > 1000) -> satıcıya", r["waiting"] is True and "sınır" in (get(r["return"]["id"])["decision_note"] or ""))
+            x5 = get(r["return"]["id"])
+            c.check("Sınır üstü tutarlı CAYMA yine onaylanır (yasal); şüphe yalnız bilgi", r["waiting"] is False and x5["decision"] == "auto" and "yüksek tutar" in (x5["decision_note"] or ""), str(x5["decision_note"]))
+            t5b = order("o5b", own, price=5000)
+            r = call("returns", {"action": "request", "token": t5b, "reasonCode": "defective", "photos": [png]})["body"]
+            c.check("Sınır üstü tutarlı KUSUR iddiası -> satıcıya", r["waiting"] is True, str(get(r["return"]["id"])["decision_note"]))
             t6 = order("o6", own, days=20)
             r = call("returns", {"action": "request", "token": t6, "reasonCode": "size"})["body"]
             c.check("İade süresi geçmiş (20 gün > 14) -> satıcıya", r["waiting"] is True and "süre" in (get(r["return"]["id"])["decision_note"] or ""))
@@ -147,6 +167,21 @@ def main():
             r = call("returns", {"action": "request", "token": t7, "reasonCode": "size"})["body"]
             ret = get(r["return"]["id"])
             c.check("returns_auto kapalı: otomatik onay yok, satıcı bekler", r["waiting"] is True and ret["status"] == "requested" and ret["decision"] is None)
+            rj = call("returns", {"action": "decide", "returnId": ret["id"], "approve": False}, True)["body"]
+            c.check("Süre içindeki yasal cayma satıcı tarafından reddedilemez", rj.get("ok") is False and "reddedilemez" in rj.get("error", ""), str(rj))
+            # Cayma istisnası ürün: yalnız ayıplı mal nedenleri
+            sql(f"update public.products set withdrawal_exempt = true, withdrawal_exempt_reason = 'hygiene', withdrawal_exempt_manual = true where id = {own};")
+            t8 = order("o8", own)
+            i8 = call("returns", {"action": "info", "token": t8})["body"]
+            c.check("Cayma hakkı yok ürün: formda yalnız kusurlu / yanlış ürün nedenleri", i8["exempt"] and i8["reasons"] == ["defective", "damaged", "wrong_item", "not_as_described"], str(i8["reasons"]))
+            r8 = call("returns", {"action": "request", "token": t8, "reasonCode": "changed_mind"})["body"]
+            c.check("Cayma hakkı yok ürün: Vazgeçtim talebi kabul edilmez", r8.get("ok") is False and "cayma" in r8.get("error", ""), str(r8))
+            sql(f"update public.products set withdrawal_exempt = false, withdrawal_exempt_reason = null, withdrawal_exempt_manual = false where id = {own};")
+            # Dijital ürün otomatik işaretlenir
+            dg = sql(f"insert into public.products (user_id, name, sale_price, product_type, store_visible) values ('{uid}', '{tag} dijital', 10, 'digital', false) returning withdrawal_exempt, withdrawal_exempt_reason, id;")
+            c.check("Dijital ürün otomatik 'Cayma hakkı yok'", "true,digital" in dg.replace(" ", ""), dg[-80:])
+            dgid = [int(v) for v in dg.replace(",", " ").split() if v.strip().isdigit()]
+            if dgid: sql(f"delete from public.products where id = {dgid[-1]};")
             sql(f"delete from public.user_feature_overrides where user_id='{uid}' and key='returns_auto';")
 
             # 9) Güvenlik
