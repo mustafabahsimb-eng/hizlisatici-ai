@@ -4,7 +4,7 @@
 - Canlıda: migration 20261016_pod_seasons.sql; etsy-listings, marketplace-orders (Etsy anahtar düzeltmesi), season-calendar, pod-personalize, assistant, telegram-bot, whatsapp-webhook, meta-dm-webhook; secret PRINTIFY_TOKEN_11444569; cron season-calendar-daily (03:00 UTC), pod-personalize-5m.
 - Etsy bağlantısı geri açıldı; 25 kapak uygulandı, 6 bölüm kuruldu, 5 set öne çıkan (1-5).
 - Fiyat A (Offsite Ads açık, %35): S-XL 68,99 $ / 2XL 75,99 $ / 3XL 79,99 $; üretici SwiftPOD. 14 sweatshirt Etsy'de yayında (ilan numaraları %LOCALAPPDATA%\seltigo-pod\durum.json).
-- BEKLEYEN: Mama (Printify sipariş onayı "elle" yapılınca `printify_yukle.py yayinla --only mama-patchwork`); numune (Türkiye adresi gelince `numune.py olustur` + `uretime`); Printify ödeme yöntemi.
+- BEKLEYEN: Mama (Printify sipariş onayı "elle" yapılınca `printify_yukle.py yayinla --only mama-patchwork`); Printify ödeme yöntemi. Numune İPTAL (16 Ekim, Mustafa): ilanlarda Printify mockup'ları kullanılır; ilk satışlardan sonra en çok satan tasarım için yeniden sorulacak (`numune.py` hazır bekliyor).
 - Aşağıdaki eski notların çoğu tamamlandı.
 
 Önizleme sayfası: https://claude.ai/artifact/7iqNtbTPi4NwkBt7LqZsVx
