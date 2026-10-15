@@ -1,3 +1,36 @@
+# Mustafa'nın yapacakları
+Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; Claude bunlar için beklemez, başka işlere devam eder. İstediğin zaman tek seferde yaparsın; bitirince "yaptım" demen yeter, gerisini Claude tamamlar.
+
+## Meta (Facebook / Instagram / WhatsApp / reklam) — 19 Ekim 2026
+1. **Bağlantıları onar (önemli; şu an bozuk):** https://mustafabahsimb-eng.github.io/hizlisatici-ai/ads.html → "Facebook'u reklam izniyle bağla" → Facebook penceresinde **tüm izinlere** izin ver.
+   - Neden: Marketing API Tools'ta 6 izinle anahtar alınınca Meta, uygulamanın izinlerini 6'ya indirdi. Instagram (@mfkoleksiyon) ve WhatsApp okunamıyor; Facebook sayfasında paylaşım izni yok.
+   - Bu düğme Instagram, WhatsApp, sayfa paylaşımı ve reklam izinlerinin hepsini birlikte ister.
+2. **Uygulamayı Live moda al (reklam testinin son adımı):** https://developers.facebook.com/apps/1650835089949068/settings/basic → App Mode: **Live**. Gizlilik adresi istenirse: https://mustafabahsimb-eng.github.io/hizlisatici-ai/gizlilik.html
+   - Neden: Meta, geliştirme modundaki uygulamanın reklam metni oluşturmasına izin vermiyor (hata 1885183).
+   - Sonra Claude reklam zincirini para harcamadan (duraklatılmış aç → doğrula → sil) uçtan uca tamamlar.
+3. *(İsteğe bağlı)* Sandbox reklam hesabı "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermiyor ("Ad account owner has NOT grant"). Gerekmiyor: test, kişisel hesapta duraklatılmış denemeyle yapılıyor. Secret `ADS_SANDBOX_TOKEN` kayıtlı.
+
+## Asistan kanalları
+4. **Telegram bot anahtarı:** Telegram'da @BotFather → /newbot → anahtarı https://supabase.com/dashboard/project/ytucdrrgxsjhrqmaxckt/functions/secrets adresine `TELEGRAM_BOT_TOKEN` adıyla ekle.
+5. **Meta WhatsApp test numarası (asistan için):** https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → API Setup → numara kimliği, WABA kimliği ve kalıcı anahtar → aynı secrets sayfasına `ASSISTANT_WA_PHONE_ID`, `ASSISTANT_WA_WABA_ID`, `ASSISTANT_WA_TOKEN`, `ASSISTANT_WA_DISPLAY_NUMBER`.
+
+## Kargo / tedarik / pazaryeri
+6. **Geliver hesabı:** https://app.geliver.io → Ayarlar > API Anahtarları → anahtarı Seltigo Ayarlar > 🚚 Kargo'dan bağla (test modu).
+7. **Printify:** ödeme yöntemi ekle; mağaza ayarında siparişler **elle onay** olsun (ayrıntı aşağıda "Sabah Mustafa'ya sorulacaklar" 3).
+8. **Hepsiburada / Çiçeksepeti / Pazarama / PTT AVM satıcı hesapları:** sipariş alanlarının doğrulanması için (hesap açılınca).
+
+## Para / şirket gerektirenler (karar: şirket kurulunca)
+9. Chrome Web Mağazası geliştirici hesabı (tek seferlik 5 $).
+10. Sabit IP sunucusu (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün").
+11. Amazon geliştirici kaydı (Solution Provider Portal, public developer) — docs/amazon-sp-api.md.
+12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
+13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
+
+## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
+- Seltigo Ads: sandbox hesabı yerine kişisel reklam hesabında para harcamayan "duraklatılmış aç → doğrula → sil" denemesi; kampanyada setler arası bütçe paylaşımı kapalı.
+
+---
+
 # Yarım işler ve sabah soruları (etsy-printify dalı, 15-16 Ekim 2026 gece)
 
 ## Güncel durum (16 Ekim, Mustafa'nın kararlarından sonra)

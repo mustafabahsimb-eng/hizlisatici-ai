@@ -11,6 +11,10 @@
   - Ekran görüntülerini depoya değil geçici klasöre kaydet.
 - Edge Function yayınlamadan ÖNCE kodu yerelde denetle (açılış hatası canlıyı bozar): %LOCALAPPDATA%\seltigo-e2e\venv\Scripts\deno.exe check --config %LOCALAPPDATA%\seltigo-e2e\deno-check.json supabase/functions/<ad>/index.ts (deno 2.9.7). Hata varsa yayınlama. Yayından sonra fonksiyonu bir istekle çağırıp açıldığını doğrula; açılmıyorsa hemen eski sürümü (git HEAD) geri yayınla.
 
+## Mustafa'nın yapacakları (kalıcı kural, 2026-10-19)
+- Mustafa'dan onay ya da işlem isteyip BEKLEME. Onun girişini / hesabını / ödemesini gerektiren işleri (Facebook / Meta, Telegram, kargo / pazaryeri hesapları, ödemeler vb.) ertele, YARIM_ISLER.md'de "Mustafa'nın yapacakları" başlığı altına adresiyle ve tek satırlık nedeniyle ekle, yapabildiğin diğer işlere devam et. Mustafa istediği zaman tek seferde yapar.
+- Kararları (teknik + ürün + arayüz adları) kendin ver; önemli olanları aynı dosyada "Claude'un verdiği kararlar" altına yaz (isteğe bağlı gözden geçirme). Bu kural aşağıdaki "sor / onay al" maddelerinden önce gelir; yalnız para harcayan işler yine yapılmaz, listeye yazılır.
+
 ## Karar kuralları
 - Teknik kararları sen ver. AMA arayüzde kullanıcıya görünen isimleri (menü, düğme, bölüm, sekme adları) ve ürün kararlarını ASLA kendin seçme; seçenek sun ve kullanıcıya sor.
 - Her özellik OTOMASYON olarak tasarlanır. Satıcının elle yapacağı ara çözümler önerme ("elle paylaş", "linki koy gerisi senin" gibi). Engel varsa otomatiğe giden yolu söyle.
