@@ -128,7 +128,8 @@
   const t = HS.t;
   const tf = (k, v) => String(t(k)).replace(/\{(\w+)\}/g, (m, x) => v[x] != null ? v[x] : m);
   const META_APP_ID = '1650835089949068';
-  const ADS_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,catalog_management,ads_management,ads_read';
+  // Sosyal medya bağlantısındaki izinlerin TAMAMI + reklam izinleri (yeniden bağlanınca WhatsApp / Instagram izinleri kaybolmasın)
+  const ADS_SCOPES = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,catalog_management,whatsapp_business_management,whatsapp_business_messaging,ads_management,ads_read';
   let S = null, PLAN = null, ACCS = null, userId = null;
 
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }

@@ -22,6 +22,9 @@ const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const ADS_LIVE = (Deno.env.get("ADS_LIVE") ?? "").toLowerCase() === "true";
+// Meta sandbox (test) reklam hesapları: adında "sandbox" geçen ya da bu listede olan (secret ADS_SANDBOX_ACCOUNTS, virgülle; ör. act_1138060605425004)
+const SANDBOX_IDS = new Set((Deno.env.get("ADS_SANDBOX_ACCOUNTS") ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+const isSandbox = (a: { id: string; sandbox?: boolean }) => !!a.sandbox || SANDBOX_IDS.has(a.id);
 const SITE = "https://mustafabahsimb-eng.github.io/hizlisatici-ai";
 const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -114,7 +117,7 @@ async function listAccounts(userId: string) {
   const { token } = await metaToken(userId);
   if (!token) return { ok: false, error: "Önce Sosyal medya sayfasından Facebook'u bağla" };
   try {
-    const list = await adAccounts(token);
+    const list = (await adAccounts(token)).map((a: any) => ({ ...a, sandbox: isSandbox(a) }));
     const withPixels = [];
     for (const a of list) { let px: any[] = []; try { px = await pixels(token, a.id); } catch (_) { /* izin yoksa boş */ } withPixels.push({ ...a, pixels: px }); }
     return { ok: true, accounts: withPixels, live: ADS_LIVE };
@@ -128,10 +131,12 @@ async function connect(userId: string, b: any) {
   const a = list.find((x: any) => x.id === String(b.externalId));
   if (!a) return { ok: false, error: "Reklam hesabı bulunamadı" };
   const { data: ch } = await db.from("social_channels").select("platform, account_id").eq("user_id", userId).eq("active", true).in("platform", ["facebook", "instagram"]);
-  const page = (ch || []).find((x: any) => x.platform === "facebook")?.account_id || null;
+  let page = (ch || []).find((x: any) => x.platform === "facebook")?.account_id || null;
+  // Sosyal medyada sayfa yoksa: kullanıcının yönettiği ilk Facebook Sayfası (API)
+  if (!page) { try { page = String(((await graph(token, "GET", "/me/accounts", { fields: "id,name", limit: 5 })).data || [])[0]?.id || "") || null; } catch (_) { /* sayfa izni yok */ } }
   const ig = (ch || []).find((x: any) => x.platform === "instagram")?.account_id || null;
   await db.from("ad_accounts").update({ is_default: false }).eq("user_id", userId).eq("platform", "meta");
-  const row = { user_id: userId, platform: "meta", external_id: a.id, name: a.name, currency: a.currency, timezone: a.timezone, sandbox: !!(b.sandbox ?? a.sandbox),
+  const row = { user_id: userId, platform: "meta", external_id: a.id, name: a.name, currency: a.currency, timezone: a.timezone, sandbox: isSandbox(a),
     page_id: page, instagram_id: ig, pixel_id: b.pixelId ? String(b.pixelId) : null, catalog_id: catalogId || null, status: "connected", last_error: null, is_default: true, updated_at: nowIso() };
   const { data, error } = await db.from("ad_accounts").upsert(row, { onConflict: "user_id,platform,external_id" }).select("*").single();
   if (error) throw error;
@@ -378,6 +383,42 @@ Deno.serve(async (req) => {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (b.action === "run") return json({ ok: true, results: await run() });
       if (b.action === "conversion") return json(await conversion(b));
+      // Meta'daki nesnelerin gerçek durumu (test doğrulaması) ve test temizliği (yalnız sandbox hesaplarında)
+      if (b.action === "inspect" && b.userId && b.campaignId) {
+        const { token } = await metaToken(String(b.userId));
+        const { data: c } = await db.from("ad_campaigns").select("*").eq("id", String(b.campaignId)).eq("user_id", String(b.userId)).maybeSingle();
+        if (!token || !c) return json({ ok: false, error: "yok" });
+        const f = "id,name,status,effective_status";
+        const out: Record<string, unknown> = {};
+        try { out.campaign = await graph(token, "GET", `/${c.external_campaign_id}`, { fields: f + ",objective,promoted_object" }); } catch (e) { out.campaign = String((e as Error).message); }
+        try { out.adset = await graph(token, "GET", `/${c.external_adset_id}`, { fields: f + ",daily_budget,optimization_goal,targeting,promoted_object" }); } catch (e) { out.adset = String((e as Error).message); }
+        try { out.ad = await graph(token, "GET", `/${c.external_ad_id}`, { fields: f }); } catch (e) { out.ad = String((e as Error).message); }
+        try { out.productSet = await graph(token, "GET", `/${c.external_product_set_id}`, { fields: "id,name,product_count,filter" }); } catch (e) { out.productSet = String((e as Error).message); }
+        return json({ ok: true, ...out });
+      }
+      if (b.action === "cleanup_test" && b.userId) {
+        const acc = await account(String(b.userId));
+        if (!acc?.sandbox) return json({ ok: false, error: "Yalnız sandbox hesabında" });
+        const { token } = await metaToken(String(b.userId));
+        const { data: cs } = await db.from("ad_campaigns").select("*").eq("user_id", String(b.userId)).eq("account_id", acc.id);
+        const out: unknown[] = [];
+        for (const c of cs || []) {
+          for (const id of [c.external_campaign_id, c.external_product_set_id].filter(Boolean)) { try { await graph(token!, "DELETE", `/${id}`); out.push({ id, deleted: true }); } catch (e) { out.push({ id, error: String((e as Error).message) }); } }
+          await db.from("ad_campaigns").delete().eq("id", c.id);
+        }
+        return json({ ok: true, out });
+      }
+      // Teşhis: Meta izinleri, reklam hesapları, sayfalar (anahtar değeri döndürmez)
+      if (b.action === "diag" && b.userId) {
+        const { token, catalogId } = await metaToken(String(b.userId));
+        if (!token) return json({ ok: false, error: "meta_catalogs anahtarı yok" });
+        const out: Record<string, unknown> = { catalogId };
+        try { out.permissions = ((await graph(token, "GET", "/me/permissions")).data || []).filter((x: any) => x.status === "granted").map((x: any) => x.permission); } catch (e) { out.permissions = String((e as Error).message); }
+        try { out.accounts = await adAccounts(token); } catch (e) { out.accounts = String((e as Error).message); }
+        try { out.pages = ((await graph(token, "GET", "/me/accounts", { fields: "id,name", limit: 25 })).data || []).map((x: any) => ({ id: x.id, name: x.name })); } catch (e) { out.pages = String((e as Error).message); }
+        if (b.account) { try { out.account = await graph(token, "GET", `/${b.account}`, { fields: "id,name,currency,account_status,timezone_name,business" }); } catch (e) { out.account = String((e as Error).message); } }
+        return json({ ok: true, ...out });
+      }
       if (b.userId) return json(await sellerAction(String(b.userId), b, "assistant"));
       return json({ error: "Geçersiz işlem" }, 400);
     }
