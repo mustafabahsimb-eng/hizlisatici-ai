@@ -11,7 +11,12 @@
      `%LOCALAPPDATA%\seltigo-mockup\Scripts\python.exe tools\etsy-mockup\kapak_uygula.py`
      (kapakları değiştirir: yeni görsel önce yüklenir, eskisi sonra silinir; ardından `organize.py` bölümleri kurar ve 5 seti öne çıkarır).
    - Not (diğer oturum için): `shipping-hub` 322. satırda da Etsy anahtarı yenilenmeden okunuyor; aynı düzeltme orada da gerekebilir (iade oturumunun dosyası, dokunulmadı).
-2. **Printify token'ı yok.** Her şey hazır: `python tools/pod-noel/printify_yukle.py hazirla` (sahte Printify ile uçtan uca test geçti: `tests/pod/printify_yukle_test.py`).
+2. **Printify token'ı geldi (16 Ekim)** — adı "Bahsistore"; yalnız depo kökündeki `.env` dosyasında (`PRINTIFY_TOKEN_BAHSISTORE`, .gitignore'da). Veritabanına yazılmaz; Seltigo'nun `printify_connections` kaydındaki "HizliSatici" token'ına dokunulmaz.
+   - Printify mağazaları: "My new store" (11436720) hiçbir kanala bağlı değil, boş. "My Etsy Store" (11444569) Etsy'ye bağlı ve bahsistore'un mağazası (ürünlerinin Etsy ilan numaraları bahsistore'da). Koleksiyon bu mağazaya gidiyor.
+   - Eski 3 ürün (21 Eylül): yaz tişörtleri. İkisi Etsy'de pasif; Printify fiyatı 2999 (29,99) Etsy'ye **29,99 TL** olarak gitmiş (Printify para birimi çevirmiyor). Üçüncüsü Etsy'ye hiç gönderilmemiş.
+   - Kişiselleştirme işçisi (`pod-personalize`) sunucuda bu token'a ihtiyaç duyar: canlıya alırken Supabase secret olarak (`PRINTIFY_TOKEN_BAHSISTORE`) eklenmeli; HizliSatici kaydı ayrı kalır.
+   - Noel son sipariş tarihi: Printify 2026 tarihlerini henüz açıklamadı. `season-calendar` her gün Printify sayfalarını okur; açıklanınca tüm sweatshirt ilanlarının açıklamasına ve mağaza duyurusuna "🎄 Order by … for Christmas delivery in the US." ekler, tarih geçince "⚠️ Orders placed now may arrive after Christmas." yapar, 26 Aralık'ta kaldırır. 1 Aralık'a kadar açıklanmazsa tahmin: 10 Aralık (USPS 17 Aralık − 5 iş günü üretim).
+   - Numune: `tools/pod-noel/numune.py` (fiyat → olustur (taslak) → uretime). Adres `%LOCALAPPDATA%\seltigo-pod\numune.json`'da durur, depoya girmez.
 3. **Canlıya alınmayı bekleyenler (onay):** migration `supabase/migrations/20261016_pod_seasons.sql`; yeni fonksiyonlar `season-calendar`, `pod-personalize`; `etsy-listings` (listing_personalization işlemi), `marketplace-orders` (Etsy anahtar düzeltmesi), `_shared/assistant-core.ts` ("notice" bildirimi → `assistant` ve `telegram-bot` yeniden yayın); zamanlanmış işler: `season-calendar` günde 1 (06:00 TR), `pod-personalize` 5 dakikada 1.
    - Bu gece yayınlanan tek şey: `etsy-listings` içine `organize` ve `listing_state` işlemleri (yalnız ekleme; açılış denendi, çalışıyor).
 

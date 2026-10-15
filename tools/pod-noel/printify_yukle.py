@@ -1,7 +1,7 @@
 """Noel sweatshirt koleksiyonu -> Printify -> Etsy. Yalnız resmi API'ler (Printify Public API, Etsy Open API v3 / etsy-listings).
 
 ADIM 1 (token gelince, tek komut):  python printify_yukle.py hazirla
-   - Token: panelde Printify bağlantısına yapıştırılmış olanı okur (printify_connections). İstenirse --token ile verilir (veritabanına kaydedilir).
+   - Token: depo kökündeki .env (PRINTIFY_TOKEN_BAHSISTORE; GitHub'a gitmez). Veritabanına yazılmaz; Seltigo'nun HizliSatici token'ına dokunulmaz.
    - Printify'da bağlı Etsy mağazasını bulur; Gildan 18000 kalıbını ve 5 renk x S-3XL'i karşılayan hızlı ABD üreticisini seçer.
    - 15 tasarımı (koyu/açık mürekkep) yükler, ürünleri TASLAK oluşturur (Etsy'ye henüz gitmez, ücret yok).
    - Gerçek maliyet + ABD kargo ile fiyatı hesaplar (pricing.py; %35 net kâr, Offsite Ads dahil), ürünlere yazar.
@@ -38,9 +38,13 @@ class PF:
                 if e.code in (429, 500, 502, 503) and i < 4: time.sleep(2 * 2 ** i); continue
                 raise RuntimeError(f"Printify {e.code} {path}: {t[:400]}")
 
-def token_from_db():
-    r = rows(sql(f"select api_token from public.printify_connections where user_id={q(UID)};"))
-    return r[0]["api_token"] if r and r[0].get("api_token") else None
+def bahsistore_token():
+    """Printify "Bahsistore" token'ı: yalnız depo kökündeki .env (PRINTIFY_TOKEN_BAHSISTORE). Veritabanına YAZILMAZ;
+    Seltigo'nun printify_connections kaydındaki "HizliSatici" token'ına dokunulmaz."""
+    env = Path(__file__).resolve().parents[2] / ".env"
+    for line in (env.read_text(encoding="utf-8").splitlines() if env.exists() else []):
+        if line.startswith("PRINTIFY_TOKEN_BAHSISTORE="): return line.split("=", 1)[1].strip()
+    return os.environ.get("PRINTIFY_TOKEN_BAHSISTORE")
 
 def usd_rate(cur):
     if cur == "USD": return 1.0
@@ -81,11 +85,8 @@ def upload(pf, path):
 
 def hazirla(a):
     col = json.loads((D / "collection.json").read_text(encoding="utf-8")); G = col["garment"]
-    token = a.token or token_from_db()
-    if not token: raise SystemExit("Printify token yok: panelde Printify bağlantısına yapıştır ya da --token ile ver")
-    if a.token:
-        sql(f"insert into public.printify_connections (user_id, api_token, updated_at) values ({q(UID)}, {q(a.token.strip())}, now()) "
-            f"on conflict (user_id) do update set api_token = excluded.api_token, updated_at = now();")
+    token = bahsistore_token()
+    if not token: raise SystemExit("Printify token yok: depo kökündeki .env dosyasına PRINTIFY_TOKEN_BAHSISTORE=... yaz")
     pf = PF(token); st = load_state()
     shops = pf("GET", "/shops.json"); etsy_shops = [s for s in shops if str(s.get("sales_channel", "")).lower() == "etsy"]
     if not etsy_shops: raise SystemExit("Printify'da bağlı Etsy mağazası yok. Printify > My stores > Etsy'yi bağla, sonra tekrar çalıştır.")
@@ -127,7 +128,9 @@ def hazirla(a):
             cost = v["cost"] / 100 + ship.get(v["id"], col["garment"]["est_shipping_us"])
             usd = price_for(cost)["price"]; local = usd if cur == "USD" else (math.ceil(usd * rate / 10) * 10 - 1)
             prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
-            size = v["title"].split("/")[-1].strip(); rep[size] = {"cost_usd": round(cost, 2), **price_for(cost)}
+            parts = [x.strip() for x in v["title"].split("/")]  # Printify: "S / Light Pink"
+            size = next((x for x in parts if x in G["sizes"]), parts[0])
+            if cost >= rep.get(size, {}).get("cost_usd", 0): rep[size] = {"cost_usd": round(cost, 2), **price_for(cost)}  # renkler arasında en yüksek maliyet
         pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", {"variants": prices})
         prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
         S.update({"title": it["title"], "pricing": rep, "currency": cur, "mockups": [i["src"] for i in prod.get("images", [])[:4]],
@@ -151,7 +154,7 @@ def write_report(st, col):
     (ROOT / "onizleme_gercek.html").write_text(html, encoding="utf-8")
 
 def yayinla(a):
-    st = load_state(); token = token_from_db(); pf = PF(token); shop = st["shop"]
+    st = load_state(); pf = PF(bahsistore_token()); shop = st["shop"]
     flags = {"title": True, "description": True, "images": True, "variants": True, "tags": True, "keyFeatures": True, "shipping_template": True}
     col = {it["key"]: it for it in json.loads((D / "collection.json").read_text(encoding="utf-8"))["items"]}
     for k, S in st["products"].items():
@@ -186,6 +189,6 @@ on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
         print(k, "yayında:", S["etsy_listing_id"])
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--token"); ap.add_argument("--garment")
+    ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla"]); ap.add_argument("--garment")
     ap.add_argument("--only"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
     a = ap.parse_args(); (hazirla if a.adim == "hazirla" else yayinla)(a)

@@ -8,3 +8,7 @@ bahsistore_etsy_paket.zip
 bahsistore_etsy_paket/
 etsy-yukleme/
 *.etsy.zip
+
+# Gizli anahtarlar (yerel; GitHub'a gitmez)
+.env
+.env.*

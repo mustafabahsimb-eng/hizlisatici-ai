@@ -13,6 +13,7 @@
 //   { action: "organize", userId, sections?: [{ title, listingIds[] }], featured?: [etsyListingId…] }
 //        -> mağaza bölümlerini oluştur (yoksa; verilen sırayla), ilanları bölümlere yerleştir, öne çıkan ilanları sırala (featured_rank)
 //   { action: "listing_personalization", userId, etsyListingId, instructions, charMax?, required? } -> Etsy kişiselleştirme kutusunu aç
+//   { action: "holiday_notice", userId, etsyListingIds[], line | null, announcement? } -> açıklama + mağaza duyurusunda Noel teslim satırı
 //   { action: "listing_state", userId, etsyListingIds[], state: "active" | "inactive" }
 //        -> ilanları yayına al / pasife al (SİLMEZ; yorum ve satış geçmişi ilanda kalır)
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
@@ -184,6 +185,36 @@ async function organize(userId: string, sections: { title: string; listingIds: s
   return { ok: report.every((r: any) => !r.failed.length) && feat.every((f) => f.ok), sections: report, featured: feat };
 }
 
+// Noel teslim satırı: ilan açıklamasının en üstüne ve mağaza duyurusuna tek satır (line=null -> satırı kaldır).
+// Önceki satır bu kalıpla tanınıp değiştirilir; açıklamanın geri kalanına dokunulmaz.
+export const HOLIDAY_RE = /^(🎄 Order by .+ for Christmas delivery|⚠️ Orders placed now may arrive after Christmas)/;
+export function withHolidayLine(text: string, line: string | null): string {
+  const rest = String(text || "").split("\n").filter((l) => !HOLIDAY_RE.test(l.trim())).join("\n").replace(/^\s*\n/, "");
+  return line ? `${line}\n\n${rest}`.trim() : rest.trim();
+}
+async function holidayNotice(userId: string, ids: string[], line: string | null, announcement: boolean) {
+  const { ctx, shopId } = await userShop(userId);
+  const out: Record<string, unknown>[] = [];
+  for (const id of ids) {
+    try {
+      const l = await etsy(ctx, "GET", `/listings/${id}`);
+      const next = withHolidayLine(l.description, line);
+      if (next !== String(l.description || "").trim()) await etsy(ctx, "PATCH", `/shops/${shopId}/listings/${id}`, { form: { description: next } });
+      out.push({ id, ok: true });
+    } catch (e) { out.push({ id, ok: false, error: friendly(e) }); }
+  }
+  let shop: Record<string, unknown> | null = null;
+  if (announcement) {
+    try {
+      const s = await etsy(ctx, "GET", `/shops/${shopId}`);
+      const next = withHolidayLine(s.announcement || "", line);
+      if (next !== String(s.announcement || "").trim()) await etsy(ctx, "PUT", `/shops/${shopId}`, { form: { announcement: next } });
+      shop = { ok: true };
+    } catch (e) { shop = { ok: false, error: friendly(e) }; }
+  }
+  return { ok: out.every((x) => x.ok) && (!shop || shop.ok === true), listings: out, announcement: shop };
+}
+
 // Sezon modülü: ilanı yayına al / pasife al. Pasif ilan Etsy'de silinmez; yeniden açılınca yorum ve satış geçmişi geri gelir.
 // (Etsy pasif ilanı yeniden yayına alırken ilan ücreti alır.)
 async function listingState(userId: string, ids: string[], state: "active" | "inactive") {
@@ -212,6 +243,9 @@ Deno.serve(async (req) => {
           is_personalizable: true, personalization_is_required: b.required !== false,
           personalization_char_count_max: Math.min(1024, Number(b.charMax) || 120), personalization_instructions: String(b.instructions || "").slice(0, 1024) } });
         return json({ ok: true, is_personalizable: d.is_personalizable, required: d.personalization_is_required });
+      }
+      if (b.action === "holiday_notice" && b.userId && Array.isArray(b.etsyListingIds)) {
+        return json(await holidayNotice(String(b.userId), b.etsyListingIds.map(String), b.line ? String(b.line).slice(0, 200) : null, b.announcement !== false));
       }
       if (b.action === "listing_state" && b.userId && Array.isArray(b.etsyListingIds) && ["active", "inactive"].includes(b.state)) {
         return json(await listingState(String(b.userId), b.etsyListingIds.map(String), b.state));

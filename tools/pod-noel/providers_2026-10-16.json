@@ -1,0 +1,8 @@
+[{"name":"Printify Choice","m_cost":17.87,"m_ship":8.79,"x3_cost":22.03,"note":"Printify siparişi uygun üreticiye yönlendirir; kalite üreticiye göre değişebilir"},
+ {"name":"SwiftPOD","m_cost":18.70,"m_ship":8.79,"x3_cost":22.88,"note":"Gildan 18000'de yüksek puanlı, hızlı ABD üreticisi"},
+ {"name":"Dimona Tee","m_cost":19.15,"m_ship":8.79,"x3_cost":30.82,"note":"3XL pahalı"},
+ {"name":"Monster Digital","m_cost":19.45,"m_ship":8.79,"x3_cost":23.79,"note":"şu an taslaklar bunda"},
+ {"name":"Fulfill Engine","m_cost":20.35,"m_ship":10.39,"x3_cost":27.03,"note":""},
+ {"name":"Printful","m_cost":20.79,"m_ship":8.79,"x3_cost":25.24,"note":""},
+ {"name":"Underground Threads","m_cost":22.86,"m_ship":10.39,"x3_cost":29.92,"note":""},
+ {"name":"Marco Fine Arts","m_cost":23.83,"m_ship":8.79,"x3_cost":32.81,"note":""}]

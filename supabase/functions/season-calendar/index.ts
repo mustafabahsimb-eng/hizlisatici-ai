@@ -90,8 +90,87 @@ async function notify(userId: string, text: string, dedupe: string) {
   await db.rpc("assistant_enqueue", { p_user: userId, p_kind: "notice", p_payload: { text }, p_dedupe: dedupe });
 }
 
+// ---------------- Noel son sipariş tarihi (Printify) ----------------
+// Printify her yıl ABD için Noel son sipariş tarihlerini yayınlar. Günde bir kez kaynak sayfalar okunur (Printify tedarikçi; pazar yeri değil),
+// metinden AI ile "ABD standart kargo, giysi" son sipariş günü çıkarılır ve app_cache'e yazılır. 1 Aralık'a kadar açıklanmazsa
+// tahmin kullanılır: USPS Ground Advantage son günü (17 Aralık) − 5 iş günü üretim = 10 Aralık (kaynak "tahmin" olarak işaretlenir).
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const DEADLINE_SOURCES = ["https://printify.com/blog/holiday-shipping-deadlines/", "https://printify.com/blog/holiday-season/", "https://printify.com/holiday-deadlines/"];
+async function cacheGet(key: string) { const { data } = await db.from("app_cache").select("value").eq("key", key).maybeSingle(); return data?.value ?? null; }
+async function cacheSet(key: string, value: unknown) { await db.from("app_cache").upsert({ key, value, updated_at: new Date().toISOString() }); }
+async function aiDeadline(text: string, year: number): Promise<string | null> {
+  if (!ANTHROPIC_API_KEY) return null;
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 200, messages: [{ role: "user", content:
+      `Below is text from Printify's website. If it states Printify's ${year} Christmas order deadline for delivery by December 25 within the United States ` +
+      `with standard shipping for apparel (or a general US standard deadline), answer ONLY with JSON {"order_by":"${year}-12-DD"}. If the ${year} deadline is not stated, answer {"order_by":null}.\n\n` + text.slice(0, 60000) }] }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!r.ok) return null;
+  const m = /\{[^}]*\}/.exec((await r.json())?.content?.[0]?.text || "");
+  try { const v = m ? JSON.parse(m[0]).order_by : null; return /^\d{4}-12-\d{2}$/.test(v || "") ? v : null; } catch { return null; }
+}
+export async function christmasDeadline(year: number, today: string): Promise<{ date: string; source: string } | null> {
+  const key = `printify_holiday_deadline:${year}`;
+  const c = await cacheGet(key);
+  if (c?.date && c.source !== "tahmin") return c;
+  if ((await cacheGet(key + ":checked")) !== today) {
+    await cacheSet(key + ":checked", today);
+    for (const url of DEADLINE_SOURCES) {
+      try {
+        const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; Seltigo/1.0)" }, signal: AbortSignal.timeout(20000) });
+        if (!r.ok) continue;
+        const text = (await r.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+        if (!text.includes(String(year)) || !/christmas|holiday/i.test(text)) continue;
+        const d = await aiDeadline(text, year);
+        if (d) { const v = { date: d, source: url }; await cacheSet(key, v); return v; }
+      } catch { /* bir sonraki kaynak */ }
+    }
+  }
+  if (c?.date) return c;
+  if (today >= `${year}-12-01`) { const v = { date: `${year}-12-10`, source: "tahmin" }; await cacheSet(key, v); return v; }
+  return null;
+}
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export function holidayLine(deadline: string | null, today: string, end: string): string | null {
+  if (!deadline || today >= end) return null;                                  // sezon bitti: satır kaldırılır
+  const d = new Date(deadline + "T00:00:00Z");
+  if (today <= deadline) return `🎄 Order by ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} for Christmas delivery in the US.`;
+  return "⚠️ Orders placed now may arrive after Christmas.";
+}
+async function christmasNotices(today: string, dryRun: boolean) {
+  const { data: s } = await db.from("seasons").select("*").eq("key", "christmas").maybeSingle();
+  if (!s) return null;
+  const w = currentWindow(s, today);
+  if (today < w.launch || today > iso(new Date(new Date(w.end).getTime() + 3 * DAY))) return { skipped: "sezon dışı" };
+  const dl = await christmasDeadline(Number(w.holiday.slice(0, 4)), today);
+  const line = holidayLine(dl?.date || null, today, w.end);
+  const { data: pods } = await db.from("pod_products").select("user_id, external_listing_id").eq("status", "published").not("external_listing_id", "is", null);
+  const byUser = new Map<string, string[]>();
+  for (const p of pods || []) byUser.set(p.user_id, [...(byUser.get(p.user_id) || []), p.external_listing_id]);
+  const out: any[] = [];
+  for (const [userId, ids] of byUser) {
+    const stateKey = `holiday_notice:${userId}:${w.year}`;
+    const prev = await cacheGet(stateKey);
+    if ((prev?.line ?? null) === line && prev?.count === ids.length) continue;   // değişiklik yok
+    if (dryRun) { out.push({ userId, line, count: ids.length }); continue; }
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/etsy-listings`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(300000),
+      body: JSON.stringify({ cronSecret: CRON_SECRET, action: "holiday_notice", userId, etsyListingIds: ids, line, announcement: true }),
+    }).then((x) => x.json()).catch((e) => ({ ok: false, error: String(e) }));
+    if (r.ok) await cacheSet(stateKey, { line, count: ids.length, at: new Date().toISOString() });
+    await notify(userId, r.ok
+      ? (line ? `🎄 Noel teslim notu güncellendi (${ids.length} ilan + mağaza duyurusu): "${line}"${dl?.source === "tahmin" ? " (Printify henüz açıklamadı; tahmini tarih)" : ""}` : `🎄 Noel teslim notu ilanlardan kaldırıldı.`)
+      : `⚠️ Noel teslim notu güncellenemedi: ${String(r.error || "").slice(0, 200)}`, `holiday:${userId}:${line ?? "none"}`);
+    out.push({ userId, line, ok: r.ok });
+  }
+  return { deadline: dl, line, users: out };
+}
+
 async function run(dryRun: boolean) {
   const today = todayTR();
+  const christmas = await christmasNotices(today, dryRun).catch((e) => ({ error: String((e as Error).message).slice(0, 200) }));
   const { data: seasons } = await db.from("seasons").select("*").eq("evergreen", false).order("sort");
   const out: any[] = [];
   for (const s of seasons || []) {
@@ -133,7 +212,7 @@ async function run(dryRun: boolean) {
     }
     out.push(item);
   }
-  return { ok: true, today, dryRun, seasons: out };
+  return { ok: true, today, dryRun, christmas, seasons: out };
 }
 
 Deno.serve(async (req) => {

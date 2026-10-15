@@ -31,3 +31,20 @@ Deno.test("bugünü kapsayan pencere", () => {
   const ny = S("new_year", "fixed:01-01", -47, 1);
   assertEquals(m.currentWindow(ny, "2026-12-01").year, 2027);
 });
+Deno.test("Noel teslim satırı", () => {
+  assertEquals(m.holidayLine(null, "2026-11-01", "2026-12-26"), null);
+  assertEquals(m.holidayLine("2026-12-10", "2026-11-01", "2026-12-26"), "🎄 Order by December 10 for Christmas delivery in the US.");
+  assertEquals(m.holidayLine("2026-12-10", "2026-12-10", "2026-12-26"), "🎄 Order by December 10 for Christmas delivery in the US.");
+  assertEquals(m.holidayLine("2026-12-10", "2026-12-11", "2026-12-26"), "⚠️ Orders placed now may arrive after Christmas.");
+  assertEquals(m.holidayLine("2026-12-10", "2026-12-26", "2026-12-26"), null);
+});
+Deno.test("açıklamada satır değiştirilir, metin korunur", async () => {
+  (Deno as any).serve = () => ({}) as any; Deno.env.set("CRON_SECRET", "x");
+  const e = await import("../../supabase/functions/etsy-listings/index.ts");
+  const base = "Most likely to eat all the cookies?\n\nPRODUCT DETAILS\n• Gildan 18000";
+  const a = e.withHolidayLine(base, "🎄 Order by December 10 for Christmas delivery in the US.");
+  assertEquals(a.split("\n")[0], "🎄 Order by December 10 for Christmas delivery in the US.");
+  const b = e.withHolidayLine(a, "⚠️ Orders placed now may arrive after Christmas.");
+  assertEquals(b, "⚠️ Orders placed now may arrive after Christmas.\n\n" + base);
+  assertEquals(e.withHolidayLine(b, null), base);
+});
