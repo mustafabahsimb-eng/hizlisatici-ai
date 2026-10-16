@@ -26,8 +26,21 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
 
+## Son durum (16 Ekim 2026 akşam)
+**Bitti ve canlıda:**
+- **Etsy senkronu** (`etsy-sync`, saatlik cron `etsy-sync-1h` + Printify webhook + Etsy / Printify bağlanınca hemen): Etsy mağazasındaki tüm aktif ilanlar (Printify'dan ya da Etsy panelinden eklenenler dahil) Seltigo ürün listesine gelir; `etsy_listing_id` ile eşleşir, iki kez eklenmez. Etsy'de silinen ilan "Etsy'de yok" etiketi alır. Printify ürünlerinde maliyet Printify API'den (ürün + ABD kargo), Etsy kesintileri (%9,5 + 0,45 $) düşülür; gerçek net kâr, marj ve "Printify" etiketi gösterilir. Panel toplamları 1000 satır sınırına takılmadan hesaplanır. Tüm satıcılarda çalışır (paket anahtarı `etsy_sync`). Test `tests/e2e/etsy_senkron.py` 7/7.
+  - Mustafa'nın hesabı: Etsy'de 42 ilan, 40'ı eşleşti (15 sweatshirt Printify'lı, maliyetli), panelde toplam 52 ürün. Eşleşmeyen 2 ilan aktif değil (eski pasif yaz tişörtleri); kural gereği yalnız aktif ilanlar içe aktarılır.
+- **İçerik otomasyonu** son iki adım ("paylaşıldı" durumu, onaysız içeriğin atlanması) test edildi: `tests/e2e/icerik_akisi.py` 18/18. Testte bulunan hata düzeltildi: haftalık plan görselleri tek istekte çizilince fonksiyon işlem sınırına takılıp son günleri oluşturmuyordu; artık parça parça çiziliyor (docs/icerik-otomasyonu.md).
+
+**Yarım / sıradaki:**
+- Facebook / Instagram / WhatsApp bağlantısı bozuk (Meta izinleri 6'ya indi) → aşağıda Mustafa'nın yapacakları 1. Bu düzelmeden içerik otomasyonu ve reklamlar gerçek hesapta paylaşım yapamaz (testler sahte bağlantıyla geçiyor).
+- Meta uygulaması Live moda alınınca reklam zincirinin son adımı (duraklatılmış aç → doğrula → sil) Claude tarafından tamamlanacak.
+- Eski notlardaki "Etsy bağlantısı süresi doldu" çözüldü (bağlantı açık, senkron saatlik başarılı).
+
 ## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
 - İçerik otomasyonu adları: menü "🗓️ İçerik Takvimi"; "Otomatik içerik", "Günde gönderi", "Haftada hikâye", "Paylaşım saati", "Kanallar", "Yayından önce onayıma sun", "Planı şimdi oluştur", "Hepsini onayla", "Onayla", "Atla", "Metni düzenle", "Şimdi paylaş", "Gönderiyi aç"; şablonlar Ürün fotoğrafı / Fiyat etiketi / Kolaj / Özel gün / Hikâye; durumlar Onay bekliyor / Zamanlandı / Paylaşılıyor / Paylaşıldı / Hata / Atlandı. Varsayılan: kapalı, günde 1, haftada 3 hikâye, 19:30, onay açık.
+- Etsy senkronu: Etsy'de silinen ilan panelden silinmez, "Etsy'de yok" etiketiyle kalır (satış / kâr geçmişi kaybolmasın). Dışarıda (Printify / Etsy) yönetilen ilanlar Seltigo'dan Etsy'ye geri yazılmaz.
+- İçerik planı: bir istekte en fazla 3 görsel, kalan için kendini yeniden çağırma; panel bitene kadar "Hazırlanıyor…" gösterir.
 - Seltigo Ads: sandbox hesabı yerine kişisel reklam hesabında para harcamayan "duraklatılmış aç → doğrula → sil" denemesi; kampanyada setler arası bütçe paylaşımı kapalı.
 
 ---
