@@ -35,3 +35,17 @@ Kişiselleştirilmemiş ve tümü Seltigo POD ürünü olan bekleyen siparişler
 - **Sorun bildirimi → Printify yeniden gönderim:** satış sonrası mesajdaki bağlantı `order-help.html?shop=<Etsy mağaza no>` → `pod-reprint` (Etsy siparişi + e-posta / posta kodu doğrulanır, fotoğraflar depoya, Printify `support-requests/reprint`, Telegram bildirimi; açılamazsa cron `pod-reprint-30m` 6 kez dener). Tablo `pod_reprints`, paket anahtarı `pod_reprint`.
 - **Etsy kişiselleştirme:** yeni uç nokta `updateListingPersonalization` (eski is_personalizable alanları işlemiyor); soru başlığı "Personalization (kids' names)", siparişte `variations.formatted_name`.
 - **Rakip fiyatları:** etsy-listings `market_prices` (resmi arama, USD ortanca).
+
+## Giyim ilanı görsel düzeni (16 Ekim 2026; tüm sweatshirt / tişört ilanlarında varsayılan)
+`tools/pod-noel/gorseller.py` — `printify_yukle.py yayinla` yayından hemen sonra kendiliğinden uygular (`varsayilan`):
+1. **Kapak:** renkli giysi (sand / light pink / forest green; tasarımla kontrast) gerçek kış / Noel üstten çekim sahnesinde (Pexels, ticari kullanım serbest; `scenes.py` ortası boş sahneleri bulur). Printify API yalnız düz ön mockup verdiği için sahne kompozisyonu burada: giysi Printify mockup'ından ayrılır (beyaz giysi için Sand maskesi), yumuşak gölge, renk kaydırma YOK. Her ilan ayrı sahne (`kapak_sahneleri.json`).
+2. Düz ürün fotoğrafı (Printify ön görünüm, kapak rengi) · 3. Renk seçenekleri (5 renk) · 4. Beden tablosu (Printify size guide, inç + cm).
+- Etsy'de görseller `etsy-listings set_images` ile değişir (önce yükle, sonra eskileri sil). Printify sonraki güncellemelerde `images: false` ile yayınlar, görseller ezilmez.
+- Açıklama sonu: "Original design by bahsistore, created with generative design tools." (`collection.py` şablonu).
+- Kargo "Sweatshirts - US only - Free shipping" ve iade politikası da yayında atanır.
+
+## Etsy senkronu (`etsy-sync`)
+- Bağlı her Etsy mağazasındaki tüm ilanlar Seltigo ürün listesine: saatlik (cron `etsy-sync-1h`), Etsy bağlanınca hemen (`etsy-token-exchange`), Printify bağlanınca webhook kaydı + ilk senkron (`printify-connect`), Printify'da ürün yayınlanınca / değişince / silinince webhook (`?t=PRINTIFY_WEBHOOK_TOKEN`, 90 sn sonra). Etsy'nin ilan değişikliği webhook'u yok (yalnız sipariş olayları) -> Etsy panelinden eklenenler saatlik gelir.
+- Eşleştirme `listings.external_listing_id`; dışarıda yönetilen ilan `attributes.managed_by` = printify | etsy -> gönderim kuyruğuna girmez (migration 20261019_etsy_sync). Etsy'de olmayan ilan `validation.etsy.state = removed` (panelde "Etsy'de yok").
+- Printify ürünü: maliyet = ilan fiyatındaki varyantın Printify maliyeti + ABD ilk ürün kargosu, mağaza para birimine çevrilir (`supplier_price`); Etsy kesintileri `commission_rate` 9,5 + `fixed_fee` 0,45 $. Panel (dashboard / report) `fixed_fee`'yi net kârdan düşer; "Printify" etiketi.
+- Test: `tests/e2e/etsy_senkron.py` (7/7).

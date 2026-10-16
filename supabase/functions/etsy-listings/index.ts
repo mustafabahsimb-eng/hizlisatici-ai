@@ -396,9 +396,14 @@ Deno.serve(async (req) => {
         const { token, cred } = await etsyToken(db, conn.id);
         const shopId = String(cred.shop_id || conn.external_seller_id); const id = String(b.etsyListingId);
         const l = await etsy({ token }, "GET", `/listings/${id}`, { query: { includes: "Images" } });
-        const fl = await etsy({ token }, "GET", `/shops/${shopId}/listings/${id}/files`);
+        const fl = l.listing_type === "download" ? await etsy({ token }, "GET", `/shops/${shopId}/listings/${id}/files`) : { results: [] };
+        // Seçenekler (renk / beden): envanterdeki özellik değerleri
+        const inv = l.listing_type === "download" ? null : await etsy({ token }, "GET", `/listings/${id}/inventory`).catch(() => null);
+        const opts: Record<string, string[]> = {};
+        for (const p of inv?.products || []) for (const v of p.property_values || []) { const k = String(v.property_name); opts[k] = [...new Set([...(opts[k] || []), ...(v.values || [])])]; }
         return json({ ok: true, state: l.state, title: l.title, auto_renew: l.should_auto_renew, price: l.price, tags: l.tags, taxonomy_id: l.taxonomy_id, type: l.listing_type,
-          images: (l.images || []).map((x: any) => ({ rank: x.rank, w: x.full_width, h: x.full_height, url: x.url_570xN })), files: (fl.results || []).map((f: any) => ({ name: f.filename, size: f.filesize, rank: f.rank })) });
+          description_end: String(l.description || "").slice(-160), options: opts,
+          images: (l.images || []).sort((a: any, z: any) => a.rank - z.rank).map((x: any) => ({ rank: x.rank, w: x.full_width, h: x.full_height, url: x.url_570xN })), files: (fl.results || []).map((f: any) => ({ name: f.filename, size: f.filesize, rank: f.rank })) });
       }
       // Dosyayı depoya yüklemek için tek kullanımlık imzalı adres (product-images / product-files)
       if (b.action === "signed_upload" && b.bucket && (b.path || Array.isArray(b.paths))) {

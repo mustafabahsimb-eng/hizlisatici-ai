@@ -24,7 +24,7 @@ COVER_COLOR = {"mlt-cookies": "Forest Green", "mlt-movies": "Sand", "mlt-naughty
 def F(name, size): return ImageFont.truetype(str(FD / name), int(size))
 def mock(key, color): return MK / f"{key}__{color.replace(' ', '-')}.jpg"
 
-def _mask(path, tol=18):
+def _mask(path, tol=34):  # açık gri gölge de zemin sayılır (sand / pink giysiler bu eşikten ayrışır; White için Sand maskesi)
     img = cv2.imread(str(path)); h, w = img.shape[:2]
     near = (np.abs(img.astype(int) - 255).max(axis=2) < tol).astype(np.uint8)
     mask = np.zeros((h + 2, w + 2), np.uint8); bg = near.copy()
@@ -34,6 +34,7 @@ def _mask(path, tol=18):
     fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)); fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
     n, lab, st, _ = cv2.connectedComponentsWithStats(fg)
     if n > 1: big = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA])); fg = np.where(lab == big, 255, 0).astype(np.uint8)
+    fg = cv2.erode(fg, np.ones((3, 3), np.uint8), iterations=5)   # zeminden kalan beyaz kenar şeridini at
     return img, cv2.GaussianBlur(fg, (0, 0), 1.2)
 
 def cutout(path):
@@ -47,17 +48,17 @@ def cutout(path):
     im = Image.fromarray(rgba); return im.crop(im.getbbox())
 
 def scene_light(scene, box):
-    """Sahnenin yerleşim bölgesindeki ortalama ışık / renk sıcaklığı (giysiye hafifçe uygulanır)."""
-    a = np.asarray(scene.crop(box).convert("RGB")).astype(float).reshape(-1, 3); m = a.mean(0)
-    return np.clip(m / max(m.mean(), 1), 0.9, 1.1), float(np.clip(m.mean() / 200, 0.82, 1.06))
+    """Sahnenin yerleşim bölgesindeki parlaklık: giysiye yalnız çok hafif parlaklık uygulanır (renk ASLA kaydırılmaz; alıcı rengi doğru görmeli)."""
+    a = np.asarray(scene.crop(box).convert("L")).astype(float)
+    return float(np.clip(a.mean() / 190, 0.96, 1.03))
 
 def compose(scene_path, garment, scale=0.70, rot=0.0, dy=0.0):
     sc = Image.open(scene_path).convert("RGB"); s = min(sc.size); sc = sc.crop(((sc.width - s) // 2, (sc.height - s) // 2, (sc.width + s) // 2, (sc.height + s) // 2)).resize((SIZE, SIZE), Image.LANCZOS)
     g = garment.copy(); r = SIZE * scale / max(g.size); g = g.resize((int(g.width * r), int(g.height * r)), Image.LANCZOS)
     if rot: g = g.rotate(rot, resample=Image.BICUBIC, expand=True)
     x = (SIZE - g.width) // 2; y = int((SIZE - g.height) // 2 + dy * SIZE)
-    tint, bright = scene_light(sc, (x, y, x + g.width, y + g.height))
-    arr = np.asarray(g).astype(float); arr[..., :3] = np.clip(arr[..., :3] * tint * bright, 0, 255); g = Image.fromarray(arr.astype(np.uint8))
+    bright = scene_light(sc, (x, y, x + g.width, y + g.height))
+    arr = np.asarray(g).astype(float); arr[..., :3] = np.clip(arr[..., :3] * bright, 0, 255); g = Image.fromarray(arr.astype(np.uint8))
     # Yumuşak gölge (üstten ışık): yakın + geniş iki katman
     alpha = g.split()[3]
     for blur, off, op in [(SIZE * 0.012, (int(SIZE * 0.006), int(SIZE * 0.010)), 0.45), (SIZE * 0.035, (int(SIZE * 0.012), int(SIZE * 0.025)), 0.30)]:
@@ -110,7 +111,7 @@ def uret(keys):
     plan = scene_plan(); sc = size_chart(); sc.save(OUT / "size_chart.jpg", quality=92)
     for k in keys:
         color = COVER_COLOR[k]; p = plan[k]
-        cover = compose(SC / f"{p['scene']}.jpg", cutout(mock(k, color)), p.get("scale", 0.70), p.get("rot", 0), p.get("dy", 0))
+        cover = compose(SC / f"{p['scene']}.jpg", cutout(mock(k, color)), p.get("scale", 0.74), p.get("rot", 0), p.get("dy", 0))
         cover.save(OUT / f"{k}_1_cover.jpg", quality=92); flat(k, color).save(OUT / f"{k}_2_flat.jpg", quality=92)
         color_chart(k).save(OUT / f"{k}_3_colors.jpg", quality=92); print(k, "görseller hazır", flush=True)
 
@@ -130,6 +131,29 @@ def uygula(keys):
         r = json.loads(call("etsy-listings", {"action": "set_images", "userId": UID, "etsyListingId": lid, "urls": [BASE + x for x in paths[k]]}, 600)["content"])
         res[k] = r; print(k, lid, r.get("ok"), r.get("count"), r.get("error") or "", flush=True)
     return res
+
+def plan_eksik(keys, dark_ink_keys=()):
+    """Yeni ilan için kapak rengi + daha önce kullanılmamış sahne seçer (kapaklar birbirinin aynısı olmaz).
+    Renk: açık mürekkepli tasarım (koyu giysi baskısı) -> Forest Green; diğerleri sırayla Sand / Light Pink."""
+    plan = scene_plan(); used = {v["scene"] for v in plan.values()}
+    cands = [c for c in json.loads((ROOT / "adaylar.json").read_text(encoding="utf-8")) if c["id"] not in used] if (ROOT / "adaylar.json").exists() else []
+    alt = ["Sand", "Light Pink"]
+    for i, k in enumerate(keys):
+        COVER_COLOR.setdefault(k, "Forest Green" if k in dark_ink_keys else alt[i % 2])
+        if k in plan: continue
+        if not cands: raise SystemExit("Kullanılmamış kapak sahnesi kalmadı: scenes.py ile yeni sahne ara")
+        c = cands.pop(0); plan[k] = {"scene": c["id"], "page": c["page"], "by": c["by"]}
+        f = SC / f"{c['id']}.jpg"
+        if not f.exists(): f.write_bytes(urllib.request.urlopen(urllib.request.Request(c["src"] + "?auto=compress&cs=tinysrgb&w=3000", headers={"User-Agent": "Mozilla/5.0"}), timeout=90).read())
+    (ROOT / "kapak_sahneleri.json").write_text(json.dumps(plan, indent=1), encoding="utf-8")
+    cc = ROOT / "kapak_renkleri.json"; cc.write_text(json.dumps(COVER_COLOR, indent=1), encoding="utf-8")
+
+def varsayilan(keys, dark_ink_keys=()):
+    """Giyim ilanı varsayılan görsel düzeni: plan + üret + Etsy'ye uygula (yayından hemen sonra çağrılır)."""
+    plan_eksik(keys, dark_ink_keys); uret(keys); return uygula(keys)
+
+# Yeni eklenen ilanların kapak renkleri (kapak_renkleri.json) varsayılanların üstüne yazılır
+if (ROOT / "kapak_renkleri.json").exists(): COVER_COLOR.update(json.loads((ROOT / "kapak_renkleri.json").read_text(encoding="utf-8")))
 
 if __name__ == "__main__":
     step = sys.argv[1]; keys = sys.argv[2].split(",") if len(sys.argv) > 2 else list(COVER_COLOR)

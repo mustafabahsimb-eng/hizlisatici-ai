@@ -165,6 +165,19 @@ def guncelle(a):
         S["pricing"] = rep; S["currency"] = cur; save_state(st)
         print(k, "güncellendi" + (" + Etsy'ye gönderildi" if S.get("published") else ""), {s: r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")})
 
+def mockup_indir(st, keys):
+    """Printify ön mockup'larını (renk başına) gorseller.py'nin kullandığı klasöre indirir."""
+    import re, urllib.request
+    pf = PF(bahsistore_token()); shop = st["shop"]["id"]; out = ROOT / "mockups"; out.mkdir(exist_ok=True)
+    COL = ["Sand", "Black", "White", "Light Pink", "Forest Green"]
+    for k in keys:
+        p = pf("GET", f"/shops/{shop}/products/{st['products'][k]['product_id']}.json")
+        color_of = {v["id"]: next((c for c in COL if c in [x.strip() for x in v["title"].split("/")]), None) for v in p["variants"]}
+        for im in p.get("images", []):
+            m = re.search(r"/mockup/[^/]+/(\d+)/", im["src"]); c = color_of.get(int(m.group(1))) if m else None
+            f = out / f"{k}__{c.replace(' ', '-')}.jpg" if c else None
+            if f and not f.exists(): f.write_bytes(urllib.request.urlopen(urllib.request.Request(im["src"].replace("?", "?s=2048&"), headers={"User-Agent": "Mozilla/5.0"}), timeout=90).read())
+
 def write_report(st, col):
     rowsh = []
     for it in col["items"]:
@@ -215,6 +228,18 @@ on conflict (provider, provider_product_id) do update set external_listing_id = 
 insert into public.season_listings (user_id, season_key, external_listing_id, title, state) values ({q(UID)}, {q(season)}, {q(S['etsy_listing_id'])}, {q(S['title'])}, 'active')
 on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
         print(k, "yayında:", S["etsy_listing_id"])
+        S["registered"] = True; save_state(st)
+    # Giyim ilanı varsayılanları (Mustafa, 16 Ekim 2026): 4 görsel düzeni, yalnız ABD + ücretsiz kargo, iade politikası
+    yeni = [k for k, S in st["products"].items() if S.get("etsy_listing_id") and not S.get("defaults_at") and (not a.only or k in a.only.split(","))]
+    if yeni:
+        import gorseller
+        mockup_indir(st, yeni)
+        gorseller.varsayilan(yeni)
+        ids = [st["products"][k]["etsy_listing_id"] for k in yeni]
+        print("kargo:", call("etsy-listings", {"action": "us_shipping_profile", "userId": UID, "title": "Sweatshirts - US only - Free shipping", "listingIds": ids, "primary": 0, "secondary": 0}, 600)["content"][:160])
+        print("iade:", call("etsy-listings", {"action": "return_policy", "userId": UID, "listingIds": ids}, 600)["content"][:160])
+        for k in yeni: st["products"][k]["defaults_at"] = time.time()
+        save_state(st)
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla", "guncelle"]); ap.add_argument("--garment"); ap.add_argument("--provider", help="üretici adı (ör. SwiftPOD)")
