@@ -1,0 +1,136 @@
+"""Giyim ilanı görsel düzeni (Mustafa, 16 Ekim 2026; tüm sweatshirt / tişört ilanlarında varsayılan):
+  1) Kapak: renkli giysi (tasarımla en iyi kontrast) gerçek kış / Noel sahnesinde (Pexels, ticari kullanım serbest). Beyaz zemin + beyaz giysi YOK.
+     Kapaklar birbirinin aynısı olmaz: her ilan ayrı sahne (used_scenes.json).
+  2) Düz ürün fotoğrafı (Printify ön görünüm, kapak rengiyle)
+  3) Renk seçenekleri (5 renk yan yana)
+  4) Beden tablosu (Printify size guide; inç + cm)
+Printify API yalnız düz ön mockup veriyor (manken / ortam mockup'ı yok) -> sahne kompozisyonu burada yapılır.
+Kullanım: python gorseller.py uret [kod,...]   (görselleri üretir, önizleme sayfası)
+          python gorseller.py uygula [kod,...] (depoya yükler, Etsy'de ilk 4 görseli bunlarla değiştirir; etsy-listings set_images)"""
+import json, os, sys, time, urllib.request
+from pathlib import Path
+import cv2, numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+D = Path(__file__).parent; sys.path.insert(0, str(D)); sys.path.insert(0, str(D.parent / "etsy-mockup"))
+ROOT = Path(os.environ["LOCALAPPDATA"]) / "seltigo-pod"; MK = ROOT / "mockups"; SC = ROOT / "scenes"; OUT = ROOT / "ilan_gorselleri"; FD = ROOT / "fonts"
+OUT.mkdir(exist_ok=True)
+COLORS = [("Sand", "#D8C7A8"), ("Light Pink", "#F2CFD6"), ("Forest Green", "#2F4A3A"), ("Black", "#1E1E1E"), ("White", "#F4F4F2")]
+SIZE = 2400
+# Kapak rengi (tasarımla en iyi kontrast; açık giysi koyu mürekkep, koyu giysi açık mürekkep). Yalnız sand / light pink / forest green.
+COVER_COLOR = {"mlt-cookies": "Forest Green", "mlt-movies": "Sand", "mlt-naughty": "Light Pink", "mlt-burn": "Forest Green", "mlt-presents": "Sand",
+               "mlt-asleep": "Forest Green", "mlt-snowball": "Light Pink", "mlt-carols": "Sand", "gingerbread-season": "Sand", "pink-merry": "Forest Green",
+               "mama-patchwork": "Light Pink", "animal-frog": "Sand", "animal-cat": "Forest Green", "animal-bird": "Light Pink", "bookish-soul": "Forest Green"}
+
+def F(name, size): return ImageFont.truetype(str(FD / name), int(size))
+def mock(key, color): return MK / f"{key}__{color.replace(' ', '-')}.jpg"
+
+def _mask(path, tol=18):
+    img = cv2.imread(str(path)); h, w = img.shape[:2]
+    near = (np.abs(img.astype(int) - 255).max(axis=2) < tol).astype(np.uint8)
+    mask = np.zeros((h + 2, w + 2), np.uint8); bg = near.copy()
+    for pt in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1), (w // 2, 0), (w // 2, h - 1), (0, h // 2), (w - 1, h // 2)]:
+        if near[pt[1], pt[0]]: cv2.floodFill(bg, mask, pt, 2)
+    fg = (bg != 2).astype(np.uint8) * 255
+    fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)); fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(fg)
+    if n > 1: big = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA])); fg = np.where(lab == big, 255, 0).astype(np.uint8)
+    return img, cv2.GaussianBlur(fg, (0, 0), 1.2)
+
+def cutout(path):
+    """Printify mockup'ında giysiyi beyaz zeminden ayır (köşelerden taşan beyaz bölge = zemin). RGBA döner.
+    Beyaz giysi beyaz zeminden ayrılamaz: Printify'da tüm renklerin giysi biçimi ve yeri aynı olduğundan maske Sand mockup'ından alınır."""
+    img, fg = _mask(path)
+    if "White" in str(path):
+        sand = Path(str(path).replace("White", "Sand"))
+        if sand.exists(): fg = _mask(sand)[1]
+    rgba = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA); rgba[..., 3] = fg
+    im = Image.fromarray(rgba); return im.crop(im.getbbox())
+
+def scene_light(scene, box):
+    """Sahnenin yerleşim bölgesindeki ortalama ışık / renk sıcaklığı (giysiye hafifçe uygulanır)."""
+    a = np.asarray(scene.crop(box).convert("RGB")).astype(float).reshape(-1, 3); m = a.mean(0)
+    return np.clip(m / max(m.mean(), 1), 0.9, 1.1), float(np.clip(m.mean() / 200, 0.82, 1.06))
+
+def compose(scene_path, garment, scale=0.70, rot=0.0, dy=0.0):
+    sc = Image.open(scene_path).convert("RGB"); s = min(sc.size); sc = sc.crop(((sc.width - s) // 2, (sc.height - s) // 2, (sc.width + s) // 2, (sc.height + s) // 2)).resize((SIZE, SIZE), Image.LANCZOS)
+    g = garment.copy(); r = SIZE * scale / max(g.size); g = g.resize((int(g.width * r), int(g.height * r)), Image.LANCZOS)
+    if rot: g = g.rotate(rot, resample=Image.BICUBIC, expand=True)
+    x = (SIZE - g.width) // 2; y = int((SIZE - g.height) // 2 + dy * SIZE)
+    tint, bright = scene_light(sc, (x, y, x + g.width, y + g.height))
+    arr = np.asarray(g).astype(float); arr[..., :3] = np.clip(arr[..., :3] * tint * bright, 0, 255); g = Image.fromarray(arr.astype(np.uint8))
+    # Yumuşak gölge (üstten ışık): yakın + geniş iki katman
+    alpha = g.split()[3]
+    for blur, off, op in [(SIZE * 0.012, (int(SIZE * 0.006), int(SIZE * 0.010)), 0.45), (SIZE * 0.035, (int(SIZE * 0.012), int(SIZE * 0.025)), 0.30)]:
+        sh = Image.new("L", sc.size, 0); sh.paste(alpha, (x + off[0], y + off[1]))
+        sh = sh.filter(ImageFilter.GaussianBlur(blur)).point(lambda v: int(v * op))
+        sc = Image.composite(Image.new("RGB", sc.size, (25, 18, 12)), sc, sh)
+    sc.paste(g, (x, y), g); return sc
+
+def flat(key, color):
+    im = Image.open(mock(key, color)).convert("RGB"); return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+def color_chart(key):
+    bg = Image.new("RGB", (SIZE, SIZE), "#F6F1EA"); d = ImageDraw.Draw(bg)
+    d.text((SIZE // 2, 170), "Available in 5 colors", font=F("DMSerifDisplay-Regular.ttf", 130), fill="#2B2A28", anchor="mm")
+    d.text((SIZE // 2, 300), "Gildan 18000 Heavy Blend Crewneck · Unisex S–3XL", font=F("Poppins-Medium.ttf", 54), fill="#6B6560", anchor="mm")
+    cell = 640; pos = [(180, 480), (880, 480), (1580, 480), (530, 1300), (1230, 1300)]
+    for (name, hexc), (x, y) in zip(COLORS, pos):
+        g = cutout(mock(key, name)); g.thumbnail((cell - 70, cell - 70), Image.LANCZOS)
+        bg.paste(g, (x + (cell - g.width) // 2, y + (cell - g.height) // 2), g)
+        d.ellipse((x + cell // 2 - 230, y + cell + 30, x + cell // 2 - 180, y + cell + 80), fill=hexc, outline="#B8B0A6", width=3)
+        d.text((x + cell // 2 - 160, y + cell + 55), name, font=F("Poppins-SemiBold.ttf", 58), fill="#2B2A28", anchor="lm")
+    return bg
+
+def size_chart():
+    # Printify size guide (Gildan 18000, mm): genişlik / boy / kol (yaka arkasından)
+    sizes = ["S", "M", "L", "XL", "2XL", "3XL"]
+    width = [508, 559, 609.6, 660.4, 711.2, 762]; length = [685.8, 711.2, 736.6, 762, 787.4, 812.8]; sleeve = [850.9, 876.3, 901.7, 927.1, 952.5, 977.9]
+    bg = Image.new("RGB", (SIZE, SIZE), "#F6F1EA"); d = ImageDraw.Draw(bg)
+    d.text((SIZE // 2, 190), "Size Chart", font=F("DMSerifDisplay-Regular.ttf", 150), fill="#2B2A28", anchor="mm")
+    d.text((SIZE // 2, 330), "Unisex fit · Measurements of the garment laid flat", font=F("Poppins-Medium.ttf", 56), fill="#6B6560", anchor="mm")
+    cols = ["Size", "Width", "Length", "Sleeve*"]; x0, x1 = 230, SIZE - 230; cw = (x1 - x0) / 4; y = 520; rh = 205
+    d.rounded_rectangle((x0, y - 90, x1, y + 70), radius=24, fill="#2F4A3A")
+    for i, c in enumerate(cols): d.text((x0 + cw * i + cw / 2, y - 10), c, font=F("Poppins-SemiBold.ttf", 66), fill="#F6F1EA", anchor="mm")
+    for r, s in enumerate(sizes):
+        yy = y + 100 + r * rh
+        if r % 2 == 0: d.rounded_rectangle((x0, yy - 10, x1, yy + rh - 30), radius=18, fill="#ECE4D8")
+        cy = yy + rh / 2 - 20
+        d.text((x0 + cw / 2, cy), s, font=F("Poppins-Bold.ttf", 74), fill="#2B2A28", anchor="mm")
+        for i, v in enumerate([width[r], length[r], sleeve[r]]):
+            d.text((x0 + cw * (i + 1) + cw / 2, cy - 28), f'{v / 25.4:.1f}"'.replace(".0\"", "\""), font=F("Poppins-SemiBold.ttf", 68), fill="#2B2A28", anchor="mm")
+            d.text((x0 + cw * (i + 1) + cw / 2, cy + 44), f"{v / 10:.0f} cm", font=F("Poppins-Regular.ttf", 50), fill="#6B6560", anchor="mm")
+    d.text((SIZE // 2, SIZE - 210), "*Sleeve measured from the center back of the neck. Tolerance ±1.5\"", font=F("Poppins-Regular.ttf", 50), fill="#6B6560", anchor="mm")
+    d.text((SIZE // 2, SIZE - 130), "For an oversized look, size up 1–2 sizes.", font=F("Poppins-Medium.ttf", 56), fill="#2B2A28", anchor="mm")
+    return bg
+
+def scene_plan():
+    f = ROOT / "kapak_sahneleri.json"; return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+
+def uret(keys):
+    plan = scene_plan(); sc = size_chart(); sc.save(OUT / "size_chart.jpg", quality=92)
+    for k in keys:
+        color = COVER_COLOR[k]; p = plan[k]
+        cover = compose(SC / f"{p['scene']}.jpg", cutout(mock(k, color)), p.get("scale", 0.70), p.get("rot", 0), p.get("dy", 0))
+        cover.save(OUT / f"{k}_1_cover.jpg", quality=92); flat(k, color).save(OUT / f"{k}_2_flat.jpg", quality=92)
+        color_chart(k).save(OUT / f"{k}_3_colors.jpg", quality=92); print(k, "görseller hazır", flush=True)
+
+def uygula(keys):
+    from syscall import call
+    st = json.loads((ROOT / "durum.json").read_text(encoding="utf-8")); UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"
+    BASE = "https://ytucdrrgxsjhrqmaxckt.supabase.co/storage/v1/object/public/product-images/"; t = time.strftime("%Y%m%d%H%M%S")
+    paths = {k: [f"{UID}/pod/{k}-{n}-{t}.jpg" for n in ("1_cover", "2_flat", "3_colors", "4_size")] for k in keys}
+    urls = json.loads(call("etsy-listings", {"action": "signed_upload", "bucket": "product-images", "paths": [x for v in paths.values() for x in v]})["content"])["urls"]
+    for k in keys:
+        for path, src in zip(paths[k], [OUT / f"{k}_1_cover.jpg", OUT / f"{k}_2_flat.jpg", OUT / f"{k}_3_colors.jpg", OUT / "size_chart.jpg"]):
+            req = urllib.request.Request(urls[path], data=src.read_bytes(), method="PUT", headers={"Content-Type": "image/jpeg", "x-upsert": "true"})
+            assert urllib.request.urlopen(req, timeout=300).status == 200
+    res = {}
+    for k in keys:
+        lid = st["products"][k]["etsy_listing_id"]
+        r = json.loads(call("etsy-listings", {"action": "set_images", "userId": UID, "etsyListingId": lid, "urls": [BASE + x for x in paths[k]]}, 600)["content"])
+        res[k] = r; print(k, lid, r.get("ok"), r.get("count"), r.get("error") or "", flush=True)
+    return res
+
+if __name__ == "__main__":
+    step = sys.argv[1]; keys = sys.argv[2].split(",") if len(sys.argv) > 2 else list(COVER_COLOR)
+    (uret if step == "uret" else uygula)(keys)

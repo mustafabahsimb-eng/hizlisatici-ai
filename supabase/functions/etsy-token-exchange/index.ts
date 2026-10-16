@@ -150,6 +150,11 @@ Deno.serve(async (req) => {
     }
 
     await note(true);
+    // Mağazadaki mevcut ilanları hemen içe aktar (etsy-sync; arka planda, bağlanmayı bekletmez)
+    const sync = fetch(Deno.env.get('SUPABASE_URL') + '/functions/v1/etsy-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cronSecret: Deno.env.get('CRON_SECRET') ?? '', userId }) }).catch(() => null);
+    // @ts-ignore: Supabase Edge Runtime
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(sync);
     return json({ connected: true, shopName: shop.shopName });
   } catch (err) {
     return json({ error: (err as Error).message }, 500);

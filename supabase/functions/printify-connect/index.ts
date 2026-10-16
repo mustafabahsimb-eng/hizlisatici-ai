@@ -86,6 +86,13 @@ Deno.serve(async (req) => {
       );
       if (upsertError) return json({ ok: false, error: `Kayıt hatası: ${upsertError.message}` });
 
+      // Printify'dan Etsy'ye yayınlanan ürünler Seltigo'ya anında gelsin: webhook kaydı + ilk senkron (arka planda)
+      const fx = (body: Record<string, unknown>) => fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/etsy-sync", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cronSecret: Deno.env.get("CRON_SECRET") ?? "", userId: user.id, ...body }) }).catch(() => null);
+      const bg = (async () => { await fx({ action: "printify_webhooks" }); await fx({}); })();
+      // @ts-ignore: Supabase Edge Runtime
+      if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(bg);
+
       return json({
         ok: true,
         shops: result.shops,

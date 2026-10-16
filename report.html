@@ -482,7 +482,7 @@
       let netProfit = null, marginPct = null;
       if (salePrice > 0) {
         const commissionCost = salePrice * (Number(p.commission_rate || 0) / 100);
-        netProfit = salePrice - Number(p.supplier_price || 0) - getShippingCost(p.weight_kg) - commissionCost;
+        netProfit = salePrice - Number(p.supplier_price || 0) - getShippingCost(p.weight_kg) - commissionCost - (Number(p.fixed_fee) || 0);
         marginPct = (netProfit / salePrice) * 100;
       }
       return { p, netProfit, marginPct, cur };

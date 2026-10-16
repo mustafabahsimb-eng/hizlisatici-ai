@@ -15,6 +15,7 @@
 //   { action: "listing_personalization", userId, etsyListingId, instructions, charMax?, required? } -> Etsy kişiselleştirme kutusunu aç
 //   { action: "shipping_profile_fx", userId, profileId, rate } -> Printify kargo profilini mağaza para birimine çevir
 //   { action: "listing_shipping", userId, etsyListingId } -> ilanın kargo profili
+//   { action: "set_images", userId, etsyListingId, urls[] } -> ilan görsellerini bu sırayla değiştir (önce yükle, sonra eskileri sil)
 //   { action: "us_shipping_profile", userId, title, listingIds[], sourceProfileId?, primary?, … } -> yalnız ABD kargo profili + ilanlara ata
 //   { action: "return_policy", userId, listingIds[] } -> iade / değişim yok politikası + ilanlara ata
 //   { action: "shop_texts", userId, saleMessage?, policyAdditional? } -> satış sonrası mesaj, ek politika metni
@@ -278,6 +279,27 @@ Deno.serve(async (req) => {
           } catch (e) { out.push({ id: d.shipping_profile_destination_id, error: friendly(e) }); }
         }
         return json({ ok: out.every((x) => !x.error), title: sp.title, destinations: out });
+      }
+      // İlanın görsellerini verilen sırayla değiştir (giyim görsel düzeni: kapak, düz ürün, renkler, beden tablosu).
+      // Önce yeniler yüklenir (sıra 1..n), sonra eskiler silinir: yayındaki ilan hiçbir an görselsiz kalmaz. Etsy sınırı 20 görsel.
+      if (b.action === "set_images" && b.userId && b.etsyListingId && Array.isArray(b.urls) && b.urls.length) {
+        const { ctx, shopId } = await userShop(String(b.userId)); const id = String(b.etsyListingId);
+        const base = `/shops/${shopId}/listings/${id}/images`;
+        const old = ((await etsy(ctx, "GET", `/listings/${id}/images`)).results || []).map((x: any) => x.listing_image_id);
+        const urls = b.urls.slice(0, 10).map(String);
+        // yer aç: toplam 20'yi aşacaksa fazlası önceden silinir (en az bir eski görsel kalır)
+        let extra = old.length + urls.length - 20; const removed: number[] = [];
+        while (extra-- > 0 && old.length - removed.length > 1) { const x = old[old.length - 1 - removed.length]; await etsy(ctx, "DELETE", `${base}/${x}`).catch(() => {}); removed.push(x); }
+        const added: number[] = [];
+        for (let i = 0; i < urls.length; i++) {
+          const r = await fetch(urls[i], { signal: AbortSignal.timeout(60000) });
+          if (!r.ok) return json({ ok: false, error: `görsel indirilemedi (${i + 1})`, added });
+          const fd = new FormData(); fd.append("image", await r.blob(), `image-${i + 1}.jpg`); fd.append("rank", String(i + 1));
+          const d = await etsy(ctx, "POST", base, { multipart: fd }); added.push(d.listing_image_id);
+        }
+        for (const x of old.filter((x: number) => !removed.includes(x))) await etsy(ctx, "DELETE", `${base}/${x}`).catch(() => {});
+        const now = ((await etsy(ctx, "GET", `/listings/${id}/images`)).results || []).sort((a: any, z: any) => a.rank - z.rank);
+        return json({ ok: now.length === urls.length && now.every((x: any, i: number) => x.listing_image_id === added[i]), count: now.length, images: now.map((x: any) => ({ rank: x.rank, url: x.url_570xN })) });
       }
       // Yalnız ABD'ye kargo profili (yoksa oluşturulur; başlıkla bulunur) + ilanlara atanır. Gönderim yeri kaynak profilden (Printify'ın) alınır.
       if (b.action === "us_shipping_profile" && b.userId && b.title && Array.isArray(b.listingIds)) {

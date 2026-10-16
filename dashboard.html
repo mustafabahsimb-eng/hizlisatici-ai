@@ -406,6 +406,8 @@
       'dash.bundleSelected': '📦 Paket oluştur',
       'dash.bundleNeedTwo': 'Paket yapmak için en az 2 ürün seç.',
       'dash.bundleBadge': '📦 Paket',
+      'dash.printifyBadge': 'Printify',
+      'dash.etsyGone': "Etsy'de yok",
       'dash.share': 'Paylaş',
       'dash.edit': '✏️ Ürünü düzenle',
       'dash.shareTitle': 'Sosyal medyada paylaş',
@@ -571,6 +573,8 @@
       'dash.bundleSelected': '📦 Create bundle',
       'dash.bundleNeedTwo': 'Select at least 2 products to create a bundle.',
       'dash.bundleBadge': '📦 Bundle',
+      'dash.printifyBadge': 'Printify',
+      'dash.etsyGone': 'Not on Etsy',
       'dash.share': 'Share',
       'dash.edit': '✏️ Edit product',
       'dash.shareTitle': 'Share on social media',
@@ -1003,7 +1007,7 @@
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       db.from('listings')
-        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at, prova_errors:validation->errors')
+        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at, prova_errors:validation->errors, etsy_state:validation->etsy->>state')
         .is('deleted_at', null),
       db.from('marketplaces').select('code, name'),
       db.from('shipping_rates').select('*')
@@ -1048,7 +1052,8 @@
       if (salePrice > 0) {
         const shippingCost = getShippingCost(p.weight_kg);
         const commissionCost = salePrice * (commissionRate / 100);
-        netProfit = salePrice - supplierPrice - shippingCost - commissionCost;
+        const fixedFee = Number(p.fixed_fee) || 0;   // satış başına sabit pazaryeri ücreti (Etsy: ilan + ödeme)
+        netProfit = salePrice - supplierPrice - shippingCost - commissionCost - fixedFee;
         marginPct = (netProfit / salePrice) * 100;
       }
       return { p, netProfit, marginPct, currency };
@@ -1216,7 +1221,7 @@
         <div style="display:flex; align-items:flex-start; gap:12px;">
           <input type="checkbox" class="product-checkbox" data-id="${id}" ${selectedProductIds.has(String(p.id)) ? 'checked' : ''} onchange="toggleProductSelect('${id}', this)">
           <div>
-            <div class="product-name">${esc(p.name || t('dash.unnamed'))}${p.is_bundle ? `<span class="bundle-badge">${esc(t('dash.bundleBadge'))}</span>` : ''}${p.image_missing ? `<span class="bundle-badge" style="background:#3a2f12;color:#e6c96a">${esc(t('img.missingTag'))}</span>` : ''}</div>
+            <div class="product-name">${esc(p.name || t('dash.unnamed'))}${p.is_bundle ? `<span class="bundle-badge">${esc(t('dash.bundleBadge'))}</span>` : ''}${p.image_missing ? `<span class="bundle-badge" style="background:#3a2f12;color:#e6c96a">${esc(t('img.missingTag'))}</span>` : ''}${p.supplier === 'printify' ? `<span class="bundle-badge" style="background:#1f3b34;color:#7fd8b8">${esc(t('dash.printifyBadge'))}</span>` : ''}${(listingsByProduct[String(p.id)] || []).some(l => l.marketplace_code === 'etsy' && l.etsy_state === 'removed') ? `<span class="bundle-badge" style="background:#3b1f22;color:#f2a3a3">${esc(t('dash.etsyGone'))}</span>` : ''}</div>
             ${marginPct !== null ? `<div class="product-meta">${esc(t('dash.margin', { p: HS.percent(marginPct) }))}</div>` : ''}
             <div class="channel-row">${channelChips(p)}</div>
           </div>

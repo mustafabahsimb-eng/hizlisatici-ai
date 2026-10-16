@@ -44,7 +44,10 @@ CARE
 RETURNS & EXCHANGES
 • Each sweatshirt is printed to order just for you, so we can't accept returns or exchanges for change of mind (including ordering the wrong size — please check the size chart).
 • Misprint, damage or wrong item? Send us a photo within 30 days of delivery and we'll ship a FREE replacement — use the "Problem with your order?" link in your Etsy order message.
-• Personalized items cannot be returned or exchanged."""
+• Personalized items cannot be returned or exchanged.
+
+Original design by bahsistore, created with generative design tools."""
+# Not (Mustafa, 16 Ekim 2026): yukarıdaki son satır tüm giyim (sweatshirt / tişört) ilanlarında varsayılan.
 
 def desc(hook, body): return COMMON_DESC.format(hook=hook, body=body)
 
