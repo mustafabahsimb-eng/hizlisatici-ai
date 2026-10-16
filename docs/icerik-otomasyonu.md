@@ -28,10 +28,15 @@ Paket anahtarı: `content_auto`.
 
 ## Testler
 - `tests/content/content_engine_test.ts`: planlayıcı ve öğrenme, 8/8.
-- `tests/e2e/icerik_akisi.py`:
-  - Son tam koşu: 14/14 madde geçti.
-  - Kalan adımlar (kuyruğun "paylaşıldı" olması, onaysız içeriğin atlanması) test bekleme hatası yüzünden koşmadı; hata düzeltildi.
-  - Tekrar koşu bilgisayarda bellek azlığı nedeniyle durduruldu.
+- `tests/e2e/icerik_akisi.py`: 18/18 (16 Ekim 2026). "Paylaşıldı" durumu ve onaysız içeriğin atlanması dahil.
+
+## Görsel çizimi parça parça (16 Ekim 2026)
+- Bütün haftanın görselleri tek istekte çizilince Supabase fonksiyonu işlem sınırına takılıyordu (`WORKER_RESOURCE_LIMIT`); son günler hiç oluşmuyordu.
+- Artık bir istekte en fazla 3 görsel çizilir (`RENDER_BATCH`), kalan için fonksiyon kendini yeni istekle çağırır (en fazla 25 parça).
+- Önceki parçada planlanan ürünler yeni paylaşılmış sayılır; aynı ürün art arda gelmez.
+- Saatlik iş her satıcının planını ayrı istekte başlatır.
+- Panel, `status.planning` (app_cache `content_plan:<kullanıcı>`) bitene kadar kendini yeniler; düğme "Hazırlanıyor…" kalır.
+- Asistan bildirimi plan tamamlanınca bir kez gider.
 
 ## Henüz yok (İ3 / İ4, yol haritasında)
 - Kısa video: ücretli servis gerekir (Shotstack / Creatomate); varsayılan kapalı.

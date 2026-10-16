@@ -80,6 +80,8 @@ def main():
             t0 = time.time()
             page.click("#planBtn")
             page.wait_for_selector(".item", timeout=240000)
+            # Görseller parça parça hazırlanır: düğme "Planı şimdi oluştur"a dönene kadar bekle
+            page.wait_for_function("() => { const b = document.getElementById('planBtn'); return b && !b.disabled; }", timeout=300000)
             took = time.time() - t0
             items = page.evaluate("async () => (await HS.db.from('content_items').select('*').order('scheduled_at')).data")
             posts = [i for i in items if i["kind"] == "post"]; stories = [i for i in items if i["kind"] == "story"]

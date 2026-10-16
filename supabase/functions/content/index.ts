@@ -5,6 +5,8 @@
 //   { action: "plan" }                         -> önümüzdeki 7 günü planla (var olanlar korunur)
 //   { action: "approve", id | all: true }      { action: "skip", id }   { action: "caption", id, caption }   { action: "publish_now", id }
 // Sistem (CRON_SECRET; saatlik): { action: "run" } -> açık satıcılara plan, zamanı gelenleri paylaş, sonuç ve etkileşim oku
+//   { action: "plan", userId, hop } -> planın devamı. Görsel çizimi ağır: tek istekte en fazla RENDER_BATCH görsel çizilir,
+//   kalan için fonksiyon kendini yeni bir istekle çağırır (her istek yeni işlem sınırı; tek istekte hepsi WORKER_RESOURCE_LIMIT verir)
 // Paylaşım: Instagram -> social_posts kuyruğu (instagram-worker); Facebook Sayfası -> doğrudan Graph API
 // Varsayılan KAPALI (content_settings.enabled). Yeni içerik varsayılan onaya düşer. Paket anahtarı: content_auto
 // =========================================================
@@ -14,6 +16,7 @@ import { type CProduct, type ContentSettings, fallbackCaption, learn, planWeek, 
 import { render } from "../_shared/content-render.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const FB_GRAPH = "https://graph.facebook.com/v21.0", IG_GRAPH = "https://graph.instagram.com/v23.0";
@@ -86,7 +89,22 @@ async function renderAndStore(userId: string, it: PlanItem, prods: Map<number, C
   return db.storage.from("content-media").getPublicUrl(path).data.publicUrl;
 }
 
-async function plan(userId: string, opts: { renderLimit?: number } = {}) {
+const RENDER_BATCH = 3, MAX_HOPS = 25;
+function background(p: Promise<unknown>) {
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(p.catch((e) => console.error("content", String(e))));
+}
+// Planın devamını yeni istekte başlat (kendi kendini zincirler)
+function planLater(userId: string, hop: number) {
+  background(fetch(`${SUPABASE_URL}/functions/v1/content`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_KEY}`, apikey: ANON_KEY },
+    body: JSON.stringify({ action: "plan", userId, hop, cronSecret: CRON_SECRET }),
+  }).then((r) => r.body?.cancel()));
+}
+
+async function plan(userId: string, opts: { hop?: number } = {}) {
+  const hop = opts.hop ?? 0;
   if (!(await featureEnabled(userId, "content_auto"))) return { ok: false, error: FEATURE_OFF_MSG };
   const s = await settingsFor(userId);
   const chs = await channelsFor(userId);
@@ -96,11 +114,19 @@ async function plan(userId: string, opts: { renderLimit?: number } = {}) {
   const prods = await productsFor(userId);
   if (!prods.length) return { ok: false, error: "Mağazada paylaşılacak ürün yok" };
   const now = Date.now();
-  const { data: taken } = await db.from("content_items").select("scheduled_at, channel, kind").eq("user_id", userId).gte("scheduled_at", new Date(now).toISOString()).neq("status", "skipped");
+  const { data: taken } = await db.from("content_items").select("scheduled_at, channel, kind, product_ids").eq("user_id", userId).gte("scheduled_at", new Date(now).toISOString()).neq("status", "skipped");
   const weekStart = new Date(now).toISOString().slice(0, 10);   // bugünden itibaren 7 gün
-  const items = planWeek({ settings, products: prods, stats: await statsFor(userId, settings.timezone), weekStart, now, seed: Math.floor(now / 3600000),
+  // Önceki parçalarda planlanmış ürünler yeni paylaşılmış sayılır (aynı ürün art arda gelmesin)
+  const plannedIds = new Set((taken || []).flatMap((t: any) => t.product_ids || []));
+  for (const p of prods) if (plannedIds.has(p.id)) p.lastPostedAt = new Date(now).toISOString();
+  const all = planWeek({ settings, products: prods, stats: await statsFor(userId, settings.timezone), weekStart, now, seed: Math.floor(now / 3600000),
     taken: (taken || []).map((t: any) => ({ scheduledAt: t.scheduled_at, channel: t.channel, kind: t.kind })) });
-  if (!items.length) return { ok: true, created: 0 };
+  if (!all.length) return { ok: true, created: 0, done: true };
+  // Bu istekte çizilecek parça: ilk RENDER_BATCH görsel (aynı slottaki kanallar aynı görseli paylaşır)
+  const keyOf = (it: PlanItem) => `${it.kind}|${it.template}|${it.scheduledAt}|${it.productIds.join(",")}`;
+  const keys = new Set<string>();
+  const items = all.filter((it) => { const k = keyOf(it); if (keys.has(k)) return true; if (keys.size >= RENDER_BATCH) return false; keys.add(k); return true; });
+  const more = items.length < all.length;
   const byId = new Map(prods.map((p) => [p.id, p]));
   const { data: ss } = await db.from("store_settings").select("store_name, business_name").eq("user_id", userId).maybeSingle();
   const store = ss?.business_name || ss?.store_name || "Mağazam";
@@ -109,10 +135,9 @@ async function plan(userId: string, opts: { renderLimit?: number } = {}) {
   // Aynı slotta (kanal farkı) aynı görsel kullanılır
   const mediaCache = new Map<string, string>();
   let created = 0, errors: string[] = [];
-  const limit = opts.renderLimit ?? 40;
-  for (let i = 0; i < items.length && created < limit; i++) {
+  for (let i = 0; i < items.length; i++) {
     const it = items[i];
-    const key = `${it.kind}|${it.template}|${it.scheduledAt}|${it.productIds.join(",")}`;
+    const key = keyOf(it);
     try {
       if (!mediaCache.has(key)) mediaCache.set(key, await renderAndStore(userId, it, byId, store));
       await db.from("content_items").insert({ user_id: userId, channel: it.channel, kind: it.kind, template: it.template, product_ids: it.productIds, reason: it.reason, caption: caps[i] || null,
@@ -120,8 +145,17 @@ async function plan(userId: string, opts: { renderLimit?: number } = {}) {
       created++;
     } catch (e) { errors.push(short((e as Error).message, 120)); }
   }
-  if (created && settings.approval_mode !== "direct") await db.rpc("assistant_enqueue", { p_user: userId, p_kind: "content", p_payload: { count: created }, p_dedupe: "content:" + weekStart });
-  return { ok: true, created, errors: errors.slice(0, 5) };
+  // Kalan görseller: yeni istekte devam (bu parçada hiç içerik oluşmadıysa döngüye girmemek için durur)
+  const continuing = more && created > 0 && hop < MAX_HOPS;
+  if (continuing) planLater(userId, hop + 1);
+  // Panel planın sürdüğünü buradan görür (status.planning)
+  await db.from("app_cache").upsert({ key: `content_plan:${userId}`, value: { running: continuing, at: nowIso() }, updated_at: nowIso() });
+  // Asistan bildirimi plan tamamlanınca bir kez (hazırlanan toplam içerik sayısıyla)
+  if (!continuing && settings.approval_mode !== "direct") {
+    const { count } = await db.from("content_items").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending_approval").gte("scheduled_at", new Date(now).toISOString());
+    if (count) await db.rpc("assistant_enqueue", { p_user: userId, p_kind: "content", p_payload: { count }, p_dedupe: "content:" + weekStart });
+  }
+  return { ok: true, created, continuing, done: !continuing, errors: errors.slice(0, 5) };
 }
 
 // ---------- Paylaşım ----------
@@ -209,7 +243,8 @@ async function run() {
     if (Date.now() > deadline) break;
     const { count } = await db.from("content_items").select("id", { count: "exact", head: true }).eq("user_id", u.user_id).gte("scheduled_at", nowIso()).lte("scheduled_at", new Date(Date.now() + 3 * 86400000).toISOString()).neq("status", "skipped");
     if (count) continue;
-    try { planned.push({ userId: u.user_id, ...(await plan(u.user_id, { renderLimit: 20 })) }); } catch (e) { planned.push({ userId: u.user_id, error: short((e as Error).message) }); }
+    planLater(u.user_id, 0);   // her satıcının planı kendi isteğinde (görsel çizimi işlem sınırına takılmasın)
+    planned.push(u.user_id);
   }
   out.planned = planned;
   return out;
@@ -222,7 +257,10 @@ async function status(userId: string) {
     .lte("scheduled_at", new Date(Date.now() + 14 * 86400000).toISOString()).order("scheduled_at").limit(200);
   const stats = await statsFor(userId, s.timezone);
   const best = [...stats].filter((x) => x.n >= 2).sort((a, b) => b.engagement - a.engagement)[0] || null;
-  return { ok: true, settings: s, channels: chs.map((c: any) => ({ platform: c.platform, name: c.account_name, status: c.token_status })), items: items || [], best };
+  // Plan parça parça hazırlanıyor mu (son parça 3 dk içinde ve devam edecek)
+  const { data: pc } = await db.from("app_cache").select("value").eq("key", `content_plan:${userId}`).maybeSingle();
+  const planning = !!pc?.value?.running && Date.now() - Date.parse(pc.value.at) < 3 * 60000;
+  return { ok: true, settings: s, channels: chs.map((c: any) => ({ platform: c.platform, name: c.account_name, status: c.token_status })), items: items || [], best, planning };
 }
 
 async function itemAction(userId: string, b: any) {
@@ -246,7 +284,7 @@ async function itemAction(userId: string, b: any) {
 
 async function sellerAction(userId: string, b: any) {
   if (b.action === "status") return await status(userId);
-  if (b.action === "plan") return await plan(userId);
+  if (b.action === "plan") return await plan(userId, { hop: Number(b.hop) || 0 });
   if (["approve", "skip", "caption", "publish_now"].includes(b.action)) return await itemAction(userId, b);
   return { ok: false, error: "Geçersiz işlem" };
 }
