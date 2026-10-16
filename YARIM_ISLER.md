@@ -27,6 +27,7 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
 
 ## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
+- İçerik otomasyonu adları: menü "🗓️ İçerik Takvimi"; "Otomatik içerik", "Günde gönderi", "Haftada hikâye", "Paylaşım saati", "Kanallar", "Yayından önce onayıma sun", "Planı şimdi oluştur", "Hepsini onayla", "Onayla", "Atla", "Metni düzenle", "Şimdi paylaş", "Gönderiyi aç"; şablonlar Ürün fotoğrafı / Fiyat etiketi / Kolaj / Özel gün / Hikâye; durumlar Onay bekliyor / Zamanlandı / Paylaşılıyor / Paylaşıldı / Hata / Atlandı. Varsayılan: kapalı, günde 1, haftada 3 hikâye, 19:30, onay açık.
 - Seltigo Ads: sandbox hesabı yerine kişisel reklam hesabında para harcamayan "duraklatılmış aç → doğrula → sil" denemesi; kampanyada setler arası bütçe paylaşımı kapalı.
 
 ---
