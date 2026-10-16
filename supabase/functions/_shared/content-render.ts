@@ -14,10 +14,19 @@ async function font(k: keyof typeof FONT_URLS) {
   if (!fontCache.has(k)) fontCache.set(k, new Uint8Array(await (await fetch(FONT_URLS[k], { signal: AbortSignal.timeout(20000) })).arrayBuffer()));
   return fontCache.get(k)!;
 }
+// Ürün görseli: önce JPEG / PNG istenir; WebP / AVIF gelirse (imagescript açamaz) ücretsiz dönüştürücüyle JPEG'e çevrilir
 async function photo(url: string): Promise<Image> {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; Seltigo/1.0)" }, signal: AbortSignal.timeout(30000) });
-  if (!r.ok) throw new Error(`Görsel indirilemedi (${r.status})`);
-  return await Image.decode(new Uint8Array(await r.arrayBuffer())) as Image;
+  const get = async (u: string) => {
+    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (compatible; Seltigo/1.0)", Accept: "image/jpeg,image/png;q=0.9,image/*;q=0.5" }, signal: AbortSignal.timeout(30000) });
+    if (!r.ok) throw new Error(`Görsel indirilemedi (${r.status})`);
+    return new Uint8Array(await r.arrayBuffer());
+  };
+  let bytes = await get(url);
+  try { return await Image.decode(bytes) as Image; }
+  catch (_) {
+    bytes = await get(`https://wsrv.nl/?url=${encodeURIComponent(url)}&output=jpg&w=1600`);
+    return await Image.decode(bytes) as Image;
+  }
 }
 async function text(s: string, size: number, color: number, maxWidth: number, bold = true) {
   return await Image.renderText(await font(bold ? "bold" : "reg"), size, s, color, new TextLayout({ maxWidth, wrapStyle: "word", verticalAlign: "left", horizontalAlign: "top" }));
