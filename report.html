@@ -567,10 +567,16 @@
 
     // Ürünler (silinenler hariç; deleted_at yoksa eski sorgu)
     try {
-      let r = await db.from('products').select('*').eq('user_id', currentUserId).is('deleted_at', null).order('created_at', { ascending: false });
-      if (r.error) r = await db.from('products').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false });
-      if (r.error) throw r.error;
-      products = r.data || [];
+      // Supabase bir sorguda en fazla 1000 satır döndürür: sayfa sayfa hepsini al (panel toplamlarıyla aynı sonuç)
+      const all = [];
+      for (let from = 0; ; from += 1000) {
+        const r = await db.from('products').select('*').eq('user_id', currentUserId).is('deleted_at', null).is('merged_into', null)
+          .order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, from + 999);
+        if (r.error) throw r.error;
+        all.push(...(r.data || []));
+        if ((r.data || []).length < 1000) break;
+      }
+      products = all;
       products.forEach(p => { productMap[p.id] = p; });
       const sr = await db.from('shipping_rates').select('*');
       shippingRates = sr.data || [];

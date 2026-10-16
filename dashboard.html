@@ -998,17 +998,31 @@
     await loadProducts();
   }
 
+  // Supabase bir sorguda en fazla 1000 satır döndürür: sabit sırayla sayfa sayfa hepsini çek
+  async function fetchAll(build) {
+    const all = []; const size = 1000;
+    for (let from = 0; ; from += size) {
+      const res = await build().range(from, from + size - 1);
+      if (res.error) return res;
+      all.push(...(res.data || []));
+      if (!res.data || res.data.length < size) return { data: all, error: null };
+    }
+  }
+
   async function loadProducts() {
     const [prodRes, listRes, mkRes, shipRes] = await Promise.all([
-      db.from('products')
+      fetchAll(() => db.from('products')
         .select('*')
         .eq('user_id', HS.user.id)
         .is('merged_into', null)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false }),
-      db.from('listings')
-        .select('product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at, prova_errors:validation->errors, etsy_state:validation->etsy->>state')
-        .is('deleted_at', null),
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })),
+      fetchAll(() => db.from('listings')
+        .select('id, product_id, marketplace_code, status, last_synced_at, last_sync_error, updated_at, prova_errors:validation->errors, etsy_state:validation->etsy->>state')
+        .eq('user_id', HS.user.id)
+        .is('deleted_at', null)
+        .order('id')),
       db.from('marketplaces').select('code, name'),
       db.from('shipping_rates').select('*')
     ]);

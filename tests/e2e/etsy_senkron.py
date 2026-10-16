@@ -19,9 +19,11 @@ r = rows(sql(f"""insert into public.products (user_id, name, sale_price, supplie
 values ('{uid}', 'E2E Printify Sweatshirt', 2073.99, 'printify', 1358.49, 9.5, 22.24, 'TRY', 'etsy', 'etsy', '{TAG}-1', 'physical', false),
        ('{uid}', 'E2E Etsy Removed Item', 249, null, null, 9.5, 22.24, 'TRY', 'etsy', 'etsy', '{TAG}-2', 'digital', false) returning id;"""))
 p1, p2 = r[0]["id"], r[1]["id"]
-sql(f"""insert into public.listings (user_id, product_id, marketplace_code, currency, title, price, status, external_listing_id, attributes, validation) values
-('{uid}', {p1}, 'etsy', 'TRY', 'E2E Printify Sweatshirt', 2073.99, 'published', '{TAG}-1', '{{"managed_by":"printify","e2e":"{TAG}"}}', '{{"etsy":{{"state":"active"}}}}'),
-('{uid}', {p2}, 'etsy', 'TRY', 'E2E Etsy Removed Item', 249, 'published', '{TAG}-2', '{{"managed_by":"etsy","e2e":"{TAG}"}}', '{{"etsy":{{"state":"removed"}}}}');""")
+for _ in range(4):  # veritabanı aracı ara sıra boş döner: ilanlar eklenene kadar dene
+    sql(f"""insert into public.listings (user_id, product_id, marketplace_code, currency, title, price, status, external_listing_id, attributes, validation) values
+    ('{uid}', {p1}, 'etsy', 'TRY', 'E2E Printify Sweatshirt', 2073.99, 'published', '{TAG}-1', '{{"managed_by":"printify","e2e":"{TAG}"}}', '{{"etsy":{{"state":"active"}}}}'),
+    ('{uid}', {p2}, 'etsy', 'TRY', 'E2E Etsy Removed Item', 249, 'published', '{TAG}-2', '{{"managed_by":"etsy","e2e":"{TAG}"}}', '{{"etsy":{{"state":"removed"}}}}');""")
+    if int(rows(sql(f"select count(*) n from public.listings where user_id = '{uid}' and attributes->>'e2e' = '{TAG}';"))[0]['n']) == 2: break
 jobs = rows(sql(f"select count(*) n from public.sync_jobs where user_id = '{uid}' and created_at > now() - interval '2 minutes';"))[0]["n"]
 c.check("içe aktarılan ilan gönderim kuyruğuna girmez", int(jobs) == 0, f"{jobs} iş")
 try:
