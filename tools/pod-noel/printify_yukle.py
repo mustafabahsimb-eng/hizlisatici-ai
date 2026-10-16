@@ -15,7 +15,7 @@ import argparse, base64, json, math, os, sys, time, urllib.error, urllib.request
 from pathlib import Path
 D = Path(__file__).parent
 sys.path.insert(0, str(D)); sys.path.insert(0, str(D.parent / "etsy-mockup"))
-from pricing import PRICE_TRY, choose, price_try, to_try
+from pricing import choose, to_try
 from syscall import sql, rows, call
 ROOT = Path(os.environ["LOCALAPPDATA"]) / "seltigo-pod"; DES = ROOT / "designs"; STATE = ROOT / "durum.json"
 UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"  # Mustafa (bahsistore)
@@ -144,18 +144,16 @@ def hazirla(a):
     write_report(st, col); print("Bitti. Önizleme:", ROOT / "onizleme_gercek.html")
 
 def price_variants(prod, ship, G, col, cur, rate):
-    """Gerçek Printify ürün maliyeti + ABD kargo -> TL mağazada bant fiyatı (pricing.PRICE_TRY; temkinli hesapta zarar yoksa),
-    diğerlerinde pricing.choose (net en az 10 $, ,99) -> mağaza para birimi."""
+    """Gerçek Printify ürün maliyeti + ABD kargo -> pricing.choose (net en az 10 $, ,99) -> mağaza para birimi (TL ,99)."""
     prices, rep = [], {}
     for v in prod["variants"]:
         if not v.get("is_enabled", True): continue
         c, sh = v["cost"] / 100, ship.get(v["id"], col["garment"]["est_shipping_us"])
         parts = [x.strip() for x in v["title"].split("/")]  # Printify: "S / Light Pink"
         size = next((x for x in parts if x in G["sizes"]), parts[0])
-        if cur == "TRY" and size in PRICE_TRY: r = price_try(size, c, sh, rate); local = r["price_local"]
-        else: r = choose(c, sh); local = r["price"] if cur == "USD" else to_try(r["price"], rate)
+        r = choose(c, sh); local = r["price"] if cur == "USD" else to_try(r["price"], rate)
         prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
-        if c >= rep.get(size, {}).get("cost", 0): rep[size] = {**r, "price_local": local, "currency": cur}  # renkler arasında en yüksek maliyet
+        if c >= rep.get(size, {}).get("cost", 0): rep[size] = {**r, "price_local": local, "currency": cur, "rate": rate}  # renkler arasında en yüksek maliyet
     return prices, rep
 
 def tasarim_yukle(pf, shop_id, k, S):
@@ -190,7 +188,15 @@ def guncelle(a):
     ilanını günceller; sonrasında ilan numarasının aynı kaldığı doğrulanır, değiştiyse durur."""
     col = json.loads((D / "collection.json").read_text(encoding="utf-8")); G = col["garment"]; items = {it["key"]: it for it in col["items"]}
     st = load_state(); pf = PF(bahsistore_token()); shop = st["shop"]
-    ship = us_shipping(pf, st["blueprint"]["id"], st["provider"]["id"])  # kayıtlı üretici (tüm kataloğu taramaz; Printify katalog sınırı)
+    try:
+        ship = us_shipping(pf, st["blueprint"]["id"], st["provider"]["id"]); st["us_shipping"] = {str(k): v for k, v in ship.items()}; save_state(st)
+    except RuntimeError as e:  # Printify katalog sınırı (429): son kaydedilen kargo tablosu
+        if " 429 " not in str(e): raise
+        if st.get("us_shipping"): ship = {int(k): v for k, v in st["us_shipping"].items()}
+        else:  # ilk kez: önceki fiyat hesabındaki en yüksek ABD kargosu (tüm bedenlerde aynı tarife)
+            last = max(r["ship"] for S in st["products"].values() for r in (S.get("pricing") or {}).values())
+            ship = type("Ship", (dict,), {"get": lambda self, k, d=None: last})()
+        print("Printify katalog sınırı: kayıtlı ABD kargosu kullanıldı", flush=True)
     cur = a.currency.upper(); rate = usd_rate(cur); hl = holiday_line()
     flags = {"title": bool(a.metin), "description": True, "images": False, "variants": True, "tags": bool(a.metin), "keyFeatures": False, "shipping_template": False}
     for k, S in st["products"].items():

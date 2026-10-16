@@ -28,7 +28,7 @@ Kişiselleştirilmemiş ve tümü Seltigo POD ürünü olan bekleyen siparişler
 - bahsistore için: `tools/etsy-mockup/kapak_uygula.py` (25 kapak) ve `organize.py` (bölümler + 5 set öne çıkan).
 
 ## 16 Ekim 2026 kararları (Mustafa)
-- **Fiyat (aynı akşam değişti, aşağıya bak):** her satıştan net en az 10 $; Offsite Ads kapalı (hesaba katılmaz). net = fiyat − fiyat × %9,5 − 0,45 $ − Printify ürün − ABD kargo; ,99 ile biter. Mağaza TL: `to_try` ile ,99 TL. Uygulama: `printify_yukle.py guncelle` (yayındaki ilanlarda yalnız fiyat + açıklama Etsy'ye gider).
+- **Fiyat (KALICI; CLAUDE.md, Mustafa açıkça söylemeden değişmez):** her satıştan net en az 10 $, indirim / kampanya yok; Offsite Ads kapalı (hesaba katılmaz). net = fiyat − fiyat × %9,5 − 0,45 $ − Printify ürün − ABD kargo; ,99 ile biter. Mağaza TL: `to_try` ile ,99 TL. Uygulama: `printify_yukle.py guncelle` (yayındaki ilanlarda yalnız fiyat + açıklama Etsy'ye gider).
 - **Üretici:** SwiftPOD (Gildan 18000).
 - **Kargo:** sweatshirt'ler yalnız ABD'ye, ücretsiz ("Sweatshirts - US only - Free shipping", etsy-listings `us_shipping_profile`). Printify'ın kendi profili kurla düzeltildi (`shipping_profile_fx`): Printify tutarları mağaza para birimine çevirmeden yazar.
 - **İade:** fikir değiştirme iadesi / değişim yok (Etsy iade politikası `return_policy`); kusur, hasar, yanlış ürün fotoğrafla bildirilirse ücretsiz yeniden gönderim; isimli ürün iade edilmez. Metin ilan açıklamasında ve satış sonrası mesajda. Etsy, ek mağaza politikası metnini (policy_additional) bu mağazada kabul etmiyor ("EU Terms").
@@ -39,13 +39,13 @@ Kişiselleştirilmemiş ve tümü Seltigo POD ürünü olan bekleyen siparişler
 ## 16 Ekim 2026 akşam: toplu düzenleme (Mustafa)
 - **Kural: Etsy'de yeni ilan / kopya / sil-yükle YOK** (her ilan ücretli). Printify ürünü güncellenir, mevcut Etsy ilanına yayınlanır; `printify_yukle.py guncelle` yayın bitince ilan numarasını karşılaştırır, değiştiyse DURUR.
   `guncelle [--metin] [--tasarim] [--yayinlama-yok] --only kod,...`: fiyat + açıklama (her zaman), başlık + etiket (`--metin`), baskı dosyası (`--tasarim`). Görsel ve kargo profiline dokunmaz.
-- **Fiyat (önceki "net ≥ 10 $" kuralının yerine):** TL bant fiyatı `pricing.PRICE_TRY`: S–XL 1.749,99 · 2XL 1.899,99 · 3XL 1.949,99 TL. Koşul: temkinli %17 Etsy kesintisiyle de zarar yok (`price_try` aksi hâlde hata verir).
+- **Fiyat:** aynı akşam denenen ~%16 indirimli TL bant fiyatı Mustafa'nın isteğiyle GERİ ALINDI; geçerli kural yukarıdaki net ≥ 10 $.
 - **"Most Likely To" tasarımı:** yazı bloğu baskı alanının %93'ü (göğsün ~%60'ı; Printify baskı alanı daha genişine izin vermiyor). Koyu giysilerde (Black, Forest Green) krem yazı + kırmızı gölge + altın başlık; holly aynı. 4500×5400, 300 DPI şeffaf PNG (`designs.py`).
 - **Başlık / etiket:** ilk 40 karakter "Most Likely To Christmas Sweatshirt", başlıkta "Matching Family Christmas Sweatshirt", ≤140; 13 etiket, tekrar yok (`collection.py`).
 - **Grup görseli:** "Matching Family Christmas Sweatshirts" kolajı (4 ürün, 4 renk; `gorseller.group_image`) serideki her ilanda 2. görsel (seride 5 görsel).
 - **Noel teslim satırı:** "Order by December 10 for delivery before Christmas (US)." açıklamanın en üstünde (season-calendar → etsy-listings `holiday_notice`; mağaza duyurusunda da). Tarih `app_cache printify_holiday_deadline:2026` = satıcı tarihi (`source: satici`); Printify resmi tarih açıklarsa onunki geçer. `guncelle` satırı Printify açıklamasının başına da koyar (yayın ezmesin).
 - **Mama kişiselleştirme talimatı:** "Please enter the names (max 4), separated by commas."
-- **Dijital "Set of 4 Stoic Quote Prints" (5 renk):** 599 → 379 TL (etsy-listings `listing_price`, ilan numarası aynı). Seltigo'da `products.sale_price` 379; `listings.price` 599 kaldı (değişirse Etsy'ye yeniden gönderim tetiklenir).
+- **Dijital "Set of 4 Stoic Quote Prints" (5 renk):** 599 TL (kısa süre 379 TL denendi, geri alındı). Tek fiyatlı ilan fiyatı: etsy-listings `listing_price` (ilan numarası aynı).
 
 ## Giyim ilanı görsel düzeni (16 Ekim 2026; tüm sweatshirt / tişört ilanlarında varsayılan)
 `tools/pod-noel/gorseller.py` — `printify_yukle.py yayinla` yayından hemen sonra kendiliğinden uygular (`varsayilan`):
