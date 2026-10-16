@@ -33,8 +33,8 @@ Deno.test("bugünü kapsayan pencere", () => {
 });
 Deno.test("Noel teslim satırı", () => {
   assertEquals(m.holidayLine(null, "2026-11-01", "2026-12-26"), null);
-  assertEquals(m.holidayLine("2026-12-10", "2026-11-01", "2026-12-26"), "🎄 Order by December 10 for Christmas delivery in the US.");
-  assertEquals(m.holidayLine("2026-12-10", "2026-12-10", "2026-12-26"), "🎄 Order by December 10 for Christmas delivery in the US.");
+  assertEquals(m.holidayLine("2026-12-10", "2026-11-01", "2026-12-26"), "Order by December 10 for delivery before Christmas (US).");
+  assertEquals(m.holidayLine("2026-12-10", "2026-12-10", "2026-12-26"), "Order by December 10 for delivery before Christmas (US).");
   assertEquals(m.holidayLine("2026-12-10", "2026-12-11", "2026-12-26"), "⚠️ Orders placed now may arrive after Christmas.");
   assertEquals(m.holidayLine("2026-12-10", "2026-12-26", "2026-12-26"), null);
 });
@@ -44,6 +44,9 @@ Deno.test("açıklamada satır değiştirilir, metin korunur", async () => {
   const base = "Most likely to eat all the cookies?\n\nPRODUCT DETAILS\n• Gildan 18000";
   const a = e.withHolidayLine(base, "🎄 Order by December 10 for Christmas delivery in the US.");
   assertEquals(a.split("\n")[0], "🎄 Order by December 10 for Christmas delivery in the US.");
+  const n = e.withHolidayLine(a, "Order by December 10 for delivery before Christmas (US).");  // eski biçim yenisiyle değişir
+  assertEquals(n, "Order by December 10 for delivery before Christmas (US).\n\n" + base);
+  assertEquals(e.withHolidayLine(n, "Order by December 8 for delivery before Christmas (US).").split("\n")[0], "Order by December 8 for delivery before Christmas (US).");
   const b = e.withHolidayLine(a, "⚠️ Orders placed now may arrive after Christmas.");
   assertEquals(b, "⚠️ Orders placed now may arrive after Christmas.\n\n" + base);
   assertEquals(e.withHolidayLine(b, null), base);

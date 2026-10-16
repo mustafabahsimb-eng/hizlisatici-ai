@@ -15,7 +15,7 @@ import argparse, base64, json, math, os, sys, time, urllib.error, urllib.request
 from pathlib import Path
 D = Path(__file__).parent
 sys.path.insert(0, str(D)); sys.path.insert(0, str(D.parent / "etsy-mockup"))
-from pricing import choose, to_try
+from pricing import PRICE_TRY, choose, price_try, to_try
 from syscall import sql, rows, call
 ROOT = Path(os.environ["LOCALAPPDATA"]) / "seltigo-pod"; DES = ROOT / "designs"; STATE = ROOT / "durum.json"
 UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"  # Mustafa (bahsistore)
@@ -81,6 +81,14 @@ def pick_provider(pf, bp_id, G, force=None):
             for vid in prof.get("variant_ids", []): us[vid] = prof["first_item"]["cost"] / 100
     return p, variants, us, [c[1]["title"] for c in cands]
 
+def us_shipping(pf, bp_id, prov_id):
+    """Varyant başına ABD ilk ürün kargosu (USD)."""
+    ship = pf("GET", f"/catalog/blueprints/{bp_id}/print_providers/{prov_id}/shipping.json"); us = {}
+    for prof in ship.get("profiles", []):
+        if "US" in prof.get("countries", []):
+            for vid in prof.get("variant_ids", []): us[vid] = prof["first_item"]["cost"] / 100
+    return us
+
 def upload(pf, path):
     return pf("POST", "/uploads/images.json", {"file_name": path.name, "contents": base64.b64encode(path.read_bytes()).decode()})
 
@@ -136,34 +144,71 @@ def hazirla(a):
     write_report(st, col); print("Bitti. Önizleme:", ROOT / "onizleme_gercek.html")
 
 def price_variants(prod, ship, G, col, cur, rate):
-    """Gerçek Printify ürün maliyeti + ABD kargo -> pricing.choose (net en az 10 $, ,99) -> mağaza para birimi (TL ,99)."""
+    """Gerçek Printify ürün maliyeti + ABD kargo -> TL mağazada bant fiyatı (pricing.PRICE_TRY; temkinli hesapta zarar yoksa),
+    diğerlerinde pricing.choose (net en az 10 $, ,99) -> mağaza para birimi."""
     prices, rep = [], {}
     for v in prod["variants"]:
         if not v.get("is_enabled", True): continue
         c, sh = v["cost"] / 100, ship.get(v["id"], col["garment"]["est_shipping_us"])
-        r = choose(c, sh); local = r["price"] if cur == "USD" else to_try(r["price"], rate)
-        prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
         parts = [x.strip() for x in v["title"].split("/")]  # Printify: "S / Light Pink"
         size = next((x for x in parts if x in G["sizes"]), parts[0])
+        if cur == "TRY" and size in PRICE_TRY: r = price_try(size, c, sh, rate); local = r["price_local"]
+        else: r = choose(c, sh); local = r["price"] if cur == "USD" else to_try(r["price"], rate)
+        prices.append({"id": v["id"], "price": int(round(local * 100)), "is_enabled": True})
         if c >= rep.get(size, {}).get("cost", 0): rep[size] = {**r, "price_local": local, "currency": cur}  # renkler arasında en yüksek maliyet
     return prices, rep
 
+def tasarim_yukle(pf, shop_id, k, S):
+    """Yeniden üretilen baskı dosyalarını (designs.py) Printify'a yükler ve ürünün ön baskı alanını değiştirir.
+    Açık giysiler 'dark', koyu giysiler (Black / Forest Green) 'light' mürekkepli dosyayı kullanır; Etsy ilanı aynı kalır (yayın = güncelleme)."""
+    ups = {ink: upload(pf, DES / f"{k}_{ink}.png") for ink in ("dark", "light")}
+    S["uploads"].update({ink: {"id": r["id"], "url": r.get("preview_url")} for ink, r in ups.items()})
+    prod = pf("GET", f"/shops/{shop_id}/products/{S['product_id']}.json")
+    dark = set(S["dark_variant_ids"]); vids = [v["id"] for v in prod["variants"]]  # Printify tüm kalıp varyantlarını ister (kapalılar dahil)
+    img = lambda ink: [{"id": S["uploads"][ink]["id"], "x": 0.5, "y": 0.5, "scale": 1, "angle": 0}]
+    return [{"variant_ids": [v for v in vids if v not in dark], "placeholders": [{"position": "front", "images": img("dark")}]},
+            {"variant_ids": [v for v in vids if v in dark], "placeholders": [{"position": "front", "images": img("light")}]}]
+
+def publish_wait(pf, shop_id, pid, timeout=900):
+    """Printify yayını bitene kadar bekler (ürün kilidi kalkınca); Etsy ilan numarasını döndürür (değişmemeli)."""
+    time.sleep(15); t0 = time.time()
+    while time.time() - t0 < timeout:
+        p = pf("GET", f"/shops/{shop_id}/products/{pid}.json")
+        if not p.get("is_locked"): return str((p.get("external") or {}).get("id") or "")
+        time.sleep(10)
+    raise RuntimeError(f"{pid}: Printify yayını {timeout} sn'de bitmedi")
+
+def holiday_line():
+    """season-calendar'ın ilanlara yazdığı güncel Noel teslim satırı (app_cache). Printify yayını açıklamayı ezdiği için başa eklenir."""
+    r = rows(sql(f"select value->>'line' line from public.app_cache where key like {q('holiday_notice:' + UID + ':%')} order by updated_at desc limit 1;"))
+    return (r[0].get("line") or None) if r else None
+
 def guncelle(a):
-    """Fiyat (pricing.py) ve açıklamayı (collection.json) Printify'a yazar; yayındaki ürünlerde yalnız fiyat + açıklama Etsy'ye gider
-    (başlık, görsel, etiket ve kargo profiline dokunulmaz)."""
+    """Fiyat (pricing.py) ve açıklamayı (collection.json) Printify'a yazar; yayındaki ürünlerde fiyat + açıklama Etsy'ye gider.
+    --metin: başlık + etiketler de; --tasarim: baskı dosyaları yeniden yüklenir (designs.py çıktısı).
+    Görsellere ve kargo profiline dokunulmaz (Etsy görselleri gorseller.py ile yönetilir). YENİ İLAN AÇILMAZ: Printify yayını mevcut Etsy
+    ilanını günceller; sonrasında ilan numarasının aynı kaldığı doğrulanır, değiştiyse durur."""
     col = json.loads((D / "collection.json").read_text(encoding="utf-8")); G = col["garment"]; items = {it["key"]: it for it in col["items"]}
     st = load_state(); pf = PF(bahsistore_token()); shop = st["shop"]
-    _, _, ship, _ = pick_provider(pf, st["blueprint"]["id"], G, st["provider"]["title"])
-    cur = a.currency.upper(); rate = usd_rate(cur)
-    flags = {"title": False, "description": True, "images": False, "variants": True, "tags": False, "keyFeatures": False, "shipping_template": False}
+    ship = us_shipping(pf, st["blueprint"]["id"], st["provider"]["id"])  # kayıtlı üretici (tüm kataloğu taramaz; Printify katalog sınırı)
+    cur = a.currency.upper(); rate = usd_rate(cur); hl = holiday_line()
+    flags = {"title": bool(a.metin), "description": True, "images": False, "variants": True, "tags": bool(a.metin), "keyFeatures": False, "shipping_template": False}
     for k, S in st["products"].items():
         if a.only and k not in a.only.split(","): continue
-        prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
+        it = items[k]; prod = pf("GET", f"/shops/{shop['id']}/products/{S['product_id']}.json")
+        before = str((prod.get("external") or {}).get("id") or "")
         prices, rep = price_variants(prod, ship, G, col, cur, rate)
-        pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", {"variants": prices, "description": items[k]["description"]})
-        if S.get("published"): pf("POST", f"/shops/{shop['id']}/products/{S['product_id']}/publish.json", flags)
-        S["pricing"] = rep; S["currency"] = cur; save_state(st)
-        print(k, "güncellendi" + (" + Etsy'ye gönderildi" if S.get("published") else ""), {s: r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")})
+        body = {"variants": prices, "description": f"{hl}\n\n{it['description']}" if hl else it["description"]}
+        if a.metin: body.update({"title": it["title"], "tags": it["tags"]})
+        if a.tasarim: body["print_areas"] = tasarim_yukle(pf, shop["id"], k, S)
+        pf("PUT", f"/shops/{shop['id']}/products/{S['product_id']}.json", body)
+        S["pricing"] = rep; S["currency"] = cur; S["title"] = it["title"]; save_state(st)
+        after = before
+        if S.get("published") and not a.yayinlama_yok:
+            pf("POST", f"/shops/{shop['id']}/products/{S['product_id']}/publish.json", flags)
+            after = publish_wait(pf, shop["id"], S["product_id"])
+            if before and after != before: raise SystemExit(f"DUR: {k} Etsy ilan numarası değişti {before} -> {after}")
+        print(k, "güncellendi" + (f" + Etsy ilanı {after} (numara aynı)" if S.get("published") else ""), {s: r["price_local"] if "price_local" in r else r["price"] for s, r in rep.items() if s in ("M", "2XL", "3XL")}, flush=True)
 
 def mockup_indir(st, keys):
     """Printify ön mockup'larını (renk başına) gorseller.py'nin kullandığı klasöre indirir."""
@@ -243,5 +288,5 @@ on conflict (user_id, marketplace_code, external_listing_id) do nothing;""")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("adim", choices=["hazirla", "yayinla", "guncelle"]); ap.add_argument("--garment"); ap.add_argument("--provider", help="üretici adı (ör. SwiftPOD)")
-    ap.add_argument("--only"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
+    ap.add_argument("--only"); ap.add_argument("--metin", action="store_true"); ap.add_argument("--tasarim", action="store_true"); ap.add_argument("--yayinlama-yok", action="store_true", help="yalnız Printify ürünü (Etsy'ye gönderme)"); ap.add_argument("--currency", default="TRY", help="Etsy mağazasının para birimi (bahsistore: TRY)")
     a = ap.parse_args(); {"hazirla": hazirla, "yayinla": yayinla, "guncelle": guncelle}[a.adim](a)

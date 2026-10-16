@@ -4,6 +4,8 @@
   2) Düz ürün fotoğrafı (Printify ön görünüm, kapak rengiyle)
   3) Renk seçenekleri (5 renk yan yana)
   4) Beden tablosu (Printify size guide; inç + cm)
+  "Most Likely To" serisinde 2. sıraya grup görseli girer (Mustafa, 16 Ekim 2026): 4 farklı ürün yan yana,
+  "Matching Family Christmas Sweatshirts" (group_image; serideki her ilanda aynı görsel) -> seride 5 görsel.
 Printify API yalnız düz ön mockup veriyor (manken / ortam mockup'ı yok) -> sahne kompozisyonu burada yapılır.
 Kullanım: python gorseller.py uret [kod,...]   (görselleri üretir, önizleme sayfası)
           python gorseller.py uygula [kod,...] (depoya yükler, Etsy'de ilk 4 görseli bunlarla değiştirir; etsy-listings set_images)"""
@@ -104,6 +106,26 @@ def size_chart():
     d.text((SIZE // 2, SIZE - 130), "For an oversized look, size up 1–2 sizes.", font=F("Poppins-Medium.ttf", 56), fill="#2B2A28", anchor="mm")
     return bg
 
+MLT_KEYS = ["mlt-cookies", "mlt-movies", "mlt-naughty", "mlt-burn", "mlt-presents", "mlt-asleep", "mlt-snowball", "mlt-carols"]
+GROUP = [("mlt-cookies", "Forest Green"), ("mlt-movies", "Sand"), ("mlt-naughty", "Light Pink"), ("mlt-presents", "Black")]
+
+def group_image():
+    """Aile seti: 4 farklı "Most Likely To" sweatshirt yan yana (farklı renkler), başlık "Matching Family Christmas Sweatshirts"."""
+    bg = Image.new("RGB", (SIZE, SIZE), "#F6F1EA"); d = ImageDraw.Draw(bg)
+    rnd = np.random.default_rng(12)  # hafif kar taneleri
+    for x, y, r in zip(rnd.integers(0, SIZE, 140), rnd.integers(0, SIZE, 140), rnd.integers(5, 14, 140)): d.ellipse((x - r, y - r, x + r, y + r), fill="#ECE3D6")
+    d.text((SIZE // 2, 170), "Matching Family Christmas Sweatshirts", font=F("DMSerifDisplay-Regular.ttf", 118), fill="#B3262E", anchor="mm")
+    d.text((SIZE // 2, 300), "Mix & match 8 \"Most Likely To\" sayings · 5 colors · Unisex S–3XL", font=F("Poppins-Medium.ttf", 60), fill="#6B6560", anchor="mm")
+    gs = [cutout(mock(k, c)) for k, c in GROUP]; w = 960
+    gs = [g.resize((w, int(g.height * w / g.width)), Image.LANCZOS) for g in gs]
+    for i, g in enumerate(gs):  # 2 x 2, yan yana
+        x = 150 + (i % 2) * (SIZE - 300 - w); y = 390 + (i // 2) * 920
+        alpha = g.split()[3]; sh = Image.new("L", bg.size, 0); sh.paste(alpha, (x + 14, y + 26)); sh = sh.filter(ImageFilter.GaussianBlur(28)).point(lambda v: int(v * 0.35))
+        bg = Image.composite(Image.new("RGB", bg.size, (60, 45, 35)), bg, sh); bg.paste(g, (x, y), g)
+    d = ImageDraw.Draw(bg)
+    d.text((SIZE // 2, SIZE - 110), "Each sweatshirt sold separately · Choose your saying, color and size", font=F("Poppins-Medium.ttf", 56), fill="#2B2A28", anchor="mm")
+    return bg
+
 def scene_plan():
     f = ROOT / "kapak_sahneleri.json"; return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
 
@@ -114,15 +136,20 @@ def uret(keys):
         cover = compose(SC / f"{p['scene']}.jpg", cutout(mock(k, color)), p.get("scale", 0.74), p.get("rot", 0), p.get("dy", 0))
         cover.save(OUT / f"{k}_1_cover.jpg", quality=92); flat(k, color).save(OUT / f"{k}_2_flat.jpg", quality=92)
         color_chart(k).save(OUT / f"{k}_3_colors.jpg", quality=92); print(k, "görseller hazır", flush=True)
+    if any(k in MLT_KEYS for k in keys): group_image().save(OUT / "mlt_group.jpg", quality=92); print("grup görseli hazır", flush=True)
+
+def sira(k):
+    """İlan görsel sırası: kapak, (seride grup), düz ürün, renkler, beden tablosu."""
+    return [("1_cover", OUT / f"{k}_1_cover.jpg")] + ([("2_group", OUT / "mlt_group.jpg")] if k in MLT_KEYS else []) +            [("2_flat", OUT / f"{k}_2_flat.jpg"), ("3_colors", OUT / f"{k}_3_colors.jpg"), ("4_size", OUT / "size_chart.jpg")]
 
 def uygula(keys):
     from syscall import call
     st = json.loads((ROOT / "durum.json").read_text(encoding="utf-8")); UID = "92458d1e-1fd7-4cf0-a3ec-9658a949377a"
     BASE = "https://ytucdrrgxsjhrqmaxckt.supabase.co/storage/v1/object/public/product-images/"; t = time.strftime("%Y%m%d%H%M%S")
-    paths = {k: [f"{UID}/pod/{k}-{n}-{t}.jpg" for n in ("1_cover", "2_flat", "3_colors", "4_size")] for k in keys}
+    paths = {k: [f"{UID}/pod/{k}-{n}-{t}.jpg" for n, _ in sira(k)] for k in keys}
     urls = json.loads(call("etsy-listings", {"action": "signed_upload", "bucket": "product-images", "paths": [x for v in paths.values() for x in v]})["content"])["urls"]
     for k in keys:
-        for path, src in zip(paths[k], [OUT / f"{k}_1_cover.jpg", OUT / f"{k}_2_flat.jpg", OUT / f"{k}_3_colors.jpg", OUT / "size_chart.jpg"]):
+        for path, (_, src) in zip(paths[k], sira(k)):
             req = urllib.request.Request(urls[path], data=src.read_bytes(), method="PUT", headers={"Content-Type": "image/jpeg", "x-upsert": "true"})
             assert urllib.request.urlopen(req, timeout=300).status == 200
     res = {}

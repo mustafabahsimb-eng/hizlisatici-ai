@@ -21,6 +21,7 @@
 //   { action: "shop_texts", userId, saleMessage?, policyAdditional? } -> satış sonrası mesaj, ek politika metni
 //   { action: "market_prices", queries[] } -> rakip fiyat ortancası (USD; resmi arama)
 //   { action: "holiday_notice", userId, etsyListingIds[], line | null, announcement? } -> açıklama + mağaza duyurusunda Noel teslim satırı
+//   { action: "listing_price", userId, etsyListingId, price } -> tek fiyatlı ilanın (dijital vb.) fiyatı, mağaza para biriminde (ilan numarası değişmez)
 //   { action: "listing_state", userId, etsyListingIds[], state: "active" | "inactive" }
 //        -> ilanları yayına al / pasife al (SİLMEZ; yorum ve satış geçmişi ilanda kalır)
 // Satıcı (userAccessToken): { action: "push", listingId } -> elle tekrar dene
@@ -194,7 +195,7 @@ async function organize(userId: string, sections: { title: string; listingIds: s
 
 // Noel teslim satırı: ilan açıklamasının en üstüne ve mağaza duyurusuna tek satır (line=null -> satırı kaldır).
 // Önceki satır bu kalıpla tanınıp değiştirilir; açıklamanın geri kalanına dokunulmaz.
-export const HOLIDAY_RE = /^(🎄 Order by .+ for Christmas delivery|⚠️ Orders placed now may arrive after Christmas)/;
+export const HOLIDAY_RE = /^((🎄 )?Order by .+ for (Christmas delivery|delivery before Christmas)|⚠️ Orders placed now may arrive after Christmas)/;
 export function withHolidayLine(text: string, line: string | null): string {
   const rest = String(text || "").split("\n").filter((l) => !HOLIDAY_RE.test(l.trim())).join("\n").replace(/^\s*\n/, "");
   return line ? `${line}\n\n${rest}`.trim() : rest.trim();
@@ -368,6 +369,16 @@ Deno.serve(async (req) => {
       }
       if (b.action === "holiday_notice" && b.userId && Array.isArray(b.etsyListingIds)) {
         return json(await holidayNotice(String(b.userId), b.etsyListingIds.map(String), b.line ? String(b.line).slice(0, 200) : null, b.announcement !== false));
+      }
+      if (b.action === "listing_price" && b.userId && b.etsyListingId && Number(b.price) > 0) {
+        const { ctx } = await userShop(String(b.userId)); const id = String(b.etsyListingId); const price = Math.round(Number(b.price) * 100) / 100;
+        const inv = await etsy(ctx, "GET", `/listings/${id}/inventory`);
+        if ((inv.price_on_property || []).length) return json({ ok: false, error: "Bu ilanda fiyat seçeneğe göre değişiyor; tek fiyat yazılamaz" });
+        const products = (inv.products || []).map((pr: any) => ({ sku: pr.sku || "", property_values: pr.property_values || [],
+          offerings: (pr.offerings || []).map((o: any) => ({ price, quantity: o.quantity, is_enabled: o.is_enabled !== false })) }));
+        await etsy(ctx, "PUT", `/listings/${id}/inventory`, { json: { products, price_on_property: [], quantity_on_property: inv.quantity_on_property || [], sku_on_property: inv.sku_on_property || [] } });
+        const back = await etsy(ctx, "GET", `/listings/${id}`);
+        return json({ ok: true, listing_id: back.listing_id, price: back.price });
       }
       if (b.action === "listing_state" && b.userId && Array.isArray(b.etsyListingIds) && ["active", "inactive"].includes(b.state)) {
         return json(await listingState(String(b.userId), b.etsyListingIds.map(String), b.state));

@@ -108,12 +108,17 @@ def stack(parts, gap=60):
 MLT = {"mlt-cookies": ["Eat All", "The Cookies"], "mlt-movies": ["Watch Holiday", "Movies All Day"], "mlt-naughty": ["Be On The", "Naughty List"],
        "mlt-burn": ["Burn The", "Cookies"], "mlt-presents": ["Shake Every", "Present"], "mlt-asleep": ["Fall Asleep", "By The Fire"],
        "mlt-snowball": ["Throw The", "First Snowball"], "mlt-carols": ["Sing Carols", "Off Key"]}
+MLT_W = 4200  # yazı bloğu baskı alanının (4500) %93'ü = göğüs genişliğinin ~%60'ı; Printify baskı alanı daha genişine izin vermiyor
+              # (Mustafa, 16 Ekim 2026: "göğüste belirgin, genişliğin ~%80'i"; %80'lik ilk deneme mockup'ta yeterince büyük görünmedi)
 def most_likely(lines, p):
-    head = text_img("MOST LIKELY TO", fit_font("MOST LIKELY TO", ARCH, 3300, 330, tracking=40), p["green"], tracking=40)
-    size = min(fit_font(t, SHRIK, 4000, 760).size for t in lines)  # tüm satırlar aynı boyda (aile seti tutarlı görünsün)
-    big = [text_img(t, F(SHRIK, size), p["red"], shadow=(26, 26, p["gold"])) for t in lines]
-    rule = Layer(3600, 80); rule.rect((0, 32, 1550, 48), p["green"], 8); rule.rect((2050, 32, 3600, 48), p["green"], 8); star(rule, 1800, 40, 40, p["gold"])
-    return stack([holly(p, 1600), head, rule.done()] + big, gap=110)
+    # Koyu giysi (Black / Forest Green; 'light' mürekkep): kırmızı yazı yeşilde okunmuyor -> krem yazı, kırmızı gölge, altın başlık. Holly aynı kalır.
+    dark_garment = p["name"] == "light"
+    head_col, txt_col, sh_col = (p["gold"], p["cream"], p["red"]) if dark_garment else (p["green"], p["red"], p["gold"])
+    head = text_img("MOST LIKELY TO", fit_font("MOST LIKELY TO", ARCH, MLT_W, 520, tracking=50), head_col, tracking=50)
+    size = min(fit_font(t, SHRIK, MLT_W - 40, 1400).size for t in lines)  # tüm satırlar aynı boyda (aile seti tutarlı görünsün)
+    big = [text_img(t, F(SHRIK, size), txt_col, shadow=(34, 34, sh_col)) for t in lines]
+    rule = Layer(MLT_W, 90); rule.rect((0, 36, MLT_W / 2 - 260, 54), head_col, 9); rule.rect((MLT_W / 2 + 260, 36, MLT_W, 54), head_col, 9); star(rule, MLT_W / 2, 45, 45, p["gold"])
+    return stack([holly(p, 1500), head, rule.done()] + big, gap=90)
 
 # ---------------- 2) Retro gingerbread + pembe vintage Noel ----------------
 def gingerbread_man(p, s=2000):

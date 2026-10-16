@@ -114,7 +114,7 @@ async function aiDeadline(text: string, year: number): Promise<string | null> {
 export async function christmasDeadline(year: number, today: string): Promise<{ date: string; source: string } | null> {
   const key = `printify_holiday_deadline:${year}`;
   const c = await cacheGet(key);
-  if (c?.date && c.source !== "tahmin") return c;
+  if (c?.date && c.source !== "tahmin" && c.source !== "satici") return c;   // satıcının verdiği tarih: Printify açıklarsa onunki geçer
   if ((await cacheGet(key + ":checked")) !== today) {
     await cacheSet(key + ":checked", today);
     for (const url of DEADLINE_SOURCES) {
@@ -136,7 +136,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 export function holidayLine(deadline: string | null, today: string, end: string): string | null {
   if (!deadline || today >= end) return null;                                  // sezon bitti: satır kaldırılır
   const d = new Date(deadline + "T00:00:00Z");
-  if (today <= deadline) return `🎄 Order by ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} for Christmas delivery in the US.`;
+  if (today <= deadline) return `Order by ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} for delivery before Christmas (US).`;  // metin: Mustafa, 16 Ekim 2026
   return "⚠️ Orders placed now may arrive after Christmas.";
 }
 async function christmasNotices(today: string, dryRun: boolean) {

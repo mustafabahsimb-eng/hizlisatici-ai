@@ -35,7 +35,6 @@ PRINTING & SHIPPING
 • Printed on demand in the USA with direct-to-garment printing
 • FREE shipping within the United States (we currently ship to US addresses only)
 • Production 2–5 business days, then shipped with tracking
-• Order by early December for Christmas delivery
 
 CARE
 • Machine wash cold, inside out, gentle cycle
@@ -51,8 +50,18 @@ Original design by bahsistore, created with generative design tools."""
 
 def desc(hook, body): return COMMON_DESC.format(hook=hook, body=body)
 
-MLT_TAGS_BASE = ["most likely to", "family christmas", "matching sweatshirt", "christmas sweatshirt", "family pajama set", "holiday crewneck",
-                 "funny christmas", "christmas gift", "group christmas", "xmas sweater", "cousin crew shirt"]
+# Noel son sipariş satırı ("Order by December 10 for delivery before Christmas (US).") açıklamanın en üstüne season-calendar / etsy-listings
+# holiday_notice ile yazılır (tarih değişirse kendiliğinden güncellenir); bu yüzden metnin içinde sabit tarih yok.
+# Başlık / etiket (Mustafa, 16 Ekim 2026): ilk 40 karakterde ana anahtar kelime ("Most Likely To Christmas Sweatshirt"), başlıkta
+# "Matching Family Christmas Sweatshirt", en fazla 140 karakter; 13 etiket, tekrar yok.
+MLT_TAGS_BASE = ["most likely to", "family christmas", "matching sweatshirt", "christmas gift", "christmas sweatshirt", "funny christmas",
+                 "matching family", "xmas sweater", "holiday crewneck", "group christmas", "christmas party", "family photo outfit"]
+MLT_SUFFIXES = [", Funny Holiday Group Crewneck, Xmas Gift", ", Funny Holiday Group Crewneck", ", Xmas Gift", ""]
+def mlt_title(phrase):
+    for suf in MLT_SUFFIXES:
+        t = f"Most Likely To Christmas Sweatshirt, {phrase}, Matching Family Christmas Sweatshirt{suf}"
+        if len(t) <= 140: return t
+    raise ValueError(phrase)
 MLT = [
     ("mlt-cookies", "Eat All The Cookies", "cookie lover gift", "the cookie monster of the family (we all know who)"),
     ("mlt-movies", "Watch Holiday Movies All Day", "holiday movie fan", "the one who never leaves the couch in December"),
@@ -69,11 +78,12 @@ def build():
     for key, phrase, tag12, who in MLT:
         items.append({
             "key": key, "group": "Most Likely To", "season": "christmas", "personalized": False,
-            "title": f"Most Likely To {phrase} Christmas Sweatshirt, Matching Family Christmas Crewneck, Funny Holiday Group Shirt, Xmas Gift",
-            "tags": MLT_TAGS_BASE + [tag12, "gift for mom"],
+            "title": mlt_title(phrase),
+            "tags": MLT_TAGS_BASE + [tag12],
             "description": desc(f"Most likely to {phrase.lower()}? Tag {who} with this cozy Christmas crewneck.",
                                 "Part of our Most Likely To Christmas collection — mix and match different sayings for the whole family, cousins, "
-                                "friends or your office party. Same retro design style across the set, so your group photos look perfect.\n\n"
+                                "friends or your office party. Same retro design style across the set, so your group photos look perfect "
+                                "(see the second photo for the whole family set together).\n\n"
                                 "Perfect as a family Christmas gift, a matching outfit for Christmas morning, a Secret Santa present or a gift for mom, dad, sister or grandma."),
         })
     items += [
@@ -92,13 +102,13 @@ def build():
                              "Made for pink Christmas lovers, holiday parties, cookie exchanges and cozy nights in. A cute Christmas gift for her, "
                              "your sister, daughter or best friend.")},
         {"key": "mama-patchwork", "group": "Personalized Mama", "season": "evergreen", "personalized": True, "word": "Mama",
-         "personalization": {"instructions": "Enter your kids' names separated by commas (up to 8 names, e.g. Emma, Liam, Noah). Names are printed exactly as written.",
+         "personalization": {"instructions": "Please enter the names (max 4), separated by commas.",
                              "char_max": 120, "required": True},
          "title": "Personalized Mama Sweatshirt with Kids Names, Faux Patchwork Mama Crewneck, Custom Mom Gift, Mothers Day Christmas Gift",
          "tags": ["mama sweatshirt", "custom mama shirt", "kids names shirt", "personalized mom", "gift for mom", "mama crewneck", "patchwork mama",
                   "mothers day gift", "new mom gift", "custom mom gift", "mom christmas gift", "mama with names", "grandma gift"],
          "description": desc("A cozy Mama crewneck with a faux patchwork quilt look — personalized with your kids' names.",
-                             "HOW TO PERSONALIZE\n1. Choose size and color\n2. In the personalization box, type the kids' names separated by commas\n"
+                             "HOW TO PERSONALIZE\n1. Choose size and color\n2. In the personalization box, type up to 4 names, separated by commas (e.g. Emma, Liam, Noah)\n"
                              "3. We print the names exactly as written, in a soft script under the Mama letters\n\n"
                              "The patchwork is a printed design (not real fabric). A heartfelt gift for Christmas, Mother's Day, birthdays or new moms.")},
     ]
@@ -120,6 +130,7 @@ def build():
                                       "librarians, teachers and bookworms.")})
     for it in items:
         assert len(it["title"]) <= 140, (it["key"], len(it["title"]))
+        if it["group"] == "Most Likely To": assert "Most Likely To Christmas Sweatshirt" in it["title"][:40] and "Matching Family Christmas Sweatshirt" in it["title"]
         it["tags"] = [t[:20] for t in it["tags"]][:13]; assert len(it["tags"]) == 13 and len(set(it["tags"])) == 13, it["key"]
     return items
 
