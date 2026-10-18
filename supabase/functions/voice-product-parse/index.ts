@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir e-ticaret ürün formu doldurma asistanısın. Kullanıcı sesli olarak bir ürünü anlatacak (konuşma metne çevrilmiş halde gelecek, bazı kelimeler yanlış tanınmış/eksik olabilir - bağlamdan mantıklı şekilde tamamla). Bu metinden ürün bilgilerini çıkar.
 
-Platform seçenekleri (sadece bu listeden birini seç, kullanıcı platform belirtmemişse null bırak): Trendyol, Hepsiburada, N11, Çiçeksepeti, PTT AVM, Amazon TR, Pazarama, Etsy, Amazon (Global), eBay, Facebook Marketplace, TikTok Shop, Shopify, WooCommerce, Wix
+Platform seçenekleri (sadece bu listeden birini seç, kullanıcı platform belirtmemişse null bırak): Trendyol, Hepsiburada, N11, Çiçeksepeti, PTT AVM, Amazon TR, Pazarama, Trendruum, Etsy, Amazon (Global), eBay, Facebook Marketplace, TikTok Shop, Shopify, WooCommerce, Wix
 
 SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir metin ekleme:
 {

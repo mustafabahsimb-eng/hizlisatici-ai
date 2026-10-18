@@ -151,6 +151,11 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
   4. Secrets: AMAZON_APP_ID, AMAZON_LWA_CLIENT_ID, AMAZON_LWA_CLIENT_SECRET (+ deneme için AMAZON_SANDBOX_REFRESH_TOKEN) -> amazon-connect selftest -> Hesaplarım'dan bağlanma testi (Claude).
   5. Amazon Appstore listesi ve yayın onayı -> AMAZON_APP_DRAFT=false; canlıya geçiş AMAZON_LIVE=true.
 
+## Trendruum (19 Ekim 2026) — kod bitti, satıcı hesabı bekliyor
+- [x] Hesap bağlama (Client ID + Secret, kasada), trendruum-verify, ilan gönderme (kategori / marka / nitelikler AI ile, seçenekler), fiyat / stok eşitleme, sipariş çekme (15 dk), kargo bildirimi, Hesaplarım kartı, paket anahtarı `trendruum`. Sahte yanıt testi 11/11. Ayrıntı docs/trendruum.md.
+- Varsayılan KAPALI (`TRENDRUUM_ENABLED`). API belgesi satıcı panelinde → satıcı hesabı şirket kurulunca (YARIM_ISLER.md "Mustafa'nın yapacakları" 14); açılış günü uç nokta adresleri belgeyle doğrulanıp açılır.
+- [ ] Komisyon oranlarını Trendruum'dan okuyup ilana yazma (belge gelince).
+
 ## Ayrı ürünler: Seltigo Ads, İçerik otomasyonu, İade otomasyonu (13 Ekim 2026)
 - Mimari plan: docs/mimari-plan-ads-icerik-iade.md (onaylandı). İade bitti (docs/iade.md). Seltigo Ads A1 + A2 bitti (docs/seltigo-ads.md); bekleyen: Mustafa'nın Meta sandbox reklam hesabı -> uçtan uca sandbox testi; sonra A3 Google, A4 TikTok, A5 pazaryeri reklamları. Sıradaki: İçerik otomasyonu.
 - Seltigo Ads adları ve varsayılanları onaylandı (Mustafa, 18 Ekim 2026): bütçe boş, otomatik aç / artır kapalı, onay modu, ROAS 3, kâr %25, 3 gün; "⚡ Tam otomatik" / "Tam otomatik moda geç" (tek tıkla, sınır girerek).

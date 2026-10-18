@@ -354,6 +354,7 @@
       d_pttavm: "PTT'nin resmi e-ticaret pazaryeri",
       d_amazontr: 'Amazon Türkiye satıcı paneli',
       d_pazarama: 'Hızlı büyüyen yerli pazaryeri',
+      d_trendruum: 'Yeni yerli pazaryeri, 14 günde ödeme',
       d_dolap: "Trendyol'un ikinci el/butik moda pazaryeri. Herhangi bir API sunmuyor — tacir (işletme) hesabı olsan bile ürünler tek tek, sadece mobil uygulama üzerinden elle ekleniyor; toplu yükleme veya panel entegrasyonu yok, bu yüzden buraya otomatik bağlantı ekleyemiyoruz. İşletme başvurusu için Vergi Levhası, İmza Sirküleri, Faaliyet Belgesi ve Ticari Sicil Belgesi ile <a href=\"mailto:butik@dolap.com\" class=\"inline-link\">butik@dolap.com</a> adresine e-posta atman gerekiyor. Komisyon: ₺10.000'e kadar satışlarda %15, üzerinde sabit ₺1.800.",
       d_amazon: "Amazon Seller Central üzerinden global satış — ürünü Amazon'dan almıyorsun, kendi tedarikçinden (CJ/AliExpress) aldığın ürünü Amazon'da satıyorsun",
       d_walmart: "Walmart'ın satıcı platformu — onaylı satıcılar ürünlerini Walmart.com üzerinden listeleyebilir",
@@ -374,6 +375,7 @@
       h_pttavm: 'PTT AVM satıcı panelinden (Ayarlar > Web Servis / Entegrasyon Ayarları) aldığın kullanıcı adını API Key alanına, şifreni API Secret alanına gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (doğrulamada kullanılmıyor, sadece kaydı ayırt etmek için).',
       h_amazontr: 'Amazon SP-API bilgilerin (Satıcı ID, LWA Client ID, Client Secret).',
       h_pazarama: "Pazarama satıcı panelinden (isortagim.pazarama.com > mağaza adın > Hesap Bilgileri > Entegrasyon Bilgileri) aldığın API Key'i ve API Secret'i gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (doğrulamada kullanılmıyor, sadece kaydı ayırt etmek için).",
+      h_trendruum: "Trendruum satıcı panelinden (seller.trendruum.com > Hesap Bilgilerim > Entegrasyon Bilgileri) aldığın Client ID'yi ve Client Secret'i gir. Satıcı ID alanına mağaza adını ya da numaranı yaz (doğrulamada kullanılmıyor, sadece kaydı ayırt etmek için).",
       h_walmart: "Walmart Seller Center panelinden (Settings > API Keys) aldığın Client ID'yi API Key alanına, Client Secret'i API Secret alanına gir. Satıcı ID alanına Walmart satıcı numaranı yaz.",
       h_woocommerce: "Mağaza adresini (örn: benimmagazam.com) Satıcı ID alanına yaz. WordPress panelinden (WooCommerce > Ayarlar > Gelişmiş > REST API) ürettiğin Consumer Key'i API Key alanına, Consumer Secret'i API Secret alanına gir.",
       cjPrompt: 'CJ Dropshipping API anahtarını yapıştır:',
@@ -488,6 +490,7 @@
       d_pttavm: "Turkish Post's official e-commerce marketplace",
       d_amazontr: 'Amazon Turkey seller panel',
       d_pazarama: 'Fast-growing local marketplace',
+      d_trendruum: 'New Turkish marketplace, paid in 14 days',
       d_dolap: "Trendyol's second-hand/boutique fashion marketplace. It offers no API — even with a business account, products are added one by one, only via the mobile app; no bulk upload or panel integration, so we can't add an automatic connection. For a business application, email the Tax Certificate, Signature Circular, Activity Certificate and Trade Registry document to <a href=\"mailto:butik@dolap.com\" class=\"inline-link\">butik@dolap.com</a>. Commission: 15% up to ₺10,000, a flat ₺1,800 above.",
       d_amazon: "Global selling via Amazon Seller Central — you don't buy from Amazon; you sell products from your own supplier (CJ/AliExpress) on Amazon",
       d_walmart: "Walmart's seller platform — approved sellers can list products on Walmart.com",
@@ -507,6 +510,7 @@
       h_pttavm: 'From the PTT AVM seller panel (Settings > Web Service / Integration): username in API Key, password in API Secret. Put your store name or number in Seller ID (not used for verification, only to tell connections apart).',
       h_amazontr: 'Your Amazon SP-API details (Seller ID, LWA Client ID, Client Secret).',
       h_pazarama: 'From the Pazarama seller panel (isortagim.pazarama.com > your store > Account Info > Integration Info): enter API Key and API Secret. Put your store name or number in Seller ID (not used for verification, only to tell connections apart).',
+      h_trendruum: "From the Trendruum seller panel (seller.trendruum.com > Account Info > Integration Info): enter Client ID and Client Secret. Put your store name or number in Seller ID (not used for verification, only to tell connections apart).",
       h_walmart: 'From Walmart Seller Center (Settings > API Keys): Client ID in API Key, Client Secret in API Secret. Put your Walmart seller number in Seller ID.',
       h_woocommerce: 'Put your store URL (e.g. mystore.com) in Seller ID. From WordPress (WooCommerce > Settings > Advanced > REST API): Consumer Key in API Key, Consumer Secret in API Secret.',
       cjPrompt: 'Paste your CJ Dropshipping API key:',
@@ -571,12 +575,14 @@
                    'amazon_ae', 'amazon_sa', 'amazon_eg', 'amazon_in', 'amazon_za', 'amazon_us', 'amazon_ca', 'amazon_mx', 'amazon_br', 'amazon_jp', 'amazon_au', 'amazon_sg'],
                    verify: false, signup: 'https://sell.amazon.com/', oauth: 'pick' },
     pazarama:    { name: 'Pazarama', group: 'TR', codes: ['pazarama_tr'], verify: true, signup: 'https://isortagim.pazarama.com/auth/seller-application', labels: ['fSellerId', 'fApiKey', 'fApiSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
+    trendruum:   { name: 'Trendruum', group: 'TR', codes: ['trendruum_tr'], verify: true, signup: 'https://seller.trendruum.com/onboarding/satici-formu/pazaryeri', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     walmart:     { name: 'Walmart Marketplace', group: 'INTL', codes: ['walmart_us'], verify: true, signup: 'https://marketplace.walmart.com/', labels: ['fSellerId', 'fClientId', 'fClientSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
     woocommerce: { name: 'WooCommerce', group: 'INTL', codes: ['woocommerce'], verify: true, signup: null, labels: ['fSiteUrl', 'fConsumerKey', 'fConsumerSecret'], req: ['sellerId', 'apiKey', 'apiSecret'] },
   };
 
   let marketplaceRows = [];   // marketplaces tablosu
   let connections = [];       // store_connections (kullanıcının)
+  let trendruumOn = true;     // paket anahtarı (feature_flags 'trendruum'); kapalıysa kart gösterilmez
   let currentKey = null;
 
   function mpCodeFor(key) {
@@ -815,7 +821,7 @@
 
     // Türkiye
     let tr = '';
-    ['trendyol', 'hepsiburada', 'n11', 'ciceksepeti', 'pttavm', 'amazontr', 'pazarama'].forEach(k => { tr += mpRowHtml(k); });
+    ['trendyol', 'hepsiburada', 'n11', 'ciceksepeti', 'pttavm', 'amazontr', 'pazarama', 'trendruum'].filter(k => k !== 'trendruum' || trendruumOn).forEach(k => { tr += mpRowHtml(k); });
     tr += staticRow('Dolap', 'd_dolap', '<span class="acc-status none">' + t('stManual') + '</span>');
     document.getElementById('listTR').innerHTML = tr;
 
@@ -1224,7 +1230,8 @@
     if (!session) { window.location.href = 'index.html'; return; }
 
     renderAll();                 // önce iskelet
-    await Promise.all([loadMarketplaceData(), loadInstagram()]); // sonra bağlantılar
+    await Promise.all([loadMarketplaceData(), loadInstagram(),
+      (window.HS && HS.feature ? HS.feature('trendruum').then(v => { trendruumOn = v !== false; }).catch(() => {}) : null)]); // sonra bağlantılar
     renderAll();
   }
 

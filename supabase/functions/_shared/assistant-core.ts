@@ -343,7 +343,7 @@ export async function weeklySummary(userId: string): Promise<Reply> {
     (s.top.length ? "\nEn çok satanlar:\n" + s.top.slice(0, 3).map((t, i) => `${i + 1}. ${short(t.name, 50)} — ${t.qty} adet`).join("\n") : "") };
 }
 // Pazaryeri kodu -> okunur ad (ör. trendyol_tr -> Trendyol, amazon_de -> Amazon DE)
-const MP_NAMES: Record<string, string> = { trendyol_tr: "Trendyol", hepsiburada_tr: "Hepsiburada", n11_tr: "n11", ciceksepeti_tr: "Çiçeksepeti", pazarama_tr: "Pazarama", pttavm_tr: "PTT AVM",
+const MP_NAMES: Record<string, string> = { trendyol_tr: "Trendyol", hepsiburada_tr: "Hepsiburada", n11_tr: "n11", ciceksepeti_tr: "Çiçeksepeti", pazarama_tr: "Pazarama", trendruum_tr: "Trendruum", pttavm_tr: "PTT AVM",
   shopify: "Shopify", woocommerce: "WooCommerce", etsy: "Etsy", wix: "Wix", own_store: "Kendi Mağazam" };
 export function mpName(code: string): string {
   const c = String(code || "");

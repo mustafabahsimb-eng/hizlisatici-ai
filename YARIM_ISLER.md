@@ -25,6 +25,8 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 11. Amazon geliştirici kaydı (Solution Provider Portal, public developer) — docs/amazon-sp-api.md.
 12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
+14. **Trendruum satıcı hesabı** (şirket kurulunca; şahıs / limited / anonim şirket ister): https://seller.trendruum.com/onboarding/satici-formu/pazaryeri → hesap açılınca "yaptım" de.
+   - Neden: Trendruum'un API belgesi yalnız satıcı panelinde; kod hazır ve kapalı bekliyor (docs/trendruum.md "Açılış günü"). Claude belgeyle adresleri doğrulayıp `TRENDRUUM_ENABLED=true` ile açar.
 
 ## Son durum (16 Ekim 2026 akşam)
 **Bitti ve canlıda:**
@@ -42,6 +44,7 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 - Etsy senkronu: Etsy'de silinen ilan panelden silinmez, "Etsy'de yok" etiketiyle kalır (satış / kâr geçmişi kaybolmasın). Dışarıda (Printify / Etsy) yönetilen ilanlar Seltigo'dan Etsy'ye geri yazılmaz.
 - İçerik planı: bir istekte en fazla 3 görsel, kalan için kendini yeniden çağırma; panel bitene kadar "Hazırlanıyor…" gösterir.
 - Seltigo Ads: sandbox hesabı yerine kişisel reklam hesabında para harcamayan "duraklatılmış aç → doğrula → sil" denemesi; kampanyada setler arası bütçe paylaşımı kapalı.
+- Trendruum (19 Ekim): Hesaplarım kartı alt yazısı "Yeni yerli pazaryeri, 14 günde ödeme"; alanlar Trendruum'un kendi adlarıyla "Client ID" / "Client Secret". Entegrasyon kapalıyken bağlantı "onay bekliyor" kaydedilir, açılınca kendiliğinden doğrulanır. Canlı açıldığında ilanlar prova beklemeden gönderilir (tek anahtar `TRENDRUUM_ENABLED`). Komisyon oranı uydurulmadı (dışarıda yayınlanmıyor); satıcı girer, sonra API'den okunacak.
 
 ---
 

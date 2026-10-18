@@ -8,6 +8,7 @@
 //   Hepsiburada: OMS (oms-external[-sit].hepsiburada.com /orders/merchantid/{id}), Basic auth — resmi belge bu ağdan erişilemedi; alanlar esnek okunur
 //   Çiçeksepeti: apis.ciceksepeti.com /api/v1/Order/GetOrders (x-api-key) — alanlar esnek okunur (satıcı belgesiyle doğrulanacak)
 //   Pazarama  : isortagimapi.pazarama.com /order/getOrdersForApi (client_credentials token) — alanlar esnek okunur
+//   Trendruum : _shared/trendruum.ts (Client ID + Secret -> JWT; webhook yok, düzenli çekme); takip: kendi kargosuyla gönderilen pakete takip no. TRENDRUUM_ENABLED olmadan çalışmaz
 //   Shopify   : Admin REST /orders.json (X-Shopify-Access-Token); takip: fulfillment_orders + fulfillments
 //   WooCommerce: /wp-json/wc/v3/orders (Basic ck:cs); takip: sipariş notu + durum completed
 //   Etsy      : /v3/application/shops/{shop}/receipts; takip: createReceiptShipment
@@ -16,6 +17,7 @@
 //   Wix       : eCommerce /ecom/v1/orders/search; takip: fulfillments
 // =========================================================
 import { etsyApiKey } from "./etsy.ts";
+import { credsFromVault, fetchTrendruumOrders, pushTrendruumTracking, trendruumEnabled } from "./trendruum.ts";
 
 export type NormLine = {
   externalId: string;            // satır bazında benzersiz (sipariş no [+ satır no])
@@ -258,6 +260,21 @@ const pazarama: Adapter = {
       }
     }
     return out;
+  },
+};
+
+// ---------------- Trendruum ----------------
+const trCtx = (ctx: Ctx) => ({ creds: credsFromVault(ctx.creds), env: ctx.env, fetch: ctx.fetch });
+const trendruum: Adapter = {
+  async fetchOrders(ctx) {
+    if (!trendruumEnabled()) return [];
+    const lines = await fetchTrendruumOrders(trCtx(ctx), ctx.since, ctx.until);
+    return lines.map((l) => ({ ...l, status: statusOf(l.status), sku: str(l.sku) || null, barcode: str(l.barcode) || null, address: { ...l.address, line1: str(l.address.line1), line2: str(l.address.line2) } }));
+  },
+  async pushTracking(ctx, mo, tracking, carrier) {
+    if (!trendruumEnabled()) throw new Error("trendruum_disabled");
+    if (mo.raw?.marketplaceShips) return; // Trendruum Kargo ile giden pakette takip numarası zaten Trendruum'da
+    await pushTrendruumTracking(trCtx(ctx), String(mo.raw?.packageId || mo.raw?.orderNo || ""), tracking, carrier);
   },
 };
 
@@ -513,6 +530,7 @@ export function adapterFor(code: string): Adapter | null {
   if (code === "hepsiburada_tr") return hepsiburada;
   if (code === "ciceksepeti_tr") return ciceksepeti;
   if (code === "pazarama_tr") return pazarama;
+  if (code === "trendruum_tr") return trendruum;
   if (code === "shopify") return shopify;
   if (code === "woocommerce") return woocommerce;
   if (code === "etsy") return etsy;

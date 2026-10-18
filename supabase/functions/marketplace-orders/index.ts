@@ -1,16 +1,18 @@
 // =========================================================
 // Pazaryeri siparişlerini çekme (zamanlanmış, 15 dk; CRON_SECRET) — Amazon hariç (amazon-orders)
-// Trendyol, Hepsiburada, n11, Çiçeksepeti, Pazarama, Shopify, WooCommerce, Etsy, eBay, Walmart, Wix
+// Trendyol, Hepsiburada, n11, Çiçeksepeti, Pazarama, Trendruum, Shopify, WooCommerce, Etsy, eBay, Walmart, Wix
 // 1) Bağlı her mağazadan son değişen siparişler -> marketplace_orders (satır başına bir kayıt; varsa durum / takip güncellenir)
 //    Ürün eşleme: barkod / stok kodu / SKU -> Seltigo ürünü ve seçeneği
 //    Tetikleyiciler: AliExpress / CJ ürünü -> tedarikçi siparişi; kendi gönderdiği ürün + kargoyu pazaryeri ayarlamıyorsa -> gönderi/etiket; asistana bildirim
-// 2) Satıcının / tedarikçinin takip numarası -> pazaryerine "gönderildi" (destekleyenlerde: Shopify, WooCommerce, Etsy, eBay, Walmart, Wix)
+// 2) Satıcının / tedarikçinin takip numarası -> pazaryerine "gönderildi" (destekleyenlerde: Trendruum, Shopify, WooCommerce, Etsy, eBay, Walmart, Wix)
+// 0) Trendruum açıldığı gün (TRENDRUUM_ENABLED): "onay bekliyor" kaydedilen Trendruum bağlantıları doğrulanır, geçerliyse bağlanır
 // Sistem: { cronSecret } | { cronSecret, connectionId } (tek bağlantı) | { cronSecret, test: { code, env, creds, sellerId, since } } (okuyucu denemesi, kayıt yok)
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { adapterFor, HttpError, type NormLine } from "../_shared/marketplace-orders.ts";
 import { featureEnabled } from "../_shared/features.ts";
 import { etsyToken } from "../_shared/etsy.ts";
+import { credsFromVault, trendruumEnabled, verifyTrendruum } from "../_shared/trendruum.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -95,6 +97,7 @@ async function syncConnection(c: any, deadline: number) {
       .eq("connection_id", c.id).in("status", ["new", "awaiting_supplier", "ordered_from_supplier"]).is("tracking_pushed_at", null).limit(50);
     for (const mo of open || []) {
       if (Date.now() > deadline) break;
+      if (mo.raw?.marketplaceShips) continue; // kargoyu pazaryeri ayarlıyor (ör. Trendruum Kargo): takip numarası oradan gelir
       let tracking = mo.tracking_number, carrier = mo.carrier;
       if (!tracking) {
         const { data: so } = await db.from("orders").select("tracking_number, tracking_carrier").eq("user_id", c.user_id).eq("platform", c.marketplace_code)
@@ -127,6 +130,19 @@ Deno.serve(async (req) => {
     } catch (e) { return json({ ok: false, error: short((e as Error).message), status: (e as any).status }); }
   }
   const started = Date.now();
+  // Trendruum açıldıysa bekleyen bağlantıları doğrula (açılış günü satıcı hiçbir şey yapmaz)
+  if (trendruumEnabled()) {
+    const { data: pend } = await db.from("store_connections").select("id, user_id").eq("marketplace_code", "trendruum_tr").eq("status", "pending").eq("environment", "live").is("deleted_at", null).limit(50);
+    for (const c of pend || []) {
+      const { data: cr } = await db.rpc("store_connection_get_credentials", { p_connection_id: c.id });
+      const v = await verifyTrendruum({ creds: credsFromVault(cr) });
+      if (v.connected) await db.from("store_connections").update({ status: "connected", last_verified_at: new Date().toISOString(), last_error: null }).eq("id", c.id);
+      else if (!v.pending) {
+        await db.from("store_connections").update({ status: "error", last_error: short(v.error) }).eq("id", c.id);
+        await db.rpc("assistant_enqueue", { p_user: c.user_id, p_kind: "connection", p_payload: { name: "trendruum_tr" }, p_dedupe: "conn:" + c.id + ":verify" });
+      }
+    }
+  }
   let q = db.from("store_connections").select("id, user_id, marketplace_code, environment, external_seller_id, settings, status").eq("status", "connected").is("deleted_at", null)
     .neq("marketplace_code", "own_store").not("marketplace_code", "like", "amazon_%");
   if (b.connectionId) q = q.eq("id", String(b.connectionId));
@@ -135,6 +151,7 @@ Deno.serve(async (req) => {
   for (const c of conns || []) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
     if (!adapterFor(c.marketplace_code)) continue;
+    if (c.marketplace_code === "trendruum_tr" && (!trendruumEnabled() || !(await featureEnabled(c.user_id, "trendruum")))) { out.push({ id: c.id, skipped: "trendruum kapalı" }); continue; }
     if (!(await featureEnabled(c.user_id, "marketplace_orders"))) { out.push({ id: c.id, skipped: "paket" }); continue; }
     try {
       out.push({ id: c.id, code: c.marketplace_code, ...(await syncConnection(c, started + TIME_BUDGET_MS)) });

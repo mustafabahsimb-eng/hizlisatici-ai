@@ -6,6 +6,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { AMAZON_MARKETS, marketByCode, amazonConfigured } from "../_shared/amazon.ts";
 import { submitListing, withdrawListing } from "../_shared/amazon-listing.ts";
+import { buildItems, categoryAttributes, credsFromVault, fillAttributes, findBrand, localChecks, pickCategory, submitProducts, trendruumEnabled, updatePriceStock } from "../_shared/trendruum.ts";
+import { featureEnabled } from "../_shared/features.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -469,6 +471,127 @@ async function etsyAdapter(action, listing) {
   return { patch: { last_sync_error: action === "publish" ? "etsy_sending" : listing.last_sync_error }, info: { handed_off: "etsy-listings", action } };
 }
 
+// 🟣 Trendruum (_shared/trendruum.ts). TRENDRUUM_ENABLED yoksa / bağlantı canlı ve bağlı değilse yalnız PROVA (hiçbir şey gönderilmez).
+// Canlıda: kategori (önceki benzer ilandan öğrenilir, yoksa AI en alt kategoriyi seçer), marka (Trendruum listesinden), zorunlu nitelikler
+// (üründen + AI) tek seferde doldurulur, seçenekler ayrı barkodla aynı ana kodda gruplanır. İçerik değişmediyse ve iş stok / fiyat
+// değişikliğiyse yalnız fiyat-stok güncellenir (AI yok, saniyeler). Satıştan kaldırma = stok 0.
+async function trendruumAdapter(action, listing, opts) {
+  const now = new Date().toISOString();
+  let conn = null;
+  if (listing.connection_id) {
+    const { data } = await db.from("store_connections").select("id, user_id, status, environment, settings").eq("id", listing.connection_id).maybeSingle();
+    conn = data || null;
+  }
+  let product = null, variants = [], images = [];
+  if (listing.product_id != null) {
+    const { data: p } = await db.from("products").select("*").eq("id", listing.product_id).maybeSingle();
+    product = p || null;
+    const { data: v } = await db.from("product_variants").select("*").eq("product_id", listing.product_id).is("deleted_at", null).order("created_at");
+    variants = v || [];
+    const { data: imgs } = await db.from("product_images").select("url, position").eq("product_id", listing.product_id).order("position");
+    images = (imgs || []).map((i) => i.url).filter(Boolean);
+    if (!images.length && product && product.image_url) images = [product.image_url];
+  }
+  const args = { listing, product, variants, images };
+  const { errors, warnings } = localChecks(args);
+  const live = trendruumEnabled() && conn && conn.status === "connected" && conn.environment === "live" && (await featureEnabled(listing.user_id, "trendruum"));
+
+  if (!live) {
+    if (!trendruumEnabled()) warnings.push({ code: "trendruum_off", field: "connection", msg: "Trendruum entegrasyonu henüz açılmadı; ilan prova olarak kontrol edildi, gönderilmedi." });
+    else if (!conn) warnings.push({ code: "no_connection", field: "connection", msg: "Trendruum mağaza bağlantısı yok; sadece prova yapılabilir." });
+    else if (conn.status !== "connected") warnings.push({ code: "connection_pending", field: "connection", msg: "Trendruum bağlantısı henüz doğrulanmadı." });
+    const validation = { ok: action === "unpublish" || errors.length === 0, dry_run: true, action, marketplace: listing.marketplace_code, errors: action === "unpublish" ? [] : errors, warnings, checked_at: now };
+    return { patch: { validation, validated_at: now, last_sync_error: validation.ok ? "prova_ok" : "prova_failed" }, info: { dry_run: true, ok: validation.ok } };
+  }
+
+  const { data: cred } = await db.rpc("store_connection_get_credentials", { p_connection_id: conn.id });
+  const ctx = { creds: credsFromVault(cred), env: "live" as const };
+  const prev = (listing.validation && listing.validation.trendruum) || {};
+
+  if (action === "unpublish") {
+    const barcodes = Array.isArray(prev.barcodes) ? prev.barcodes : [];
+    if (barcodes.length) await updatePriceStock(ctx, barcodes.map((b) => ({ barcode: b, quantity: 0, salePrice: Number(listing.price) || 0, listPrice: Math.max(Number(listing.price) || 0, Number(listing.compare_at_price) || 0) })));
+    const validation = { ...(listing.validation || {}), ok: true, dry_run: false, action, note: "Trendruum'da stok 0 yapılarak satışa kapatıldı.", checked_at: now };
+    return { patch: { validation, validated_at: now }, info: { withdrawn: barcodes.length } };
+  }
+  if (!product) throw new Error("product_not_found");
+  if (errors.length) {
+    const validation = { ok: false, dry_run: false, action, marketplace: listing.marketplace_code, errors, warnings, trendruum: prev, checked_at: now };
+    return { patch: { validation, validated_at: now, last_sync_error: "trendruum_rejected" }, info: { ok: false, errors: errors.length } };
+  }
+
+  const facts = { title: String(listing.title || ""), description: String(listing.description || ""), brand: product.brand, specs: product.specs, categoryHint: listing.category_key };
+  const contentHash = JSON.stringify([listing.title, listing.description, images, product.brand, product.specs, listing.category_key, listing.marketplace_category_id, listing.marketplace_brand_id, variants.map((v) => [v.id, v.attributes, v.gtin, v.sku, v.image_url])]);
+  const sameContent = prev.contentHash === contentHash && Array.isArray(prev.barcodes) && prev.barcodes.length > 0 && prev.categoryId != null;
+  const job = opts && opts.job;
+
+  // Hızlı yol: içerik aynı -> yalnız fiyat / stok
+  if (sameContent && (job?.payload?.reason === "stock" || prev.status === "ok")) {
+    const items = buildItems(args, { categoryId: prev.categoryId, brandId: prev.brandId, attributes: prev.attributes || [], perVariant: prev.perVariant || {} });
+    const batchId = await updatePriceStock(ctx, items);
+    const validation = { ...(listing.validation || {}), ok: true, dry_run: false, action, warnings, checked_at: now, trendruum: { ...prev, priceStockBatchId: batchId, priceStockAt: now } };
+    return { patch: { validation, validated_at: now, last_sync_error: null }, info: { priceStock: items.length } };
+  }
+
+  // Tam yol: kategori -> marka -> nitelikler -> gönder
+  let learned = prev.categoryId ?? (listing.marketplace_category_id || null);
+  if (learned == null && listing.category_key) {
+    const { data: same } = await db.from("listings").select("validation").eq("user_id", listing.user_id).eq("marketplace_code", listing.marketplace_code)
+      .eq("category_key", listing.category_key).neq("id", listing.id).not("validation->trendruum->categoryId", "is", null).limit(1).maybeSingle();
+    learned = same?.validation?.trendruum?.categoryId ?? null;
+  }
+  const cat = await pickCategory(ctx, facts, learned);
+  if (!cat) errors.push({ code: "category_missing", field: "category", msg: "Uygun Trendruum kategorisi bulunamadı." });
+  const brand = listing.marketplace_brand_id ? { id: listing.marketplace_brand_id, name: listing.marketplace_brand_name } : await findBrand(ctx, product.brand);
+  if (!brand) errors.push({ code: "brand_not_listed", field: "brand", msg: product.brand ? `"${product.brand}" markası Trendruum listesinde yok; Trendruum'dan marka talebi gerekir.` : "Üründe marka yok; Trendruum marka ister." });
+  let attributes = [];
+  const perVariant = {};
+  if (cat) {
+    const all = await categoryAttributes(ctx, cat.id);
+    const common = await fillAttributes(all.filter((a) => !a.varianter), facts);
+    attributes = common.list;
+    const missing = [...common.missing];
+    const varianters = all.filter((a) => a.varianter);
+    const options = variants.filter((x) => !x.is_default && x.is_active !== false);
+    if (varianters.length && options.length > 1) {
+      for (const v of options) {
+        const r = await fillAttributes(varianters, facts, v.attributes || {});
+        perVariant[String(v.id)] = r.list;
+        for (const m of r.missing) if (!missing.includes(m)) missing.push(m);
+      }
+    } else if (varianters.length) {
+      const r = await fillAttributes(varianters, facts, (options[0] || variants[0] || {}).attributes || {});
+      attributes = [...attributes, ...r.list];
+      for (const m of r.missing) if (!missing.includes(m)) missing.push(m);
+    }
+    if (missing.length) errors.push({ code: "attributes_missing", field: "attributes", msg: "Doldurulamayan zorunlu nitelik: " + missing.join(", "), params: { missing } });
+  }
+  const meta = { categoryId: cat?.id ?? null, categoryPath: cat?.path ?? null, brandId: brand?.id ?? null, brandName: brand?.name ?? null, attributes, perVariant, contentHash };
+  if (errors.length) {
+    const validation = { ok: false, dry_run: false, action, marketplace: listing.marketplace_code, errors, warnings, trendruum: { ...prev, ...meta, status: "failed" }, checked_at: now };
+    return { patch: { validation, validated_at: now, last_sync_error: "trendruum_rejected" }, info: { ok: false, errors: errors.length } };
+  }
+  const items = buildItems(args, { categoryId: cat.id, brandId: brand.id, attributes, perVariant });
+  const r = await submitProducts(ctx, items);
+  if (Array.isArray(prev.barcodes) && prev.barcodes.length) await updatePriceStock(ctx, items); // var olan üründe fiyat / stok ayrı uçtan güncellenir
+  const failed = r.results.filter((x) => /fail|error|reject/.test(x.status));
+  const pending = r.results.some((x) => x.status === "pending" || x.status === "in_progress");
+  for (const f of failed) errors.push({ code: "trendruum_rejected", field: "trendruum", msg: `${f.barcode}: ${f.reason || "Trendruum reddetti"}` });
+  const ok = failed.length === 0;
+  const validation = {
+    ok, dry_run: false, action, marketplace: listing.marketplace_code, errors, warnings, checked_at: now,
+    trendruum: { ...meta, barcodes: items.map((i) => i.barcode), batchId: r.batchId, results: r.results, status: ok ? (pending ? "pending" : "ok") : "failed", sentAt: now },
+  };
+  return {
+    patch: {
+      validation, validated_at: now, external_batch_id: r.batchId, external_listing_id: String(items[0].productMainId),
+      last_sync_error: ok ? (pending ? "trendruum_pending" : null) : "trendruum_rejected",
+      ...(ok && !listing.published_at ? { published_at: now } : {}),
+    },
+    info: { ok, items: items.length, pending, batchId: r.batchId },
+  };
+}
+
 const ADAPTERS = {
   etsy: etsyAdapter,
   own_store: ownStoreAdapter,
@@ -478,6 +601,7 @@ const ADAPTERS = {
   ciceksepeti_tr: genericProvaAdapter,
   pttavm_tr: genericProvaAdapter,
   pazarama_tr: genericProvaAdapter,
+  trendruum_tr: trendruumAdapter,
 };
 for (const m of AMAZON_MARKETS) ADAPTERS[m.code] = amazonAdapter;
 

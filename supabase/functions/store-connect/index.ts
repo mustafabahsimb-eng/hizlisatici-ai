@@ -8,6 +8,7 @@ const VERIFY_FUNCTIONS: Record<string, string | null> = {
   ciceksepeti_tr: 'ciceksepeti-verify',
   pttavm_tr: 'rpttavm-verify',
   pazarama_tr: 'pazarama-verify',
+  trendruum_tr: 'trendruum-verify', // entegrasyon kapalıyken (TRENDRUUM_ENABLED yok) bilgiler 'onay bekliyor' saklanır
   walmart_us: 'walmart-verify',
   woocommerce: 'woocommerce-verify',
   amazon_tr: null, // doğrulama henüz yok, "bekliyor" olarak kaydedilir
@@ -71,6 +72,7 @@ Deno.serve(async (req) => {
       // 2) Canlı ortamda pazaryerinin gerçek API'si ile doğrula
       const verifyFn = VERIFY_FUNCTIONS[marketplaceCode];
       let verified = false;
+      let pendingVerify = false;
       if (environment === 'live' && verifyFn) {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/${verifyFn}`, {
           method: 'POST',
@@ -83,10 +85,13 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ sellerId, apiKey, apiSecret }),
         });
         const result = await res.json().catch(() => ({}));
-        if (result.connected !== true) {
+        if (result.pending === true) {
+          pendingVerify = true; // pazaryeri entegrasyonu henüz açılmadı: kaydet, açılınca otomatik doğrulanır
+        } else if (result.connected !== true) {
           return json({ ok: false, error: 'verify_failed', detail: result.error || null });
+        } else {
+          verified = true;
         }
-        verified = true;
       }
 
       // 3) Pazaryeri adı (etiket boşsa)
@@ -142,7 +147,7 @@ Deno.serve(async (req) => {
       });
       if (vaultError) throw vaultError;
 
-      return json({ ok: true, connectionId, status: fields.status, verified });
+      return json({ ok: true, connectionId, status: fields.status, verified, ...(pendingVerify ? { pendingVerify: true } : {}) });
     }
 
     // ============================================================
