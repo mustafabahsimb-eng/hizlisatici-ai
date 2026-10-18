@@ -11,7 +11,7 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 3. *(İsteğe bağlı)* Sandbox reklam hesabı "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermiyor ("Ad account owner has NOT grant"). Gerekmiyor: test, kişisel hesapta duraklatılmış denemeyle yapılıyor. Secret `ADS_SANDBOX_TOKEN` kayıtlı.
 
 ## Asistan kanalları
-4. **Telegram bot anahtarı:** Telegram'da @BotFather → /newbot → anahtarı https://supabase.com/dashboard/project/ytucdrrgxsjhrqmaxckt/functions/secrets adresine `TELEGRAM_BOT_TOKEN` adıyla ekle.
+4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Kalan: bot açıklamaları (metinler Mustafa'nın onayında), panelden "Telegram'a bağla" ile asistanın canlı uçtan uca testi.
 5. **Meta WhatsApp test numarası (asistan için):** https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → API Setup → numara kimliği, WABA kimliği ve kalıcı anahtar → aynı secrets sayfasına `ASSISTANT_WA_PHONE_ID`, `ASSISTANT_WA_WABA_ID`, `ASSISTANT_WA_TOKEN`, `ASSISTANT_WA_DISPLAY_NUMBER`.
 
 ## Kargo / tedarik / pazaryeri
