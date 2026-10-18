@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Seltigo: tüm mağazalarınız tek yerde, her şey otomatik. İlk 25 kurucu üyeden biri ol.">
+<title>Seltigo Çok Yakında</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: tek ekranlık açılış — solda vaat, sağda kurucu üye kartı; altında gelecek modüller ve kanal şeridi. Tek (açık) tema bilinçli: marka sitesi açık. */
+:root{
+ --navy:#0F1B3D; --blue:#2456E8; --orange:#FF7A1A; --ink:#0F1B3D; --muted:#55607A;
+ --paper:#F5F7FC; --card:#FFFFFF; --line:#E1E6F2; --soft:#EAF0FE;
+ --sans:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+ color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;
+ padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 40px;display:flex;flex-direction:column;gap:56px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.logo{height:38px;width:auto;display:block}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:3px}
+.lang button{border:0;background:transparent;font:600 13px var(--sans);color:var(--muted);padding:6px 12px;border-radius:999px;cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.lang button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+.hero>*{min-width:0}
+.badge{display:inline-flex;align-items:center;gap:8px;background:var(--soft);color:var(--blue);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:6px 12px;border-radius:999px}
+.badge i{width:8px;height:8px;border-radius:50%;background:var(--orange);display:block;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+h1{font-size:clamp(34px,5.2vw,58px);line-height:1.05;letter-spacing:-.025em;font-weight:800;margin:18px 0 18px;text-wrap:balance}
+h1 em{font-style:normal;color:var(--blue)}
+.lead{font-size:18px;color:var(--muted);max-width:56ch;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 18px 40px -24px rgba(15,27,61,.35)}
+.card h2{font-size:22px;margin:0 0 6px;letter-spacing:-.01em}
+.card p{margin:0;color:var(--muted);font-size:15px}
+.seats{display:flex;align-items:baseline;gap:8px;margin:18px 0 6px;font-variant-numeric:tabular-nums}
+.seats b{font-size:34px;font-weight:800;letter-spacing:-.02em}
+.seats span{color:var(--muted);font-size:14px}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin-bottom:18px}
+.bar i{display:block;height:100%;width:4%;transition:width .6s ease;background:linear-gradient(90deg,var(--blue),var(--orange))}
+.perks{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:8px;font-size:15px}
+.perks li{display:flex;gap:10px;align-items:flex-start}
+.perks li::before{content:"";flex:none;width:0;height:0;margin-top:6px;border-left:9px solid var(--orange);border-top:5px solid transparent;border-bottom:5px solid transparent}
+form{display:grid;gap:10px}
+label{font-size:13px;font-weight:600}
+input,select{width:100%;font:500 15px var(--sans);padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.btn{border:0;background:var(--navy);color:#fff;font:700 16px var(--sans);padding:14px 18px;border-radius:12px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:10px}
+.btn:hover{background:var(--blue)}
+.btn svg{width:12px;height:12px}
+.note{font-size:12px;color:var(--muted)}
+.err{color:#B4380B;font-size:13px;font-weight:600}
+.btn[disabled]{opacity:.6;cursor:wait}
+.ok{background:#E9F8EF;color:#14603A;border-radius:12px;padding:14px;font-weight:600;font-size:15px}
+.sec h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.mod{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}
+.mod b{display:block;font-size:17px;margin-bottom:6px}
+.mod span{color:var(--muted);font-size:14px}
+.mod .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+.groups{display:grid;grid-template-columns:repeat(2,1fr);gap:22px 32px}.grp{min-width:0}.grp h4{margin:0 0 10px;font-size:15px;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-weight:600;font-size:13.5px;color:var(--navy)}
+footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:20px}
+.preview{background:#FFF4EA;color:#8A4A12;border:1px dashed #F3B37C;border-radius:12px;padding:10px 14px;font-size:13px}
+@media (max-width:900px){.hero{grid-template-columns:1fr}.groups{grid-template-columns:1fr}.mods{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:480px){.mods{grid-template-columns:1fr}.logo{height:30px}.card{padding:22px}}
+@media (prefers-reduced-motion:reduce){.badge i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header>
+  <svg class="logo" role="img" aria-label="Seltigo" xmlns="http://www.w3.org/2000/svg" viewBox="-18.19 -106.58 488.57 148.77"><path d="M34.90 -88.40 L99.22 -88.40 L69.67 -58.71 L27.28 -54.96 L46.54 -35.17 L34.90 -24.07 L0.27 -54.43 Z M64.32 15.64 L0.00 15.64 L29.55 -14.04 L71.94 -17.79 L52.69 -37.58 L64.32 -48.68 L98.96 -18.32 Z" fill="#0F1B3D"/><path transform="translate(138.51 0)" d="M32.958984375 1.171875C50.87890625 1.171875 61.81640625 -7.470703125 61.81640625 -21.484375C61.81640625 -32.421875 54.931640625 -38.818359375 39.404296875 -42.08984375L32.421875 -43.603515625C23.486328125 -45.556640625 19.873046875 -48.046875 19.873046875 -52.5390625C19.873046875 -57.861328125 25.09765625 -61.572265625 32.51953125 -61.572265625C40.33203125 -61.572265625 45.458984375 -57.32421875 45.99609375 -50.439453125H60.05859375C59.619140625 -65.087890625 49.21875 -73.92578125 32.470703125 -73.92578125C15.91796875 -73.92578125 4.833984375 -65.0390625 4.833984375 -51.806640625C4.833984375 -41.40625 11.81640625 -34.716796875 26.220703125 -31.591796875L33.88671875 -29.931640625C43.115234375 -27.9296875 46.923828125 -25.1953125 46.923828125 -20.5078125C46.923828125 -14.84375 41.40625 -11.181640625 33.056640625 -11.181640625C23.73046875 -11.181640625 18.115234375 -15.869140625 17.919921875 -23.876953125H3.41796875C3.41796875 -8.056640625 14.306640625 1.171875 32.958984375 1.171875Z M91.84765625 1.171875C104.34765625 1.171875 114.30859375 -5.95703125 116.212890625 -16.2109375H103.078125C101.759765625 -12.20703125 97.90234375 -9.619140625 92.287109375 -9.619140625C84.71875 -9.619140625 80.32421875 -14.55078125 80.080078125 -22.16796875H116.75V-26.025390625C116.75 -41.748046875 106.544921875 -52.734375 91.359375 -52.734375C76.564453125 -52.734375 66.06640625 -41.455078125 66.06640625 -25.732421875C66.06640625 -10.05859375 76.22265625 1.171875 91.84765625 1.171875ZM80.177734375 -31.34765625C80.958984375 -37.79296875 85.20703125 -41.796875 91.65234375 -41.796875C98.146484375 -41.796875 102.443359375 -37.79296875 103.17578125 -31.34765625Z M136.857421875 -72.75390625H122.453125V0.0H136.857421875Z M175.138671875 -51.5625H164.591796875V-65.625H150.1875V-51.5625H141.30078125V-40.283203125H150.1875V-13.671875C150.1875 -4.296875 155.412109375 0.0 166.740234375 0.0H175.138671875V-11.279296875H169.62109375C165.71484375 -11.279296875 164.591796875 -12.40234375 164.591796875 -15.91796875V-40.283203125H175.138671875Z M180.375 0.0H194.779296875V-51.5625H180.375Z M227.302734375 21.09375C242.244140625 21.09375 252.498046875 14.35546875 252.498046875 -2.001953125V-51.5625H238.2890625V-44.091796875H238.240234375C234.96875 -49.8046875 229.59765625 -52.63671875 222.908203125 -52.63671875C209.724609375 -52.63671875 200.69140625 -41.650390625 200.69140625 -26.171875C200.69140625 -10.791015625 209.529296875 0.048828125 223.005859375 0.048828125C229.744140625 0.048828125 235.1640625 -2.685546875 238.240234375 -8.740234375H238.2890625V-0.830078125C238.2890625 6.591796875 234.333984375 10.498046875 227.302734375 10.498046875C221.931640625 10.498046875 218.123046875 8.30078125 217.09765625 4.39453125H203.23046875C204.6953125 14.404296875 212.654296875 21.09375 227.302734375 21.09375ZM226.716796875 -11.474609375C219.734375 -11.474609375 215.193359375 -16.89453125 215.193359375 -26.3671875C215.193359375 -35.83984375 219.734375 -41.2109375 226.716796875 -41.2109375C233.9921875 -41.2109375 238.826171875 -35.3515625 238.826171875 -26.3671875C238.826171875 -17.333984375 233.9921875 -11.474609375 226.716796875 -11.474609375Z M284.62890625 1.171875C300.302734375 1.171875 310.849609375 -9.5703125 310.849609375 -25.732421875C310.849609375 -41.89453125 300.302734375 -52.734375 284.62890625 -52.734375C269.00390625 -52.734375 258.45703125 -41.89453125 258.45703125 -25.732421875C258.45703125 -9.5703125 269.00390625 1.171875 284.62890625 1.171875ZM284.62890625 -10.498046875C277.646484375 -10.498046875 272.958984375 -16.162109375 272.958984375 -25.732421875C272.958984375 -35.3515625 277.6953125 -41.064453125 284.62890625 -41.064453125C291.611328125 -41.064453125 296.34765625 -35.3515625 296.34765625 -25.732421875C296.34765625 -16.162109375 291.66015625 -10.498046875 284.62890625 -10.498046875Z" fill="#0F1B3D"/><path transform="translate(138.51 0)" d="M180.86 -81.56 L196.86 -73.06 L180.86 -64.56 Z" fill="#FF7A1A"/></svg>
+  <div class="lang" role="group" aria-label="Dil / Language">
+   <button id="tr" aria-pressed="true">TR</button><button id="en" aria-pressed="false">EN</button>
+  </div>
+ </header>
+
+ <section class="hero">
+  <div>
+   <span class="badge"><i></i><span data-tr="Yapım aşamasında" data-en="Under construction"></span></span>
+   <h1 data-tr="Tüm mağazalarınız tek yerde. <em>Her şey otomatik.</em>" data-en="All your stores in one place. <em>Everything on autopilot.</em>"></h1>
+   <p class="lead" data-tr="Seltigo; ürün yüklemeyi, içerik ve reklamı, siparişleri ve kargoyu tek panelden otomatik yöneten e-ticaret platformu. Trendyol'dan Etsy'ye, Amazon'dan kendi mağazana kadar hepsi tek tıkla." data-en="Seltigo runs your product listings, content and ads, orders and shipping from one panel, automatically. From Trendyol to Etsy, from Amazon to your own store, all in one click."></p>
+  </div>
+
+  <div class="card" id="kurucu" style="position:relative">
+   <h2 id="ttl" data-tr="İlk 25 kurucu üyeden biri ol" data-en="Become one of the first 25 founding members"></h2>
+   <p id="sub" data-tr="Seltigo açıldığında ilk sen haberdar ol, kurucu üye ayrıcalıklarını kap." data-en="Be the first to know when Seltigo opens and lock in founding member perks."></p>
+   <div class="seats"><b id="left">25</b><span data-tr="/ 25 yer kaldı" data-en="/ 25 seats left"></span></div>
+   <div class="bar"><i id="fill"></i></div>
+   <ul class="perks" id="perks">
+    <li data-tr="Ömür boyu %25 indirim" data-en="25% off for life"></li>
+    <li data-tr="Herkesten önce erken erişim" data-en="Early access before everyone else"></li>
+    <li data-tr="Öncelikli birebir destek" data-en="Priority one-on-one support"></li>
+   </ul>
+   <form id="f" novalidate>
+    <label for="email" data-tr="E-posta adresin" data-en="Your email"></label>
+    <input id="email" type="email" placeholder="ornek@magazan.com" autocomplete="email" required>
+    <label for="where" data-tr="Şu an nerede satıyorsun?" data-en="Where do you sell now?"></label>
+    <select id="where">
+     <option value="none" data-tr="Henüz satmıyorum" data-en="Not selling yet"></option>
+     <option value="tr_marketplaces">Trendyol / Hepsiburada / N11</option>
+     <option value="etsy">Etsy</option>
+     <option value="amazon">Amazon</option>
+     <option value="own_site" data-tr="Kendi sitem (Shopify, ikas…)" data-en="My own site (Shopify, ikas…)"></option>
+     <option value="social" data-tr="Instagram / WhatsApp" data-en="Instagram / WhatsApp"></option>
+    </select>
+    <input id="hp" name="company" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+    <button class="btn" id="go" type="submit"><span id="golbl" data-tr="Yerimi ayır" data-en="Save my seat"></span><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0 L10 6 L0 12 Z" fill="#FF7A1A"/></svg></button>
+    <span class="err" id="err" hidden></span>
+    <span class="note" data-tr="Spam yok. Sadece açılış haberi ve kurucu üye daveti." data-en="No spam. Only the launch news and your founding member invite."></span>
+   </form>
+   <div class="ok" id="ok" hidden></div>
+  </div>
+ </section>
+
+ <section class="sec">
+  <div class="mods">
+   <div class="mod"><span class="tag" lang="en">Seltigo</span><b data-tr="Ürün ve mağaza" data-en="Products & stores"></b><span data-tr="Linkten, PDF'ten, fotoğraftan ürün yükle; bütün mağazalarına tek tıkla yayınla." data-en="Add products from a link, PDF or photo; publish to every store in one click."></span></div>
+   <div class="mod"><span class="tag" lang="en">Content</span><b data-tr="İçerik otomasyonu" data-en="Content automation"></b><span data-tr="Görsel ve videoları kendisi üretir, Instagram, TikTok ve YouTube'da paylaşır." data-en="Creates images and videos and posts them to Instagram, TikTok and YouTube."></span></div>
+   <div class="mod"><span class="tag" lang="en">Ads</span><b data-tr="Reklam otomasyonu" data-en="Ad automation"></b><span data-tr="Bütçeni yönetir, satmayan reklamı kapatır, satanı büyütür." data-en="Manages your budget, stops what doesn't sell, scales what does."></span></div>
+   <div class="mod"><span class="tag" lang="en">Logistics</span><b data-tr="Sipariş, kargo, iade" data-en="Orders, shipping, returns"></b><span data-tr="Siparişler tek panelde; kargo etiketi ve iadeler otomatik." data-en="All orders in one panel; shipping labels and returns handled automatically."></span></div>
+  </div>
+ </section>
+
+ <section class="sec">
+  <h3 data-tr="Seltigo'ya bağlanan 50+ kanal" data-en="50+ channels that connect to Seltigo"></h3>
+  <div class="groups"><div class="grp"><h4 data-tr="Pazaryerleri" data-en="Marketplaces"></h4><div class="chips"><span>Trendyol</span><span>Hepsiburada</span><span>N11</span><span>Çiçeksepeti</span><span>Pazarama</span><span>PTT AVM</span><span>Amazon</span><span>Etsy</span><span>eBay</span><span>Walmart</span><span>Noon</span><span>Allegro</span><span>eMAG</span><span>Ozon</span><span>Otto</span><span>Temu</span></div></div><div class="grp"><h4 data-tr="Mağaza altyapıları" data-en="Store platforms"></h4><div class="chips"><span data-tr="Seltigo Mağaza" data-en="Seltigo Store"></span><span>Shopify</span><span>WooCommerce</span><span>ikas</span><span>Ticimax</span><span>Wix</span><span>Squarespace</span><span>PrestaShop</span><span>BigCommerce</span></div></div><div class="grp"><h4 data-tr="Sosyal medya ve mesajlaşma" data-en="Social & messaging"></h4><div class="chips"><span>Instagram</span><span>Facebook</span><span>TikTok</span><span>YouTube</span><span>Pinterest</span><span>WhatsApp</span><span>Telegram</span><span>Messenger</span></div></div><div class="grp"><h4 data-tr="Tedarikçiler" data-en="Suppliers"></h4><div class="chips"><span>AliExpress</span><span>CJ Dropshipping</span><span>Alibaba</span><span>Printify</span><span>Printful</span><span data-tr="Türkiye XML tedarikçileri" data-en="Turkish XML suppliers"></span></div></div><div class="grp"><h4 data-tr="Kargo" data-en="Shipping"></h4><div class="chips"><span>Yurtiçi Kargo</span><span>Aras Kargo</span><span>MNG Kargo</span><span>PTT Kargo</span><span>Sürat Kargo</span><span>HepsiJet</span><span>Geliver</span><span>Basit Kargo</span></div></div><div class="grp"><h4 data-tr="Reklam" data-en="Ads"></h4><div class="chips"><span>Meta Ads</span><span>Google Ads</span><span>TikTok Ads</span><span>Google Merchant Center</span></div></div><div class="grp"><h4 data-tr="Ödeme" data-en="Payments"></h4><div class="chips"><span>iyzico</span><span>PayTR</span></div></div><div class="grp"><h4 data-tr="Muhasebe ve e-fatura · yakında" data-en="Accounting & e-invoice · soon"></h4><div class="chips"><span data-tr="Seltigo Muhasebe" data-en="Seltigo Accounting"></span><span>Paraşüt</span><span>Logo</span><span>Mikro</span></div></div></div>
+ </section>
+
+ <p style="margin:0;color:var(--muted);font-size:12.5px;line-height:1.5" data-tr="Adı geçen markalar sahiplerine aittir. Seltigo bu firmaların resmi ortağı değildir." data-en="All trademarks belong to their respective owners. Seltigo is not an official partner of these companies."></p>
+
+ <footer><span>© 2026 Seltigo</span><span data-tr="seltigo.com · Yakında" data-en="seltigo.com · Coming soon"></span></footer>
+</div>
+
+<script>
+(function(){
+ var API='https://ytucdrrgxsjhrqmaxckt.supabase.co/rest/v1/rpc/';
+ var KEY='sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+ var LIMIT=25, founders=0;
+ var preview=!/github\.io$|seltigo\.com$/.test(location.hostname);
+ var T={
+  tr:{full_t:'Kurucu üyelik doldu',full_s:'İlk 25 yer doldu. Bekleme listesine yazıl, açılışta sana haber verelim.',full_b:'Bekleme listesine yazıl',
+      ok_f:'Teşekkürler! Yerin ayrıldı, açılışta ilk sana yazacağız.',ok_w:'Teşekkürler! Bekleme listesine eklendin, açılışta sana yazacağız.',
+      exists:'Bu e-posta zaten kayıtlı, yerin duruyor.',bad:'Geçerli bir e-posta adresi yaz.',busy:'Şu an yoğunluk var, birkaç dakika sonra tekrar dene.',net:'Bağlantı kurulamadı, birazdan tekrar dene.'},
+  en:{full_t:'Founding seats are full',full_s:'All 25 seats are taken. Join the waitlist and we\'ll let you know at launch.',full_b:'Join the waitlist',
+      ok_f:'Thanks! Your seat is saved. We\'ll write to you first at launch.',ok_w:'Thanks! You\'re on the waitlist. We\'ll write to you at launch.',
+      exists:'This email is already registered. Your spot is safe.',bad:'Please enter a valid email address.',busy:'It\'s busy right now, please try again in a few minutes.',net:'Could not connect, please try again shortly.'}
+ };
+ var lang='tr', $=function(id){return document.getElementById(id)};
+ function t(k){return T[lang][k]}
+ function paint(){
+  var left=Math.max(0,LIMIT-founders);
+  $('left').textContent=left;
+  $('fill').style.width=Math.max(4,founders/LIMIT*100)+'%';
+  if(left===0){$('ttl').innerHTML=t('full_t');$('sub').innerHTML=t('full_s');$('golbl').innerHTML=t('full_b');$('perks').hidden=true;}
+ }
+ function setLang(l){
+  lang=l;document.documentElement.lang=l;
+  document.querySelectorAll('[data-tr]').forEach(function(el){el.innerHTML=el.getAttribute('data-'+l);});
+  $('tr').setAttribute('aria-pressed',l==='tr');$('en').setAttribute('aria-pressed',l==='en');
+  try{localStorage.setItem('lang',l)}catch(e){}
+  paint();
+ }
+ function call(fn,body){
+  return fetch(API+fn,{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(body||{})})
+   .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});
+ }
+ try{lang=localStorage.getItem('lang')||'tr'}catch(e){}
+ setLang(lang);
+ $('tr').onclick=function(){setLang('tr')};
+ $('en').onclick=function(){setLang('en')};
+ if(!preview){call('waitlist_stats').then(function(d){founders=d.founders||0;LIMIT=d.limit||25;paint();}).catch(function(){});}
+ $('f').addEventListener('submit',function(e){
+  e.preventDefault();
+  var em=$('email'), err=$('err'), go=$('go');
+  err.hidden=true;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value.trim())){em.focus();em.style.borderColor='#D9480F';err.textContent=t('bad');err.hidden=false;return;}
+  em.style.borderColor='';
+  function done(msg){$('f').hidden=true;var ok=$('ok');ok.textContent=msg;ok.hidden=false;}
+  if(preview){done(t('ok_f'));return;}
+  go.disabled=true;
+  call('join_waitlist',{p_email:em.value.trim(),p_sells_on:$('where').value,p_lang:lang,p_hp:$('hp').value})
+   .then(function(d){
+    go.disabled=false;
+    if(d.founders!=null){founders=d.founders;paint();}
+    if(d.status==='ok')done(d.founder?t('ok_f'):t('ok_w'));
+    else if(d.status==='exists')done(t('exists'));
+    else{err.textContent=t(d.status==='invalid'?'bad':'busy');err.hidden=false;}
+   })
+   .catch(function(){go.disabled=false;err.textContent=t('net');err.hidden=false;});
+ });
+})();
+</script>
+</body>
+</html>
