@@ -496,6 +496,7 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   if (want.has("manufacturer")) safe.manufacturer = textVal(market, String(product?.brand || "Generic").slice(0, 50)); // marka alanıyla aynı
   if (want.has("batteries_required")) safe.batteries_required = plainVal(market, false);
   if (want.has("supplier_declared_dg_hz_regulation")) safe.supplier_declared_dg_hz_regulation = plainVal(market, "not_applicable");
+  if (want.has("item_type_keyword")) safe.item_type_keyword = plainVal(market, productType.toLowerCase().replace(/_/g, "-")); // AI daha iyisini verirse o kullanılır
   const tA = Date.now();
   let ai = { ...safe, ...tb.at };
   // Amazon sonradan itiraz ettiyse (amazon-orders ilan durumunu okur): itiraz edilen nitelikler gönderimden önce düzeltilir

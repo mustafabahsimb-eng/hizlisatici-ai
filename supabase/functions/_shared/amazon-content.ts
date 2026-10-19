@@ -269,15 +269,20 @@ Translate naturally (not word by word). Never invent specifications that are not
   const r = await aiJson(system, JSON.stringify(src), { maxTokens: 2500 });
   const draft: AmazonContent = r && typeof r.title === "string"
     ? { title: r.title, bullets: Array.isArray(r.bullets) ? r.bullets.map(String) : [], description: String(r.description || ""), keywords: String(r.keywords || "") }
-    : { title: src.title, bullets: src.bullets.length ? src.bullets : specBullets(product), description: src.description, keywords: src.keywords };
+    : { title: src.title, bullets: src.bullets.length ? src.bullets : specBullets(product, src.description), description: src.description, keywords: src.keywords };
   const { content, issues } = checkContent(draft, market, src.brand, maxTitle);
   return { content, issues, ai: !!(r && typeof r.title === "string") };
 }
 
-// AI yoksa: ürün özelliklerinden madde ("Malzeme: Seramik")
-function specBullets(product: any): string[] {
+// AI yoksa: ürün özelliklerinden madde ("Malzeme: Seramik"), yetmezse açıklamanın cümlelerinden
+function specBullets(product: any, description = ""): string[] {
   const s = product?.specs;
-  if (Array.isArray(s)) return s.map((x: any) => (x?.k && x?.v ? `${x.k}: ${x.v}` : "")).filter(Boolean).slice(0, 5);
-  if (s && typeof s === "object") return Object.entries(s).map(([k, v]) => `${k}: ${v}`).slice(0, 5);
-  return [];
+  let out: string[] = [];
+  if (Array.isArray(s)) out = s.map((x: any) => (x?.k && x?.v ? `${x.k}: ${x.v}` : "")).filter(Boolean);
+  else if (s && typeof s === "object") out = Object.entries(s).map(([k, v]) => `${k}: ${v}`);
+  if (out.length < 5) {
+    const sent = String(description || "").replace(/<[^>]+>/g, " ").split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter((x) => x.length >= 20);
+    out = [...out, ...sent];
+  }
+  return out.slice(0, 5);
 }

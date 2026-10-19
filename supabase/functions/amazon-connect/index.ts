@@ -17,6 +17,7 @@ import { buyAmazonLabel, shipFromAddress, shipmentRequest } from "../_shared/ama
 import { ORDERS_PATH } from "../_shared/amazon-orders.ts";
 import { prepareImages, storageUploader } from "../_shared/amazon-images.ts";
 import { once } from "../_shared/once.ts";
+import { AI_MODELS, aiText } from "../_shared/amazon-content.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -166,6 +167,17 @@ Deno.serve(async (req) => {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (b.action === "selftest") return json(await selftest(b));
       if (b.action === "sandbox_connect" && b.email) return json(await sandboxConnect(String(b.email), b));
+      // Teşhis: AI modellerinin cevap kodu (anahtar ya da içerik dönmez)
+      if (b.action === "ai_ping") {
+        const out: Record<string, unknown> = {};
+        for (const model of AI_MODELS) {
+          const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
+            body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "hi" }] }) }).catch((e) => ({ status: 0, text: async () => String(e) } as any));
+          out[model] = { status: r.status, body: String(await r.text()).slice(0, 160) };
+        }
+        out.aiText = await aiText({ content: "Say OK", maxTokens: 5 });
+        return json({ ok: true, aiPing: out });
+      }
       // Ana görsel düzeltme ayrı çağrıda (kendi işlemci süresiyle); aynı ürünün tüm Amazon pazarları tek sonucu paylaşır
       if (b.action === "prepare_images" && Array.isArray(b.urls)) {
         const urls = b.urls.map(String).slice(0, 9), prefix = String(b.pathPrefix || "amazon/x");

@@ -1,6 +1,11 @@
 # Mustafa'nın yapacakları
 Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kimlik doğrulamanı gerektiren işler burada toplanır (kalıcı kural, CLAUDE.md); Claude'un kendi yapabileceği hiçbir iş bu listeye girmez. Claude bunlar için beklemez, başka işlere devam eder. İstediğin zaman tek seferde yaparsın; bitirince "yaptım" demen yeter, gerisini Claude tamamlar.
 
+## ACİL — Yapay zekâ kredisi bitti (19 Ekim 2026, 14:20)
+0. **Anthropic API kredisi yükle:** https://console.anthropic.com/settings/billing → kredi ekle (otomatik yükleme önerilir).
+   - Neden: AI isteklerinin hepsi "credit balance is too low" ile reddediliyor. Seltigo'daki tüm AI işleri duruyor: ürün metni, Amazon nitelikleri, asistan, görsel tanıma, içerik.
+   - Yükleyince "yaptım" de. Claude Amazon hız ölçümünü (`tests/e2e/amazon_hiz.py`) tamamlar.
+
 ## Meta (Facebook / Instagram / WhatsApp / reklam) — 19 Ekim 2026
 1. **Bağlantıları onar (önemli; şu an bozuk):** https://mustafabahsimb-eng.github.io/hizlisatici-ai/ads.html → "Facebook'u reklam izniyle bağla" → Facebook penceresinde **tüm izinlere** izin ver.
    - Neden: Marketing API Tools'ta 6 izinle anahtar alınınca Meta, uygulamanın izinlerini 6'ya indirdi. Instagram (@mfkoleksiyon) ve WhatsApp okunamıyor; Facebook sayfasında paylaşım izni yok.

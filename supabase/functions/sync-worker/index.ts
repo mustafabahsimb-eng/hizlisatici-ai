@@ -727,13 +727,19 @@ Deno.serve(async (req) => {
   const worker = "sync-worker-" + crypto.randomUUID().slice(0, 8);
   const results = [];
   let claimed = 0;
+  let graced = false;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
 
     const { data: jobs, error } = await db.rpc("claim_sync_jobs", { p_limit: BATCH_SIZE, p_worker: worker });
     if (error) return json({ ok: false, error: "claim_failed", detail: errMsg(error) }, 500);
-    if (!jobs || jobs.length === 0) break;
+    if (!jobs || jobs.length === 0) {
+      // Kuyruk boş: 6 sn bekleyip bir kez daha bak. Ürün eklenince önce mağaza ilanı, 1-2 sn sonra pazaryeri ilanları gelir;
+      // tetikleyici 5 sn'de en fazla bir kez çalıştığından geç gelenler yoksa 2 dk'lık zamanlanmış çalışmayı beklerdi.
+      if (!graced && Date.now() - started < TIME_BUDGET_MS - 10000) { graced = true; await new Promise((r) => setTimeout(r, 6000)); continue; }
+      break;
+    }
     claimed += jobs.length;
 
     const runJob = async (job) => {
