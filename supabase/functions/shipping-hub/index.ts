@@ -119,17 +119,19 @@ type Tracked = { status: "created" | "shipped" | "delivered" | "cancelled"; trac
 
 // --- Yurtiçi (SOAP) ---
 const YK_URL = { test: "http://testwebservices.yurticikargo.com:9090/KOPSWebServices/ShippingOrderDispatcherServices", live: "https://ws.yurticikargo.com/KOPSWebServices/ShippingOrderDispatcherServices" };
-async function ykCall(mode: string, op: string, inner: string): Promise<string> {
+// Gönderi oluşturma 3 deneme / 30 sn; sorgu (takip, doğrulama) 1 deneme / 15 sn: yavaş test sunucusu kuyruğu kilitlemesin
+async function ykCall(mode: string, op: string, inner: string, o: { tries?: number; timeout?: number } = {}): Promise<string> {
+  const tries = o.tries ?? (op === "createShipment" ? 3 : 1), timeout = o.timeout ?? (op === "createShipment" ? 30000 : 15000);
   const body = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ship="http://yurticikargo.com.tr/ShippingOrderDispatcherServices"><soapenv:Header/><soapenv:Body><ship:${op}>${inner}</ship:${op}></soapenv:Body></soapenv:Envelope>`;
   // Bağlantı kopmalarına karşı 3 deneme (Yurtiçi aynı cargoKey'i ikinci kez oluşturmaz)
   let r: Response | null = null, lastErr: unknown = null;
-  for (let i = 0; i < 3 && !r; i++) {
+  for (let i = 0; i < tries && !r; i++) {
     try {
       r = await fetch(mode === "test" ? YK_URL.test : YK_URL.live, {
         method: "POST", headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' }, body,
-        signal: AbortSignal.timeout(30000), // yanıt vermeyen sunucu fonksiyonu kilitlemesin
+        signal: AbortSignal.timeout(timeout), // yanıt vermeyen sunucu fonksiyonu kilitlemesin
       });
-    } catch (e) { lastErr = e; await new Promise((res) => setTimeout(res, 1500 * (i + 1))); }
+    } catch (e) { lastErr = e; if (i < tries - 1) await new Promise((res) => setTimeout(res, 1500 * (i + 1))); }
   }
   if (!r) throw new Error("Yurtiçi'ne bağlanılamadı: " + short((lastErr as Error)?.message, 120));
   const text = await r.text();
@@ -388,7 +390,7 @@ async function createShipment(sh: any) {
   if (sh.marketplace_order_id) {
     const r = await db.from("marketplace_orders").select("*").eq("id", sh.marketplace_order_id).maybeSingle();
     mo = r.data;
-    if (!mo) throw new Error("Sipariş bulunamadı");
+    if (!mo) throw new OrderGone();
     if (mo.status === "cancelled") { await db.from("shipments").update({ status: "cancelled" }).eq("id", sh.id); return { cancelled: true }; }
     if (sh.provider === "amazon") return await createAmazonShipment(sh, mo);
   }
@@ -397,7 +399,7 @@ async function createShipment(sh: any) {
   const provider = PROVIDERS[account.provider];
   if (!provider) throw new Error("Desteklenmeyen kargo: " + account.provider);
   const order: any = mo ? mpOrderShape(mo) : (await db.from("store_orders").select("*").eq("id", sh.store_order_id).maybeSingle()).data;
-  if (!order) throw new Error("Sipariş bulunamadı");
+  if (!order) throw new OrderGone();
   if (order.status === "cancelled") { await db.from("shipments").update({ status: "cancelled" }).eq("id", sh.id); return { cancelled: true }; }
   const { data: product } = await db.from("products").select("name, weight_kg").eq("id", order.product_id).maybeSingle();
   const kg = Math.max(0.5, Number(product?.weight_kg || 1) * (order.quantity || 1));
@@ -486,6 +488,11 @@ async function trackShipment(sh: any) {
   return { status: t.status, tracking: t.tracking || null };
 }
 
+// Sipariş silinmişse gönderi tekrar denenmez, kapanır
+class OrderGone extends Error { constructor() { super("Sipariş bulunamadı (silinmiş)"); } }
+const QUEUE_CONCURRENCY = 4;
+const TEST_TRACK_DAYS = 3; // test gönderileri (kargo test sunucusu) 3 günden sonra izlenmez
+
 async function runQueue(onlyId?: string) {
   const started = Date.now();
   const results: unknown[] = [];
@@ -494,13 +501,24 @@ async function runQueue(onlyId?: string) {
   if (onlyId) q = db.from("shipments").select("*").eq("id", onlyId).limit(1);
   const { data: list, error } = await q;
   if (error) throw error;
-  for (const sh of list || []) {
-    if (Date.now() - started > TIME_BUDGET_MS) break;
+  const one = async (sh: any) => {
+    if (Date.now() - started > TIME_BUDGET_MS) return;
+    // Test gönderisi: kargo test sunucusu gerçek hareket üretmez; birkaç gün sonra takibi bırak
+    if (sh.test && sh.status !== "pending" && Date.now() - new Date(sh.created_at).getTime() > TEST_TRACK_DAYS * 86400_000) {
+      await db.from("shipments").update({ next_attempt_at: new Date(Date.now() + 365 * 86400_000).toISOString(), last_error: "Test gönderisi: takip durduruldu", updated_at: new Date().toISOString() }).eq("id", sh.id);
+      results.push({ id: sh.id, skipped: "test_old" });
+      return;
+    }
     try {
       if (sh.status === "pending") results.push({ id: sh.id, ...(await createShipment(sh)) });
       else results.push({ id: sh.id, ...(await trackShipment(sh)) });
     } catch (e) {
       const msg = short((e as Error).message);
+      if (e instanceof OrderGone) {
+        await db.from("shipments").update({ status: "cancelled", last_error: msg, updated_at: new Date().toISOString() }).eq("id", sh.id);
+        results.push({ id: sh.id, cancelled: "order_gone" });
+        return;
+      }
       const attempts = (sh.attempts || 0) + 1;
       await db.from("shipments").update({
         attempts, last_error: msg, updated_at: new Date().toISOString(),
@@ -509,7 +527,13 @@ async function runQueue(onlyId?: string) {
       }).eq("id", sh.id);
       results.push({ id: sh.id, error: msg });
     }
-  }
+  };
+  // Aynı anda en fazla 4 gönderi (biri yavaş kargo sunucusunda beklerken diğerleri işlenir)
+  let i = 0;
+  const items = list || [];
+  await Promise.all(Array.from({ length: Math.min(QUEUE_CONCURRENCY, items.length) }, async () => {
+    while (i < items.length) await one(items[i++]);
+  }));
   return results;
 }
 
