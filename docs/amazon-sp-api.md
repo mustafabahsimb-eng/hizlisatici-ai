@@ -73,6 +73,37 @@ Kaynaklar (resmi): developer-docs.amazon/sp-api — uç noktalar, pazar kimlikle
   - `tests/amazon/amazon_quality_test.ts` 13/13
 - **Gerçek Amazon sandbox'ı:** `python tools/amazon/amazon_ac.py test` → 7/7 geçti (19 Ekim; pazarlar, katalog, ilan provası, siparişler v2026, kategori onayı, Amazon kesintisi, etiket).
 
+## Uçtan uca ölçüm: "ürün ekle -> Amazon'a gönder" (19 Ekim 2026)
+**Akış:**
+- Toplu Yükleme'ye ürün linkini yapıştır → [Seçilenleri ekle] (1 tıklama).
+- "📤 Pazaryerlerine de gönder" seçimi bir kez yapılır ve hatırlanır (asistanın varsayılan kanallarıyla ortak).
+- Ürün kendi mağazaya ve bağlı tüm Amazon pazarlarına aynı anda gider (`site-store send_products` → `distributeProducts` → sync-worker).
+
+**Test ortamı:**
+- Test kullanıcısında 5 Amazon pazarı sandbox bağlantısı (TR / DE / UK / FR / US): `python tools/amazon/amazon_ac.py test-baglan` (kaldırmak: `--sil`).
+- Satıcı hesabı olmadığı için Amazon'un cevapları benzetimden gelir (`_shared/amazon-sim.ts`, istek başına 300 ms, eksik zorunlu nitelikte Amazon gibi hata).
+- Giriş anahtarı, ürün okuma, AI, görsel düzeltme, kuyruk ve işçi gerçek.
+- Ölçüm: `tests/e2e/amazon_hiz.py` (5 kategori: ayakkabı, çanta, kot, tişört, poster).
+
+**Bulunan darboğazlar ve çözümler:**
+1. Panelden pazaryerine gönderim yolu yoktu (linkten / dosyadan yükleme yalnız kendi mağaza; "Ürün ekle" taslağı hiç gönderilmiyordu) → "Pazaryerlerine de gönder".
+2. İşçi kaynak sınırı (WORKER_RESOURCE_LIMIT): her pazar aynı büyük görseli aynı anda çözüyordu.
+   - Görsel düzeltme artık ürün başına tek kez ve ayrı çağrıda (`amazon-connect prepare_images` + `prep_once`).
+   - Takılı iş 3 dk'da geri sıraya döner (önceden 15 dk).
+3. AI nitelik biçimi: düz değer / tek nesne olarak gelen nitelikler "eksik" sayılıyordu → `normalizeAttrs`. Üretici, pil ve tehlikeli madde için güvenli varsayılan.
+4. 15 AI isteği birden → sınır aşımı → boş cevap → aynı anda en fazla 4 istek, 429 / 529'da bekleyip yeniden deneme.
+5. Kuyruk başlama gecikmesi (2 dk): pazaryeri ilanları tetikleyicinin 5 sn penceresine düşünce zamanlanmış çalışmayı bekliyordu → işçi boş kuyrukta 6 sn bekleyip bir kez daha bakar, kuyruk boşalana kadar çalışır.
+
+**Sonuç** (5 pazar birlikte, ürün başına; link yapıştırmadan son pazarın sonucuna):
+
+| Ölçüm | Ayakkabı | Çanta | Kot | Tişört | Poster | Kabul |
+|---|---|---|---|---|---|---|
+| Önce (1. tur) | 5 dk+ (işçi çöktü) | 56 sn | 5 dk+ | 5 dk+ | — | 0 / 20 |
+| Sonra (4. tur, AI kredisi yok) | 48 sn | 16 sn | 20 sn | 13 sn | 17 sn | 0 / 25 |
+
+- 4. turda kabul yok, çünkü Anthropic kredisi bitti: renk / malzeme / beden gibi nitelikler AI olmadan doldurulamıyor (YARIM_ISLER "ACİL").
+- Kredi yüklenince ölçüm tekrarlanacak; AI adımları paralel olduğu için beklenen ek süre 5-12 sn / ürün.
+
 ## Durum ve açmak için gerekenler
 - Kayıtlı (6 Ekim): `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET`, `AMAZON_SANDBOX_REFRESH_TOKEN` → sandbox çalışıyor.
 - `AMAZON_APP_ID` kaydedildi (19 Ekim; `amazon_ac.py uygulama-no`). "Amazon mağazanı bağla" akışı test edildi: `tests/e2e/amazon_baglanti.py` 16/16.
