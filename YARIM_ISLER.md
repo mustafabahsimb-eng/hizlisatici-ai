@@ -22,7 +22,12 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 ## Para / şirket gerektirenler (karar: şirket kurulunca)
 9. Chrome Web Mağazası geliştirici hesabı (tek seferlik 5 $).
 10. Sabit IP sunucusu (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün").
-11. Amazon geliştirici kaydı (Solution Provider Portal, public developer) — docs/amazon-sp-api.md.
+11. Amazon:
+   - **Şimdi (sandbox; 5 dk, ücretsiz):** 6 Ekim'de açtığın Amazon geliştirici uygulamasının sayfasını aç. Solution Provider Portal'dan kaydolduysan https://solutionproviderportal.amazon.com → Apps & Services → Develop Apps; Seller Central'dan kaydolduysan https://sellercentral.amazon.com/sellingpartner/developerconsole.
+     - Uygulamanın "Edit App" bölümünde OAuth Login URI ve OAuth Redirect URI alanlarının ikisine de şu adresi yaz: `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`
+     - Uygulama numarasını (App ID, `amzn1.sp.solution.` ile başlar) Claude'a gönder.
+     - Neden: sandbox anahtarları kayıtlı ve Amazon'un gerçek sandbox'ı 6/6 geçti (19 Ekim). Satıcıların "Amazon mağazanı bağla" onay sayfası için yalnız bu numara eksik. Claude: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>`.
+   - **Şirket kurulunca:** Solution Provider Portal "public developer" + Appstore onayı + alıcı adresi için PII rolü (adımlar YOL-HARITASI.md "Amazon"). Claude sonra `amazon_ac.py canli --yayinda` çalıştırır.
 12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
 14. **Trendruum satıcı hesabı** (şirket kurulunca; şahıs / limited / anonim şirket ister): https://seller.trendruum.com/onboarding/satici-formu/pazaryeri → hesap açılınca "yaptım" de.

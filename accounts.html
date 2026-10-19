@@ -912,7 +912,11 @@
         body: JSON.stringify({ action: 'start', region, userAccessToken: session.access_token }),
       });
       const d = await res.json().catch(() => ({}));
-      if (d.ok && d.url) { toast(t('amzRedirecting')); window.location.href = d.url; return; }
+      if (d.ok && d.url) {
+        // Amazon onaydan sonra satıcıyı önce giriş adresimize (amazon-callback.html) getirir; durum anahtarı orada geri verilir
+        try { sessionStorage.setItem('amzState', new URL(d.url).searchParams.get('state') || ''); } catch (_) {}
+        toast(t('amzRedirecting')); window.location.href = d.url; return;
+      }
       const msg = d.notReady ? t('amzSoon') : (d.error || t('errServer'));
       if (inModal) document.getElementById('amazonRegionError').textContent = msg;
       else toast(msg, true);

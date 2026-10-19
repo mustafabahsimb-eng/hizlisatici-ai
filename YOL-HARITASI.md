@@ -140,9 +140,22 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
 | Toplu Ürün Yükleme (12 Ekim) | soru "AliExpress ürünleri için kaynak" (AliExpress / Kendi stoğum) |
 | Panel "Ürün ekle" kartı alt yazısı (12 Ekim) | "Tek ürün, link, katalog ya da fotoğraf" |
 
-## Amazon (TR + Global, SP-API) — kod bitti (13 Ekim 2026), anahtar bekliyor
+## Amazon (TR + Global, SP-API) — kod bitti (13 Ekim 2026), sandbox çalışıyor (19 Ekim), uygulama numarası bekliyor
+- [x] 19 Ekim, hızlı yükleme katmanı:
+  - pazar dilinde AI metni + Amazon metin kuralları (otomatik düzeltme)
+  - ana görsel kontrolü + otomatik düzeltme
+  - AI ile görselli ürün türü seçimi
+  - kategori onayı ön kontrolü
+  - ret → AI düzeltme → yeniden gönderme
+  - çok pazar paralel (sync-worker 6 iş aynı anda)
+  - zarar kontrolü; mağaza içi barkod kontrolü
+  - siparişler Orders API v2026-01-01 (satıcı başına tek istek)
+  - süre ölçümü (tam ilan ~3,7 sn / pazar, ASIN'e teklif ~0,9 sn, fiyat-stok ~0,3 sn)
+  - Gerçek Amazon sandbox'ı 6/6 (`python tools/amazon/amazon_ac.py test`). Ayrıntı docs/amazon-sp-api.md "Hızlı yükleme katmanı".
+- [ ] AMAZON_APP_ID gelince: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>` → Hesaplarım'dan bağlanma testi (Claude).
+- [ ] Komisyonu kategoriye göre Amazon'dan okuma (Product Fees API getMyFeesEstimate); şimdilik %15.
 - [x] Kod tamam, varsayılan SANDBOX: mağaza bağlama (Amazon onay sayfası; TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (barkodla ya da marka+modelle katalog eşleme -> yalnız teklif + bulunan barkod ürüne yazılır; yoksa ürün türü + şema + AI nitelikler; GTIN muafiyeti; seçenekler paralel; prova), ilan kuyruğu beklemeden çalışır (1 dk hedefi), sipariş (15 dk), tedarikçiye yönlendirme, stok/fiyat hızlı PATCH, etiket (satıcının kargo hesabı ya da Amazon Buy Shipping), kargo bildirimi, asistan bildirim + gönderilecekler. Ayrıntı docs/amazon-sp-api.md.
-- [x] Testler: Amazon'un resmi örnek cevaplarıyla taklit testler (tests/amazon/amazon_sandbox_test.ts 13/13), veritabanı tetikleyicileri (tests/amazon/amazon_db_test.sql 7/7, iz bırakmaz), Hesaplarım (tests/e2e/amazon_baglanti.py 8/8).
+- [x] Testler: Amazon'un resmi örnek cevaplarıyla taklit testler (tests/amazon/amazon_sandbox_test.ts), veritabanı tetikleyicileri (tests/amazon/amazon_db_test.sql 7/7, iz bırakmaz), Hesaplarım (tests/e2e/amazon_baglanti.py 8/8).
 - Arayüz adları onaylandı (13 Ekim): "Amazon mağazanı bağla", "Avrupa", "Kuzey Amerika", "Uzak Doğu".
 - **Şirket sonrası (Mustafa karar verdi, 13 Ekim: şimdi para harcanmayacak)**:
   1. Solution Provider Portal'da (solutionproviderportal.amazon.com) şirket adına "public developer" kaydı: şirket bilgileri, web sitesi (Amazon'un web sitesi kurallarına uygun), güvenlik soruları, geliştirici profili (500 kelime altı).

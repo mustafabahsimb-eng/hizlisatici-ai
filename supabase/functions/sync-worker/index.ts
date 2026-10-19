@@ -6,6 +6,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { AMAZON_MARKETS, marketByCode, amazonConfigured } from "../_shared/amazon.ts";
 import { submitListing, withdrawListing } from "../_shared/amazon-listing.ts";
+import { storageUploader } from "../_shared/amazon-images.ts";
 import { buildItems, categoryAttributes, credsFromVault, fillAttributes, findBrand, localChecks, pickCategory, submitProducts, trendruumEnabled, updatePriceStock } from "../_shared/trendruum.ts";
 import { featureEnabled } from "../_shared/features.ts";
 
@@ -19,6 +20,16 @@ const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: fal
 const BATCH_SIZE = 10;        // tek seferde alınan iş sayısı
 const MAX_ROUNDS = 40;        // bir çalışmada en fazla kaç tur (asıl sınır süre bütçesi)
 const TIME_BUDGET_MS = 45000; // Edge Function süresini aşmamak için
+const CONCURRENCY = 6;         // aynı anda işlenen ilan sayısı (pazaryeri kotalarına adaptörlerin tekrar denemesi uyar)
+
+// En fazla n işi aynı anda çalıştırır
+async function runPool(items, n, fn) {
+  let i = 0;
+  const lanes = Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const it = items[i++]; await fn(it); }
+  });
+  await Promise.all(lanes);
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -438,7 +449,21 @@ async function amazonAdapter(action, listing) {
   }
   if (!product) throw new Error("product_not_found");
 
-  const r = await submitListing({ db, ctx, market, sellerId, listing, product, variants, images, stockQty: product.stock_qty, preview });
+  // Pazar kuralları (başlık sınırı) + zarar kontrolü için maliyet pazar para biriminde
+  const { data: mk } = await db.from("marketplaces").select("max_title_length, default_commission_pct").eq("code", listing.marketplace_code).maybeSingle();
+  let unitCost = null;
+  const cost = Number(product.supplier_price) || 0;
+  if (cost > 0) {
+    const from = product.cost_currency || "TRY";
+    if (from === market.currency) unitCost = cost;
+    else {
+      const { data: k } = await db.rpc("fx_rate", { p_from: from, p_to: market.currency, p_date: null });
+      if (Number(k) > 0) unitCost = Math.round(cost * Number(k) * 100) / 100;
+    }
+  }
+  const r = await submitListing({ db, ctx, market, sellerId, listing, product, variants, images, stockQty: product.stock_qty, preview,
+    upload: storageUploader(db), imagePrefix: `amazon/${listing.user_id}/${product.id}`, maxTitle: mk?.max_title_length || 200,
+    commissionPct: listing.commission_pct ?? mk?.default_commission_pct ?? 15, unitCost });
   const validation = {
     ok: r.ok, dry_run: preview, action: "publish", marketplace: listing.marketplace_code, errors: r.errors, warnings: r.warnings,
     amazon: r.amazon, checked_at: now,
@@ -697,12 +722,12 @@ Deno.serve(async (req) => {
     if (!jobs || jobs.length === 0) break;
     claimed += jobs.length;
 
-    for (const job of jobs) {
+    const runJob = async (job) => {
       if (Date.now() - started > TIME_BUDGET_MS) {
         // Süre doldu: alınan ama işlenemeyen işi hata saymadan sıraya geri bırak
         await db.rpc("fail_sync_job", { p_job_id: job.id, p_error: "time_budget_exceeded" });
         results.push({ id: job.id, outcome: "requeued" });
-        continue;
+        return;
       }
       try {
         results.push(await processJob(job));
@@ -714,7 +739,15 @@ Deno.serve(async (req) => {
         await db.rpc("fail_sync_job", { p_job_id: job.id, p_error: msg });
         results.push({ id: job.id, outcome: "failed", error: msg });
       }
+    };
+    // HIZ KURALI: kanallara yayın PARALEL. Aynı ilanın işleri kendi içinde sırayla (yarış olmasın), farklı ilanlar aynı anda.
+    const groups = new Map();
+    for (const job of jobs) {
+      const k = job.listing_id || job.id;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(job);
     }
+    await runPool([...groups.values()], CONCURRENCY, async (g) => { for (const job of g) await runJob(job); });
 
     if (jobs.length < BATCH_SIZE) break;
   }

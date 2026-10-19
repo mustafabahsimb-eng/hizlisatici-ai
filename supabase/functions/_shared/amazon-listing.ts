@@ -10,6 +10,8 @@
 // Üretilen nitelikler listings.validation.amazon içinde saklanır (listings.attributes'a yazılmaz; yoksa senkron döngüsü olur).
 // =========================================================
 import { type AmazonMarket, type Ctx, gtinType, makeSku, money, sp, SpApiError, validGtin } from "./amazon.ts";
+import { aiJson, type AmazonContent, localizedContent } from "./amazon-content.ts";
+import { prepareImages, type Uploader } from "./amazon-images.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const AI_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-sonnet-4-6"]; // hız için önce Haiku
@@ -18,6 +20,8 @@ export type Issue = { code: string; field?: string; msg: string; severity?: stri
 export type BuildInput = {
   db: any; ctx: Ctx; market: AmazonMarket; sellerId: string; listing: any; product: any; variants: any[]; images: string[];
   stockQty: number | null; preview: boolean;
+  // İsteğe bağlı: pazar dilindeki metin (yoksa üretilir), görsel düzeltme için depo, başlık sınırı, komisyon (%), maliyet (pazar para biriminde)
+  content?: AmazonContent | null; upload?: Uploader | null; imagePrefix?: string; maxTitle?: number | null; commissionPct?: number | null; unitCost?: number | null;
 };
 
 async function sha(s: string) {
@@ -42,9 +46,54 @@ export async function productTypeFor(input: BuildInput): Promise<string> {
   const words = title.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, " ").split(/\s+/).filter((w) => w.length > 2).slice(0, 6);
   const d = await sp(ctx, "GET", "/definitions/2020-09-01/productTypes", { query: { marketplaceIds: market.id, itemName: title, locale: market.locale } })
     .catch(() => sp(ctx, "GET", "/definitions/2020-09-01/productTypes", { query: { marketplaceIds: market.id, keywords: words } }));
-  const t = d?.productTypes?.[0]?.name;
-  if (!t) throw new Error("Amazon ürün türü bulunamadı");
-  return t;
+  const cands: { name: string; displayName?: string }[] = (d?.productTypes || []).slice(0, 6);
+  if (!cands.length) throw new Error("Amazon ürün türü bulunamadı");
+  if (cands.length === 1) return cands[0].name;
+  // Birden çok aday: ürün adı + ana görselle AI seçer (yanlış tür = yanlış zorunlu alanlar = ret)
+  const r = await aiJson(
+    `You choose the single best Amazon product type for a product listing on ${market.domain}. Answer ONLY JSON {"productType":"<one of the candidate names>"}.`,
+    JSON.stringify({ title, brand: product?.brand, description: String(listing.description || product?.generated_description || "").slice(0, 600),
+      candidates: cands.map((c) => ({ name: c.name, displayName: c.displayName })) }),
+    { imageUrl: input.images?.[0] || null, maxTokens: 100 },
+  );
+  const pick = r && cands.find((c) => c.name === r.productType);
+  return (pick || cands[0]).name;
+}
+
+// ---------- Kategori onayı (ungating) ----------
+// Amazon'da yeni satıcıya kapalı (onay / belge isteyen) ürün türleri — Amazon "Categories and products requiring approval" listesi.
+// Kesin cevap ASIN'li üründe Listings Restrictions API'dan gelir; yeni üründe bu liste önceden uyarır.
+export const GATED_TYPES = new Set([
+  "JEWELRY", "FINE_JEWELRY", "FINENECKLACE", "FINERING", "FINEEARRING", "WATCH", "COLLECTIBLE_COIN", "SPORTS_MEMORABILIA", "TRADING_CARD", "ENTERTAINMENT_COLLECTIBLES",
+  "GROCERY", "FOOD", "SNACK_FOOD_BAR", "BEVERAGE", "COFFEE", "TEA", "CANDY", "WINE", "BEER", "SPIRITS", "ALCOHOLIC_BEVERAGE", "DIETARY_SUPPLEMENT", "NUTRITIONAL_SUPPLEMENT",
+  "MEDICATION", "DRUG", "OVER_THE_COUNTER_MEDICATION", "MEDICAL_SUPPLIES", "HEALTH_PERSONAL_CARE", "SEXUAL_WELLNESS", "PESTICIDE", "INSECT_REPELLENT",
+  "AUTO_PART", "AUTO_ACCESSORY", "TIRE", "MUSIC_ALBUM", "VIDEO_DVD", "VIDEO_BLU_RAY", "STREAMING_MEDIA_PLAYER", "LUXURY_BEAUTY", "SKIN_CARE_AGENT", "SUNSCREEN",
+  "HAIR_COLOR", "HAIR_REMOVAL_AGENT", "PET_FOOD", "TOBACCO", "ELECTRONIC_CIGARETTE", "SOLAR_PANEL", "HOVERBOARD", "FIREARM_ACCESSORY",
+]);
+export function gatingHint(productType: string | null, market: AmazonMarket, now = new Date()): string | null {
+  const t = String(productType || "").toUpperCase();
+  if (GATED_TYPES.has(t)) return `"${t}" ürün türü Amazon'da kategori onayı isteyebilir (belge / fatura). Onay yoksa ilan reddedilir.`;
+  // ABD tatil dönemi oyuncak kısıtı (yeni satıcılar 1 Kasım - 31 Aralık arası satamaz)
+  if (/^TOY|_TOY$|^GAME$|^PUZZLE$/.test(t) && market.country === "US" && now.getUTCMonth() >= 9) return "Amazon ABD tatil döneminde (Kasım-Aralık) yeni satıcıların oyuncak satışını kısıtlar.";
+  return null;
+}
+export async function asinRestrictions(ctx: Ctx, sellerId: string, market: AmazonMarket, asin: string): Promise<{ approval: boolean; msg: string; link: string | null } | null> {
+  const d = await sp(ctx, "GET", "/listings/2021-08-01/restrictions", {
+    query: { asin, sellerId, marketplaceIds: market.id, conditionType: "new_new", reasonLocale: market.locale },
+  }).catch(() => null);
+  const reasons = (d?.restrictions || []).flatMap((r: any) => r.reasons || []);
+  if (!reasons.length) return null;
+  const r = reasons.find((x: any) => x.reasonCode === "APPROVAL_REQUIRED") || reasons[0];
+  return { approval: r.reasonCode === "APPROVAL_REQUIRED" || !r.reasonCode, msg: String(r.message || "Kısıtlı ürün"), link: r.links?.[0]?.resource || null };
+}
+
+// ---------- Fiyat: pazar yuvarlaması (asla düşürmez) + zarar kontrolü ----------
+export function marketPrice(price: number, market: AmazonMarket): number {
+  if (!(price > 0)) return 0;
+  if (["JPY", "INR"].includes(market.currency)) return Math.ceil(price); // kuruşsuz para birimleri
+  const p = Math.round(price * 100) / 100;
+  const cents = Math.round((p - Math.floor(p)) * 100);
+  return cents === 99 ? p : money(Math.ceil(p + 0.0001) - 0.01);
 }
 
 export async function schemaFor(input: BuildInput, productType: string): Promise<{ required: string[]; properties: Record<string, any>; themes: string[] }> {
@@ -190,14 +239,15 @@ function identifierAttrs(m: AmazonMarket, gtin: string | null, props: Record<str
 }
 function contentAttrs(m: AmazonMarket, input: BuildInput) {
   const { listing, product, images } = input;
+  const c = input.content;
   const a: Record<string, unknown> = {
-    item_name: textVal(m, String(listing.title || product?.generated_title || product?.name || "").slice(0, 200)),
+    item_name: textVal(m, String(c?.title || listing.title || product?.generated_title || product?.name || "").slice(0, 200)),
     brand: textVal(m, String(product?.brand || "Generic").slice(0, 50)),
-    product_description: textVal(m, String(listing.description || product?.generated_description || "").replace(/<[^>]+>/g, " ").slice(0, 2000)),
+    product_description: textVal(m, String(c?.description || listing.description || product?.generated_description || "").replace(/<[^>]+>/g, " ").slice(0, 2000)),
   };
-  const bullets = (Array.isArray(listing.bullet_points) ? listing.bullet_points : []).map(String).filter(Boolean).slice(0, 5);
+  const bullets = (c?.bullets?.length ? c.bullets : Array.isArray(listing.bullet_points) ? listing.bullet_points : []).map(String).filter(Boolean).slice(0, 5);
   if (bullets.length) a.bullet_point = bullets.map((b) => ({ value: b.slice(0, 500), language_tag: m.locale, marketplace_id: m.id }));
-  const kw = (Array.isArray(listing.keywords) ? listing.keywords : []).map(String).join(" ").slice(0, 250);
+  const kw = c ? c.keywords : (Array.isArray(listing.keywords) ? listing.keywords : []).map(String).join(" ").slice(0, 250);
   if (kw) a.generic_keyword = textVal(m, kw);
   const imgs = images.filter((u) => /^https:\/\//i.test(u)).slice(0, 9);
   if (imgs[0]) a.main_product_image_locator = [{ media_location: imgs[0], marketplace_id: m.id }];
@@ -232,18 +282,60 @@ function variantOptionAttrs(m: AmazonMarket, v: any) {
 // ---------- Ana işlev: bir ilanı Amazon'a gönder (ya da prova et) ----------
 export type SubmitResult = { ok: boolean; preview: boolean; skus: { sku: string; status?: string; submissionId?: string; issues: Issue[] }[]; amazon: Record<string, unknown>; errors: Issue[]; warnings: Issue[] };
 
+// Amazon'un ret nedeni -> otomatik düzeltilebilir mi?
+const APPROVAL_RE = /approval|approve|gated|restricted|onay|genehmigung|autorisation|aprobación|approvazione/i;
+const GTIN_RE = /gtin|upc|ean|barcode|barkod|product.?id|exemption|muafiyet/i;
+const FIX_SKIP = new Set(["externally_assigned_product_identifier", "external_product_id", "supplier_declared_has_product_identifier_exemption", "merchant_suggested_asin",
+  "purchasable_offer", "fulfillment_availability", "condition_type", "parentage_level", "child_parent_sku_relationship", "variation_theme"]);
+export function classifyIssue(i: Issue): "approval" | "gtin" | "image" | "attribute" | "other" {
+  if (APPROVAL_RE.test(i.msg)) return "approval";
+  if ((i.field && /identifier|external_product_id/.test(i.field)) || GTIN_RE.test(i.msg)) return "gtin";
+  if (i.field && /image_locator/.test(i.field)) return "image";
+  if (i.field && !FIX_SKIP.has(i.field)) return "attribute";
+  return "other";
+}
+// Reddedilen nitelikleri Amazon'un hata metniyle birlikte AI'ya yeniden doldurt
+async function aiFixAttributes(input: BuildInput, productType: string, issues: Issue[], attrs: Record<string, unknown>, props: Record<string, any>): Promise<Record<string, unknown>> {
+  const names = [...new Set(issues.map((i) => i.field!).filter(Boolean))];
+  if (!names.length) return {};
+  const { market, product, listing } = input;
+  const r = await aiJson(
+    `You fix rejected Amazon SP-API Listings Items attributes for product type ${productType} on ${market.domain}. Output ONLY a JSON object: keys = attribute names to replace, values = arrays exactly in Amazon attribute format (marketplace_id "${market.id}", language_tag "${market.locale}" where applicable). Choose enum values only from the schema. Fix exactly what Amazon's error says. Never invent certifications.`,
+    JSON.stringify({ errors: issues.map((i) => ({ attribute: i.field, message: i.msg })), current: Object.fromEntries(names.map((n) => [n, attrs[n] ?? null])),
+      schemas: Object.fromEntries(names.map((n) => [n, JSON.stringify(props[n] || {}).slice(0, 2500)])),
+      product: { title: input.content?.title || listing.title, brand: product?.brand, model: product?.model_code, specs: product?.specs, weight_kg: product?.weight_kg,
+        dimensions_cm: [product?.length_cm, product?.width_cm, product?.height_cm] } }),
+    { maxTokens: 3000 },
+  );
+  if (!r || typeof r !== "object") return {};
+  return Object.fromEntries(Object.entries(r).filter(([k, v]) => names.includes(k) && Array.isArray(v)));
+}
+
 export async function submitListing(input: BuildInput): Promise<SubmitResult> {
+  const t0 = Date.now();
+  const timings: Record<string, number> = {};
+  const lap = (k: string, from: number) => { timings[k] = (timings[k] || 0) + (Date.now() - from); };
   const { ctx, market, sellerId, listing, product, preview } = input;
   const prev = listing.validation?.amazon || {};
   const active = (input.variants || []).filter((v) => v.is_active !== false && !v.deleted_at);
   const multi = active.length > 1;
-  const price = Number(listing.price) || 0;
+  const price = marketPrice(Number(listing.price) || 0, market);
   const qty = Math.max(0, Number(input.stockQty ?? product?.stock_qty ?? 0));
-  const gtin = String(product?.gtin || active.find((v) => v.is_default)?.gtin || "").replace(/\D/g, "") || null;
+  let gtin = String(product?.gtin || active.find((v) => v.is_default)?.gtin || "").replace(/\D/g, "") || null;
   const errors: Issue[] = [], warnings: Issue[] = [];
   if (price <= 0) errors.push({ code: "price_missing", field: "price", msg: "Satış fiyatı yok." });
   if (!input.images.some((u) => /^https:\/\//i.test(u))) errors.push({ code: "images_missing", field: "images", msg: "En az 1 görsel gerekli." });
+  // Zarar kontrolü (kapatılamaz): fiyat - Amazon komisyonu - maliyet < 0 ise gönderilmez
+  const commission = Number(input.commissionPct ?? listing.commission_pct ?? 15);
+  if (price > 0 && input.unitCost != null && input.unitCost > 0 && price - price * commission / 100 - input.unitCost < 0) {
+    errors.push({ code: "loss", field: "price", msg: `Zarar: ${price} ${market.currency} fiyattan Amazon komisyonu (%${commission}) ve maliyet (${money(input.unitCost)} ${market.currency}) düşünce kâr eksi.` });
+  }
   if (errors.length) return { ok: false, preview, skus: [], amazon: prev, errors, warnings };
+  // Barkod ön kontrolü: GS1'in mağaza içi (dahili) önekleri Amazon'da geçmez -> barkodsuz yol
+  if (gtin && validGtin(gtin) && internalGtin(gtin)) {
+    warnings.push({ code: "gtin_internal", field: "barcode", msg: "Barkod mağaza içi (GS1 dahili önek: 02 / 04 / 2xx); Amazon kabul etmez, barkodsuz gönderildi." });
+    gtin = null;
+  }
 
   const contentHash = await sha(JSON.stringify([listing.title, listing.description, listing.bullet_points, listing.keywords, input.images, product?.brand, gtin,
     active.map((v) => [v.id, v.attributes, v.gtin])]));
@@ -252,16 +344,23 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   const skus: SubmitResult["skus"] = [];
   const collect = (sku: string, d: any) => {
     const issues: Issue[] = (d?.issues || []).map((i: any) => ({ code: String(i.code), field: (i.attributeNames || [])[0], msg: String(i.message), severity: i.severity }));
-    skus.push({ sku, status: d?.status, submissionId: d?.submissionId, issues });
-    for (const i of issues) (i.severity === "ERROR" ? errors : warnings).push({ ...i, msg: `${sku}: ${i.msg}` });
+    const at = skus.findIndex((x) => x.sku === sku);
+    const row = { sku, status: d?.status, submissionId: d?.submissionId, issues };
+    if (at >= 0) skus[at] = row; else skus.push(row);
+    return issues;
+  };
+  const finish = () => {
+    for (const s of skus) for (const i of s.issues) (i.severity === "ERROR" ? errors : warnings).push({ ...i, msg: `${s.sku}: ${i.msg}` });
   };
 
-  // Hızlı yol: içerik değişmedi, daha önce kabul edildi -> yalnız fiyat / stok
-  if (!preview && prev.hash === contentHash && prev.accepted && Array.isArray(prev.skus) && prev.skus.length) {
+  // Hızlı yol: içerik değişmedi, daha önce kabul edildi, Amazon'da açık hata yok -> yalnız fiyat / stok
+  const openErrors = Array.isArray(prev.issues) && prev.issues.some((i: any) => i.severity === "ERROR");
+  if (!preview && prev.hash === contentHash && prev.accepted && !openErrors && Array.isArray(prev.skus) && prev.skus.length) {
+    const tp = Date.now();
     for (const s of prev.skus as { sku: string; variantId?: string; parent?: boolean }[]) {
       if (s.parent) continue;
       const v = active.find((x) => x.id === s.variantId);
-      const vPrice = v && product?.supplier_price && v.cost ? price * (Number(v.cost) / Number(product.supplier_price)) : price;
+      const vPrice = v && product?.supplier_price && v.cost ? marketPrice(price * (Number(v.cost) / Number(product.supplier_price)), market) : price;
       const vQty = v && v.stock_qty != null ? Number(v.stock_qty) : qty;
       const patches = Object.entries(offerAttrs(market, vPrice, vQty, listing.compare_at_price)).map(([path, value]) => ({ op: "replace", path: `/attributes/${path}`, value }));
       const d = await sp(ctx, "PATCH", `/listings/2021-08-01/items/${encodeURIComponent(sellerId)}/${encodeURIComponent(s.sku)}`, {
@@ -269,10 +368,14 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
       });
       collect(s.sku, d);
     }
-    return { ok: !errors.length, preview, skus, amazon: { ...prev, syncedAt: new Date().toISOString() }, errors, warnings };
+    lap("priceStock", tp);
+    finish();
+    timings.total = Date.now() - t0;
+    return { ok: !errors.length, preview, skus, amazon: { ...prev, syncedAt: new Date().toISOString(), timings }, errors, warnings };
   }
 
   // 1) Katalogda var mı (barkodla)?
+  const tCat = Date.now();
   let asin: string | null = null, productType: string | null = null;
   if (gtin && validGtin(gtin) && !multi) {
     const t = gtinType(gtin)!.toUpperCase();
@@ -284,40 +387,118 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
       asin = item.asin;
       productType = (item.productTypes || []).find((p: any) => p.marketplaceId === market.id)?.productType || item.productTypes?.[0]?.productType || "PRODUCT";
     }
-  } else if (gtin && !validGtin(gtin)) warnings.push({ code: "gtin_invalid", field: "barcode", msg: "Barkod geçersiz (kontrol hanesi tutmuyor); barkodsuz gönderildi." });
+  } else if (gtin && !validGtin(gtin)) { warnings.push({ code: "gtin_invalid", field: "barcode", msg: "Barkod geçersiz (kontrol hanesi tutmuyor); barkodsuz gönderildi." }); gtin = null; }
   let foundGtin: string | null = null;
   if (!asin && !multi && !(gtin && validGtin(gtin))) {
     const m = await matchCatalog(input);
     if (m) { asin = m.asin; productType = m.productType; foundGtin = m.gtin; }
   }
+  lap("catalog", tCat);
 
   if (asin) {
+    // Kategori / marka onayı: ASIN'e teklif açmadan önce sor (onay gerekiyorsa göndermeden durur, onay bağlantısı verilir)
+    const tR = Date.now();
+    const rs = await asinRestrictions(ctx, sellerId, market, asin);
+    lap("restrictions", tR);
+    if (rs?.approval) {
+      errors.push({ code: "approval_required", field: "category", msg: `Amazon bu ürün için kategori / marka onayı istiyor: ${rs.msg}${rs.link ? " Onay başvurusu: " + rs.link : ""}` });
+      timings.total = Date.now() - t0;
+      return { ok: false, preview, skus, amazon: { ...prev, productType, asin, gated: { link: rs.link, msg: rs.msg }, timings }, errors, warnings };
+    }
     const sku = makeSku(product.id);
     const body = { productType, requirements: "LISTING_OFFER_ONLY", attributes: { merchant_suggested_asin: [{ value: asin, marketplace_id: market.id }], ...offerAttrs(market, price, qty, listing.compare_at_price) } };
+    const tP = Date.now();
     collect(sku, await sp(ctx, "PUT", `/listings/2021-08-01/items/${encodeURIComponent(sellerId)}/${encodeURIComponent(sku)}`, { query: query(mode), body }));
+    lap("submit", tP);
+    finish();
+    timings.total = Date.now() - t0;
     const amazon = { productType, asin, offerOnly: true, hash: contentHash, accepted: !preview && !errors.length, skus: [{ sku }], url: `https://${market.domain}/dp/${asin}`,
-      ...(foundGtin ? { foundGtin } : {}) };
+      ...(foundGtin ? { foundGtin } : {}), timings };
     return { ok: !errors.length, preview, skus, amazon, errors, warnings };
   }
 
-  // 2) Tam ilan
-  productType = await productTypeFor(input);
-  const sch = await schemaFor(input, productType);
-  const base = { ...contentAttrs(market, input), ...identifierAttrs(market, multi ? null : gtin, sch.properties) };
-  const known = new Set([...Object.keys(base), "condition_type", "purchasable_offer", "fulfillment_availability", "list_price", "merchant_suggested_asin",
+  // 2) Tam ilan. HIZ: iki kol AYNI ANDA çalışır:
+  //    a) görseller (ana görsel düzeltme) + pazar dilinde metin   b) ürün türü -> şema -> zorunlu nitelikler (AI)
+  // (madde / arama terimi / menşe zorunluysa AI da doldurur; üründen gelen değer her zaman önce gelir)
+  const KNOWN = ["item_name", "brand", "product_description", "main_product_image_locator",
+    "condition_type", "purchasable_offer", "fulfillment_availability", "list_price", "merchant_suggested_asin",
     "parentage_level", "child_parent_sku_relationship", "variation_theme", "color", "size", "externally_assigned_product_identifier", "external_product_id",
-    "supplier_declared_has_product_identifier_exemption", "gtin_exemption_reason"]);
-  const missing = sch.required.filter((n) => !known.has(n));
-  // Aynı içerikle daha önce AI'nın doldurduğu nitelikler yeniden kullanılır
-  const ai = prev.hash === contentHash && prev.productType === productType && prev.ai ? prev.ai : await aiAttributes(input, productType, missing, sch.properties);
-  const common = { ...ai, ...base };
+    "supplier_declared_has_product_identifier_exemption", "gtin_exemption_reason"];
+  const typeBranch = (async () => {
+    const tT = Date.now();
+    const pt = await productTypeFor(input);
+    const sc = await schemaFor(input, pt);
+    lap("productType", tT);
+    const tA = Date.now();
+    const missing = sc.required.filter((n) => !KNOWN.includes(n) && !/^other_product_image_locator_/.test(n));
+    // Aynı içerikle daha önce AI'nın doldurduğu nitelikler yeniden kullanılır
+    const at = prev.hash === contentHash && prev.productType === pt && prev.ai ? prev.ai : await aiAttributes(input, pt, missing, sc.properties);
+    lap("attributes", tA);
+    return { pt, sc, at };
+  })();
+  typeBranch.catch(() => {}); // görsel / metin kolu erken dönerse yakalanmamış hata olmasın
+  const tPrep = Date.now();
+  const [img, txt] = await Promise.all([
+    input.upload ? prepareImages(input.images, { upload: input.upload, pathPrefix: input.imagePrefix || `amazon/${listing.user_id}/${product?.id}`, cache: prev.imageFix }) : null,
+    input.content ? null : (prev.content?.hash === contentHash && prev.content?.locale === market.locale && prev.content?.title
+      ? { content: prev.content, issues: [], ai: false }
+      : localizedContent(product, listing, market, input.maxTitle || 200)),
+  ]);
+  lap("prepare", tPrep);
+  if (img) {
+    input.images = img.images;
+    for (const i of img.issues) (i.severity === "ERROR" ? errors : warnings).push({ code: i.code, field: i.field, msg: i.msg, severity: i.severity });
+    if (errors.length) return { ok: false, preview, skus: [], amazon: prev, errors, warnings };
+  }
+  if (txt) {
+    input.content = { title: txt.content.title, bullets: txt.content.bullets, description: txt.content.description, keywords: txt.content.keywords };
+    for (const i of txt.issues) warnings.push({ code: i.code, field: i.field, msg: i.msg, severity: i.fixed ? "INFO" : "WARNING" });
+  }
+  const contentCache = input.content ? { ...input.content, hash: contentHash, locale: market.locale } : null;
+  const extra = { imageFix: { ...(prev.imageFix || {}), ...(img?.imageFix || {}) }, content: contentCache };
+
+  const tb = await typeBranch;
+  productType = tb.pt;
+  const sch = tb.sc;
+  const gate = gatingHint(productType, market);
+  if (gate) warnings.push({ code: "approval_maybe", field: "category", msg: gate });
+  const base = { ...contentAttrs(market, input), ...identifierAttrs(market, multi ? null : gtin, sch.properties) };
+  const tA = Date.now();
+  let ai = tb.at;
+  // Amazon sonradan itiraz ettiyse (amazon-orders ilan durumunu okur): itiraz edilen nitelikler gönderimden önce düzeltilir
+  if (openErrors) {
+    const later = (prev.issues as Issue[]).filter((i) => i.severity === "ERROR" && classifyIssue(i) === "attribute");
+    if (later.length) ai = { ...ai, ...(await aiFixAttributes(input, productType, later, { ...ai, ...base }, sch.properties)) };
+  }
+  lap("attributes", tA);
+  const common = () => ({ ...ai, ...base });
   if (!gtin || multi) warnings.push({ code: "gtin_exemption", field: "barcode", msg: "Barkod yok: marka için Amazon GTIN muafiyeti gerekir; muafiyet yoksa Amazon ilanı reddeder." });
 
-  const putSku = async (sku: string, attributes: Record<string, unknown>) =>
-    collect(sku, await sp(ctx, "PUT", `/listings/2021-08-01/items/${encodeURIComponent(sellerId)}/${encodeURIComponent(sku)}`, {
-      query: query(mode), body: { productType, requirements: "LISTING", attributes },
-    }));
+  // Gönder; Amazon reddederse hatayı oku, düzeltilebilir nitelikleri AI ile düzelt, en fazla 2 kez yeniden gönder
+  const fixes: { sku: string; round: number; fields: string[] }[] = [];
+  const putSku = async (sku: string, build: () => Record<string, unknown>) => {
+    let attributes = build();
+    for (let round = 0; ; round++) {
+      const issues = collect(sku, await sp(ctx, "PUT", `/listings/2021-08-01/items/${encodeURIComponent(sellerId)}/${encodeURIComponent(sku)}`, {
+        query: query(mode), body: { productType, requirements: "LISTING", attributes },
+      }));
+      const errs = issues.filter((i) => i.severity === "ERROR");
+      if (!errs.length || round >= 2) return;
+      const kinds = errs.map(classifyIssue);
+      if (kinds.includes("approval")) return; // onay gerekiyor: düzeltilemez
+      let patch: Record<string, unknown> = {};
+      const attrErrs = errs.filter((_, k) => kinds[k] === "attribute");
+      if (attrErrs.length) patch = await aiFixAttributes(input, productType!, attrErrs, attributes, sch.properties);
+      // Görsel reddedildiyse sıradaki görsel ana görsel olur
+      if (kinds.includes("image") && input.images.length > 1) patch.main_product_image_locator = [{ media_location: input.images[1], marketplace_id: market.id }];
+      if (!Object.keys(patch).length) return;
+      ai = { ...ai, ...Object.fromEntries(Object.entries(patch).filter(([k]) => !k.endsWith("image_locator"))) };
+      attributes = { ...attributes, ...patch };
+      fixes.push({ sku, round: round + 1, fields: Object.keys(patch) });
+    }
+  };
 
+  const tS = Date.now();
   const skuList: { sku: string; variantId?: string; parent?: boolean }[] = [];
   if (multi) {
     const theme = themeFor(active, sch.themes);
@@ -325,33 +506,48 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
     const parentSku = makeSku(product.id);
     if (theme) {
       // Ana ilan (satılmaz, seçenekleri toplar)
-      await putSku(parentSku, { ...common,
-        parentage_level: [{ value: "parent", marketplace_id: market.id }], variation_theme: [{ name: theme }] });
+      await putSku(parentSku, () => ({ ...common(), parentage_level: [{ value: "parent", marketplace_id: market.id }], variation_theme: [{ name: theme }] }));
       skuList.push({ sku: parentSku, parent: true });
     }
     // Seçenekler PARALEL gönderilir (HIZ KURALI); Amazon kotasına sp() içindeki tekrar deneme uyar
-    await Promise.all(active.map(async (v, i) => {
+    const children = await Promise.all(active.map(async (v, i) => {
       const sku = makeSku(product.id, String(i + 1));
-      const vPrice = product?.supplier_price && v.cost ? price * (Number(v.cost) / Number(product.supplier_price)) : price;
+      const vPrice = product?.supplier_price && v.cost ? marketPrice(price * (Number(v.cost) / Number(product.supplier_price)), market) : price;
       const vQty = v.stock_qty != null ? Number(v.stock_qty) : qty;
-      const attrs: Record<string, unknown> = { ...common, ...variantOptionAttrs(market, v), ...offerAttrs(market, vPrice, vQty, null),
-        ...identifierAttrs(market, v.gtin ? String(v.gtin).replace(/\D/g, "") : null, sch.properties) };
-      if (v.image_url && /^https:\/\//.test(v.image_url)) attrs.main_product_image_locator = [{ media_location: v.image_url, marketplace_id: market.id }];
-      if (theme) {
-        attrs.parentage_level = [{ value: "child", marketplace_id: market.id }];
-        attrs.child_parent_sku_relationship = [{ child_relationship_type: "variation", parent_sku: parentSku, marketplace_id: market.id }];
-        attrs.variation_theme = [{ name: theme }];
-      }
-      await putSku(sku, attrs);
-      skuList.push({ sku, variantId: v.id });
+      await putSku(sku, () => {
+        const attrs: Record<string, unknown> = { ...common(), ...variantOptionAttrs(market, v), ...offerAttrs(market, vPrice, vQty, null),
+          ...identifierAttrs(market, v.gtin ? String(v.gtin).replace(/\D/g, "") : null, sch.properties) };
+        if (v.image_url && /^https:\/\//.test(v.image_url)) attrs.main_product_image_locator = [{ media_location: v.image_url, marketplace_id: market.id }];
+        if (theme) {
+          attrs.parentage_level = [{ value: "child", marketplace_id: market.id }];
+          attrs.child_parent_sku_relationship = [{ child_relationship_type: "variation", parent_sku: parentSku, marketplace_id: market.id }];
+          attrs.variation_theme = [{ name: theme }];
+        }
+        return attrs;
+      });
+      return { sku, variantId: v.id };
     }));
+    skuList.push(...children);
   } else {
     const sku = makeSku(product.id);
-    await putSku(sku, { ...common, ...offerAttrs(market, price, qty, listing.compare_at_price) });
+    await putSku(sku, () => ({ ...common(), ...offerAttrs(market, price, qty, listing.compare_at_price) }));
     skuList.push({ sku, variantId: active[0]?.id });
   }
-  const amazon = { productType, offerOnly: false, hash: contentHash, ai, accepted: !preview && !errors.length, skus: skuList };
+  lap("submit", tS);
+  finish();
+  if (fixes.length) warnings.push({ code: "auto_fixed", field: "attributes", severity: "INFO",
+    msg: "Amazon'un itiraz ettiği alanlar otomatik düzeltilip yeniden gönderildi: " + [...new Set(fixes.flatMap((f) => f.fields))].join(", ") });
+  timings.total = Date.now() - t0;
+  const amazon = { ...extra, productType, offerOnly: false, hash: contentHash, ai, accepted: !preview && !errors.length, skus: skuList, fixes, ...(gate ? { gatedHint: gate } : {}), timings };
   return { ok: !errors.length, preview, skus, amazon, errors, warnings };
+}
+
+// GS1 dahili / mağaza içi önekler (Amazon reddeder): 020-029, 040-049, 200-299 (EAN-13); UPC 2 ve 4 ile başlayan
+export function internalGtin(code: string): boolean {
+  const c = String(code || "").replace(/\D/g, "");
+  if (c.length === 13) return /^(0[24]|2)/.test(c);
+  if (c.length === 12) return /^[24]/.test(c);
+  return false;
 }
 
 // Satıştan kaldırma: stok 0 (ilan geçmişi korunur; Trendyol ile aynı yaklaşım)

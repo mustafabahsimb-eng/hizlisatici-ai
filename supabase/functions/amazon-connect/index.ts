@@ -14,6 +14,7 @@ import {
   AMAZON_MARKETS, amazonConfigured, amazonLive, CONNECT_REGIONS, consentUrl, exchangeCode, marketById, sp, type Ctx,
 } from "../_shared/amazon.ts";
 import { buyAmazonLabel, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
+import { ORDERS_PATH } from "../_shared/amazon-orders.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -84,7 +85,9 @@ async function callback(userId: string, b: any) {
 // Amazon'un statik sandbox örnekleriyle uçtan uca deneme (istek değerleri Amazon modelindeki örneklerle birebir aynı olmalı)
 async function selftest() {
   const rt = Deno.env.get("AMAZON_SANDBOX_REFRESH_TOKEN") || "";
-  if (!amazonConfigured() || !rt) return { ok: false, notReady: true, need: ["AMAZON_APP_ID", "AMAZON_LWA_CLIENT_ID", "AMAZON_LWA_CLIENT_SECRET", "AMAZON_SANDBOX_REFRESH_TOKEN"] };
+  // Sandbox isteği için LWA istemcisi + yenileme anahtarı yeter (AMAZON_APP_ID yalnız satıcı onay sayfası için)
+  const need = ["AMAZON_LWA_CLIENT_ID", "AMAZON_LWA_CLIENT_SECRET", "AMAZON_SANDBOX_REFRESH_TOKEN"].filter((k) => !Deno.env.get(k));
+  if (need.length) return { ok: false, notReady: true, need };
   const ctx: Ctx = { region: "na", refreshToken: rt, sandbox: true };
   const steps: Record<string, unknown> = {};
   const t0 = Date.now();
@@ -97,8 +100,11 @@ async function selftest() {
   await run("ilan prova (VALIDATION_PREVIEW)", () => sp(ctx, "PUT", "/listings/2021-08-01/items/AXXXXXXXXXXXXX/VALIDATION_VALID", {
     query: { marketplaceIds: ["ATVPDKIKX0DER"], includedData: ["identifiers", "issues"], mode: "VALIDATION_PREVIEW" },
     body: { productType: "PRODUCT", requirements: "LISTING", attributes: {} } }), (d) => d?.status === "VALID" || d?.status === "ACCEPTED");
-  await run("siparişler", () => sp(ctx, "GET", "/orders/v0/orders", { query: { CreatedAfter: "TEST_CASE_200", MarketplaceIds: ["ATVPDKIKX0DER"] } }), (d) => Array.isArray(d?.payload?.Orders));
-  await run("sipariş kalemleri", () => sp(ctx, "GET", "/orders/v0/orders/TEST_CASE_200/orderItems"), (d) => Array.isArray(d?.payload?.OrderItems));
+  // Orders API v2026-01-01: Amazon'un sandbox örneği Japonya pazarında (Uzak Doğu bölgesi)
+  await run("siparişler (v2026-01-01)", () => sp({ ...ctx, region: "fe" }, "GET", ORDERS_PATH, { query: { createdAfter: "2024-12-25T00:00:00Z", marketplaceIds: ["A1VC38T7YXB528"],
+    includedData: ["BUYER", "RECIPIENT", "PROCEEDS", "EXPENSE", "PROMOTION", "CANCELLATION", "FULFILLMENT", "PACKAGES"] } }), (d) => !!d?.orders?.[0]?.orderItems?.length);
+  await run("kategori onayı (Listings Restrictions)", () => sp(ctx, "GET", "/listings/2021-08-01/restrictions", {
+    query: { asin: "B0000ASIN1", sellerId: "AXXXXXXXXXXXXX", marketplaceIds: ["ATVPDKIKX0DER"], conditionType: "used_acceptable" } }), (d) => Array.isArray(d?.restrictions));
   await run("etiket (Buy Shipping)", async () => {
     const us = marketById("ATVPDKIKX0DER")!;
     const from = shipFromAddress({ DefaultShipFromLocationAddress: { Name: "John Doe", AddressLine1: "300 Turnbull Ave", City: "Detroit", StateOrRegion: "MI", PostalCode: "48123", CountryCode: "US", Phone: "7132341234" } }, { email: "jdoeasdfllkj@yahoo.com" })!;
@@ -106,7 +112,7 @@ async function selftest() {
       dims: { length: 10.25, width: 10.25, height: 10.25 }, weight: 10.25 }));
   }, (d) => !!d?.trackingId);
   const ms = Date.now() - t0;
-  return { ok: Object.values(steps).every((s) => s === "geçti"), steps, ms };
+  return { ok: Object.values(steps).every((s) => s === "geçti"), steps, ms, appIdSet: !!Deno.env.get("AMAZON_APP_ID") };
 }
 
 Deno.serve(async (req) => {

@@ -76,6 +76,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const body = raw && typeof raw === "string" ? (raw.startsWith("{") ? JSON.parse(raw) : Object.fromEntries(new URLSearchParams(raw))) : null;
   calls.push({ method, url, body });
   const res = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json" } });
+  if (url.host === "deno.land") return realFetch(input, init); // görsel kütüphanesinin (imagescript) wasm dosyası
   if (url.host === "api.amazon.com") {
     if (body?.client_secret !== "test-secret") return res({ error: "invalid_client" }, 401);
     return res({ access_token: "Atza|test-" + body.grant_type, refresh_token: body.grant_type === "authorization_code" ? "Atzr|refresh" : undefined, token_type: "bearer", expires_in: 3600 });
@@ -104,7 +105,6 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 
 const A = await import("../../supabase/functions/_shared/amazon.ts");
 const L = await import("../../supabase/functions/_shared/amazon-listing.ts");
-const O = await import("../../supabase/functions/_shared/amazon-orders.ts");
 const S = await import("../../supabase/functions/_shared/amazon-shipping.ts");
 
 // Basit veritabanı taklidi (ürün türü önbelleği ve "önceki benzer ürün" sorgusu)
@@ -175,7 +175,7 @@ Deno.test("İlan: barkodlu ürün katalogda varsa yalnız teklif (ASIN ile), pro
   assertEquals(put.url.searchParams.get("mode"), "VALIDATION_PREVIEW");
   assertEquals(put.body.requirements, "LISTING_OFFER_ONLY");
   assertEquals(put.body.attributes.merchant_suggested_asin[0].value, "B07N4M94X4");
-  assertEquals(put.body.attributes.purchasable_offer[0].our_price[0].schedule[0].value_with_tax, 499.9);
+  assertEquals(put.body.attributes.purchasable_offer[0].our_price[0].schedule[0].value_with_tax, 499.99, "pazar yuvarlaması (x,99)");
   assertEquals(put.body.attributes.fulfillment_availability[0].quantity, 7);
   assertEquals((r.amazon as any).asin, "B07N4M94X4");
   assertEquals((r.amazon as any).url, "https://www.amazon.com/dp/B07N4M94X4");
@@ -206,7 +206,7 @@ Deno.test("İlan: barkodsuz, seçenekli ürün -> ürün türü + şema + ana/al
   assertEquals(child.body.attributes.child_parent_sku_relationship[0].parent_sku, "SLT-77");
   assertEquals(child.body.attributes.size[0].value, "M");
   assertEquals(child.body.attributes.fulfillment_availability[0].quantity, 6);
-  assertEquals(child.body.attributes.purchasable_offer[0].our_price[0].schedule[0].value_with_tax, 100, "seçenek fiyatı alış oranıyla");
+  assertEquals(child.body.attributes.purchasable_offer[0].our_price[0].schedule[0].value_with_tax, 101.99, "seçenek fiyatı alış oranıyla (80,99 × 50/40 → x,99)");
   assertEquals(child.body.attributes.supplier_declared_has_product_identifier_exemption[0].value, true);
   assertEquals(child.body.attributes.bullet_point.length, 2);
   assert(r.warnings.some((w) => w.code === "gtin_exemption"));
@@ -230,29 +230,10 @@ Deno.test("İlan: içerik aynı ve kabul edilmişse yalnız fiyat/stok PATCH (AI
   assert(calls.every((c) => c.method !== "PUT"), "PUT yok");
   assert(!calls.some((c) => c.url.pathname.startsWith("/definitions")), "şema sorulmadı");
   const patch = calls.find((c) => c.method === "PATCH")!;
-  assertEquals(patch.body.patches.find((p: any) => p.path === "/attributes/purchasable_offer").value[0].our_price[0].schedule[0].value_with_tax, 12);
+  assertEquals(patch.body.patches.find((p: any) => p.path === "/attributes/purchasable_offer").value[0].our_price[0].schedule[0].value_with_tax, 12.99);
 });
 
-Deno.test("Sandbox: siparişler + kalemler -> Seltigo sipariş kaydı; kargo bildirimi gövdesi", async () => {
-  const d = await A.sp(ctx, "GET", "/orders/v0/orders", { query: { CreatedAfter: "TEST_CASE_200", MarketplaceIds: ["ATVPDKIKX0DER"] } });
-  const o = d.payload.Orders[0];
-  assertEquals(O.STATUS[o.OrderStatus], "new");
-  const items = (await A.sp(ctx, "GET", "/orders/v0/orders/TEST_CASE_200/orderItems")).payload.OrderItems;
-  const addr = (await A.sp(ctx, "GET", "/orders/v0/orders/TEST_CASE_200/address")).payload.ShippingAddress;
-  const row = O.buildOrderRow({ id: "c1", user_id: "u", marketplace_code: "amazon_us" }, US, { ...o, ShippingAddress: addr }, items[0], items.length,
-    { productId: 5, variantId: null, listingId: "l3" });
-  assertEquals(row.external_order_id, o.AmazonOrderId);
-  assertEquals(row.status, "new");
-  assertEquals(row.item_price, 10);
-  assertEquals(row.currency, "USD");
-  assertEquals(row.buyer_address.city, "SEATTLE");
-  assertEquals(row.buyer_country, "US");
-  assertEquals(row.raw.orderItemId, items[0].OrderItemId);
-  const body = O.confirmBody(US, { id: "abc-def", quantity: 1, raw: row.raw }, "1Z999", "Yurtiçi Kargo");
-  assertEquals(body.packageDetail.orderItems[0].orderItemId, items[0].OrderItemId);
-  assertEquals(body.packageDetail.carrierName, "Yurtiçi Kargo");
-  assertEquals(body.marketplaceId, "ATVPDKIKX0DER");
-});
+// Sipariş akışı (Orders API v2026-01-01) ayrı dosyada: tests/amazon/amazon_orders_test.ts
 
 Deno.test("Barkod doğrulama ve SKU", () => {
   assert(A.validGtin("8806090193972"));

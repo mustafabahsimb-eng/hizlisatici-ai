@@ -69,6 +69,24 @@
     await HS.init({ auth: false });
     renderMsg();
     const params = new URLSearchParams(window.location.search);
+    // 1. adım (Amazon "giriş adresi"): onaydan sonra Amazon satıcıyı buraya amazon_callback_uri ile getirir;
+    // satıcıyı kendi durum anahtarımızla Amazon'a geri yollarız, Amazon sonra spapi_oauth_code ile yine bu sayfaya döner.
+    const back = params.get('amazon_callback_uri');
+    if (back) {
+      const ourState = (() => { try { return sessionStorage.getItem('amzState') || ''; } catch (_) { return ''; } })();
+      if (!/^https:\/\/sellercentral[\w.-]*\.amazon\.[a-z.]+\//i.test(back) || !ourState) {
+        setMsg('amz.noCode', 'error'); spinnerEl.style.display = 'none';
+        setTimeout(() => window.location.href = 'accounts.html', 3000);
+        return;
+      }
+      const u = new URL(back);
+      u.searchParams.set('amazon_state', params.get('amazon_state') || '');
+      u.searchParams.set('state', ourState);
+      u.searchParams.set('redirect_uri', location.origin + location.pathname);
+      if (params.get('version') === 'beta') u.searchParams.set('version', 'beta');
+      window.location.replace(u.toString());
+      return;
+    }
     const code = params.get('spapi_oauth_code');
     const state = params.get('state');
     const sellingPartnerId = params.get('selling_partner_id');
