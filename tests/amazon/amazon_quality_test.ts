@@ -332,6 +332,32 @@ Deno.test("Amazon kesintisi (Product Fees): ASIN'li üründe gerçek kesinti zar
   assert(calls.some((c) => c.url.pathname === "/products/fees/v0/listings/SLT-501/feesEstimate"), "yeni ilan SKU ile soruldu");
 });
 
+Deno.test("AI nitelik biçimi: düz değer / tek nesne Amazon listesine çevrilir; üretici / pil / tehlikeli madde güvenli varsayılan", async () => {
+  const n = L.normalizeAttrs(DE, { manufacturer: "Svea", color: { value: "Schwarz" }, batteries_required: false, material: [{ value: "Leder", marketplace_id: DE.id }], empty: "" });
+  assertEquals(n.manufacturer, [{ value: "Svea", language_tag: "de_DE", marketplace_id: DE.id }]);
+  assertEquals(n.color, [{ value: "Schwarz", marketplace_id: DE.id }]);
+  assertEquals(n.batteries_required, [{ value: false, marketplace_id: DE.id }]);
+  assertEquals((n.material as any)[0].value, "Leder");
+  assertEquals(n.empty, undefined);
+  reset();
+  // AI düz değer döndürse de ilan ilk seferde kabul edilir
+  const SAVE = SCHEMA.required.slice();
+  SCHEMA.required.push("manufacturer", "batteries_required", "supplier_declared_dg_hz_regulation");
+  (SCHEMA.properties as any).manufacturer = { type: "array" }; (SCHEMA.properties as any).batteries_required = { type: "array" }; (SCHEMA.properties as any).supplier_declared_dg_hz_regulation = { type: "array" };
+  aiHandler = (sys, u) => sys.includes("fill Amazon SP-API Listings Items attributes") ? { material: "Polycarbonat", item_type_keyword: "koffer" } : defaultAi(sys, u);
+  putHandler = (c) => {
+    const miss = SCHEMA.required.filter((k) => !["condition_type"].includes(k) && !(Array.isArray(c.body.attributes[k]) && c.body.attributes[k].length));
+    return miss.length ? { status: "INVALID", issues: miss.map((k) => ({ code: "90220", message: k + " missing", severity: "ERROR", attributeNames: [k] })) } : { status: "ACCEPTED", issues: [] };
+  };
+  const r = await L.submitListing(baseInput() as any);
+  SCHEMA.required.length = 0; SCHEMA.required.push(...SAVE);
+  assert(r.ok, JSON.stringify(r.errors));
+  assertEquals(calls.filter((c) => c.method === "PUT").length, 1, "ilk gönderimde kabul");
+  const put = calls.find((c) => c.method === "PUT")!;
+  assertEquals(put.body.attributes.manufacturer[0].value, "Seltigo");
+  assertEquals(put.body.attributes.material[0].value, "Polycarbonat");
+});
+
 // ---------------- Süre ölçümü ----------------
 Deno.test("Süre: gerçekçi gecikmeyle (Amazon isteği 300 ms, AI 2,5 sn) ürün başına süre ölçülür ve hedefin altında", async () => {
   reset();

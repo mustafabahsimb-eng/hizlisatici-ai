@@ -25,9 +25,9 @@ const isProduct = (r: number, g: number, b: number, a = 255) => a > 16 && !(Math
 
 export async function decode(bytes: Uint8Array): Promise<Image> {
   const img = await Image.decode(bytes) as Image;
-  // Çok büyük görseller bellek sınırı için küçültülür (uzun kenar en fazla 3000 px)
+  // Çok büyük görseller bellek / işlemci sınırı için küçültülür (uzun kenar en fazla 2000 px; Amazon yakınlaştırma için 1000 px yeter)
   const long = Math.max(img.width, img.height);
-  if (long > 3000) img.resize(Math.round(img.width * 3000 / long), Math.round(img.height * 3000 / long));
+  if (long > 2000) img.resize(Math.round(img.width * 2000 / long), Math.round(img.height * 2000 / long));
   return img;
 }
 

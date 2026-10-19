@@ -64,7 +64,7 @@ export function simulate(method: string, path: string, q: URLSearchParams, body:
     const type = String(body?.productType || "PRODUCT");
     typeFromSku.set(sku, type);
     const isParent = attrs.parentage_level?.[0]?.value === "parent";
-    const req = body?.requirements === "LISTING_OFFER_ONLY" ? [] : schemaOf(type).required.filter((k) => !(isParent && ["purchasable_offer"].includes(k)));
+    const req = body?.requirements === "LISTING_OFFER_ONLY" ? [] : schemaOf(type).required.filter((k) => !(isParent && ["purchasable_offer", "condition_type"].includes(k))); // ana (parent) ilan satılmaz
     const issues = req.filter((k) => !(Array.isArray(attrs[k]) && attrs[k].length)).map((k) => ({
       code: "90220", message: `'${k}' is required but not supplied.`, severity: "ERROR", attributeNames: [k], categories: ["MISSING_ATTRIBUTE"],
     }));

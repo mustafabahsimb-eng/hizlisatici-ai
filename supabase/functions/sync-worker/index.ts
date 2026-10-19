@@ -464,6 +464,17 @@ async function amazonAdapter(action, listing) {
     }
   }
   const r = await submitListing({ db, ctx, market, sellerId, listing, product, variants, images, stockQty: product.stock_qty, preview,
+    // Ana görsel düzeltme ayrı çağrıda (amazon-connect prepare_images): bu işçinin işlemci süresini yemez, ürünün tüm pazarları tek sonucu paylaşır
+    prepareImagesFn: async (urls) => {
+      const r = await fetch(SUPABASE_URL + "/functions/v1/amazon-connect", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (Deno.env.get("SUPABASE_ANON_KEY") ?? "") },
+        body: JSON.stringify({ action: "prepare_images", urls, pathPrefix: `amazon/${listing.user_id}/${product.id}`, cronSecret: CRON_SECRET }),
+        signal: AbortSignal.timeout(100000),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !Array.isArray(d.images)) throw new Error("görsel hazırlığı: " + (d?.error || r.status));
+      return d;
+    },
     upload: storageUploader(db), imagePrefix: `amazon/${listing.user_id}/${product.id}`, maxTitle: mk?.max_title_length || 200,
     commissionPct: listing.commission_pct ?? mk?.default_commission_pct ?? 15, unitCost });
   const validation = {
@@ -752,7 +763,7 @@ Deno.serve(async (req) => {
     }
     await runPool([...groups.values()], CONCURRENCY, async (g) => { for (const job of g) await runJob(job); });
 
-    if (jobs.length < BATCH_SIZE) break;
+    // Kuyruk boşalana kadar yeni tur (bu sırada eklenen ilanlar bir sonraki zamanlanmış çalışmayı beklemesin; boş tur break eder)
   }
 
   // Süre bitti ama kuyrukta iş kaldıysa beklemeden yeni bir çalışma başlat (HIZ: 2 dk'lık görevi bekleme)

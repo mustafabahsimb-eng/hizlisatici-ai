@@ -42,11 +42,6 @@ def main():
             for i, (cat, link) in enumerate(LINKS):
                 page.goto(f"{SITE}/toplu-yukleme.html")
                 page.wait_for_selector("#srcUrl")
-                page.wait_for_selector("#chanRow", state="visible", timeout=20000)
-                amz = page.locator(".chanChk[value='amazon']")
-                if not amz.is_checked():           # bir kerelik ayar (sonra hatırlanır)
-                    amz.check(); setup_taps += 1
-                    page.wait_for_timeout(800)
                 taps = 0
                 before = page.evaluate("async () => (await HS.db.from('products').select('id').order('id', {ascending:false}).limit(1)).data?.[0]?.id || 0")
                 t0 = time.time()
@@ -54,6 +49,12 @@ def main():
                 page.dispatch_event("#srcUrl", "paste")   # yapıştırma: okuma kendiliğinden başlar
                 page.wait_for_selector("#previewBox .pname", timeout=120000)
                 t_preview = time.time() - t0
+                page.wait_for_selector("#chanRow", state="visible", timeout=20000)
+                amz = page.locator(".chanChk[value='amazon']")
+                if not amz.is_checked():           # bir kerelik ayar (sonra hatırlanır)
+                    amz.check(); setup_taps += 1
+                if i == 0:
+                    page.screenshot(path=sys.argv[1].replace(".json", "_onizleme.png") if len(sys.argv) > 1 else "amazon_onizleme.png", full_page=True)
                 if not page.is_checked("#consentChk"):
                     page.check("#consentChk"); setup_taps += 1
                 if page.is_visible("#imageTermsRow") and not page.is_checked("#imageTermsChk"):

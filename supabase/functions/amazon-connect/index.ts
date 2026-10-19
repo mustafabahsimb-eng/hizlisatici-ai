@@ -15,6 +15,8 @@ import {
 } from "../_shared/amazon.ts";
 import { buyAmazonLabel, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
 import { ORDERS_PATH } from "../_shared/amazon-orders.ts";
+import { prepareImages, storageUploader } from "../_shared/amazon-images.ts";
+import { once } from "../_shared/once.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
@@ -164,6 +166,11 @@ Deno.serve(async (req) => {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (b.action === "selftest") return json(await selftest(b));
       if (b.action === "sandbox_connect" && b.email) return json(await sandboxConnect(String(b.email), b));
+      // Ana görsel düzeltme ayrı çağrıda (kendi işlemci süresiyle); aynı ürünün tüm Amazon pazarları tek sonucu paylaşır
+      if (b.action === "prepare_images" && Array.isArray(b.urls)) {
+        const urls = b.urls.map(String).slice(0, 9), prefix = String(b.pathPrefix || "amazon/x");
+        return json(await once(db, "amzimg:" + prefix + ":" + urls.slice(0, 5).join("|"), () => prepareImages(urls, { upload: storageUploader(db), pathPrefix: prefix })));
+      }
       return json({ error: "Geçersiz işlem" }, 400);
     }
     const token = String(b?.userAccessToken || "").trim();
