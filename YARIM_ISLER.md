@@ -1,5 +1,5 @@
 # Mustafa'nın yapacakları
-Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; Claude bunlar için beklemez, başka işlere devam eder. İstediğin zaman tek seferde yaparsın; bitirince "yaptım" demen yeter, gerisini Claude tamamlar.
+Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kimlik doğrulamanı gerektiren işler burada toplanır (kalıcı kural, CLAUDE.md); Claude'un kendi yapabileceği hiçbir iş bu listeye girmez. Claude bunlar için beklemez, başka işlere devam eder. İstediğin zaman tek seferde yaparsın; bitirince "yaptım" demen yeter, gerisini Claude tamamlar.
 
 ## Meta (Facebook / Instagram / WhatsApp / reklam) — 19 Ekim 2026
 1. **Bağlantıları onar (önemli; şu an bozuk):** https://mustafabahsimb-eng.github.io/hizlisatici-ai/ads.html → "Facebook'u reklam izniyle bağla" → Facebook penceresinde **tüm izinlere** izin ver.
@@ -8,15 +8,15 @@ Senin girişini, hesabını ya da ödemeni gerektiren işler burada toplanır; C
 2. **Uygulamayı Live moda al (reklam testinin son adımı):** https://developers.facebook.com/apps/1650835089949068/settings/basic → App Mode: **Live**. Gizlilik adresi istenirse: https://mustafabahsimb-eng.github.io/hizlisatici-ai/gizlilik.html
    - Neden: Meta, geliştirme modundaki uygulamanın reklam metni oluşturmasına izin vermiyor (hata 1885183).
    - Sonra Claude reklam zincirini para harcamadan (duraklatılmış aç → doğrula → sil) uçtan uca tamamlar.
-3. *(İsteğe bağlı)* Sandbox reklam hesabı "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermiyor ("Ad account owner has NOT grant"). Gerekmiyor: test, kişisel hesapta duraklatılmış denemeyle yapılıyor. Secret `ADS_SANDBOX_TOKEN` kayıtlı.
+3. ~~*(İsteğe bağlı)* Sandbox reklam hesabı "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermiyor ("Ad account owner has NOT grant"). Gerekmiyor: test, kişisel hesapta duraklatılmış denemeyle yapılıyor. Secret `ADS_SANDBOX_TOKEN` kayıtlı.~~ — listeden çıkarıldı: gerekmiyor.
 
 ## Asistan kanalları
-4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Kalan: bot açıklamaları (metinler Mustafa'nın onayında), panelden "Telegram'a bağla" ile asistanın canlı uçtan uca testi.
+4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Kalan (senin Telegram hesabın gerekiyor): https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "Telegram'a bağla" → açılan Telegram'da Başlat. Canlı uçtan uca testi sonra Claude yapar.
 5. **Meta WhatsApp test numarası (asistan için):** https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → API Setup → numara kimliği, WABA kimliği ve kalıcı anahtar → aynı secrets sayfasına `ASSISTANT_WA_PHONE_ID`, `ASSISTANT_WA_WABA_ID`, `ASSISTANT_WA_TOKEN`, `ASSISTANT_WA_DISPLAY_NUMBER`.
 
 ## Kargo / tedarik / pazaryeri
 6. **Geliver hesabı:** https://app.geliver.io → Ayarlar > API Anahtarları → anahtarı Seltigo Ayarlar > 🚚 Kargo'dan bağla (test modu).
-7. **Printify:** ödeme yöntemi ekle; mağaza ayarında siparişler **elle onay** olsun (ayrıntı aşağıda "Sabah Mustafa'ya sorulacaklar" 3).
+7. ~~**Printify:** ödeme yöntemi + siparişler elle onay~~ — ✅ TAMAMLANDI (16 Ekim 2026, Mustafa).
 8. **Hepsiburada / Çiçeksepeti / Pazarama / PTT AVM satıcı hesapları:** sipariş alanlarının doğrulanması için (hesap açılınca).
 
 ## Para / şirket gerektirenler (karar: şirket kurulunca)

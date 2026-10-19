@@ -13,6 +13,7 @@
 
 ## Mustafa'nın yapacakları (kalıcı kural, 2026-10-19)
 - Mustafa'dan onay ya da işlem isteyip BEKLEME. Onun girişini / hesabını / ödemesini gerektiren işleri (Facebook / Meta, Telegram, kargo / pazaryeri hesapları, ödemeler vb.) ertele, YARIM_ISLER.md'de "Mustafa'nın yapacakları" başlığı altına adresiyle ve tek satırlık nedeniyle ekle, yapabildiğin diğer işlere devam et. Mustafa istediği zaman tek seferde yapar.
+- Mustafa'dan YALNIZ şunları iste (kalıcı kural, 2026-10-19): site şifresi / girişi, hesap izni, kart / ödeme, kimlik doğrulama. Bunun dışındaki her şeyi (araç seçimi, alternatif yol bulma, kurulum, düzeltme, test) kendin yap. "Mustafa'nın yapacakları" listesine kendin yapabileceğin hiçbir şeyi koyma; zorunlu olanları tek listede, adresleriyle yaz.
 - Kararları (teknik + ürün + arayüz adları) kendin ver; önemli olanları aynı dosyada "Claude'un verdiği kararlar" altına yaz (isteğe bağlı gözden geçirme). Bu kural aşağıdaki "sor / onay al" maddelerinden önce gelir; yalnız para harcayan işler yine yapılmaz, listeye yazılır.
 
 ## Karar kuralları
