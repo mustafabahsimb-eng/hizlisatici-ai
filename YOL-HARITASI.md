@@ -153,13 +153,13 @@ Sıra (12 Ekim 2026 güncel): 1 ve 2 temeldir (büyük kısmı bitti); 2b Chrome
   - süre ölçümü (tam ilan ~3,7 sn / pazar, ASIN'e teklif ~0,9 sn, fiyat-stok ~0,3 sn)
   - Gerçek Amazon sandbox'ı 6/6 (`python tools/amazon/amazon_ac.py test`). Ayrıntı docs/amazon-sp-api.md "Hızlı yükleme katmanı".
 - [ ] AMAZON_APP_ID gelince: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>` → Hesaplarım'dan bağlanma testi (Claude).
-- [ ] Komisyonu kategoriye göre Amazon'dan okuma (Product Fees API getMyFeesEstimate); şimdilik %15.
+- [x] Gerçek Amazon kesintisi (Product Fees API, 19 Ekim): ASIN'li üründe teklif açmadan önce zarar kontrolü, yeni ilanda kabulden sonra; ilanın komisyon oranı kendiliğinden güncellenir. %15 yalnız yedek.
 - [x] Kod tamam, varsayılan SANDBOX: mağaza bağlama (Amazon onay sayfası; TR + Avrupa / Kuzey Amerika / Uzak Doğu, 23 pazar), ilan (barkodla ya da marka+modelle katalog eşleme -> yalnız teklif + bulunan barkod ürüne yazılır; yoksa ürün türü + şema + AI nitelikler; GTIN muafiyeti; seçenekler paralel; prova), ilan kuyruğu beklemeden çalışır (1 dk hedefi), sipariş (15 dk), tedarikçiye yönlendirme, stok/fiyat hızlı PATCH, etiket (satıcının kargo hesabı ya da Amazon Buy Shipping), kargo bildirimi, asistan bildirim + gönderilecekler. Ayrıntı docs/amazon-sp-api.md.
 - [x] Testler: Amazon'un resmi örnek cevaplarıyla taklit testler (tests/amazon/amazon_sandbox_test.ts), veritabanı tetikleyicileri (tests/amazon/amazon_db_test.sql 7/7, iz bırakmaz), Hesaplarım (tests/e2e/amazon_baglanti.py 8/8).
 - Arayüz adları onaylandı (13 Ekim): "Amazon mağazanı bağla", "Avrupa", "Kuzey Amerika", "Uzak Doğu".
 - **Şirket sonrası (Mustafa karar verdi, 13 Ekim: şimdi para harcanmayacak)**:
   1. Solution Provider Portal'da (solutionproviderportal.amazon.com) şirket adına "public developer" kaydı: şirket bilgileri, web sitesi (Amazon'un web sitesi kurallarına uygun), güvenlik soruları, geliştirici profili (500 kelime altı).
-  2. Seltigo uygulamasını oluştur: roller Ürün Listeleme, Fiyatlandırma, Envanter ve Sipariş Takibi, Doğrudan-Satıcı Kargo (Buy Shipping); OAuth yönlendirme adresi https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html.
+  2. Seltigo uygulamasını oluştur: roller Ürün Listeleme, Fiyatlandırma, Envanter ve Sipariş Takibi, Doğrudan-Satıcı Kargo (Buy Shipping); OAuth Login URI ve Redirect URI: https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html (sandbox uygulamasında bu kutular yok). Amazon satıcı hesabıyla Hesaplarım'dan bir kez bağlanma denemesi.
   3. Alıcı adresi için kısıtlı rol (PII) başvurusu + Amazon güvenlik incelemesi (adres yoksa tedarikçi siparişi onaya düşer).
   4. Secrets: AMAZON_APP_ID, AMAZON_LWA_CLIENT_ID, AMAZON_LWA_CLIENT_SECRET (+ deneme için AMAZON_SANDBOX_REFRESH_TOKEN) -> amazon-connect selftest -> Hesaplarım'dan bağlanma testi (Claude).
   5. Amazon Appstore listesi ve yayın onayı -> AMAZON_APP_DRAFT=false; canlıya geçiş AMAZON_LIVE=true.

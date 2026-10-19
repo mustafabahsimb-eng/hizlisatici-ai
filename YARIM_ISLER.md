@@ -23,17 +23,18 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 9. Chrome Web Mağazası geliştirici hesabı (tek seferlik 5 $).
 10. Sabit IP sunucusu (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün").
 11. Amazon:
-   - ✅ Sandbox anahtarları + uygulama numarası (App ID) kaydedildi (19 Ekim). Gerçek sandbox 6/6, "Amazon mağazanı bağla" akışı 16/16 (Amazon'un onay sayfası hariç).
-   - **Bir kez dene (2 dk):**
-     1. Uygulamanın "Edit App" bölümünde OAuth Login URI ve OAuth Redirect URI alanlarının ikisinde de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html` yazdığından emin ol.
-     2. https://mustafabahsimb-eng.github.io/hizlisatici-ai/accounts.html → Amazon TR → [Mağazanı Bağla] → Amazon'da onayla.
-     - Neden: zincirin tek denenemeyen adımı Amazon'un kendi onay sayfası (senin Seller Central girişin). Bağlantı sandbox olarak kurulur; canlıya şirket sonrası geçilir.
+   - ✅ Sandbox anahtarları + uygulama numarası (App ID) kaydedildi (19 Ekim). Gerçek sandbox 7/7 (Amazon kesintisi dahil), "Amazon mağazanı bağla" akışı 16/16 (Amazon'un onay sayfası hariç).
    - **Canlıya geçmeden ÖNCE (zorunlu, güvenlik):** Client Secret ve yenileme anahtarı 19 Ekim'de sohbette paylaşıldı.
      - Amazon uygulama sayfasında **"Rotate secret"** ile Client Secret'ı yenile.
      - Uygulamayı kendi hesabına yeniden yetkilendir ("Authorize app"), yeni yenileme anahtarını al.
      - İkisini Claude'a ver; Claude secrets'a yazar. `amazon_ac.py canli`, `--secret-yenilendi` olmadan çalışmaz.
      - Sandbox için gerekmez.
-   - **Şirket kurulunca:** Solution Provider Portal "public developer" + Appstore onayı + alıcı adresi için PII rolü (adımlar YOL-HARITASI.md "Amazon"). Claude sonra `amazon_ac.py canli --yayinda` çalıştırır.
+   - **Şirket kurulunca / canlıya geçerken** (şimdi istenmez):
+     1. Amazon satıcı hesabı (Profesyonel) aç.
+     2. Solution Provider Portal "public developer" kaydı, Appstore onayı ve alıcı adresi için PII rolü (adımlar YOL-HARITASI.md "Amazon").
+     3. Canlı uygulamanın "Edit App" ekranında OAuth Login URI ve OAuth Redirect URI alanlarına `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html` yaz. Sandbox uygulamasında bu kutular yok.
+     4. https://mustafabahsimb-eng.github.io/hizlisatici-ai/accounts.html → Amazon TR → [Mağazanı Bağla] → Amazon'da onayla. Bu, zincirin denenemeyen tek adımı: Amazon'un kendi onay sayfası.
+     5. Claude yukarıdaki "Rotate secret" adımından sonra `amazon_ac.py canli --secret-yenilendi --yayinda` çalıştırır.
 12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).
 14. **Trendruum satıcı hesabı** (şirket kurulunca; şahıs / limited / anonim şirket ister): https://seller.trendruum.com/onboarding/satici-formu/pazaryeri → hesap açılınca "yaptım" de.

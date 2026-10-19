@@ -46,7 +46,12 @@ Kaynaklar (resmi): developer-docs.amazon/sp-api — uç noktalar, pazar kimlikle
   - bağlı her Amazon pazarı ayrı ilan; her biri kendi dili, para birimi ve x,99 fiyatıyla (JPY / INR kuruşsuz; yuvarlama fiyatı asla düşürmez)
   - ilan kuyruğu (sync-worker) artık 6 ilanı aynı anda işler (önceden sırayla)
   - bir ilanın içinde görsel + metin hazırlığı ile ürün türü + şema + nitelik hazırlığı aynı anda yürür
-- **Zarar kontrolü (kapatılamaz):** fiyat − Amazon komisyonu (varsayılan %15, `marketplaces.default_commission_pct`) − maliyet (pazar para birimine kurla) < 0 ise gönderilmez.
+- **Zarar kontrolü (kapatılamaz):** fiyat − Amazon kesintisi − maliyet (pazar para birimine kurla) < 0 ise gönderilmez.
+  - Kesinti önce varsayılan %15 ile kontrol edilir (`marketplaces.default_commission_pct`).
+  - Sonra **Product Fees API** ile gerçek tutar alınır:
+    - ASIN'li üründe teklif açılmadan önce;
+    - yeni ilanda kabulden sonra SKU ile (ya da `amazon-orders` ilan turunda).
+  - `listings.commission_pct` gerçek orana güncellenir; sipariş zarar kontrolü de bununla çalışır.
 - **Siparişler: Orders API v2026-01-01** (v0 okuma uçları 27 Mart 2027'de kapanıyor)
   - satıcının tüm pazarları **tek istekte** (yeni kota satıcı başına çok düşük)
   - alıcı / adres siparişle gelir (ayrı kişisel veri anahtarı yok)
@@ -66,14 +71,14 @@ Kaynaklar (resmi): developer-docs.amazon/sp-api — uç noktalar, pazar kimlikle
   - `tests/amazon/amazon_sandbox_test.ts` 12/12 (Amazon örnekleri)
   - `tests/amazon/amazon_orders_test.ts` 5/5 (v2026 sipariş örnekleri: TR / UK / BR / JP)
   - `tests/amazon/amazon_quality_test.ts` 13/13
-- **Gerçek Amazon sandbox'ı:** `python tools/amazon/amazon_ac.py test` → 6/6 geçti (19 Ekim; pazarlar, katalog, ilan provası, siparişler v2026, kategori onayı, etiket).
+- **Gerçek Amazon sandbox'ı:** `python tools/amazon/amazon_ac.py test` → 7/7 geçti (19 Ekim; pazarlar, katalog, ilan provası, siparişler v2026, kategori onayı, Amazon kesintisi, etiket).
 
 ## Durum ve açmak için gerekenler
 - Kayıtlı (6 Ekim): `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET`, `AMAZON_SANDBOX_REFRESH_TOKEN` → sandbox çalışıyor.
 - `AMAZON_APP_ID` kaydedildi (19 Ekim; `amazon_ac.py uygulama-no`). "Amazon mağazanı bağla" akışı test edildi: `tests/e2e/amazon_baglanti.py` 16/16.
   Amazon'un sitesi tarayıcıda açılmaz; Amazon'a giden istek kesilip adres doğrulanır.
   Sahte kodla son adım Amazon'un LWA servisine kadar gider ve reddedilir; yani state, kimlik bilgileri ve uç nokta doğru.
-- Uygulama ayarlarında iki adres: giriş adresi (Login URI) ve yönlendirme adresi (Redirect URI), ikisi de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`.
+- Canlı uygulamada (sandbox uygulamasında bu kutular yok) iki adres: giriş adresi (Login URI) ve yönlendirme adresi (Redirect URI), ikisi de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`. Şirket kurulunca, Amazon satıcı hesabıyla.
   Sayfa iki adımı da yapar: Amazon'un `amazon_callback_uri`'sine geri yollar, sonra kodu alır.
 - 19 Ekim: yenileme anahtarı yenilendi (sandbox 6/6). Client ID / Secret 6 Ekim'dekiyle aynı (parmak izi karşılaştırıldı).
   Canlı uçta salt okuma denemesi (satıcının pazarları) 3 bölgede de 403: uygulamanın canlı erişimi yok (taslak / geliştirici kaydı tamamlanmadı). Canlı, şirket sonrası kayıtla açılır.

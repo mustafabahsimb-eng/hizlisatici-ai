@@ -478,6 +478,7 @@ async function amazonAdapter(action, listing) {
       last_sync_error: preview ? (r.ok ? "prova_ok" : "prova_failed") : (r.ok ? null : "amazon_rejected"),
       external_listing_id: main ? main.sku : listing.external_listing_id,
       ...(r.amazon.url ? { external_url: r.amazon.url } : {}),
+      ...(Number((r.amazon.fees as any)?.pct) > 0 ? { commission_pct: (r.amazon.fees as any).pct } : {}), // Amazon'un gerçek kesintisi (zarar kontrolü bununla)
       ...(!preview && r.ok && !listing.published_at ? { published_at: now } : {}),
     },
     info: { dry_run: preview, ok: r.ok, errors: r.errors.length, warnings: r.warnings.length, skus: r.skus.length },

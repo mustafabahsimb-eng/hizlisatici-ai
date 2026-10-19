@@ -279,6 +279,22 @@ function variantOptionAttrs(m: AmazonMarket, v: any) {
   return a;
 }
 
+// ---------- Amazon kesintisi (Product Fees API): komisyon + sabit ücretler, satıcı kargolu (FBM) ----------
+// ASIN'li üründe teklif açmadan önce, yeni üründe ilan kabul edilince SKU ile sorulur. Sonuç: toplam kesinti ve fiyata oranı (%).
+export async function feesEstimate(ctx: Ctx, market: AmazonMarket, id: { asin?: string; sku?: string }, price: number): Promise<{ total: number; pct: number; details: { type: string; amount: number }[] } | null> {
+  if (!(price > 0) || (!id.asin && !id.sku)) return null;
+  const path = id.asin ? `/products/fees/v0/items/${encodeURIComponent(id.asin)}/feesEstimate` : `/products/fees/v0/listings/${encodeURIComponent(id.sku!)}/feesEstimate`;
+  const d = await sp(ctx, "POST", path, { body: { FeesEstimateRequest: {
+    MarketplaceId: market.id, IsAmazonFulfilled: false, Identifier: "slt-" + (id.asin || id.sku),
+    PriceToEstimateFees: { ListingPrice: { CurrencyCode: market.currency, Amount: money(price) }, Shipping: { CurrencyCode: market.currency, Amount: 0 } },
+  } } }).catch(() => null);
+  const r = d?.payload?.FeesEstimateResult;
+  const total = Number(r?.FeesEstimate?.TotalFeesEstimate?.Amount);
+  if (r?.Status !== "Success" || !Number.isFinite(total)) return null;
+  const details = (r.FeesEstimate.FeeDetailList || []).map((f: any) => ({ type: String(f.FeeType), amount: Number(f.FinalFee?.Amount ?? f.FeeAmount?.Amount) || 0 }));
+  return { total: money(total), pct: Math.round(total / price * 10000) / 100, details };
+}
+
 // ---------- Ana işlev: bir ilanı Amazon'a gönder (ya da prova et) ----------
 export type SubmitResult = { ok: boolean; preview: boolean; skus: { sku: string; status?: string; submissionId?: string; issues: Issue[] }[]; amazon: Record<string, unknown>; errors: Issue[]; warnings: Issue[] };
 
@@ -405,6 +421,15 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
       timings.total = Date.now() - t0;
       return { ok: false, preview, skus, amazon: { ...prev, productType, asin, gated: { link: rs.link, msg: rs.msg }, timings }, errors, warnings };
     }
+    // Gerçek Amazon kesintisiyle zarar kontrolü (kapatılamaz)
+    const tF = Date.now();
+    const fees = await feesEstimate(ctx, market, { asin }, price);
+    lap("fees", tF);
+    if (fees && input.unitCost != null && input.unitCost > 0 && price - fees.total - input.unitCost < 0) {
+      errors.push({ code: "loss", field: "price", msg: `Zarar: ${price} ${market.currency} fiyattan Amazon kesintisi (${fees.total} ${market.currency}, %${fees.pct}) ve maliyet (${money(input.unitCost)} ${market.currency}) düşünce kâr eksi.` });
+      timings.total = Date.now() - t0;
+      return { ok: false, preview, skus, amazon: { ...prev, productType, asin, fees, timings }, errors, warnings };
+    }
     const sku = makeSku(product.id);
     const body = { productType, requirements: "LISTING_OFFER_ONLY", attributes: { merchant_suggested_asin: [{ value: asin, marketplace_id: market.id }], ...offerAttrs(market, price, qty, listing.compare_at_price) } };
     const tP = Date.now();
@@ -413,7 +438,7 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
     finish();
     timings.total = Date.now() - t0;
     const amazon = { productType, asin, offerOnly: true, hash: contentHash, accepted: !preview && !errors.length, skus: [{ sku }], url: `https://${market.domain}/dp/${asin}`,
-      ...(foundGtin ? { foundGtin } : {}), timings };
+      ...(foundGtin ? { foundGtin } : {}), ...(fees ? { fees } : {}), timings };
     return { ok: !errors.length, preview, skus, amazon, errors, warnings };
   }
 
@@ -535,10 +560,21 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   }
   lap("submit", tS);
   finish();
+  // Kabul edilen yeni ilanın gerçek kesintisi (SKU ile); ilanın komisyon oranı buna göre güncellenir
+  let fees: Awaited<ReturnType<typeof feesEstimate>> = null;
+  if (!preview && !errors.length) {
+    const tF = Date.now();
+    const first = skuList.find((x) => !x.parent);
+    fees = first ? await feesEstimate(ctx, market, { sku: first.sku }, price) : null;
+    lap("fees", tF);
+    if (fees && input.unitCost != null && input.unitCost > 0 && price - fees.total - input.unitCost < 0) {
+      warnings.push({ code: "loss_after_fees", field: "price", msg: `Amazon'un gerçek kesintisi %${fees.pct}: bu fiyatla kâr eksi. Fiyatı yükselt (ilan açık, satışta zarar kontrolü siparişi onaya düşürür).` });
+    }
+  }
   if (fixes.length) warnings.push({ code: "auto_fixed", field: "attributes", severity: "INFO",
     msg: "Amazon'un itiraz ettiği alanlar otomatik düzeltilip yeniden gönderildi: " + [...new Set(fixes.flatMap((f) => f.fields))].join(", ") });
   timings.total = Date.now() - t0;
-  const amazon = { ...extra, productType, offerOnly: false, hash: contentHash, ai, accepted: !preview && !errors.length, skus: skuList, fixes, ...(gate ? { gatedHint: gate } : {}), timings };
+  const amazon = { ...extra, productType, offerOnly: false, hash: contentHash, ai, accepted: !preview && !errors.length, skus: skuList, fixes, ...(gate ? { gatedHint: gate } : {}), ...(fees ? { fees } : {}), timings };
   return { ok: !errors.length, preview, skus, amazon, errors, warnings };
 }
 

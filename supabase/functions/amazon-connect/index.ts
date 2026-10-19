@@ -108,6 +108,10 @@ async function selftest(b: any = {}) {
     includedData: ["BUYER", "RECIPIENT", "PROCEEDS", "EXPENSE", "PROMOTION", "CANCELLATION", "FULFILLMENT", "PACKAGES"] } }), (d) => !!d?.orders?.[0]?.orderItems?.length);
   await run("kategori onayı (Listings Restrictions)", () => sp(ctx, "GET", "/listings/2021-08-01/restrictions", {
     query: { asin: "B0000ASIN1", sellerId: "AXXXXXXXXXXXXX", marketplaceIds: ["ATVPDKIKX0DER"], conditionType: "used_acceptable" } }), (d) => Array.isArray(d?.restrictions));
+  await run("Amazon kesintisi (Product Fees)", () => sp(ctx, "POST", "/products/fees/v0/listings/UmaS1/feesEstimate", { body: { FeesEstimateRequest: {
+    MarketplaceId: "ATVPDKIKX0DER", IsAmazonFulfilled: false, PriceToEstimateFees: { ListingPrice: { CurrencyCode: "USD", Amount: 10 }, Shipping: { CurrencyCode: "USD", Amount: 10 },
+      Points: { PointsNumber: 0, PointsMonetaryValue: { CurrencyCode: "USD", Amount: 0 } } }, Identifier: "UmaS1" } } }),
+    (d) => d?.payload?.FeesEstimateResult?.Status === "Success" && Number(d.payload.FeesEstimateResult.FeesEstimate?.TotalFeesEstimate?.Amount) > 0);
   await run("etiket (Buy Shipping)", async () => {
     const us = marketById("ATVPDKIKX0DER")!;
     const from = shipFromAddress({ DefaultShipFromLocationAddress: { Name: "John Doe", AddressLine1: "300 Turnbull Ave", City: "Detroit", StateOrRegion: "MI", PostalCode: "48123", CountryCode: "US", Phone: "7132341234" } }, { email: "jdoeasdfllkj@yahoo.com" })!;

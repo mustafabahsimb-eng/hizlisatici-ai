@@ -10,6 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 import { amazonConfigured, marketByCode, sp, type Ctx } from "../_shared/amazon.ts";
+import { feesEstimate } from "../_shared/amazon-listing.ts";
 import { confirmShipments, syncSellerOrders } from "../_shared/amazon-orders.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
@@ -22,7 +23,7 @@ const TIME_BUDGET_MS = 120_000;
 async function refreshListings(conn: any, cred: any) {
   const market = marketByCode(conn.marketplace_code)!;
   const ctx: Ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox" };
-  const { data: ls } = await db.from("listings").select("id, external_listing_id, validation").eq("connection_id", conn.id).eq("status", "published").is("deleted_at", null)
+  const { data: ls } = await db.from("listings").select("id, external_listing_id, validation, price").eq("connection_id", conn.id).eq("status", "published").is("deleted_at", null)
     .is("external_url", null).not("external_listing_id", "is", null).limit(20);
   let n = 0;
   for (const l of ls || []) {
@@ -34,13 +35,15 @@ async function refreshListings(conn: any, cred: any) {
       const s = (d?.summaries || [])[0];
       const issues = (d?.issues || []).map((i: any) => ({ code: String(i.code), field: (i.attributeNames || [])[0], msg: String(i.message), severity: i.severity }));
       const hasError = issues.some((i: any) => i.severity === "ERROR");
+      // Gerçek Amazon kesintisi henüz okunmadıysa (ilan yeni kabul edildi): SKU ile sor, ilanın komisyon oranını güncelle
+      const fees = !l.validation?.amazon?.fees && Number(l.price) > 0 ? await feesEstimate(ctx, market, { sku: l.external_listing_id }, Number(l.price)) : null;
       // Amazon sonradan itiraz ettiyse: ilan günde en fazla bir kez kuyruğa döner, sync-worker hatayı okuyup düzeltir ve yeniden gönderir
       const lastFix = l.validation?.amazon?.autoFixQueuedAt ? new Date(l.validation.amazon.autoFixQueuedAt).getTime() : 0;
       const requeue = hasError && Date.now() - lastFix > 86400_000;
       const v = { ...(l.validation || {}), amazon: { ...(l.validation?.amazon || {}), asin: s?.asin || null, status: s?.status || null, issues,
-        ...(requeue ? { autoFixQueuedAt: new Date().toISOString() } : {}) } };
+        ...(requeue ? { autoFixQueuedAt: new Date().toISOString() } : {}), ...(fees ? { fees } : {}) } };
       await db.from("listings").update({ validation: v, ...(s?.asin ? { external_url: `https://${market.domain}/dp/${s.asin}` } : {}),
-        last_sync_error: hasError ? "amazon_issue" : null }).eq("id", l.id);
+        last_sync_error: hasError ? "amazon_issue" : null, ...(fees && fees.pct > 0 ? { commission_pct: fees.pct } : {}) }).eq("id", l.id);
       if (requeue) await db.rpc("enqueue_sync_job", { p_user_id: conn.user_id, p_job_type: "listing_sync", p_listing_id: l.id, p_connection_id: conn.id,
         p_payload: { reason: "amazon_fix" }, p_dedupe_key: "listing:" + l.id, p_priority: 50 });
       n++;

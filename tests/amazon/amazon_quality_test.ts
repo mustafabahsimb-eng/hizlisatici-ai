@@ -29,6 +29,7 @@ const SCHEMA = {
 const sleep = (ms: number) => ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
 const res = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json" } });
 let putCount = 0;
+let feeRate = 0.15;
 
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -63,6 +64,11 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
       return res({ items: [] });
     }
     if (p === "/listings/2021-08-01/restrictions") return res(restrictions);
+    if (p.startsWith("/products/fees/v0/")) {
+      const price = body.FeesEstimateRequest.PriceToEstimateFees.ListingPrice.Amount;
+      return res({ payload: { FeesEstimateResult: { Status: "Success", FeesEstimate: { TotalFeesEstimate: { CurrencyCode: body.FeesEstimateRequest.PriceToEstimateFees.ListingPrice.CurrencyCode, Amount: Math.round(price * feeRate * 100) / 100 },
+        FeeDetailList: [{ FeeType: "ReferralFee", FinalFee: { Amount: Math.round(price * feeRate * 100) / 100 } }] } } } });
+    }
     if (p.startsWith("/listings/2021-08-01/items/") && method === "PUT") return res(putHandler(c, ++putCount));
     if (p.startsWith("/listings/2021-08-01/items/") && method === "PATCH") return res({ status: "ACCEPTED", issues: [] });
     return res({ errors: [{ code: "NotFound", message: p }] }, 404);
@@ -121,7 +127,7 @@ const defaultAi = (system: string, user: any) => {
   return {};
 };
 function reset() {
-  calls.length = 0; putCount = 0; latency = { sp: 0, ai: 0 }; restrictions = { restrictions: [] };
+  calls.length = 0; putCount = 0; latency = { sp: 0, ai: 0 }; restrictions = { restrictions: [] }; feeRate = 0.15;
   productTypes = [{ name: "LUGGAGE", displayName: "Luggage" }];
   putHandler = () => ({ status: "ACCEPTED", submissionId: "s1", issues: [] });
   aiHandler = defaultAi;
@@ -303,6 +309,27 @@ Deno.test("Zarar kontrolü: fiyat - Amazon komisyonu - maliyet < 0 ise hiçbir i
   assert(!r.ok);
   assertEquals(r.errors[0].code, "loss");
   assertEquals(calls.length, 0);
+});
+
+Deno.test("Amazon kesintisi (Product Fees): ASIN'li üründe gerçek kesinti zarar ettiriyorsa teklif açılmaz; yeni ilanda oran okunur", async () => {
+  reset();
+  feeRate = 0.32; // ör. kategori komisyonu + sabit ücret
+  const r = await L.submitListing(baseInput({ market: US, unitCost: 32, commissionPct: 15, // %15 ile kârlı (44,99 - 6,75 - 32 > 0), gerçek %32 ile zararlı
+    listing: { id: "lf", user_id: "u1", marketplace_code: "amazon_us", title: "TV", description: "x", price: 44.99, validation: null },
+    product: { id: 7, brand: "Samsung", gtin: "8806090193972", stock_qty: 2 } }) as any);
+  assert(!r.ok);
+  assertEquals(r.errors[0].code, "loss");
+  assert(r.errors[0].msg.includes("%32"), r.errors[0].msg);
+  assert(!calls.some((c) => c.method === "PUT"), "teklif açılmadı");
+  const f = calls.find((c) => c.url.pathname.startsWith("/products/fees/v0/items/B0TEST0001"))!;
+  assertEquals(f.body.FeesEstimateRequest.IsAmazonFulfilled, false);
+  assertEquals(f.body.FeesEstimateRequest.PriceToEstimateFees.ListingPrice, { CurrencyCode: "USD", Amount: 44.99 });
+  reset();
+  feeRate = 0.12;
+  const r2 = await L.submitListing(baseInput() as any);
+  assert(r2.ok);
+  assertEquals((r2.amazon as any).fees.pct, 12);
+  assert(calls.some((c) => c.url.pathname === "/products/fees/v0/listings/SLT-501/feesEstimate"), "yeni ilan SKU ile soruldu");
 });
 
 // ---------------- Süre ölçümü ----------------
