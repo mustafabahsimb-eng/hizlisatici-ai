@@ -11,7 +11,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 import {
-  AMAZON_MARKETS, amazonConfigured, amazonLive, CONNECT_REGIONS, consentUrl, exchangeCode, marketById, sp, type Ctx,
+  AMAZON_MARKETS, amazonConfigured, amazonLive, CONNECT_REGIONS, consentUrl, exchangeCode, marketByCode, marketById, sp, type Ctx,
 } from "../_shared/amazon.ts";
 import { buyAmazonLabel, shipFromAddress, shipmentRequest } from "../_shared/amazon-shipping.ts";
 import { ORDERS_PATH } from "../_shared/amazon-orders.ts";
@@ -82,6 +82,32 @@ async function callback(userId: string, b: any) {
   return { ok: true, environment: env, marketplaces: codes.map((c) => c.code), connections: ids.length };
 }
 
+// Test kullanıcısına Amazon sandbox bağlantısı (satıcı hesabı olmadan "ürün ekle -> Amazon'a gönder" ölçümü için).
+// Yalnız sistem çağrısı ve yalnız *@seltigo.test hesapları. Amazon cevapları benzetimden (settings.simulate), giriş anahtarı gerçek.
+async function sandboxConnect(email: string, b: any) {
+  if (!/@seltigo\.test$/i.test(email)) return { ok: false, error: "Yalnız test hesapları" };
+  const rt = Deno.env.get("AMAZON_SANDBOX_REFRESH_TOKEN") || "";
+  if (!rt) return { ok: false, error: "AMAZON_SANDBOX_REFRESH_TOKEN yok" };
+  const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const user = (list?.users || []).find((u: any) => String(u.email).toLowerCase() === email.toLowerCase());
+  if (!user) return { ok: false, error: "Kullanıcı yok" };
+  if (b.remove) {
+    const { data: rm } = await db.from("store_connections").update({ deleted_at: new Date().toISOString(), status: "disconnected" })
+      .eq("user_id", user.id).like("marketplace_code", "amazon_%").eq("environment", "sandbox").is("deleted_at", null).select("id");
+    return { ok: true, removed: (rm || []).length };
+  }
+  const codes: string[] = Array.isArray(b.markets) && b.markets.length ? b.markets.map(String) : ["amazon_tr", "amazon_de", "amazon_uk", "amazon_fr", "amazon_us"];
+  const ids: string[] = [];
+  for (const code of codes) {
+    const m = marketByCode(code);
+    if (!m) continue;
+    const id = await saveConnection(user.id, code, "A1SELTIGOSANDBOX", "sandbox", { refresh_token: rt, region: m.region, seller_id: "A1SELTIGOSANDBOX", connect_region: m.code === "amazon_tr" ? "tr" : m.region }, "Sandbox");
+    await db.from("store_connections").update({ settings: { dry_run: false, simulate: true, authorized_at: new Date().toISOString() } }).eq("id", id);
+    ids.push(id);
+  }
+  return { ok: true, connections: ids.length, markets: codes };
+}
+
 // Amazon'un statik sandbox örnekleriyle uçtan uca deneme (istek değerleri Amazon modelindeki örneklerle birebir aynı olmalı)
 // tokenSecret: hangi yenileme anahtarı denenecek (yalnız bu iki secret adı); live: canlı uçta yalnız OKUMA (satıcının pazarları) — hiçbir şey yazılmaz
 const TOKEN_SECRETS = ["AMAZON_SANDBOX_REFRESH_TOKEN", "AMAZON_SANDBOX_REFRESH_TOKEN_NEW"];
@@ -137,6 +163,7 @@ Deno.serve(async (req) => {
   try {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
       if (b.action === "selftest") return json(await selftest(b));
+      if (b.action === "sandbox_connect" && b.email) return json(await sandboxConnect(String(b.email), b));
       return json({ error: "Geçersiz işlem" }, 400);
     }
     const token = String(b?.userAccessToken || "").trim();

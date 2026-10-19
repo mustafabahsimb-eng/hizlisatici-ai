@@ -10,7 +10,7 @@
 // HIZ: ürün sayfaları 6'şar paralel okunur, 20'şer kaydedilir; ilan önce açılır, eksik görseller arka planda tamamlanır.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { connectedChannels, distributeProducts } from "../_shared/distribute.ts";
+import { channelIdsFromDefaults, connectedChannels, distributeProducts } from "../_shared/distribute.ts";
 
 import { featureEnabled, FEATURE_OFF_MSG } from "../_shared/features.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -188,6 +188,18 @@ async function distribute(userId: string, b: any) {
   return { ok: true, result: out, whatsappCatalog: false };
 }
 
+// Panelden eklenen ürünleri satıcının kanallarına gönder (linkten / dosyadan yükleme "Gönderilecek kanallar").
+// channels: "mp:<bağlantı>" kimlikleri; yoksa defaults (asistan ayarındaki varsayılan kanal adları: amazon, trendyol ...) bağlı kanallara çevrilir.
+async function sendProducts(userId: string, b: any) {
+  if (!(await featureEnabled(userId, "multi_channel"))) return { ok: false, error: FEATURE_OFF_MSG, feature: "multi_channel" };
+  const ids = (Array.isArray(b.productIds) ? b.productIds : []).map(Number).filter((n: number) => n > 0).slice(0, 500);
+  if (!ids.length) return { ok: false, error: "Gönderilecek ürün yok" };
+  let want: string[] = Array.isArray(b.channels) ? b.channels.map(String) : [];
+  if (!want.length && Array.isArray(b.defaults)) want = channelIdsFromDefaults(await connectedChannels(db, userId), b.defaults.map(String)).ids;
+  if (!want.length) return { ok: true, result: {}, note: "Kanal seçilmedi" };
+  return { ok: true, result: await distributeProducts(db, userId, ids, want) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const b = await req.json().catch(() => ({}));
@@ -205,6 +217,7 @@ Deno.serve(async (req) => {
     if (b.action === "start") return json(await start(userId, b));
     if (b.action === "distribute") return json(await distribute(userId, b));
     if (b.action === "channels") return json({ ok: true, ...(await connectedChannels(db, userId)) });
+    if (b.action === "send_products") return json(await sendProducts(userId, b));
     return json({ error: "Geçersiz işlem" }, 400);
   } catch (e) {
     return json({ ok: false, error: short((e as Error).message) }, 500);

@@ -22,7 +22,8 @@ const TIME_BUDGET_MS = 120_000;
 // Kabul edilen ilanların durumu (ASIN, Amazon uyarıları)
 async function refreshListings(conn: any, cred: any) {
   const market = marketByCode(conn.marketplace_code)!;
-  const ctx: Ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox" };
+  const ctx: Ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox",
+    simulate: conn.environment === "sandbox" && conn.settings?.simulate === true };
   const { data: ls } = await db.from("listings").select("id, external_listing_id, validation, price").eq("connection_id", conn.id).eq("status", "published").is("deleted_at", null)
     .is("external_url", null).not("external_listing_id", "is", null).limit(20);
   let n = 0;

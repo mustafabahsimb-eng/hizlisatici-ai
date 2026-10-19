@@ -295,6 +295,10 @@
       <label class="chk" id="imageTermsRow" style="display:none;margin-top:8px"><input type="checkbox" id="imageTermsChk" onchange="updateImportBtn()"> <span data-t="imageTerms"></span></label>
     </div>
     <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="publishChk" checked> <span data-t="publishStore"></span></label>
+    <div id="chanRow" style="display:none;margin-bottom:12px">
+      <div style="font-size:13px;color:#c3c9d4;margin-bottom:6px" data-t="sendChannels"></div>
+      <div id="chanList" style="display:flex;flex-wrap:wrap;gap:6px 18px"></div>
+    </div>
     <div class="row" style="margin-bottom:14px;align-items:center;gap:10px">
       <label class="chk" style="margin:0"><input type="checkbox" id="syncChk" checked> <span data-t="syncKeep"></span></label>
       <select id="syncHours" style="width:auto">
@@ -464,6 +468,10 @@
       consent: 'Bu ürün görsellerini, açıklamalarını ve bilgilerini kullanma hakkım olduğunu (ör. tedarikçimin/bayisi olduğum firmanın ürünleri) ve bu içeriklerden doğacak sorumluluğun bana ait olduğunu kabul ediyorum.',
       consentLog: 'Kullanıcı, içe aktarılan ürün görsellerini ve içeriklerini kullanma hakkı olduğunu ve sorumluluğun kendisine ait olduğunu onayladı.',
       publishStore: '🏪 Kendi mağazamda da hemen yayınla',
+      sendChannels: '📤 Pazaryerlerine de gönder (seçimin hatırlanır):',
+      chanMarkets: '{n} pazar',
+      sentTo: 'Pazaryerlerine gönderildi: {r}. İlanlar arka planda hazırlanıp gönderiliyor.',
+      sendFail: 'Pazaryerine gönderilemedi: ',
       syncKeep: 'Fiyat ve stoğu otomatik güncel tut',
       sync6: '6 saatte bir',
       sync24: 'Günde bir',
@@ -646,6 +654,10 @@
       consent: 'I confirm that I have the right to use these product images, descriptions and details (e.g. products of my supplier / the brand I am a dealer of) and that I am responsible for this content.',
       consentLog: 'The user confirmed they have the right to use the imported product images and content and that they are responsible for it.',
       publishStore: '🏪 Also publish in my store right away',
+      sendChannels: '📤 Also send to marketplaces (your choice is remembered):',
+      chanMarkets: '{n} markets',
+      sentTo: 'Sent to marketplaces: {r}. Listings are being prepared and sent in the background.',
+      sendFail: 'Could not send to marketplace: ',
       syncKeep: 'Keep price and stock up to date automatically',
       sync6: 'Every 6 hours',
       sync24: 'Once a day',
@@ -775,6 +787,55 @@
       renderPreview();
     }, 250);
   }
+  // ---------- Pazaryerlerine gönderim (varsayılan kanallar: asistan ayarıyla ortak, bir kez seçilir) ----------
+  let chanDefaults = ['own_store'];
+  const chanKey = (code) => code.startsWith('amazon_') ? 'amazon' : code.endsWith('_tr') ? code.slice(0, -3) : code;
+  async function loadChannels() {
+    try {
+      const session = (await db.auth.getSession()).data.session;
+      const [chRes, st] = await Promise.all([
+        fetch(HS.SUPABASE_URL + '/functions/v1/site-store', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+          body: JSON.stringify({ action: 'channels', userAccessToken: session.access_token }) }).then(r => r.json()),
+        db.from('assistant_settings').select('default_channels').eq('user_id', userId).maybeSingle(),
+      ]);
+      chanDefaults = (st.data && st.data.default_channels) || ['own_store'];
+      const groups = {};
+      for (const m of (chRes.marketplaces || [])) {
+        const k = chanKey(m.code);
+        (groups[k] = groups[k] || []).push(m);
+      }
+      const keys = Object.keys(groups);
+      if (!keys.length) return;
+      document.getElementById('chanList').innerHTML = keys.map(k => {
+        const g = groups[k];
+        const name = k === 'amazon' ? 'Amazon' : esc(String(g[0].label || g[0].code).split(' · ')[0]);
+        const extra = g.length > 1 ? ' <span style="color:#8b93a1">(' + fmt(t('chanMarkets'), { n: g.length }) + ')</span>' : '';
+        return '<label class="chk" style="margin:0"><input type="checkbox" class="chanChk" value="' + k + '"' + (chanDefaults.includes(k) ? ' checked' : '') + ' onchange="saveChannels()"> ' + name + extra + '</label>';
+      }).join('');
+      document.getElementById('chanRow').style.display = 'block';
+    } catch (e) { console.warn('kanallar', e); }
+  }
+  async function saveChannels() {
+    const picked = [...document.querySelectorAll('.chanChk:checked')].map(x => x.value);
+    const shown = [...document.querySelectorAll('.chanChk')].map(x => x.value);
+    chanDefaults = [...new Set([...chanDefaults.filter(k => !shown.includes(k)), ...picked])];
+    if (!chanDefaults.includes('own_store')) chanDefaults.unshift('own_store');
+    const up = await db.from('assistant_settings').update({ default_channels: chanDefaults }).eq('user_id', userId).select('user_id');
+    if (!up.error && (!up.data || !up.data.length)) await db.from('assistant_settings').insert({ user_id: userId, default_channels: chanDefaults });
+  }
+  async function sendToMarketplaces(productIds) {
+    const picked = [...document.querySelectorAll('.chanChk:checked')].map(x => x.value);
+    if (!picked.length || !productIds.length) return '';
+    try {
+      const session = (await db.auth.getSession()).data.session;
+      const r = await fetch(HS.SUPABASE_URL + '/functions/v1/site-store', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + HS.SUPABASE_KEY, 'apikey': HS.SUPABASE_KEY },
+        body: JSON.stringify({ action: 'send_products', productIds: productIds, defaults: picked, userAccessToken: session.access_token }) }).then(r => r.json());
+      if (!r.ok) return '<div style="color:#f28b8b;margin-top:6px">' + esc(t('sendFail') + (r.error || '')) + '</div>';
+      const parts = Object.entries(r.result || {}).filter(([, v]) => v && (v.listings || v.existing)).map(([k, v]) => k + ' ' + HS.number((v.listings || 0) + (v.existing || 0)));
+      return parts.length ? '<div style="margin-top:6px">' + esc(fmt(t('sentTo'), { r: parts.join(', ') })) + '</div>' : '';
+    } catch (e) { return '<div style="color:#f28b8b;margin-top:6px">' + esc(t('sendFail') + e.message) + '</div>'; }
+  }
+
   async function loadRules() {
     const res = await db.from('import_rules').select('rules').eq('user_id', userId).maybeSingle();
     if (res.data && res.data.rules) applyRuleValues(res.data.rules);
@@ -2260,6 +2321,7 @@
     await uploadPdfImages(sel);
 
     let added = 0, failed = 0, lastErr = '', imgErr = '';
+    const addedIds = [];
     const needJobs = [];   // görseli / özelliği eksik eklenen ürünler
     const CHUNK = 40;
     for (let i = 0; i < sel.length; i += CHUNK) {
@@ -2373,6 +2435,7 @@
         });
         pairs.forEach(p => { if (!p.it.images.length || !p.it.specs.length) needJobs.push(p.id); });
         added += pairs.length;
+        pairs.forEach(p => addedIds.push(p.id));
         pairs.forEach(p => { p.it.selected = false; p.it.exists = true; });
       } catch (e) {
         failed += chunk.length;
@@ -2410,6 +2473,7 @@
       resBox.innerHTML += '<div style="color:#e6c96a;margin-top:6px">' + esc(t('imgSaveErr') + imgErr) + '</div>';
     }
     if (bgN) resBox.innerHTML += '<div style="margin-top:6px">' + fmt(t('bgStarted'), { n: HS.number(bgN) }) + '</div>';
+    if (addedIds.length) resBox.innerHTML += await sendToMarketplaces(addedIds);
     renderBgNote();
     renderPreview();
   }
@@ -2429,6 +2493,7 @@
     document.getElementById('stopBtn').style.display = 'none';
     applyStatic();
     await loadRules();
+    loadChannels();
     try {
       const pr = await db.from('user_profiles').select('image_terms_accepted_at').eq('user_id', userId).maybeSingle();
       imageTermsAccepted = !!(pr.data && pr.data.image_terms_accepted_at);

@@ -8,6 +8,8 @@
 //   AMAZON_LIVE=true       -> canlı uç noktalar; yoksa SANDBOX (varsayılan, güvenli)
 // Satıcının yenileme anahtarı (refresh_token) store_connections + Vault'ta durur.
 // =========================================================
+import { SIM_LATENCY_MS, simulate } from "./amazon-sim.ts";
+
 export type Region = "na" | "eu" | "fe";
 export type AmazonMarket = { code: string; id: string; country: string; region: Region; sellerCentral: string; domain: string; currency: string; locale: string };
 
@@ -95,13 +97,21 @@ export class SpApiError extends Error {
     this.status = status; this.body = body;
   }
 }
-export type Ctx = { region: Region; refreshToken: string; sandbox?: boolean; rdt?: string };
+// simulate: yalnız test kullanıcısının sandbox bağlantısı (amazon-sim.ts); giriş anahtarı yine gerçek Amazon'dan alınır
+export type Ctx = { region: Region; refreshToken: string; sandbox?: boolean; rdt?: string; simulate?: boolean };
 
 export async function sp(ctx: Ctx, method: string, path: string, opts: { query?: Record<string, string | string[] | undefined>; body?: unknown } = {}): Promise<any> {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(opts.query || {})) {
     if (v == null) continue;
     q.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  }
+  if (ctx.simulate) {
+    await accessToken(ctx.refreshToken); // gerçek LWA
+    await new Promise((r) => setTimeout(r, SIM_LATENCY_MS));
+    const r = simulate(method.toUpperCase(), path, q, opts.body ?? null);
+    if (r.status >= 400) throw new SpApiError(r.status, r.data);
+    return r.data;
   }
   const url = endpoint(ctx.region, ctx.sandbox ?? !amazonLive()) + path + (q.toString() ? "?" + q : "");
   for (let attempt = 0; ; attempt++) {

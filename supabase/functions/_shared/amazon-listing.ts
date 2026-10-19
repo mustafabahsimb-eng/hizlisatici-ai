@@ -100,12 +100,12 @@ export async function schemaFor(input: BuildInput, productType: string): Promise
   const { db, ctx, market } = input;
   const { data: cached } = await db.from("amazon_product_types").select("required, properties, themes, fetched_at")
     .eq("marketplace_id", market.id).eq("product_type", productType).maybeSingle();
-  if (cached && Date.now() - new Date(cached.fetched_at).getTime() < 14 * 86400_000) return cached;
+  if (!ctx.simulate && cached && Date.now() - new Date(cached.fetched_at).getTime() < 14 * 86400_000) return cached;
   const def = await sp(ctx, "GET", `/definitions/2020-09-01/productTypes/${encodeURIComponent(productType)}`, {
     query: { marketplaceIds: market.id, requirements: "LISTING", locale: market.locale },
   });
-  let schema: any = {};
-  const link = def?.schema?.link?.resource;
+  let schema: any = def?.simulatedSchema || {}; // benzetim (amazon-sim.ts) şemayı doğrudan verir
+  const link = def?.simulatedSchema ? null : def?.schema?.link?.resource;
   if (link && /^https:\/\//.test(link)) {
     const r = await fetch(link, { signal: AbortSignal.timeout(30000) }).catch(() => null);
     schema = r?.ok ? await r.json().catch(() => ({})) : {};
@@ -118,7 +118,7 @@ export async function schemaFor(input: BuildInput, productType: string): Promise
   for (const k of keep) if (schema.properties?.[k]) properties[k] = trimSchema(schema.properties[k]);
   const themes = findEnum(schema.properties?.variation_theme) || [];
   const row = { marketplace_id: market.id, product_type: productType, required, properties, themes, fetched_at: new Date().toISOString() };
-  await db.from("amazon_product_types").upsert(row);
+  if (!ctx.simulate) await db.from("amazon_product_types").upsert(row); // benzetim şeması gerçek önbelleğe yazılmaz
   return row;
 }
 function trimSchema(s: any, depth = 0): any {

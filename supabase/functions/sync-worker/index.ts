@@ -424,7 +424,9 @@ async function amazonAdapter(action, listing) {
   if (!market || !conn || conn.status !== "connected" || !amazonConfigured()) return genericProvaAdapter(action, listing);
   const { data: cred } = await db.rpc("store_connection_get_credentials", { p_connection_id: conn.id });
   if (!cred || !cred.refresh_token) throw new Error("amazon_credentials_missing");
-  const ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox" };
+  // Test kullanıcısının sandbox bağlantısı: Amazon cevapları benzetimden (amazon-sim.ts), geri kalan her şey gerçek
+  const ctx = { region: cred.region || market.region, refreshToken: cred.refresh_token, sandbox: conn.environment === "sandbox",
+    simulate: conn.environment === "sandbox" && (conn.settings || {}).simulate === true };
   const sellerId = conn.external_seller_id || cred.seller_id;
   const preview = (conn.settings || {}).dry_run !== false;
 
