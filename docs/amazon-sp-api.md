@@ -70,8 +70,9 @@ Kaynaklar (resmi): developer-docs.amazon/sp-api — uç noktalar, pazar kimlikle
 
 ## Durum ve açmak için gerekenler
 - Kayıtlı (6 Ekim): `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET`, `AMAZON_SANDBOX_REFRESH_TOKEN` → sandbox çalışıyor.
-- Eksik: `AMAZON_APP_ID` (uygulama numarası, `amzn1.sp.solution.` ile başlar). Yalnız satıcının Hesaplarım'dan "Amazon mağazanı bağla" onay sayfası için gerekir.
-  Gelince: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>`.
+- `AMAZON_APP_ID` kaydedildi (19 Ekim; `amazon_ac.py uygulama-no`). "Amazon mağazanı bağla" akışı test edildi: `tests/e2e/amazon_baglanti.py` 16/16.
+  Amazon'un sitesi tarayıcıda açılmaz; Amazon'a giden istek kesilip adres doğrulanır.
+  Sahte kodla son adım Amazon'un LWA servisine kadar gider ve reddedilir; yani state, kimlik bilgileri ve uç nokta doğru.
 - Uygulama ayarlarında iki adres: giriş adresi (Login URI) ve yönlendirme adresi (Redirect URI), ikisi de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`.
   Sayfa iki adımı da yapar: Amazon'un `amazon_callback_uri`'sine geri yollar, sonra kodu alır.
 - 19 Ekim: yenileme anahtarı yenilendi (sandbox 6/6). Client ID / Secret 6 Ekim'dekiyle aynı (parmak izi karşılaştırıldı).

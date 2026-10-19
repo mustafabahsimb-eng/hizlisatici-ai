@@ -23,10 +23,11 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 9. Chrome Web Mağazası geliştirici hesabı (tek seferlik 5 $).
 10. Sabit IP sunucusu (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün").
 11. Amazon:
-   - **Şimdi (sandbox; 5 dk, ücretsiz):** 6 Ekim'de açtığın Amazon geliştirici uygulamasının sayfasını aç. Solution Provider Portal'dan kaydolduysan https://solutionproviderportal.amazon.com → Apps & Services → Develop Apps; Seller Central'dan kaydolduysan https://sellercentral.amazon.com/sellingpartner/developerconsole.
-     - Uygulamanın "Edit App" bölümünde OAuth Login URI ve OAuth Redirect URI alanlarının ikisine de şu adresi yaz: `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`
-     - Uygulama numarasını (App ID, `amzn1.sp.solution.` ile başlar) Claude'a gönder.
-     - Neden: sandbox anahtarları kayıtlı ve Amazon'un gerçek sandbox'ı 6/6 geçti (19 Ekim). Satıcıların "Amazon mağazanı bağla" onay sayfası için yalnız bu numara eksik. Claude: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>`.
+   - ✅ Sandbox anahtarları + uygulama numarası (App ID) kaydedildi (19 Ekim). Gerçek sandbox 6/6, "Amazon mağazanı bağla" akışı 16/16 (Amazon'un onay sayfası hariç).
+   - **Bir kez dene (2 dk):**
+     1. Uygulamanın "Edit App" bölümünde OAuth Login URI ve OAuth Redirect URI alanlarının ikisinde de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html` yazdığından emin ol.
+     2. https://mustafabahsimb-eng.github.io/hizlisatici-ai/accounts.html → Amazon TR → [Mağazanı Bağla] → Amazon'da onayla.
+     - Neden: zincirin tek denenemeyen adımı Amazon'un kendi onay sayfası (senin Seller Central girişin). Bağlantı sandbox olarak kurulur; canlıya şirket sonrası geçilir.
    - **Canlıya geçmeden ÖNCE (zorunlu, güvenlik):** Client Secret ve yenileme anahtarı 19 Ekim'de sohbette paylaşıldı.
      - Amazon uygulama sayfasında **"Rotate secret"** ile Client Secret'ı yenile.
      - Uygulamayı kendi hesabına yeniden yetkilendir ("Authorize app"), yeni yenileme anahtarını al.
