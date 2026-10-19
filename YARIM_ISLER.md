@@ -123,7 +123,7 @@ Eski sorular (arşiv):
 - Etsy'nin öne çıkan ürün sayısı sınırı (4 olabilir) belgelerde net değil; 5. set reddedilirse `organize` raporunda görünür.
 - Marka kontrolü: ✅ USPTO'da yapıldı (19 Ekim; tekrarlanabilir: `python tools/pod-noel/marka_kontrol.py`, yalnız resmi USPTO araması):
   - Temiz: Bookish Soul, Gingerbread Season, Nap Season, Cozy Mode, Burn / Eat The Cookies, Snowball, Carols ve diğer Most Likely To cümleleri.
-  - **MOST LIKELY TO** (8 ilan): giyimde 2 başvuru; birinde "Notice of Allowance" (kayda yakın). Karar: şimdilik kalır; kayda dönerse ifade başlık ve etiketlerden kaldırılır (Printify güncelleme, aynı ilan numarası). Ayda bir kontrol.
+  - **MOST LIKELY TO** (8 ilan): giyimde 2 başvuru; birinde "Notice of Allowance" (kayda yakın). Karar: şimdilik kalır; kayda dönerse ifade başlık ve etiketlerden kaldırılır (Printify güncelleme, aynı ilan numarası). Her POD işinde Claude kontrolü yeniden çalıştırır.
   - STAY COZY (kurbağa): askıda bir başvuru; izlenir.
   - MAMA: giyimde kayıtlı (Mothers Against Media Addiction). Bizde genel kelime olarak, çocuk isimleriyle açıklayıcı kullanım: kalır.
   - THE NAUGHTY LIST kayıtlı; bizdeki "Be On The Naughty List" cümlesi: düşük risk, kalır.

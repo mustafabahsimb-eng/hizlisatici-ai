@@ -1,6 +1,6 @@
 # POD ifadeleri için ABD marka kontrolü (USPTO resmi arama; Etsy / pazaryeri sitesi açılmaz)
 # Giyim sınıfında (IC 025) yaşayan (kayıtlı ya da başvurusu süren) markaları listeler.
-#   python tools/pod-noel/marka_kontrol.py                 -> durum.json'daki ürünlerin ifadeleri + varsayılan liste
+#   python tools/pod-noel/marka_kontrol.py                 -> varsayılan liste (bahsistore'daki ifadeler)
 #   python tools/pod-noel/marka_kontrol.py "ifade" ...     -> yalnız verilen ifadeler
 # Sonuç: KAYITLI birebir eşleşme = ifadeyi başlık / etiketten kaldır (Printify güncelle, aynı ilan numarası), genel bir kelimeyse
 #   (ör. "mama") açıklayıcı kullanım: kalır, izlenir. BAŞVURU = izle; kayda dönerse kaldır. Çıkış kodu: 0 temiz, 1 başvuru, 2 kayıtlı.
