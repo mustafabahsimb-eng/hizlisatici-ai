@@ -74,6 +74,9 @@ Kaynaklar (resmi): developer-docs.amazon/sp-api — uç noktalar, pazar kimlikle
   Gelince: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>`.
 - Uygulama ayarlarında iki adres: giriş adresi (Login URI) ve yönlendirme adresi (Redirect URI), ikisi de `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`.
   Sayfa iki adımı da yapar: Amazon'un `amazon_callback_uri`'sine geri yollar, sonra kodu alır.
+- 19 Ekim: yenileme anahtarı yenilendi (sandbox 6/6). Client ID / Secret 6 Ekim'dekiyle aynı (parmak izi karşılaştırıldı).
+  Canlı uçta salt okuma denemesi (satıcının pazarları) 3 bölgede de 403: uygulamanın canlı erişimi yok (taslak / geliştirici kaydı tamamlanmadı). Canlı, şirket sonrası kayıtla açılır.
+- **Güvenlik:** Client Secret ve yenileme anahtarı bir sohbette görüldü. Canlıdan önce "Rotate secret" + yeniden yetkilendirme şart; `amazon_ac.py canli`, `--secret-yenilendi` olmadan çalışmaz.
 - Canlı: şirket kurulunca Solution Provider Portal "public developer" + Appstore onayı → `python tools/amazon/amazon_ac.py canli --yayinda`. Adımlar YOL-HARITASI.md "Amazon".
 
 ## Kişisel veri (alıcı adı / adres)

@@ -1,7 +1,8 @@
 # Amazon SP-API — tek komutla deneme / açma (Claude çalıştırır; gizli değerler depoya yazılmaz)
 #   python tools/amazon/amazon_ac.py test                 -> Amazon'un GERÇEK sandbox'ında uçtan uca deneme (amazon-connect selftest)
 #   python tools/amazon/amazon_ac.py uygulama-no <APP_ID> -> AMAZON_APP_ID secret'ı + deneme (Hesaplarım'dan "Amazon mağazanı bağla" açılır)
-#   python tools/amazon/amazon_ac.py canli [--yayinda]     -> AMAZON_LIVE=true (canlı uç noktalar); --yayinda: Appstore onayı geldi, AMAZON_APP_DRAFT=false
+#   python tools/amazon/amazon_ac.py canli --secret-yenilendi [--yayinda] -> AMAZON_LIVE=true (canlı uç noktalar); --yayinda: Appstore onayı geldi, AMAZON_APP_DRAFT=false
+#     (--secret-yenilendi olmadan çalışmaz: Client Secret 'Rotate secret' ile yenilenmeden canlıya geçilmez)
 #   python tools/amazon/amazon_ac.py sandbox               -> canlıdan sandbox'a geri dön (AMAZON_LIVE silinir)
 # Deneme isteği, gizli CRON anahtarı veritabanından hiç çıkmadan mevcut zamanlanmış işin komutu kopyalanarak gönderilir.
 import json, os, subprocess, sys, tempfile, time
@@ -53,6 +54,7 @@ end $$;""")
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8"); sys.stderr.reconfigure(encoding="utf-8")
     cmd = sys.argv[1] if len(sys.argv) > 1 else "test"
     if cmd == "test":
         sys.exit(0 if selftest() else 1)
@@ -64,6 +66,11 @@ def main():
         print("AMAZON_APP_ID kaydedildi.")
         sys.exit(0 if selftest() else 1)
     if cmd == "canli":
+        # Güvenlik: Client Secret ve yenileme anahtarı 19 Ekim'de bir sohbette görüldü -> canlıdan önce yenilenmeli
+        if "--secret-yenilendi" not in sys.argv:
+            sys.exit("DUR: Canlıya geçmeden önce Amazon uygulamasında 'Rotate secret' ile Client Secret yenilenmeli, uygulama yeniden yetkilendirilip\n"
+                     "yeni yenileme anahtarı alınmalı ve ikisi secrets'a yazılmalı (YARIM_ISLER.md, Amazon maddesi).\n"
+                     "Yapıldıysa: python tools/amazon/amazon_ac.py canli --secret-yenilendi [--yayinda]")
         kv = {"AMAZON_LIVE": "true"}
         if "--yayinda" in sys.argv:
             kv["AMAZON_APP_DRAFT"] = "false"

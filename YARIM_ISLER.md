@@ -27,6 +27,11 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
      - Uygulamanın "Edit App" bölümünde OAuth Login URI ve OAuth Redirect URI alanlarının ikisine de şu adresi yaz: `https://mustafabahsimb-eng.github.io/hizlisatici-ai/amazon-callback.html`
      - Uygulama numarasını (App ID, `amzn1.sp.solution.` ile başlar) Claude'a gönder.
      - Neden: sandbox anahtarları kayıtlı ve Amazon'un gerçek sandbox'ı 6/6 geçti (19 Ekim). Satıcıların "Amazon mağazanı bağla" onay sayfası için yalnız bu numara eksik. Claude: `python tools/amazon/amazon_ac.py uygulama-no <APP_ID>`.
+   - **Canlıya geçmeden ÖNCE (zorunlu, güvenlik):** Client Secret ve yenileme anahtarı 19 Ekim'de sohbette paylaşıldı.
+     - Amazon uygulama sayfasında **"Rotate secret"** ile Client Secret'ı yenile.
+     - Uygulamayı kendi hesabına yeniden yetkilendir ("Authorize app"), yeni yenileme anahtarını al.
+     - İkisini Claude'a ver; Claude secrets'a yazar. `amazon_ac.py canli`, `--secret-yenilendi` olmadan çalışmaz.
+     - Sandbox için gerekmez.
    - **Şirket kurulunca:** Solution Provider Portal "public developer" + Appstore onayı + alıcı adresi için PII rolü (adımlar YOL-HARITASI.md "Amazon"). Claude sonra `amazon_ac.py canli --yayinda` çalıştırır.
 12. AliExpress yayın başvurusu (Corporation) — docs/aliexpress-yayin-basvurusu.md.
 13. Meta işletme doğrulaması + uygulama incelemesi (WhatsApp / reklam canlı; `ADS_LIVE=true`).

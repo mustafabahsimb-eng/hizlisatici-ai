@@ -83,10 +83,13 @@ async function callback(userId: string, b: any) {
 }
 
 // Amazon'un statik sandbox örnekleriyle uçtan uca deneme (istek değerleri Amazon modelindeki örneklerle birebir aynı olmalı)
-async function selftest() {
-  const rt = Deno.env.get("AMAZON_SANDBOX_REFRESH_TOKEN") || "";
+// tokenSecret: hangi yenileme anahtarı denenecek (yalnız bu iki secret adı); live: canlı uçta yalnız OKUMA (satıcının pazarları) — hiçbir şey yazılmaz
+const TOKEN_SECRETS = ["AMAZON_SANDBOX_REFRESH_TOKEN", "AMAZON_SANDBOX_REFRESH_TOKEN_NEW"];
+async function selftest(b: any = {}) {
+  const secretName = TOKEN_SECRETS.includes(b?.tokenSecret) ? b.tokenSecret : TOKEN_SECRETS[0];
+  const rt = Deno.env.get(secretName) || "";
   // Sandbox isteği için LWA istemcisi + yenileme anahtarı yeter (AMAZON_APP_ID yalnız satıcı onay sayfası için)
-  const need = ["AMAZON_LWA_CLIENT_ID", "AMAZON_LWA_CLIENT_SECRET", "AMAZON_SANDBOX_REFRESH_TOKEN"].filter((k) => !Deno.env.get(k));
+  const need = ["AMAZON_LWA_CLIENT_ID", "AMAZON_LWA_CLIENT_SECRET", secretName].filter((k) => !Deno.env.get(k));
   if (need.length) return { ok: false, notReady: true, need };
   const ctx: Ctx = { region: "na", refreshToken: rt, sandbox: true };
   const steps: Record<string, unknown> = {};
@@ -112,7 +115,16 @@ async function selftest() {
       dims: { length: 10.25, width: 10.25, height: 10.25 }, weight: 10.25 }));
   }, (d) => !!d?.trackingId);
   const ms = Date.now() - t0;
-  return { ok: Object.values(steps).every((s) => s === "geçti"), steps, ms, appIdSet: !!Deno.env.get("AMAZON_APP_ID") };
+  // Canlı uçta salt okuma: anahtar hangi satıcı hesabına ve hangi pazarlara ait (yazma yok)
+  let liveAccount: unknown = undefined;
+  if (b?.live === true) {
+    try {
+      const d = await sp({ region: b.region || "eu", refreshToken: rt, sandbox: false }, "GET", "/sellers/v1/marketplaceParticipations");
+      liveAccount = (d?.payload || []).map((x: any) => ({ id: x.marketplace?.id, country: x.marketplace?.countryCode, name: x.marketplace?.name,
+        participating: x.participation?.isParticipating, suspended: x.participation?.hasSuspendedListings, store: x.storeName }));
+    } catch (e) { liveAccount = { error: short((e as Error).message, 300) }; }
+  }
+  return { ok: Object.values(steps).every((s) => s === "geçti"), steps, ms, tokenSecret: secretName, appIdSet: !!Deno.env.get("AMAZON_APP_ID"), ...(liveAccount !== undefined ? { liveAccount } : {}) };
 }
 
 Deno.serve(async (req) => {
@@ -120,7 +132,7 @@ Deno.serve(async (req) => {
   const b = await req.json().catch(() => ({}));
   try {
     if (CRON_SECRET && String(b?.cronSecret || "").trim() === CRON_SECRET.trim()) {
-      if (b.action === "selftest") return json(await selftest());
+      if (b.action === "selftest") return json(await selftest(b));
       return json({ error: "Geçersiz işlem" }, 400);
     }
     const token = String(b?.userAccessToken || "").trim();
