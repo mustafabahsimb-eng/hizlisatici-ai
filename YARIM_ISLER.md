@@ -121,4 +121,9 @@ Eski sorular (arşiv):
 - Etsy API "yükselen arama hacmi" vermez; sezon kontrolü resmi aramada sonuç sayısını geçen yılla karşılaştırır ve en yeni ilanlarda en sık geçen etiketleri temalara ekler.
 - Printify API üretici puanı vermez; seçim bilinen yüksek puanlı ABD üreticileri listesiyle (Monster Digital, SwiftPOD, …) ve 5 renk × S–3XL şartıyla yapılır.
 - Etsy'nin öne çıkan ürün sayısı sınırı (4 olabilir) belgelerde net değil; 5. set reddedilirse `organize` raporunda görünür.
-- Marka kontrolü: "Just one more" ifadesi için giyimde bekleyen bir ABD başvurusu var → kitapsever tasarımında "Bookish Soul" kullanıldı. Yayından önce USPTO'da ifadeler son bir kez aranmalı.
+- Marka kontrolü: ✅ USPTO'da yapıldı (19 Ekim; tekrarlanabilir: `python tools/pod-noel/marka_kontrol.py`, yalnız resmi USPTO araması):
+  - Temiz: Bookish Soul, Gingerbread Season, Nap Season, Cozy Mode, Burn / Eat The Cookies, Snowball, Carols ve diğer Most Likely To cümleleri.
+  - **MOST LIKELY TO** (8 ilan): giyimde 2 başvuru; birinde "Notice of Allowance" (kayda yakın). Karar: şimdilik kalır; kayda dönerse ifade başlık ve etiketlerden kaldırılır (Printify güncelleme, aynı ilan numarası). Ayda bir kontrol.
+  - STAY COZY (kurbağa): askıda bir başvuru; izlenir.
+  - MAMA: giyimde kayıtlı (Mothers Against Media Addiction). Bizde genel kelime olarak, çocuk isimleriyle açıklayıcı kullanım: kalır.
+  - THE NAUGHTY LIST kayıtlı; bizdeki "Be On The Naughty List" cümlesi: düşük risk, kalır.
