@@ -11,7 +11,7 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 3. ~~*(İsteğe bağlı)* Sandbox reklam hesabı "Seltigo Test" (act_1138060605425004) uygulamaya erişim vermiyor ("Ad account owner has NOT grant"). Gerekmiyor: test, kişisel hesapta duraklatılmış denemeyle yapılıyor. Secret `ADS_SANDBOX_TOKEN` kayıtlı.~~ — listeden çıkarıldı: gerekmiyor.
 
 ## Asistan kanalları
-4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Kalan (senin Telegram hesabın gerekiyor): https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "Telegram'a bağla" → açılan Telegram'da Başlat. Canlı uçtan uca testi sonra Claude yapar.
+4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Bot açıklamaları (TR + EN) uygulandı (19 Ekim). Kalan (senin Telegram hesabın gerekiyor): https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "Telegram'a bağla" → açılan Telegram'da Başlat. Canlı uçtan uca testi sonra Claude yapar.
 5. **Meta WhatsApp test numarası (asistan için):** https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → API Setup → numara kimliği, WABA kimliği ve kalıcı anahtar → aynı secrets sayfasına `ASSISTANT_WA_PHONE_ID`, `ASSISTANT_WA_WABA_ID`, `ASSISTANT_WA_TOKEN`, `ASSISTANT_WA_DISPLAY_NUMBER`.
 
 ## Kargo / tedarik / pazaryeri
@@ -49,6 +49,15 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 - Etsy senkronu: Etsy'de silinen ilan panelden silinmez, "Etsy'de yok" etiketiyle kalır (satış / kâr geçmişi kaybolmasın). Dışarıda (Printify / Etsy) yönetilen ilanlar Seltigo'dan Etsy'ye geri yazılmaz.
 - İçerik planı: bir istekte en fazla 3 görsel, kalan için kendini yeniden çağırma; panel bitene kadar "Hazırlanıyor…" gösterir.
 - Seltigo Ads: sandbox hesabı yerine kişisel reklam hesabında para harcamayan "duraklatılmış aç → doğrula → sil" denemesi; kampanyada setler arası bütçe paylaşımı kapalı.
+- Amazon (19 Ekim):
+  - Fiyat pazarın x,99 kuralına yukarı yuvarlanır (asla düşmez; JPY / INR kuruşsuz).
+  - Komisyon varsayılanı %15 (zarar kontrolü bununla).
+  - Ana görsel otomatik düzeltilir; ücretli zemin silme varsayılan kapalı (`AMAZON_AUTO_BG_REMOVE`).
+  - Kategori onayı gereken ASIN'e teklif açılmaz, onay bağlantısı ilana yazılır.
+  - Reddedilen ilan en fazla 2 kez AI ile düzeltilip yeniden gönderilir.
+  - Siparişler Orders API v2026-01-01'e geçti.
+- Kargo (19 Ekim): 3 günden eski test gönderileri izlenmez; siparişi silinmiş gönderi "iptal" olur. Test kullanıcısının 42 yetim test gönderisi iptal edildi (silinmedi).
+- Telegram bot açıklamaları (19 Ekim): 18 Ekim'de gösterilen TR / EN metinler aynen uygulandı.
 - Trendruum (19 Ekim): Hesaplarım kartı alt yazısı "Yeni yerli pazaryeri, 14 günde ödeme"; alanlar Trendruum'un kendi adlarıyla "Client ID" / "Client Secret". Entegrasyon kapalıyken bağlantı "onay bekliyor" kaydedilir, açılınca kendiliğinden doğrulanır. Canlı açıldığında ilanlar prova beklemeden gönderilir (tek anahtar `TRENDRUUM_ENABLED`). Komisyon oranı uydurulmadı (dışarıda yayınlanmıyor); satıcı girer, sonra API'den okunacak.
 
 ---
@@ -59,12 +68,18 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 - Canlıda: migration 20261016_pod_seasons.sql; etsy-listings, marketplace-orders (Etsy anahtar düzeltmesi), season-calendar, pod-personalize, assistant, telegram-bot, whatsapp-webhook, meta-dm-webhook; secret PRINTIFY_TOKEN_11444569; cron season-calendar-daily (03:00 UTC), pod-personalize-5m.
 - Etsy bağlantısı geri açıldı; 25 kapak uygulandı, 6 bölüm kuruldu, 5 set öne çıkan (1-5).
 - Fiyat A (Offsite Ads açık, %35): S-XL 68,99 $ / 2XL 75,99 $ / 3XL 79,99 $; üretici SwiftPOD. 14 sweatshirt Etsy'de yayında (ilan numaraları %LOCALAPPDATA%\seltigo-pod\durum.json).
-- Mama yayında (16 Ekim). Printify kartı, sipariş onayı Manual ve Etsy Offsite Ads kapalı (Mustafa, 16 Ekim; API bu ayarları göstermiyor, doğrulanamadı). Numune YOK: alınmayacak, bir daha sorulmayacak; numune.py kaldırıldı. Telegram botu: TELEGRAM_BOT_TOKEN bekleniyor.
+- Mama yayında (16 Ekim). Printify kartı, sipariş onayı Manual ve Etsy Offsite Ads kapalı (Mustafa, 16 Ekim; API bu ayarları göstermiyor, doğrulanamadı). Numune YOK: alınmayacak, bir daha sorulmayacak; numune.py kaldırıldı. Telegram botu: ✅ bağlandı (18 Ekim).
 - Aşağıdaki eski notların çoğu tamamlandı.
 
 Önizleme sayfası: https://claude.ai/artifact/7iqNtbTPi4NwkBt7LqZsVx
 
-## Takılan yerler
+## Takılan yerler — ✅ hepsi çözüldü (19 Ekim kontrolü)
+- 1 (Etsy "süresi doldu"): düzeltme yayında, bağlantı açık, kapak / bölüm / öne çıkanlar uygulandı. `shipping-hub` artık Etsy anahtarı okumuyor (not geçersiz).
+- 2 (Printify token'ı): secret `PRINTIFY_TOKEN_11444569` kayıtlı, `pod-personalize` çalışıyor.
+- 3 (canlıya alınacaklar): hepsi canlıda (bkz. "Güncel durum").
+
+Eski notlar (arşiv):
+
 
 1. **Etsy bağlantısı "süresi doldu" durumunda (bahsistore).** Sebep bulundu: `marketplace-orders` (15 dk'da bir sipariş çeker) Etsy erişim anahtarını yenilemeden kullanıyor; anahtarın 1 saatlik süresi dolunca 401 alıyor ve bağlantıyı "expired" yapıyor. Yenileme anahtarı (90 gün) büyük ihtimalle hâlâ geçerli.
    - Düzeltme bu dalda hazır: `supabase/functions/marketplace-orders/index.ts` Etsy için önce `etsyToken` ile yeniler. Denetimden geçti, **yayınlanmadı** (canlıya onay gerekiyor).
@@ -81,7 +96,16 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 3. **Canlıya alınmayı bekleyenler (onay):** migration `supabase/migrations/20261016_pod_seasons.sql`; yeni fonksiyonlar `season-calendar`, `pod-personalize`; `etsy-listings` (listing_personalization işlemi), `marketplace-orders` (Etsy anahtar düzeltmesi), `_shared/assistant-core.ts` ("notice" bildirimi → `assistant` ve `telegram-bot` yeniden yayın); zamanlanmış işler: `season-calendar` günde 1 (06:00 TR), `pod-personalize` 5 dakikada 1.
    - Bu gece yayınlanan tek şey: `etsy-listings` içine `organize` ve `listing_state` işlemleri (yalnız ekleme; açılış denendi, çalışıyor).
 
-## Sabah Mustafa'ya sorulacaklar
+## Sabah Mustafa'ya sorulacaklar — ✅ tamamlandı (19 Ekim; açık kalanlar Claude'un kararıyla kapatıldı)
+- 1 Fiyat: kalıcı kural CLAUDE.md'de (her sweatshirt satışından net en az 10 $).
+- 2 "Most Likely To": 8 ayrı ilan olarak yayında; değiştirilmez (Etsy'de yeni ilan / kopya yasak, her ilan ücretli).
+- 3 Printify ayarları: Mustafa yaptı (16 Ekim).
+- 4 Noel: ilanlar açık kalır; `season-calendar` açıklamaya son sipariş tarihini yazar, tarih geçince uyarı, 26 Aralık'ta kaldırır.
+- 5 Sezon takvimi menüsü: ayrı menü açılmadı; işler arka planda, bildirimi asistan verir ("Trend takvimi" sayfası ayrı kalır).
+- 6 Etsy kapak / bölüm / öne çıkanlar: uygulandı.
+
+Eski sorular (arşiv):
+
 
 1. **Fiyat.** Kesintiler + %15 Offsite Ads + %35 net kâr ile Gildan 18000: S–XL 58,99 $, 2XL 64,99 $, 3XL 69,99 $ (TL mağazada ≈ 2.419 TL). Piyasa 35–45 $.
    - A) Böyle kalsın (her satışta en az %35).
