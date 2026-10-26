@@ -202,52 +202,26 @@ export function checkContent(c: AmazonContent, market: AmazonMarket, brand: stri
   return { content, issues };
 }
 
-// ---------- AI çağrısı (ortak): aynı anda en fazla 4 istek, yoğunlukta (429 / 529 / 5xx) bekleyip yeniden dener ----------
-// Neden: bir ürün 5 Amazon pazarına aynı anda gidince ~15 AI isteği birden çıkar; sınır aşılırsa AI boş döner ve Amazon zorunlu alan eksik der.
-const AI_MAX_PARALLEL = 4;
-let aiActive = 0;
-const aiWaiters: (() => void)[] = [];
-async function aiSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (aiActive >= AI_MAX_PARALLEL) await new Promise<void>((r) => aiWaiters.push(r));
-  aiActive++;
-  try { return await fn(); } finally { aiActive--; aiWaiters.shift()?.(); }
-}
-// Metin cevabı (null: AI yok / hepsi başarısız)
-export async function aiText(req: { system?: string; content: unknown; maxTokens?: number; timeoutMs?: number }): Promise<string | null> {
-  if (!ANTHROPIC_API_KEY) return null;
-  return await aiSlot(async () => {
-    for (const model of AI_MODELS) {
-      for (let attempt = 0; attempt < 4; attempt++) {
-        try {
-          const r = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model, max_tokens: req.maxTokens || 3000, ...(req.system ? { system: req.system } : {}), messages: [{ role: "user", content: req.content }] }),
-            signal: AbortSignal.timeout(req.timeoutMs || 60000),
-          });
-          if (r.status === 429 || r.status === 529 || r.status >= 500) {
-            await r.body?.cancel();
-            const ra = Number(r.headers.get("retry-after")) || 0;
-            await new Promise((res) => setTimeout(res, Math.min(8000, ra ? ra * 1000 : 1200 * 2 ** attempt) + Math.random() * 400));
-            continue;
-          }
-          const d = await r.json();
-          if (!r.ok) break; // bu model kullanılamıyor: sıradaki model
-          return (d?.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-        } catch (_) { /* zaman aşımı / ağ: yeniden dene */ }
-      }
-    }
-    return null;
-  });
-}
-
-// ---------- AI (metin + isteğe bağlı görsel) -> JSON ----------
+// ---------- AI (metin + isteğe bağlı görsel) ----------
 export async function aiJson(system: string, user: string, opts: { imageUrl?: string | null; maxTokens?: number } = {}): Promise<any | null> {
+  if (!ANTHROPIC_API_KEY) return null;
   const content: unknown[] = [];
   if (opts.imageUrl && /^https:\/\//.test(opts.imageUrl)) content.push({ type: "image", source: { type: "url", url: opts.imageUrl } });
   content.push({ type: "text", text: user });
-  const text = await aiText({ system, content, maxTokens: opts.maxTokens || 3000 });
-  const m = text?.match(/\{[\s\S]*\}/);
-  try { return m ? JSON.parse(m[0]) : null; } catch (_) { return null; }
+  for (const model of AI_MODELS) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model, max_tokens: opts.maxTokens || 3000, system, messages: [{ role: "user", content }] }), signal: AbortSignal.timeout(60000),
+      });
+      const d = await r.json();
+      if (!r.ok) continue;
+      const text = (d?.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+    } catch (_) { /* sonraki model */ }
+  }
+  return null;
 }
 
 const LANG_NAMES: Record<string, string> = { tr: "Turkish", en: "English", de: "German", fr: "French", it: "Italian", es: "Spanish", nl: "Dutch", sv: "Swedish", pl: "Polish", pt: "Portuguese", ja: "Japanese", ar: "Arabic" };
@@ -269,20 +243,15 @@ Translate naturally (not word by word). Never invent specifications that are not
   const r = await aiJson(system, JSON.stringify(src), { maxTokens: 2500 });
   const draft: AmazonContent = r && typeof r.title === "string"
     ? { title: r.title, bullets: Array.isArray(r.bullets) ? r.bullets.map(String) : [], description: String(r.description || ""), keywords: String(r.keywords || "") }
-    : { title: src.title, bullets: src.bullets.length ? src.bullets : specBullets(product, src.description), description: src.description, keywords: src.keywords };
+    : { title: src.title, bullets: src.bullets.length ? src.bullets : specBullets(product), description: src.description, keywords: src.keywords };
   const { content, issues } = checkContent(draft, market, src.brand, maxTitle);
   return { content, issues, ai: !!(r && typeof r.title === "string") };
 }
 
-// AI yoksa: ürün özelliklerinden madde ("Malzeme: Seramik"), yetmezse açıklamanın cümlelerinden
-function specBullets(product: any, description = ""): string[] {
+// AI yoksa: ürün özelliklerinden madde ("Malzeme: Seramik")
+function specBullets(product: any): string[] {
   const s = product?.specs;
-  let out: string[] = [];
-  if (Array.isArray(s)) out = s.map((x: any) => (x?.k && x?.v ? `${x.k}: ${x.v}` : "")).filter(Boolean);
-  else if (s && typeof s === "object") out = Object.entries(s).map(([k, v]) => `${k}: ${v}`);
-  if (out.length < 5) {
-    const sent = String(description || "").replace(/<[^>]+>/g, " ").split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter((x) => x.length >= 20);
-    out = [...out, ...sent];
-  }
-  return out.slice(0, 5);
+  if (Array.isArray(s)) return s.map((x: any) => (x?.k && x?.v ? `${x.k}: ${x.v}` : "")).filter(Boolean).slice(0, 5);
+  if (s && typeof s === "object") return Object.entries(s).map(([k, v]) => `${k}: ${v}`).slice(0, 5);
+  return [];
 }

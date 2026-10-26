@@ -10,10 +10,11 @@
 // Üretilen nitelikler listings.validation.amazon içinde saklanır (listings.attributes'a yazılmaz; yoksa senkron döngüsü olur).
 // =========================================================
 import { type AmazonMarket, type Ctx, gtinType, makeSku, money, sp, SpApiError, validGtin } from "./amazon.ts";
-import { aiJson, aiText, type AmazonContent, localizedContent } from "./amazon-content.ts";
+import { aiJson, type AmazonContent, localizedContent } from "./amazon-content.ts";
 import { prepareImages, type Uploader } from "./amazon-images.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const AI_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-sonnet-4-6"]; // hız için önce Haiku
 
 export type Issue = { code: string; field?: string; msg: string; severity?: string };
 export type BuildInput = {
@@ -21,8 +22,6 @@ export type BuildInput = {
   stockQty: number | null; preview: boolean;
   // İsteğe bağlı: pazar dilindeki metin (yoksa üretilir), görsel düzeltme için depo, başlık sınırı, komisyon (%), maliyet (pazar para biriminde)
   content?: AmazonContent | null; upload?: Uploader | null; imagePrefix?: string; maxTitle?: number | null; commissionPct?: number | null; unitCost?: number | null;
-  // Görsel düzeltmeyi başka bir çağrıda yaptıran işlev (sync-worker: amazon-connect prepare_images; aynı ürünün pazarları tek sonucu paylaşır)
-  prepareImagesFn?: ((urls: string[]) => Promise<Awaited<ReturnType<typeof prepareImages>>>) | null;
 };
 
 async function sha(s: string) {
@@ -153,27 +152,20 @@ async function aiAttributes(input: BuildInput, productType: string, names: strin
   const schemas = Object.fromEntries(names.map((n) => [n, JSON.stringify(props[n] || {}).slice(0, 2500)]));
   const system = `You fill Amazon SP-API Listings Items attributes. Output ONLY a JSON object: keys = attribute names, values = arrays exactly in the Amazon attribute format described by each JSON schema. Use marketplace_id "${market.id}" and language_tag "${market.locale}" where the schema has them. Write texts in the marketplace language (${market.locale}). Choose enum values only from the schema. Never invent safety certifications; for unknown numeric facts choose conservative realistic values. Product type: ${productType}.`;
   const user = `Product facts:\n${JSON.stringify(facts)}\n\nAttributes to fill (schemas):\n${JSON.stringify(schemas)}`;
-  const text = await aiText({ system, content: user, maxTokens: 6000 });
-  const m = text?.match(/\{[\s\S]*\}/);
-  try { return m ? normalizeAttrs(input.market, JSON.parse(m[0])) : {}; } catch (_) { return {}; }
-}
-
-// AI bazen niteliği Amazon'un liste biçiminde değil düz değer / tek nesne olarak döndürür ("Svea", {"value":"Svea"}).
-// Amazon her niteliği [{ value, marketplace_id[, language_tag] }] listesi olarak ister; burada o biçime çevrilir.
-export function normalizeAttrs(m: AmazonMarket, o: any): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  if (!o || typeof o !== "object" || Array.isArray(o)) return out;
-  const fix = (x: any) => {
-    if (x == null || x === "") return null;
-    if (typeof x !== "object") return typeof x === "string" ? { value: x, language_tag: m.locale, marketplace_id: m.id } : { value: x, marketplace_id: m.id };
-    if (!Array.isArray(x)) return { ...x, ...(x.marketplace_id ? {} : { marketplace_id: m.id }) };
-    return null;
-  };
-  for (const [k, v] of Object.entries(o)) {
-    const arr = (Array.isArray(v) ? v : [v]).map(fix).filter(Boolean);
-    if (arr.length) out[k] = arr;
+  for (const model of AI_MODELS) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model, max_tokens: 6000, system, messages: [{ role: "user", content: user }] }), signal: AbortSignal.timeout(60000),
+      });
+      const d = await r.json();
+      if (!r.ok) continue;
+      const text = (d?.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+    } catch (_) { /* sonraki model */ }
   }
-  return out;
+  return {};
 }
 
 // ---------- Barkodsuz ürün: Amazon kataloğunda aynı ürünü bul (marka + model; gerekirse AI onayı) ----------
@@ -194,8 +186,18 @@ async function aiSameProduct(title: string, product: any, item: any): Promise<bo
   if (!ANTHROPIC_API_KEY) return false;
   const sum = item?.summaries?.[0] || {};
   const q = `Our product: ${JSON.stringify({ title, brand: product?.brand, model: product?.model_code, specs: product?.specs })}\nAmazon item: ${JSON.stringify({ name: sum.itemName, brand: sum.brand, model: sum.modelNumber, color: sum.color, size: sum.size })}\nIs this exactly the same product (same model, same size/variant)? Answer only YES or NO.`;
-  const text = await aiText({ content: q, maxTokens: 5, timeoutMs: 20000 });
-  return /^\s*yes/i.test(text || "");
+  for (const model of AI_MODELS) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: q }] }), signal: AbortSignal.timeout(20000),
+      });
+      const d = await r.json();
+      if (!r.ok) continue;
+      return /^\s*yes/i.test((d?.content || []).map((c: any) => c.text || "").join(""));
+    } catch (_) { /* sonraki model */ }
+  }
+  return false;
 }
 export async function matchCatalog(input: BuildInput): Promise<{ asin: string; productType: string; gtin: string | null } | null> {
   const { ctx, market, product, listing } = input;
@@ -322,8 +324,7 @@ async function aiFixAttributes(input: BuildInput, productType: string, issues: I
     { maxTokens: 3000 },
   );
   if (!r || typeof r !== "object") return {};
-  const n = normalizeAttrs(market, r);
-  return Object.fromEntries(Object.entries(n).filter(([k]) => names.includes(k)));
+  return Object.fromEntries(Object.entries(r).filter(([k, v]) => names.includes(k) && Array.isArray(v)));
 }
 
 export async function submitListing(input: BuildInput): Promise<SubmitResult> {
@@ -446,7 +447,7 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   // (madde / arama terimi / menşe zorunluysa AI da doldurur; üründen gelen değer her zaman önce gelir)
   const KNOWN = ["item_name", "brand", "product_description", "main_product_image_locator",
     "condition_type", "purchasable_offer", "fulfillment_availability", "list_price", "merchant_suggested_asin",
-    "parentage_level", "child_parent_sku_relationship", "variation_theme", "externally_assigned_product_identifier", "external_product_id",
+    "parentage_level", "child_parent_sku_relationship", "variation_theme", "color", "size", "externally_assigned_product_identifier", "external_product_id",
     "supplier_declared_has_product_identifier_exemption", "gtin_exemption_reason"];
   const typeBranch = (async () => {
     const tT = Date.now();
@@ -462,14 +463,11 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   })();
   typeBranch.catch(() => {}); // görsel / metin kolu erken dönerse yakalanmamış hata olmasın
   const tPrep = Date.now();
-  const timed = async <T,>(k: string, p: Promise<T> | T): Promise<T> => { const t = Date.now(); const r = await p; lap(k, t); return r; };
   const [img, txt] = await Promise.all([
-    timed("images", prev.imageFix?.[input.images[0]] ? { images: [prev.imageFix[input.images[0]], ...input.images.slice(1)], issues: [], imageFix: prev.imageFix, ms: 0 }
-      : input.prepareImagesFn ? input.prepareImagesFn(input.images).catch(() => null)
-      : input.upload ? prepareImages(input.images, { upload: input.upload, pathPrefix: input.imagePrefix || `amazon/${listing.user_id}/${product?.id}`, cache: prev.imageFix }) : null),
-    timed("text", input.content ? null : (prev.content?.hash === contentHash && prev.content?.locale === market.locale && prev.content?.title
+    input.upload ? prepareImages(input.images, { upload: input.upload, pathPrefix: input.imagePrefix || `amazon/${listing.user_id}/${product?.id}`, cache: prev.imageFix }) : null,
+    input.content ? null : (prev.content?.hash === contentHash && prev.content?.locale === market.locale && prev.content?.title
       ? { content: prev.content, issues: [], ai: false }
-      : localizedContent(product, listing, market, input.maxTitle || 200))),
+      : localizedContent(product, listing, market, input.maxTitle || 200)),
   ]);
   lap("prepare", tPrep);
   if (img) {
@@ -490,15 +488,8 @@ export async function submitListing(input: BuildInput): Promise<SubmitResult> {
   const gate = gatingHint(productType, market);
   if (gate) warnings.push({ code: "approval_maybe", field: "category", msg: gate });
   const base = { ...contentAttrs(market, input), ...identifierAttrs(market, multi ? null : gtin, sch.properties) };
-  // Kesin bilinen / güvenli varsayılan nitelikler (AI atlarsa Amazon reddetmesin): üretici = marka, pil yok, tehlikeli madde yok
-  const want = new Set([...sch.required, ...Object.keys(sch.properties || {})]);
-  const safe: Record<string, unknown> = {};
-  if (want.has("manufacturer")) safe.manufacturer = textVal(market, String(product?.brand || "Generic").slice(0, 50)); // marka alanıyla aynı
-  if (want.has("batteries_required")) safe.batteries_required = plainVal(market, false);
-  if (want.has("supplier_declared_dg_hz_regulation")) safe.supplier_declared_dg_hz_regulation = plainVal(market, "not_applicable");
-  if (want.has("item_type_keyword")) safe.item_type_keyword = plainVal(market, productType.toLowerCase().replace(/_/g, "-")); // AI daha iyisini verirse o kullanılır
   const tA = Date.now();
-  let ai = { ...safe, ...tb.at };
+  let ai = tb.at;
   // Amazon sonradan itiraz ettiyse (amazon-orders ilan durumunu okur): itiraz edilen nitelikler gönderimden önce düzeltilir
   if (openErrors) {
     const later = (prev.issues as Issue[]).filter((i) => i.severity === "ERROR" && classifyIssue(i) === "attribute");
