@@ -56,6 +56,7 @@ export async function whatsappMedia(mediaId: string): Promise<{ bytes: Uint8Arra
   const h = { Authorization: `Bearer ${env("ASSISTANT_WA_TOKEN")}` };
   const m = await (await fetch(`${GRAPH}/${mediaId}`, { headers: h })).json();
   if (!m?.url) throw new Error("WhatsApp dosyası alınamadı");
+  if (Number(m.file_size) > 20 * 1024 * 1024) throw new Error("Dosya çok büyük (en fazla 20 MB)");
   const r = await fetch(m.url, { headers: h, signal: AbortSignal.timeout(60000) });
   return { bytes: new Uint8Array(await r.arrayBuffer()), mime: m.mime_type || "" };
 }

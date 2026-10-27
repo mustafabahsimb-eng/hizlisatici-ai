@@ -430,6 +430,67 @@ async function askAI(system: string, user: string): Promise<any> {
   return null;
 }
 
+// Ticimax: ürün sayfasındaki "var productDetailModel = {...}" (fiyat, barkod, stok kodu, beden / renk seçenekleri)
+function ticimaxFromHtml(html: string, base: URL): any | null {
+  const at = html.indexOf("var productDetailModel");
+  if (at < 0) return null;
+  const start = html.indexOf("{", at);
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false, end = -1;
+  for (let i = start; i < Math.min(html.length, start + 2_000_000); i++) {
+    const ch = html[i];
+    if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true; else if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth === 0) { end = i + 1; break; } }
+  }
+  if (end < 0) return null;
+  let d: any;
+  try { d = JSON.parse(html.slice(start, end)); } catch { return null; }
+  if (!d?.productName) return null;
+  const ps: any[] = Array.isArray(d.products) ? d.products : [];
+  const main = ps.find((x) => x.anaUrun) || ps[0] || d.product || {};
+  const attrsOf = new Map<number, Record<string, string>>();
+  for (const v of (Array.isArray(d.productVariantData) ? d.productVariantData : [])) {
+    const a = attrsOf.get(v.urunID) || {};
+    if (v.ekSecenekTipiTanim && v.tanim) a[clean(v.ekSecenekTipiTanim, 40)] = clean(v.tanim, 60);
+    attrsOf.set(v.urunID, a);
+  }
+  const priceOf = (x: any) => Number(x?.indirimliFiyati) > 0 ? Number(x.indirimliFiyati) : Number(x?.satisFiyati) > 0 ? Number(x.satisFiyati) : null;
+  const variants: Variant[] = ps.map((x) => ({
+    supplier_variant_id: String(x.id), sku: clean(x.barkod || x.stokKodu, 80), attributes: attrsOf.get(x.id) || {},
+    price: priceOf(x), stock: Number.isFinite(Number(x.stokAdedi)) ? Number(x.stokAdedi) : null, image: null,
+  })).filter((v) => Object.keys(v.attributes).length > 0);
+  const ld = jsonLdNodes(html).find((n) => isType(n, "Product"));
+  const imgs = uniq([
+    ...(Array.isArray(main.resimler) ? main.resimler.map((r: any) => typeof r === "string" ? r : r?.resimBuyukYolu || r?.resimYolu) : []),
+    main.spotResimBuyukYolu, meta(html, "og:image"), ...htmlImages(html, base).filter((u) => /uploads\/urunresimleri/i.test(u)),
+  ].filter((u) => typeof u === "string" && u && !/resim-hazirlaniyor/.test(u)).map((u: string) => absUrl(u, base)).filter(Boolean) as string[]).slice(0, 12);
+  const price = priceOf(main) ?? parsePrice(d.productPrice);
+  return {
+    url: base.toString(), name: clean(d.productName, 300), price, list_price: Number(main.satisFiyati) > (price || 0) ? Number(main.satisFiyati) : null,
+    currency: guessCurrency(d.productCurrency || main.paraBirimiKodu) || "TRY",
+    stock: Number.isFinite(Number(d.totalStockAmount)) ? Number(d.totalStockAmount) : null,
+    model_code: clean(d.stockCode || main.stokKodu, 80), barcode: clean(main.barkod, 40), brand: clean(d.brandName, 80), category: "",
+    description: clean(stripTags(ld?.description || d.productShortDescription || meta(html, "og:description") || ""), 5000),
+    images: imgs, specs: [] as { k: string; v: string }[], variants: variants.slice(0, 100),
+    source_platform: "ticimax", source_item_id: String(d.productId || main.urunKartiId || ""),
+  };
+}
+
+// Next.js tabanlı vitrinler (ör. ikas): sayfa verisindeki ürün görselleri
+function nextDataImages(html: string, base: URL): string[] {
+  const m = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!m) return [];
+  const out: string[] = [];
+  const walk = (o: any, d: number) => {
+    if (!o || d > 9 || out.length >= 12) return;
+    if (typeof o === "string") { if (/^https?:\/\/[^"\s]+\.(jpe?g|png|webp)(\?|$)/i.test(o)) out.push(o); return; }
+    if (Array.isArray(o)) { o.forEach((x) => walk(x, d + 1)); return; }
+    if (typeof o === "object") Object.values(o).forEach((x) => walk(x, d + 1));
+  };
+  try { walk(JSON.parse(m[1])?.props?.pageProps, 0); } catch { return []; }
+  return uniq(out.map((x) => absUrl(x, base)).filter(Boolean) as string[]).slice(0, 12);
+}
+
 async function parseHtml(html: string, base: URL) {
   if (html.length > MAX_HTML) html = html.slice(0, MAX_HTML);
   const nodes = jsonLdNodes(html);
@@ -824,7 +885,7 @@ async function sitemapProductLinks(u: URL): Promise<string[]> {
     }
     for (const l of locs) {
       const lu = isSafeUrl(l);
-      if (!lu || lu.hostname !== u.hostname || lu.pathname === "/" || NOT_PRODUCT.test(lu.pathname)) continue;
+      if (!lu || lu.hostname.replace(/^www\./, "") !== u.hostname.replace(/^www\./, "") || lu.pathname === "/" || NOT_PRODUCT.test(lu.pathname)) continue;
       links.push(lu.toString());
       if (links.length >= MAX_SITEMAP_LINKS) break;
     }
@@ -919,6 +980,10 @@ Deno.serve(async (req) => {
     const sniff = html.slice(0, 400000);
     const isShopify = /cdn\.shopify\.com|Shopify\.shop\s*=|shopify-digital-wallet/i.test(sniff);
     const isWoo = /wp-content\/plugins\/woocommerce|woocommerce-page|wc-block-/i.test(sniff);
+    // Türk e-ticaret altyapıları: herkese açık ürün API'leri yok; site haritası + sayfadaki JSON-LD / OpenGraph okunur
+    const trPlatform = /cdn\.myikas\.com|myikas\.com|ikas-storefront|"ikas"/i.test(sniff) ? "ikas"
+      : /ticimax|ticimaxcdn|static\.ticimax/i.test(sniff) ? "ticimax"
+      : /ideasoft|ideacdn/i.test(sniff) ? "ideasoft" : /tsoft|t-soft/i.test(sniff) ? "tsoft" : "";
 
     if (isShopify) {
       if (/\/products\/[^/]+/.test(fu.pathname)) {
@@ -942,21 +1007,26 @@ Deno.serve(async (req) => {
       const it = trendyolFromHtml(html, fu);
       if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "trendyol" });
     }
+    if (trPlatform === "ticimax" && !isRoot) {
+      const it = ticimaxFromHtml(html, fu);
+      if (it?.name) return json({ kind: "product", item: it, url: it.url, platform: "ticimax" });
+    }
     // Site ana sayfası: site haritasından tüm ürün linkleri
     if (isRoot) {
       const links = await sitemapProductLinks(fu);
-      if (links.length >= 3) return json({ kind: "category", links: links.slice(0, 2000), next_page: "", url: fu.toString(), platform: "sitemap" });
+      if (links.length >= 3) return json({ kind: "category", links: links.slice(0, 2000), next_page: "", url: fu.toString(), platform: trPlatform || "sitemap" });
     }
 
     const res = await parseHtml(html, fu);
     if (res.kind === "product" && (res as any).item) {
       (res as any).item.variants = jsonLdVariants(html, fu);
-      (res as any).item.source_platform = "web";
+      (res as any).item.source_platform = trPlatform || "web";
+      if (trPlatform && !(res as any).item.images?.length) (res as any).item.images = nextDataImages(html, fu);
     }
     if (res.kind === "product" && !(res as any).item?.name) {
       return json({ error: E("Bu sayfada ürün bilgisi bulunamadı.", "No product information found on this page.") }, 422);
     }
-    return json({ ...res, url: page.finalUrl.toString() });
+    return json({ ...res, url: page.finalUrl.toString(), platform: trPlatform || (res as any).platform || undefined });
   } catch (err) {
     console.error(err);
     return json({ error: E("Sunucu hatası", "Server error") }, 500);

@@ -648,6 +648,17 @@ for (const m of AMAZON_MARKETS) ADAPTERS[m.code] = amazonAdapter;
 // Tek bir işi işle
 // ---------------------------------------------------------
 async function processJob(job) {
+  // PDF + link ile ürün yükleme parçaları: catalog-import kendi isteğinde (kendi süre sınırıyla) işler ve işi kendisi kapatır.
+  // Kapatamazsa (çökme) iş 3 dk sonra claim_sync_jobs ile yeniden sıraya döner.
+  if (job.job_type === "catalog_import") {
+    const r = await fetch(SUPABASE_URL + "/functions/v1/catalog-import", {
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (Deno.env.get("SUPABASE_ANON_KEY") ?? "") },
+      body: JSON.stringify({ cronSecret: CRON_SECRET, action: "run", jobId: job.id }), signal: AbortSignal.timeout(20000),
+    });
+    await r.body?.cancel();
+    if (!r.ok) throw new Error("catalog-import HTTP " + r.status);
+    return { id: job.id, outcome: "delegated", step: job.payload?.step };
+  }
   if (job.job_type !== "listing_sync") {
     await db.rpc("complete_sync_job", { p_job_id: job.id, p_result: { skipped: "unknown_job_type", job_type: job.job_type } });
     return { id: job.id, outcome: "skipped", reason: "unknown_job_type" };

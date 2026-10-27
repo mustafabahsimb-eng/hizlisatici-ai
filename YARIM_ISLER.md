@@ -18,6 +18,9 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 ## Asistan kanalları
 4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Bot açıklamaları (TR + EN) uygulandı (19 Ekim). Kalan (senin Telegram hesabın gerekiyor): https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "Telegram'a bağla" → açılan Telegram'da Başlat. Canlı uçtan uca testi sonra Claude yapar.
 5. **Meta WhatsApp test numarası (asistan için):** https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → API Setup → numara kimliği, WABA kimliği ve kalıcı anahtar → aynı secrets sayfasına `ASSISTANT_WA_PHONE_ID`, `ASSISTANT_WA_WABA_ID`, `ASSISTANT_WA_TOKEN`, `ASSISTANT_WA_DISPLAY_NUMBER`.
+   - Bu bilgileri Claude'a vermen de yeter; Claude secrets'a yazar ve `ASSISTANT_WA_ENABLED=true` yapar. (Kalıcı anahtar: Business Settings → System Users → Generate token, izinler `whatsapp_business_messaging` + `whatsapp_business_management`.)
+   - **Webhook (27 Ekim, "WhatsApp'tan PDF / link ile ürün yükleme" için):** aynı sayfada WhatsApp → Configuration → Webhook → Callback URL `https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/whatsapp-webhook`, Verify token: Claude'un sohbette verdiği değer → "Verify and save" → Webhook fields'ta **messages** → Subscribe.
+   - Sonra kendi telefonunu test numarasının alıcı listesine ekle (API Setup → "To" → Manage phone number list) ve panelde https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "WhatsApp'a bağla". Gerisini (PDF / link gönderip uçtan uca deneme) Claude yapar.
 
 ## Kargo / tedarik / pazaryeri
 6. **Geliver hesabı:** https://app.geliver.io → Ayarlar > API Anahtarları → anahtarı Seltigo Ayarlar > 🚚 Kargo'dan bağla (test modu).
@@ -57,6 +60,15 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 - Eski notlardaki "Etsy bağlantısı süresi doldu" çözüldü (bağlantı açık, senkron saatlik başarılı).
 
 ## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
+- PDF + link ile ürün yükleme (27 Ekim; docs/pdf-link-yukleme.md):
+  - PDF önce ÜCRETSİZ okuyucuyla (yazı katmanı + gömülü görseller) okunur; yapay zekâ yalnız taranmış / okunamayan sayfalarda (kota sayılır). Yapay zekâ kredisi bittiğinde de yazılı PDF'ler okunmaya devam eder.
+  - Yüklenen ürünler TASLAK kaydedilir, [Yayınla] ile açılır (asistanın "doğrudan" ayarında da). Fiyatsız ürün yayınlanmaz.
+  - PDF + link birlikteyken PDF esastır: sitedeki eşleşmeyen ürünler eklenmez. Eşleşme barkod > SKU / model kodu > ad benzerliği (≥ %55).
+  - Kopya önleme: barkod > aynı kaynak linki > SKU / model kodu. Ad benzerliğiyle var olan ürün GÜNCELLENMEZ (yanlış ürünü ezmesin).
+  - Asistanda belge olarak yalnız PDF kabul edilir (görev isteği: güvenlik); Excel / CSV panelden "📄 Katalog / fiyat listesi yükle" ile.
+  - Sınırlar: PDF 20 MB / 100 sayfa; numara başına dakikada 20, günde 400 mesaj; yükleme saatte 30, günde 150; bağlı olmayan numaraya cevap 10 dk'da bir.
+  - Webhook imza anahtarı tanımlı değilse artık hiçbir POST kabul edilmez (önceden kabul ediliyordu).
+  - Kâr oranı yoksa asistan bir kez sorar ([%30] [%50] [%100]) ve Ayarlar'a yazar; panelde Kâr kuralı kutusundaki oran kullanılır.
 - İçerik otomasyonu adları: menü "🗓️ İçerik Takvimi"; "Otomatik içerik", "Günde gönderi", "Haftada hikâye", "Paylaşım saati", "Kanallar", "Yayından önce onayıma sun", "Planı şimdi oluştur", "Hepsini onayla", "Onayla", "Atla", "Metni düzenle", "Şimdi paylaş", "Gönderiyi aç"; şablonlar Ürün fotoğrafı / Fiyat etiketi / Kolaj / Özel gün / Hikâye; durumlar Onay bekliyor / Zamanlandı / Paylaşılıyor / Paylaşıldı / Hata / Atlandı. Varsayılan: kapalı, günde 1, haftada 3 hikâye, 19:30, onay açık.
 - Etsy senkronu: Etsy'de silinen ilan panelden silinmez, "Etsy'de yok" etiketiyle kalır (satış / kâr geçmişi kaybolmasın). Dışarıda (Printify / Etsy) yönetilen ilanlar Seltigo'dan Etsy'ye geri yazılmaz.
 - İçerik planı: bir istekte en fazla 3 görsel, kalan için kendini yeniden çağırma; panel bitene kadar "Hazırlanıyor…" gösterir.

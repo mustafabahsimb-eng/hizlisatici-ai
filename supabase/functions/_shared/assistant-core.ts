@@ -92,7 +92,8 @@ const NO_PERM: Reply = { text: "Bu işlem için yetkin yok. Mağaza sahibi Selti
 // ---------- Yardım ----------
 const HELP: Reply = {
   text: "Merhaba, ben Seltigo Asistan 👋\n\n" +
-    "• Toptancı PDF'ini / katalog fotoğrafını gönder → ürünleri listelerim, [Hepsini ekle] ya da \"1-15'i %50 kârla ekle\"\n" +
+    "• Toptancı PDF'ini (resimli ya da resimsiz) ve/veya mağaza linkini gönder → ürünleri okurum, eksikleri söylerim, [Yayınla]\n" +
+    "• Katalog fotoğrafı → ürünleri listelerim, [Hepsini ekle] ya da \"1-15'i %50 kârla ekle\"\n" +
     "• Ürün fotoğrafı + \"350'ye sat, 20 tane\" → ilanı açarım\n" +
     "• Ürün linki gönder → ürünü eklerim\n" +
     "• \"bu ay ne kadar kâr ettim\", \"en çok ne satıyor\", \"hangi ürün zarar ediyor\"\n" +
@@ -257,6 +258,39 @@ function rowToItem(r: any) {
     images: [], specs: [], variants: [], description: "", url: "", source_platform: null,
   };
 }
+// ---------- PDF + link ile yükleme (catalog-import motoru; iş kuyrukta parça parça, bitince özet buraya gelir) ----------
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+const IMPORT_SOURCE: Record<string, string> = { whatsapp: "whatsapp", telegram: "telegram", instagram: "instagram", messenger: "messenger" };
+async function openPdfImport(link: Link): Promise<any | null> {
+  const since = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data } = await db.from("catalog_imports").select("id, pdf_path, link_url").eq("link_id", link.id)
+    .in("status", ["parsing", "merging", "need_margin", "saving", "ready"]).gt("created_at", since).not("pdf_path", "is", null).is("link_url", null)
+    .order("created_at", { ascending: false }).limit(1);
+  return data?.[0] || null;
+}
+async function startPdfImport(link: Link, file: NonNullable<Incoming["file"]>, url?: string): Promise<Reply> {
+  if (!(await featureEnabled(link.user_id, "pdf_link_import"))) return { text: "PDF ile ürün yükleme paketinde kapalı. " + FEATURE_OFF_MSG };
+  const name = String(file.filename || "katalog.pdf").slice(0, 120);
+  const isPdf = /pdf/i.test(file.mime || "") || /\.pdf$/i.test(name);
+  if (!isPdf) return { text: "Şimdilik yalnız PDF dosyası kabul ediyorum (fiyat listesi ya da katalog). Ürün fotoğrafını da doğrudan fotoğraf olarak gönderebilirsin." };
+  const bytes = await file.bytes();
+  if (bytes.length > MAX_PDF_BYTES) return { text: "PDF çok büyük (en fazla 20 MB). Dosyayı bölüp parça parça gönderir misin?" };
+  if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") return { text: "Bu dosya PDF değil gibi görünüyor; fiyat listesini PDF olarak gönderir misin?" };
+  const path = `${link.user_id}/${link.channel}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`;
+  const up = await db.storage.from("catalog-uploads").upload(path, bytes, { contentType: "application/pdf", upsert: false });
+  if (up.error) return { text: "PDF kaydedilemedi: " + short(up.error.message, 150) };
+  const r = await fn("catalog-import", link.user_id, { action: "start", source: IMPORT_SOURCE[link.channel] || "test", linkId: link.id, pdfPath: path, pdfName: name, url: url || null });
+  if (!r?.ok) return { text: "PDF'i işleyemedim: " + short(r?.error, 200) };
+  return { text: `📄 ${name} geldi (${r.pages} sayfa). Ürünleri okuyorum; bitince buradan özet göndereceğim.` +
+    (url ? "\n🔗 Linkteki görselleri ve açıklamaları da eşleştireceğim." : r.attached ? "\n🔗 Az önceki linkle birleştiriyorum (fiyat + stok PDF'ten, görsel + açıklama linkten)." : "\nGörselleri ve açıklamaları bir siteden almamı istersen 10 dakika içinde linkini de gönderebilirsin.") };
+}
+async function startLinkImport(link: Link, url: string): Promise<Reply> {
+  const r = await fn("catalog-import", link.user_id, { action: "start", source: IMPORT_SOURCE[link.channel] || "test", linkId: link.id, url });
+  if (!r?.ok) return { text: "Linki işleyemedim: " + short(r?.error, 200) };
+  return { text: r.attached ? "🔗 Linki PDF'le birleştiriyorum: fiyat ve stok PDF'ten, görsel ve açıklama siteden. Bitince özet göndereceğim."
+    : "🔗 Mağazadaki ürünleri okuyorum; bitince buradan özet göndereceğim. Toptancı fiyat listen (PDF) varsa 10 dakika içinde gönder, fiyat ve stoğu ondan alırım." };
+}
+
 async function previewRows(link: Link, rows: any[], fromName: string): Promise<Reply> {
   const st = await getState(link);
   const { data: rule } = await db.from("import_rules").select("rules").eq("user_id", link.user_id).maybeSingle();
@@ -507,6 +541,19 @@ async function handleButton(link: Link, id: string): Promise<Reply[]> {
     if (act === "add_pick") return [{ text: "Hangi ürünler? Örn: \"1-15 ekle\", \"1,3,7 ekle\" ya da \"1-15'i %50 kârla ekle\"." }];
     return await addFromPending(link, st, { all: true });
   }
+  if (act === "cimp_pub") {
+    if (!can(link, "products")) return [NO_PERM];
+    const r = await fn("catalog-import", link.user_id, { action: "publish", importId: a1 });
+    if (r?.ok) await setState(link, { ...st, awaitPriceEdit: null, lastImport: null });
+    return [{ text: r?.ok ? (r.already ? "Bu ürünler zaten yayında ya da yayınlanıyor." : `🚀 ${r.products} ürün yayınlanıyor; bitince haber vereceğim.`) : "Yayınlanamadı: " + short(r?.error, 200) }];
+  }
+  if (act === "cimp_panel") return [{ text: "Ürünleri, eksik bilgileri ve okunamayan satırları panelde görebilirsin:", link: { title: "Panelde kontrol et", url: `${SITE}/toplu-yukleme.html?import=${a1}` } }];
+  if (act === "cimp_m") {
+    if (!can(link, "products")) return [NO_PERM];
+    const r = await fn("catalog-import", link.user_id, { action: "set_margin", importId: a1, margin: Number(a2) });
+    await setState(link, { ...st, awaitImportMargin: null });
+    return [{ text: r?.ok ? `✅ Kâr oranın %${a2} olarak kaydedildi. Ürünleri kaydediyorum, bitince özet gelecek.` : "Kaydedilemedi: " + short(r?.error, 200) }];
+  }
   if (act === "publish") {
     if (!can(link, "products")) return [NO_PERM];
     const ids: number[] = st.awaitPublish || [];
@@ -630,7 +677,10 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
   // Bağlama (yalnız panelden alınan tek kullanımlık kodla)
   const codeM = text.match(/^(?:\/start\s+|bağla\s+|bagla\s+)?([A-Z0-9]{8})$/i);
   if (!link || codeM && !link) {
+    const rk = inc.channel + ":" + inc.externalId;
     if (codeM) {
+      const { data: okc } = await db.rpc("rate_hit", { p_key: "code:" + rk, p_limit: 10, p_window_seconds: 3600 });
+      if (okc === false) return { link: null, replies: [] };
       const code = codeM[1].toUpperCase();
       const { data: c } = await db.from("assistant_link_codes").select("*").eq("code", code).is("used_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
       if (c && c.channel === inc.channel) {
@@ -642,9 +692,22 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
       }
       return { link: null, replies: [{ text: "Bu kod geçersiz ya da süresi dolmuş. Seltigo panelinde 🤖 Asistan bölümünden yeni kod al." }] };
     }
-    return { link: null, replies: [{ text: "Merhaba! Bu hesap henüz bir Seltigo hesabına bağlı değil. Seltigo panelinde 🤖 Asistan bölümünden bağlama kodunu al ve buraya gönder." }] };
+    // Bağlı olmayan numara: işlem yapılmaz; kibar cevap en fazla 10 dakikada bir
+    if (inc.channel !== "test") {
+      const { data: okr } = await db.rpc("rate_hit", { p_key: "unl:" + rk, p_limit: 1, p_window_seconds: 600 });
+      if (okr === false) return { link: null, replies: [] };
+    }
+    return { link: null, replies: [{ text: "Merhaba! Bu numara henüz bir Seltigo hesabına bağlı değil, bu yüzden bir işlem yapmadım. Önce Seltigo panelinde 🤖 Asistan bölümünden bağlama kodunu al ve buraya gönder.", link: { title: "🤖 Asistan", url: `${SITE}/asistan.html` } }] };
   }
 
+  // Numara başına istek sınırı (dakikada 20, günde 400); aşılınca 10 dk'da bir uyarı, işlem yok
+  const rkey = link.channel + ":" + link.external_id;
+  const { data: okm } = await db.rpc("rate_hit", { p_key: "msg:m:" + rkey, p_limit: 20, p_window_seconds: 60 });
+  const { data: okd } = await db.rpc("rate_hit", { p_key: "msg:d:" + rkey, p_limit: 400, p_window_seconds: 86400 });
+  if (okm === false || okd === false) {
+    const { data: warn } = await db.rpc("rate_hit", { p_key: "msg:w:" + rkey, p_limit: 1, p_window_seconds: 600 });
+    return { link, replies: warn === false ? [] : [{ text: "Çok sık mesaj geldi; birkaç dakika bekleyip tekrar dener misin?" }] };
+  }
   await db.from("assistant_links").update({ last_inbound_at: new Date().toISOString(), display_name: inc.name || link.display_name }).eq("id", link.id);
   await db.from("assistant_messages").insert({ user_id: link.user_id, channel: link.channel, direction: "in" });
   link.last_inbound_at = new Date().toISOString();
@@ -700,6 +763,7 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
         await setState(link, { ...st, awaitPublish: r.approve ? r.products.map((p: any) => p.id) : null });
         return { link, replies: [addedReply(r)] };
       }
+      if (inc.file.kind === "document") return { link, replies: [await startPdfImport(link, inc.file, cmd.url)] };
       const rows = await rowsFromFile(link, inc.file);
       if (!rows.length) return { link, replies: [{ text: "Dosyada ürün bulamadım. Fiyat listesi ya da katalog olduğundan emin misin?" }] };
       return { link, replies: [await previewRows(link, rows, inc.file.filename || "Dosya")] };
@@ -720,6 +784,11 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
       await setState(link, { ...st, awaitAnswer: null });
       return { link, replies: [{ text: "✅ Cevabın gönderildi." }, await questionsReply(link)] };
     }
+    if (st.awaitImportMargin && cmd.margin != null) {
+      const r = await fn("catalog-import", link.user_id, { action: "set_margin", importId: st.awaitImportMargin, margin: cmd.margin });
+      await setState(link, { ...st, awaitImportMargin: null });
+      return { link, replies: [{ text: r?.ok ? `✅ Kâr oranın %${cmd.margin} olarak kaydedildi. Ürünleri kaydediyorum, bitince özet gelecek.` : "Kaydedilemedi: " + short(r?.error, 200) }] };
+    }
     if (st.awaitPriceEdit?.length && (cmd.margin != null || cmd.price != null)) {
       const ids: number[] = st.awaitPriceEdit;
       const nth = text.match(/(\d{1,3})\s*\.\s*ürün/);
@@ -731,8 +800,9 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
         await db.from("products").update({ sale_price: sale }).eq("id", id);
       }
       const { data: ps } = await db.from("products").select("id, name, sale_price, cost_currency").in("id", ids);
-      return { link, replies: [{ text: "Güncel fiyatlar:\n" + (ps || []).map((p: any, i: number) => `${i + 1}. ${short(p.name, 50)} — ${money(p.sale_price, p.cost_currency)}`).join("\n"),
-        buttons: [{ id: "publish", title: "Yayınla" }, { id: "edit_prices", title: "Fiyatları düzenle" }] }] };
+      return { link, replies: [{ text: "Güncel fiyatlar:\n" + (ps || []).slice(0, 20).map((p: any, i: number) => `${i + 1}. ${short(p.name, 50)} — ${money(p.sale_price, p.cost_currency)}`).join("\n") + ((ps || []).length > 20 ? `\n… ve ${(ps || []).length - 20} ürün daha` : ""),
+        buttons: st.lastImport ? [{ id: `cimp_pub:${st.lastImport}`, title: "Yayınla" }, { id: `cimp_panel:${st.lastImport}`, title: "Panelde kontrol et" }]
+          : [{ id: "publish", title: "Yayınla" }, { id: "edit_prices", title: "Fiyatları düzenle" }] }] };
     }
     if (cmd.intent === "publish") return { link, replies: await handleButton(link, "publish") };
     if (cmd.intent === "cancel") { await setState(link, {}); return { link, replies: [{ text: "Tamam, bekleyen işlemi bıraktım." }] }; }
@@ -751,15 +821,11 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
     }
     if (cmd.url) {
       if (!can(link, "products")) return { link, replies: [NO_PERM] };
+      // 10 dk içinde gönderilen PDF varsa link aynı yüklemeye eklenir (fiyat + stok PDF'ten, görsel + açıklama linkten)
+      // Mağaza / kategori linki -> PDF + link motoru (10 dk içinde gönderilen PDF varsa ona eklenir).
+      // Tek ürün sayfası her zaman hemen ürün olarak eklenir (PDF'te eşi olmayabilir).
       const d = await fn("product-import", link.user_id, { url: cmd.url, language: "tr" });
-      if (d?.kind === "feed" || d?.kind === "category") {
-        const items = d.kind === "feed" ? d.items : [];
-        if (items.length) {
-          await setState(link, { ...st, pending: { rows: items.map((i: any) => ({ name: i.name, code: i.model_code, price: i.price, list_price: i.list_price, currency: i.currency, brand: i.brand, _item: i })), from: "Link", at: Date.now() } });
-          return { link, replies: [await previewRows(link, items.map((i: any) => ({ name: i.name, code: i.model_code, price: i.price, currency: i.currency })), "Mağaza linki")] };
-        }
-        return { link, replies: [{ text: "Bu bir liste sayfası; tek ürün linki gönderir misin? (Tüm siteyi panelden Toplu Ürün Yükleme ile çekebilirsin.)" }] };
-      }
+      if (d?.kind === "feed" || d?.kind === "category" || (!d?.item?.name && await openPdfImport(link))) return { link, replies: [await startLinkImport(link, cmd.url)] };
       if (!d?.item?.name) return { link, replies: [{ text: "Bu linkten ürün okuyamadım: " + short(d?.error || "", 150) }] };
       if (d.item.source_platform === "aliexpress") {
         await setState(link, { ...st, awaitAe: { item: d.item, opts: { salePrice: cmd.price, stock: cmd.stock, margin: cmd.margin, channels: cmd.channels } } });

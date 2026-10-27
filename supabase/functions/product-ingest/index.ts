@@ -7,10 +7,13 @@
 //   - ürün + görseller (kaynağıyla) + seçenekler + Kendi Mağazam ilanı (TL'ye çevrilmiş fiyat)
 //   - eksik görsel / özellik -> arka plan görsel tamamlama işi; AliExpress tedarikçili -> CJ eşdeğer araması
 //   - kullanım hakkı kaydı (import_consents)
-// Satıcı (oturum): POST { items: [...], sourceUrl, via, publish?, aeSource?, margin?, sync?, syncHours? }
+// Satıcı (oturum): POST { items: [...], sourceUrl, via, publish?, aeSource?, margin?, sync?, syncHours?, dedupe? }
 // Sistem: aynı gövde + { cronSecret, userId }
 // items: product-import çıktısıyla aynı biçim (name, price, list_price, currency, images, specs, variants, url,
 //        source_platform, source_item_id, stock, model_code, brand, category, description)
+//        + isteğe bağlı: barcode (GTIN), sku, sale_price (satış fiyatı belliyse; ör. perakende PDF), existing_id, imgSrc
+// dedupe: true -> aynı barkod / SKU / model kodu satıcıda varsa yeni ürün açılmaz; maliyet, satış fiyatı ve stok güncellenir
+//         (PDF + link ile yükleme; catalog-import). Cevapta her ürün için action: "created" | "updated" (items ile aynı sıra).
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -50,6 +53,75 @@ function fullDescription(it: any): string {
   const specs = Array.isArray(it.specs) ? it.specs : [];
   if (specs.length) d += (d ? "\n\n" : "") + "Teknik Özellikler:\n" + specs.map((s: any) => "• " + s.k + ": " + s.v).join("\n");
   return d.slice(0, 8000);
+}
+
+// ---------- Kopya önleme: barkod > SKU / model kodu ----------
+async function findExisting(userId: string, it: any): Promise<any | null> {
+  const cols = "id, name, image_url, image_missing, sale_price, store_visible";
+  if (Number(it.existing_id) > 0) {
+    const { data } = await db.from("products").select(cols).eq("id", Number(it.existing_id)).eq("user_id", userId).is("deleted_at", null).maybeSingle();
+    if (data) return data;
+  }
+  const vars = Array.isArray(it.variants) ? it.variants : [];
+  const barcodes = [it.barcode, ...vars.map((v: any) => v?.barcode)].map((x) => String(x || "").trim()).filter((x) => /^\d{8,14}$/.test(x));
+  if (barcodes.length) {
+    const { data: p } = await db.from("products").select(cols).eq("user_id", userId).is("deleted_at", null).in("gtin", barcodes).limit(1);
+    if (p?.length) return p[0];
+    const { data: v } = await db.from("product_variants").select("product_id").eq("user_id", userId).is("deleted_at", null).in("gtin", barcodes).limit(1);
+    if (v?.length) {
+      const { data } = await db.from("products").select(cols).eq("id", v[0].product_id).is("deleted_at", null).maybeSingle();
+      if (data) return data;
+    }
+  }
+  // Aynı ürün sayfası (kaynak linki) daha önce eklendiyse
+  if (/^https?:\/\//i.test(String(it.url || ""))) {
+    const { data: p } = await db.from("products").select(cols).eq("user_id", userId).is("deleted_at", null).eq("source_url", String(it.url)).limit(1);
+    if (p?.length) return p[0];
+  }
+  const codes = [it.sku, it.model_code, ...vars.map((v: any) => v?.sku)].map((x) => clean(x, 80)).filter((x) => x.length >= 3);
+  if (codes.length) {
+    const { data: p } = await db.from("products").select(cols).eq("user_id", userId).is("deleted_at", null).in("model_code", codes).limit(1);
+    if (p?.length) return p[0];
+    const { data: v } = await db.from("product_variants").select("product_id").eq("user_id", userId).is("deleted_at", null).in("supplier_sku", codes).limit(1);
+    if (v?.length) {
+      const { data } = await db.from("products").select(cols).eq("id", v[0].product_id).is("deleted_at", null).maybeSingle();
+      if (data) return data;
+    }
+  }
+  return null;
+}
+// Var olan ürün: maliyet, satış fiyatı, stok (ve eksikse görsel / açıklama / barkod) güncellenir; ad ve satıcının düzenlemeleri korunur
+async function updateExisting(userId: string, ex: any, it: any, sale: number | null, cur: string) {
+  const patch: any = { updated_at: new Date().toISOString() };
+  if (Number(it.price) > 0) { patch.supplier_price = Number(it.price); patch.cost_currency = cur; }
+  if (sale && sale > 0) patch.sale_price = sale;
+  if (it.stock != null && Number.isFinite(Number(it.stock))) patch.stock_qty = Math.max(0, Math.round(Number(it.stock)));
+  if (/^\d{8,14}$/.test(String(it.barcode || ""))) patch.gtin = String(it.barcode);
+  const images: string[] = (Array.isArray(it.images) ? it.images : []).filter((u: any) => /^https?:\/\//i.test(String(u))).slice(0, 12);
+  if (images.length && (!ex.image_url || ex.image_missing)) {
+    patch.image_url = images[0]; patch.image_missing = false;
+    await db.from("product_images").insert(images.map((u, i) => ({ product_id: ex.id, user_id: userId, url: u, position: i, source: "supplier", source_kind: it.imgSrc?.kind || "link", source_url: it.imgSrc?.url || it.url || null })));
+  }
+  if (it.description && String(it.description).length > 40) {
+    const { data: cur0 } = await db.from("products").select("generated_description").eq("id", ex.id).maybeSingle();
+    if (!cur0?.generated_description || String(cur0.generated_description).length < 40) patch.generated_description = fullDescription(it);
+  }
+  await db.from("products").update(patch).eq("id", ex.id).eq("user_id", userId);
+  // Seçenekler: barkod ya da SKU eşleşirse stok / maliyet
+  for (const v of (Array.isArray(it.variants) ? it.variants : []).slice(0, 100)) {
+    const vp: any = {};
+    if (v?.stock != null && Number.isFinite(Number(v.stock))) vp.stock_qty = Math.max(0, Math.round(Number(v.stock)));
+    if (Number(v?.price) > 0) vp.cost = Number(v.price);
+    if (!Object.keys(vp).length) continue;
+    if (/^\d{8,14}$/.test(String(v.barcode || ""))) await db.from("product_variants").update(vp).eq("product_id", ex.id).eq("gtin", String(v.barcode));
+    else if (v.sku) await db.from("product_variants").update(vp).eq("product_id", ex.id).eq("supplier_sku", clean(v.sku, 80));
+  }
+  // Kendi Mağazam ilanı varsa fiyatı da (TL)
+  if (sale && sale > 0) {
+    let price = sale;
+    if (cur !== "TRY") { const k = await fx(cur, "TRY"); price = k != null ? Math.round(sale * k * 100) / 100 : sale; }
+    await db.from("listings").update({ price }).eq("product_id", ex.id).eq("marketplace_code", "own_store");
+  }
 }
 
 async function ingest(userId: string, b: any) {
@@ -93,7 +165,16 @@ async function ingest(userId: string, b: any) {
   const needJobs: number[] = [];
   for (const it of items) {
     const cur = curOf(it);
-    const sale = priceOf(it);
+    const sale = Number(it.sale_price) > 0 ? Number(it.sale_price) : priceOf(it);
+    if (b.dedupe) {
+      const ex = await findExisting(userId, it);
+      if (ex) {
+        await updateExisting(userId, ex, it, sale, cur);
+        if ((!ex.image_url || ex.image_missing) && !(Array.isArray(it.images) && it.images.length)) needJobs.push(ex.id);
+        created.push({ id: ex.id, name: ex.name, sale_price: sale, currency: cur, action: "updated" });
+        continue;
+      }
+    }
     const images: string[] = (Array.isArray(it.images) ? it.images : []).filter((u: any) => /^https?:\/\//i.test(String(u))).slice(0, 12);
     const isAe = it.source_platform === "aliexpress";
     const row: any = {
@@ -107,7 +188,8 @@ async function ingest(userId: string, b: any) {
       source_url: it.url || null, source_platform: it.source_platform || (it.url ? "web" : null), source_item_id: it.source_item_id || null,
       source_sync: !!(sync && it.url), source_sync_hours: syncHours,
       stock_qty: b.stock != null && items.length === 1 ? Math.max(0, parseInt(b.stock, 10) || 0) : (Number.isFinite(Number(it.stock)) && it.stock !== null ? Number(it.stock) : null),
-      model_code: it.model_code || null, brand: r.brand || it.brand || null,
+      model_code: it.model_code || it.sku || null, brand: r.brand || it.brand || null,
+      gtin: /^\d{8,14}$/.test(String(it.barcode || "")) ? String(it.barcode) : null,
     };
     const ins = await db.from("products").insert(row).select("id").single();
     if (ins.error) throw new Error("Ürün kaydı: " + ins.error.message);
@@ -123,6 +205,7 @@ async function ingest(userId: string, b: any) {
       await db.from("product_variants").insert(vars.map((v: any, k: number) => ({
         product_id: pid, user_id: userId, sku: "HS-" + pid + "-" + (k + 1), supplier_variant_id: v.supplier_variant_id || null, supplier_sku: v.sku || null,
         attributes: v.attributes, cost: Number(v.price) > 0 ? Number(v.price) : null, cost_currency: cur,
+        gtin: /^\d{8,14}$/.test(String(v.barcode || "")) ? String(v.barcode) : null,
         stock_qty: Number.isFinite(Number(v.stock)) && v.stock !== null ? Number(v.stock) : null, stock_status: v.stock === 0 ? "tukendi" : null,
         image_url: v.image || null, is_default: false, is_active: true,
       })));
@@ -146,7 +229,8 @@ async function ingest(userId: string, b: any) {
         body: JSON.stringify({ productId: pid, cronSecret: CRON_SECRET }),
       }).catch(() => {});
     }
-    created.push({ id: pid, name: row.name, sale_price: sale, currency: cur });
+    if (it.sku) await db.from("product_variants").update({ supplier_sku: clean(it.sku, 80) }).eq("product_id", pid).eq("is_default", true);
+    created.push({ id: pid, name: row.name, sale_price: sale, currency: cur, action: "created" });
   }
   // Arka plan görsel tamamlama (ilan önce açıldı)
   let batchId: string | null = null;

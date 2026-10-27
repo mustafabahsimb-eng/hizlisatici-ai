@@ -18,13 +18,18 @@ const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-async function validSignature(raw: string, header: string | null) {
-  if (!APP_SECRET) return true;
+// X-Hub-Signature-256: gövdenin uygulama gizli anahtarıyla HMAC-SHA256'sı. Anahtar yoksa hiçbir istek kabul edilmez.
+export async function validSignature(raw: string, header: string | null, secret = APP_SECRET) {
+  if (!secret) return false;
   if (!header || !header.startsWith("sha256=")) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw));
   const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hex === header.slice(7);
+  const got = header.slice(7).toLowerCase();
+  if (got.length !== hex.length) return false;
+  let diff = 0;
+  for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ got.charCodeAt(i); // sabit süreli karşılaştırma
+  return diff === 0;
 }
 
 function money(n: number, cur: string) {
