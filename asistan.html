@@ -392,8 +392,10 @@
     const { error } = await HS.db.from('assistant_links').delete().eq('id', id).eq('user_id', userId);
     if (error) return toast(t('errGeneric'), true);
     links = links.filter(l => l.id !== id);
-    document.querySelector(`[data-link="${id}"]`)?.remove();
-    if (!links.length) document.getElementById('linkList').innerHTML = `<div class="empty">${t('noLinks')}</div>`;
+    // Kanal kartı "bağla" düğmesine dönsün; kaydedilmemiş ayar değişiklikleri korunur
+    const keep = dirty ? readSettings() : null;
+    render();
+    if (keep) { Object.assign(settings, keep.settings); rules = keep.rules; render(); markDirty(); }
     toast(t('unlinked'));
   }
   function readSettings() {
