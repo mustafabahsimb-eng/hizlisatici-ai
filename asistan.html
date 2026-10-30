@@ -39,6 +39,9 @@
   .ch-name { font-weight: 600; color: #fff; font-size: 14px; }
   .ch-state { font-size: 12px; color: #9aa3b2; line-height: 1.45; flex: 1; }
   .ch-state.on { color: #6ee7b7; }
+  .ch-linked { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid #1D9E75; border-radius: 10px; background: rgba(29,158,117,.08); }
+  .ch-linked .ch-state { flex: 0; font-weight: 600; font-size: 13px; }
+  .ch-who { font-size: 13px; color: #cbd5e1; word-break: break-word; }
   .code-box { margin-top: 14px; background: #0d0f16; border: 1px solid #1D9E75; border-radius: 12px; padding: 14px 16px; display: none; }
   .code-box .code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; letter-spacing: 4px; color: #fff; margin: 6px 0; user-select: all; }
   .list { display: flex; flex-direction: column; gap: 8px; }
@@ -94,6 +97,7 @@
       instagram: 'Instagram DM',
       messenger: 'Messenger',
       connectTelegram: 'Telegram\'a bağla',
+      chLinked: '✅ Bağlı',
       connectWhatsapp: 'WhatsApp\'a bağla',
       chLive: 'Açık',
       chSoon: 'Yakında açılacak',
@@ -156,6 +160,7 @@
       instagram: 'Instagram DM',
       messenger: 'Messenger',
       connectTelegram: 'Connect Telegram',
+      chLinked: '✅ Connected',
       connectWhatsapp: 'Connect WhatsApp',
       chLive: 'On',
       chSoon: 'Coming soon',
@@ -254,6 +259,20 @@
     return `<span class="ch-state ${s.live ? 'on' : ''}">${s.live ? t('chLive') : t('chSoon')}</span>`;
   }
 
+  // Kanal sahibin kendi hesabına bağlıysa kartta "✅ Bağlı" + hesap adı / numara; "bağla" düğmesi gösterilmez
+  // (bağlantıyı kaldırma "Bağlı hesaplar" bölümünde). Çalışan bağlantıları sayılmaz.
+  function linkedBadge(channel) {
+    const l = links.find(x => x.channel === channel && x.is_owner);
+    if (!l) return '';
+    let who = l.display_name || '';
+    if (channel === 'whatsapp') {
+      const n = String(l.external_id || '').replace(/\D/g, '');
+      const num = n.length === 12 && n.startsWith('90') ? `+90 ${n.slice(2, 5)} ${n.slice(5, 8)} ${n.slice(8, 10)} ${n.slice(10)}` : (n ? '+' + n : '');
+      who = [who, num].filter(Boolean).join(' · ');
+    }
+    return `<div class="ch-linked" data-linked="${channel}"><span class="ch-state on">${t('chLinked')}</span>${who ? `<span class="ch-who">${esc(who)}</span>` : ''}</div>`;
+  }
+
   function render() {
     const roleOpts = sel => ['orders', 'products', 'full'].map(r => `<option value="${r}" ${r === sel ? 'selected' : ''}>${t('role_' + r)}</option>`).join('');
     const linkList = links.length ? links.map(l => `
@@ -266,8 +285,8 @@
     document.getElementById('content').innerHTML = `
       <div class="card">
         <div class="channels">
-          <div class="ch"><span class="ch-name">✈️ ${t('telegram')}</span>${chState('telegram')}<button class="btn" id="tgBtn" onclick="getCode('telegram')">${t('connectTelegram')}</button></div>
-          <div class="ch"><span class="ch-name">🟢 ${t('whatsapp')}</span>${chState('whatsapp')}<button class="btn" id="waBtn" onclick="getCode('whatsapp')" ${status.whatsapp?.live ? '' : 'disabled'}>${t('connectWhatsapp')}</button></div>
+          <div class="ch"><span class="ch-name">✈️ ${t('telegram')}</span>${chState('telegram')}${linkedBadge('telegram') || `<button class="btn" id="tgBtn" onclick="getCode('telegram')">${t('connectTelegram')}</button>`}</div>
+          <div class="ch"><span class="ch-name">🟢 ${t('whatsapp')}</span>${chState('whatsapp')}${linkedBadge('whatsapp') || `<button class="btn" id="waBtn" onclick="getCode('whatsapp')" ${status.whatsapp?.live ? '' : 'disabled'}>${t('connectWhatsapp')}</button>`}</div>
           <div class="ch"><span class="ch-name">📸 ${t('instagram')}</span>${chState('instagram')}<button class="btn2" onclick="getCode('instagram')" ${status.instagram?.live ? '' : 'disabled'}>${t('connect')}</button></div>
           <div class="ch"><span class="ch-name">💬 ${t('messenger')}</span>${chState('messenger')}<button class="btn2" onclick="getCode('messenger')" ${status.messenger?.live ? '' : 'disabled'}>${t('connect')}</button></div>
         </div>
