@@ -17,11 +17,8 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 
 ## Asistan kanalları
 4. ~~**Telegram bot anahtarı**~~ — ✅ TAMAMLANDI (18 Ekim 2026): bot @SeltigoAsistanBot; `TELEGRAM_BOT_TOKEN` secret'ı, Vault'ta `seltigo_bot_token` + `seltigo_admin_chat_id`; webhook telegram-bot'a bağlı; profil fotoğrafı yüklendi; bekleme listesi bildirimi Mustafa'ya ulaştı. Bot açıklamaları (TR + EN) uygulandı (19 Ekim). Kalan (senin Telegram hesabın gerekiyor): https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "Telegram'a bağla" → açılan Telegram'da Başlat. Canlı uçtan uca testi sonra Claude yapar.
-5. **Meta WhatsApp (asistan) — 30 Ekim:** Phone Number ID ve WABA ID secrets'a kaydedildi. Kalan (adım adım, adresleriyle: docs/meta/whatsapp-canli.md):
-   - **Access token'ı Claude'a gönder** (geçici 24 saatlik de olur; mesajda token boş geldi).
-   - Kalıcı anahtar: https://business.facebook.com/settings/system-users → System User "Seltigo Asistan" (Admin) → uygulama + WABA'ya Full control → Generate new token (Never, `whatsapp_business_messaging` + `whatsapp_business_management`) → Claude'a gönder.
-   - Webhook: https://supabase.com/dashboard/project/ytucdrrgxsjhrqmaxckt/functions/secrets → `WHATSAPP_VERIFY_TOKEN` = kendi kelimen; https://developers.facebook.com/apps/1650835089949068/ → WhatsApp → Configuration → Callback URL `https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/whatsapp-webhook` + aynı kelime → Verify and save → **messages** Subscribe.
-   - Gerekirse Live: https://developers.facebook.com/apps/1650835089949068/settings/basic/ → simge `docs/meta/seltigo-icon-1024.png`, gizlilik + veri silme adresleri, kategori → App Mode: Live.
+5. ~~**Meta WhatsApp (asistan)**~~ — ✅ TAMAMLANDI (30 Ekim 2026): Phone Number ID, WABA ID, kalıcı System User anahtarı secrets'ta, `ASSISTANT_WA_ENABLED=true`; WABA uygulamaya abone edildi; gerçek telefonla uçtan uca test geçti (bağlama → PDF iletme → 8 ürün, 8 görsel → [Yayınla] → 8 ürün yayında; 2 gelen, 5 giden mesaj Meta'ca kabul). Bildirim şablonu `seltigo_asistan_bildirim_v1` Meta onayında (PENDING). Uygulamayı Live'a almak gerekmedi.
+   - İsteğe bağlı: numaran şu an test kullanıcısına bağlı; kendi hesabına bağlamak için https://mustafabahsimb-eng.github.io/hizlisatici-ai/asistan.html → "WhatsApp'a bağla" (kendi hesabınla girişte).
 
 ## Kargo / tedarik / pazaryeri
 6. **Geliver hesabı:** https://app.geliver.io → Ayarlar > API Anahtarları → anahtarı Seltigo Ayarlar > 🚚 Kargo'dan bağla (test modu).
