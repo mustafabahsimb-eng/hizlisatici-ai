@@ -178,8 +178,9 @@ async function sendToChannels(link: Link, ids: number[], channels: string[]): Pr
   }
 }
 function sentLines(sent: Record<string, any>): string {
-  const parts = Object.entries(sent || {}).map(([k, v]: [string, any]) =>
-    v?.listings != null ? `${k}: ${v.listings} ilan${v.test ? " (test)" : ""}` : v?.queued != null ? `${k}: ${v.queued} paylaşım sıraya alındı` : v?.synced != null ? `${k}: ✓` : v?.error ? `${k}: ${short(v.error, 80)}` : "").filter(Boolean);
+  // Sandbox / test bağlantıları satıcıya gösterilmez; yalnız canlı kanallar yazılır
+  const parts = Object.entries(sent || {}).filter(([k, v]: [string, any]) => !v?.test && !/sandbox|\btest\b/i.test(k)).map(([k, v]: [string, any]) =>
+    v?.listings != null ? `${k}: ${v.listings} ilan` : v?.queued != null ? `${k}: ${v.queued} paylaşım sıraya alındı` : v?.synced != null ? `${k}: ✓` : v?.error ? `${k}: ${short(v.error, 80)}` : "").filter(Boolean);
   return parts.length ? `\n📤 Diğer kanallar: ${parts.join(" · ")}` : "";
 }
 function addedReply(r: any): Reply {
@@ -674,24 +675,41 @@ export async function handleIncoming(inc: Incoming): Promise<{ link: Link | null
   const { data: link } = await db.from("assistant_links").select("*").eq("channel", inc.channel).eq("external_id", inc.externalId).maybeSingle() as { data: Link | null };
   const text = (inc.text || "").trim();
 
-  // Bağlama (yalnız panelden alınan tek kullanımlık kodla)
-  const codeM = text.match(/^(?:\/start\s+|bağla\s+|bagla\s+)?([A-Z0-9]{8})$/i);
-  if (!link || codeM && !link) {
+  // Bağlama (yalnız panelden alınan tek kullanımlık kodla). Bağlı numarada kod yalnız "BAĞLA <kod>" / "/start <kod>" ile işlenir
+  // (8 harfli bir ürün kodu yanlışlıkla bağlama sayılmasın). Kod başka hesaba aitse numara o hesaba TAŞINIR: kodu yeni hesabın
+  // sahibi panelden aldı, mesaj da numaranın kendisinden geldi. Bağlantı kurulmadıysa "bağlandın" / karşılama mesajı gitmez.
+  const codeM = text.match(/^(?:\/start\s+|bağla\s+|bagla\s+|BAĞLA\s+)?([A-Z0-9]{8})$/i);
+  const explicit = /^(?:\/start|bağla|bagla|BAĞLA)\s+/i.test(text);
+  if (codeM && (!link || explicit)) {
     const rk = inc.channel + ":" + inc.externalId;
-    if (codeM) {
-      const { data: okc } = await db.rpc("rate_hit", { p_key: "code:" + rk, p_limit: 10, p_window_seconds: 3600 });
-      if (okc === false) return { link: null, replies: [] };
-      const code = codeM[1].toUpperCase();
-      const { data: c } = await db.from("assistant_link_codes").select("*").eq("code", code).is("used_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
-      if (c && c.channel === inc.channel) {
-        await db.from("assistant_link_codes").update({ used_at: new Date().toISOString() }).eq("code", code);
-        const ins = await db.from("assistant_links").upsert({
-          user_id: c.user_id, channel: inc.channel, external_id: inc.externalId, display_name: inc.name || null, role: c.role, is_owner: c.is_owner, last_inbound_at: new Date().toISOString(),
-        }, { onConflict: "channel,external_id" }).select("*").single();
-        return { link: ins.data as Link, replies: [{ text: "✅ Seltigo hesabına bağlandın.\n\n" + HELP.text }] };
-      }
-      return { link: null, replies: [{ text: "Bu kod geçersiz ya da süresi dolmuş. Seltigo panelinde 🤖 Asistan bölümünden yeni kod al." }] };
+    const { data: okc } = await db.rpc("rate_hit", { p_key: "code:" + rk, p_limit: 10, p_window_seconds: 3600 });
+    if (okc === false) return { link, replies: [{ text: "Çok fazla kod denemesi oldu; bir saat sonra tekrar dene." }] };
+    const code = codeM[1].toUpperCase();
+    const { data: c } = await db.from("assistant_link_codes").select("*").eq("code", code).is("used_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
+    if (!c || c.channel !== inc.channel) {
+      return { link, replies: [{ text: "Bu kod geçersiz ya da süresi dolmuş; bağlantı DEĞİŞMEDİ." + (link ? " Bu numara hâlâ önceki Seltigo hesabına bağlı." : "") + " Seltigo panelinde 🤖 Asistan bölümünden yeni kod al.", link: { title: "🤖 Asistan", url: `${SITE}/asistan.html` } }] };
     }
+    if (link && link.user_id === c.user_id) {
+      await db.from("assistant_link_codes").update({ used_at: new Date().toISOString() }).eq("code", code);
+      return { link, replies: [{ text: "Bu numara zaten bu Seltigo hesabına bağlı; bir şey değişmedi." }] };
+    }
+    const now = new Date().toISOString();
+    const row = { user_id: c.user_id, channel: inc.channel, external_id: inc.externalId, display_name: inc.name || null, role: c.role, is_owner: c.is_owner, last_inbound_at: now };
+    const ins = link
+      ? await db.from("assistant_links").update(row).eq("id", link.id).select("*").maybeSingle()
+      : await db.from("assistant_links").upsert(row, { onConflict: "channel,external_id" }).select("*").maybeSingle();
+    if (ins.error || !ins.data || ins.data.user_id !== c.user_id) {
+      return { link, replies: [{ text: "Bağlantı kurulamadı, bir şey değişmedi. Birazdan yeni kodla tekrar dener misin?" }] };
+    }
+    await db.from("assistant_link_codes").update({ used_at: now }).eq("code", code);
+    if (link) {
+      await db.from("assistant_sessions").delete().eq("link_id", link.id); // önceki hesabın yarım işleri yeni hesaba taşınmasın
+      return { link: ins.data as Link, replies: [{ text: "✅ Bu numara yeni Seltigo hesabına TAŞINDI; önceki hesapla bağlantısı kaldırıldı.\n\n" + HELP.text }] };
+    }
+    return { link: ins.data as Link, replies: [{ text: "✅ Seltigo hesabına bağlandın.\n\n" + HELP.text }] };
+  }
+  if (!link) {
+    const rk = inc.channel + ":" + inc.externalId;
     // Bağlı olmayan numara: işlem yapılmaz; kibar cevap en fazla 10 dakikada bir
     if (inc.channel !== "test") {
       const { data: okr } = await db.rpc("rate_hit", { p_key: "unl:" + rk, p_limit: 1, p_window_seconds: 600 });

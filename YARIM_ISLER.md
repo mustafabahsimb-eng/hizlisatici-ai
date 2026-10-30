@@ -58,6 +58,8 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 - Eski notlardaki "Etsy bağlantısı süresi doldu" çözüldü (bağlantı açık, senkron saatlik başarılı).
 
 ## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
+- Asistan numara bağlama (30 Ekim): başka hesaba bağlı numaradan geçerli "BAĞLA <kod>" gelirse numara yeni hesaba TAŞINIR (kodu yeni hesabın sahibi aldı, mesaj numaranın kendisinden geldi), önceki hesabın yarım işleri silinir, cevapta "TAŞINDI" yazar. Geçersiz kodda "bağlantı değişmedi" denir, karşılama mesajı gitmez. Bağlı numarada kod yalnız "BAĞLA <kod>" ile işlenir.
+- Yayın özetlerinde sandbox / test bağlantıları (ör. Amazon sandbox) satıcıya gösterilmez.
 - PDF + link ile ürün yükleme (27 Ekim; docs/pdf-link-yukleme.md):
   - PDF önce ÜCRETSİZ okuyucuyla (yazı katmanı + gömülü görseller) okunur; yapay zekâ yalnız taranmış / okunamayan sayfalarda (kota sayılır). Yapay zekâ kredisi bittiğinde de yazılı PDF'ler okunmaya devam eder.
   - Yüklenen ürünler TASLAK kaydedilir, [Yayınla] ile açılır (asistanın "doğrudan" ayarında da). Fiyatsız ürün yayınlanmaz.

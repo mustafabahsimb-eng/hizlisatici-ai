@@ -613,7 +613,8 @@ async function notify(id: string) {
   if (imp.status === "failed") return say(imp, { text: `${from}: ürün bulamadım. ${short(imp.error || "", 200)}\nFiyat listesi / katalog PDF'i ya da mağaza linki olduğundan emin misin?`, link: panel });
   if (imp.status === "published") {
     const d = imp.distributed || {};
-    const sent = Object.entries(d.sent || {}).map(([k, v]: [string, any]) => v?.listings != null ? `${k}: ${v.listings} ilan` : v?.queued != null ? `${k}: ${v.queued} paylaşım` : v?.error ? `${k}: ${short(v.error, 60)}` : "").filter(Boolean);
+    // Sandbox / test bağlantıları satıcıya gösterilmez; yalnız canlı kanallar yazılır
+    const sent = Object.entries(d.sent || {}).filter(([k, v]: [string, any]) => !v?.test && !/sandbox|\btest\b/i.test(k)).map(([k, v]: [string, any]) => v?.listings != null ? `${k}: ${v.listings} ilan` : v?.queued != null ? `${k}: ${v.queued} paylaşım` : v?.error ? `${k}: ${short(v.error, 60)}` : "").filter(Boolean);
     const ids = await productIds(id, true);
     const all = await productIds(id);
     return say(imp, {
