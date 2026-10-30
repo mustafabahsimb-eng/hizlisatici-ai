@@ -95,7 +95,7 @@ const WA_TEMPLATES = [{
   components: [{ type: "BODY", text: "Seltigo mağaza bildirimi: {{1}}\n\nAyrıntı ve işlemler için bu mesaja cevap yazabilirsin.", example: { body_text: [["Yeni sipariş: Çelik termos 500 ml, 1 adet, 349,90 TL"]] } }],
 }];
 async function waTemplates() {
-  const waba = env("ASSISTANT_WABA_ID"), token = env("ASSISTANT_WA_TOKEN");
+  const waba = env("ASSISTANT_WA_WABA_ID") || env("ASSISTANT_WABA_ID"), token = env("ASSISTANT_WA_TOKEN");
   if (!waba || !token) return { ok: false, dry: true, templates: WA_TEMPLATES, note: "ASSISTANT_WABA_ID / ASSISTANT_WA_TOKEN girilince onaya gönderilir" };
   const out: unknown[] = [];
   const ex = await (await fetch(`https://graph.facebook.com/v21.0/${waba}/message_templates?limit=200`, { headers: { Authorization: `Bearer ${token}` } })).json();
