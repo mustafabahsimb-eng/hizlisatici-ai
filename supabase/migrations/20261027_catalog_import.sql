@@ -182,3 +182,6 @@ grant execute on function public.ai_quota_ok(uuid) to authenticated;
 insert into public.feature_flags (key, name_tr, enabled, note)
 values ('pdf_link_import', 'PDF + link ile ürün yükleme (WhatsApp / panel)', true, 'catalog-import; WhatsApp / Telegram asistanı ve Toplu Yükleme')
 on conflict (key) do nothing;
+
+-- 31 Ekim: PDF satırının siteyle neye göre eşleştiği (barcode | sku | name); panelde gösterilir
+alter table public.catalog_import_rows add column if not exists match_by text;

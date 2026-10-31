@@ -454,7 +454,12 @@ function ticimaxFromHtml(html: string, base: URL): any | null {
     if (v.ekSecenekTipiTanim && v.tanim) a[clean(v.ekSecenekTipiTanim, 40)] = clean(v.tanim, 60);
     attrsOf.set(v.urunID, a);
   }
-  const priceOf = (x: any) => Number(x?.indirimliFiyati) > 0 ? Number(x.indirimliFiyati) : Number(x?.satisFiyati) > 0 ? Number(x.satisFiyati) : null;
+  // satisFiyati / indirimliFiyati KDV hariç gelir; sitede görünen fiyat KDV dahil (kdvOrani)
+  const vat = (x: any) => 1 + (Number(x?.kdvOrani) > 0 ? Number(x.kdvOrani) : 0) / 100;
+  const priceOf = (x: any) => {
+    const n = Number(x?.indirimliFiyati) > 0 ? Number(x.indirimliFiyati) : Number(x?.satisFiyati) > 0 ? Number(x.satisFiyati) : 0;
+    return n > 0 ? Math.round(n * vat(x) * 100) / 100 : null;
+  };
   const variants: Variant[] = ps.map((x) => ({
     supplier_variant_id: String(x.id), sku: clean(x.barkod || x.stokKodu, 80), attributes: attrsOf.get(x.id) || {},
     price: priceOf(x), stock: Number.isFinite(Number(x.stokAdedi)) ? Number(x.stokAdedi) : null, image: null,
@@ -464,9 +469,9 @@ function ticimaxFromHtml(html: string, base: URL): any | null {
     ...(Array.isArray(main.resimler) ? main.resimler.map((r: any) => typeof r === "string" ? r : r?.resimBuyukYolu || r?.resimYolu) : []),
     main.spotResimBuyukYolu, meta(html, "og:image"), ...htmlImages(html, base).filter((u) => /uploads\/urunresimleri/i.test(u)),
   ].filter((u) => typeof u === "string" && u && !/resim-hazirlaniyor/.test(u)).map((u: string) => absUrl(u, base)).filter(Boolean) as string[]).slice(0, 12);
-  const price = priceOf(main) ?? parsePrice(d.productPrice);
+  const price = priceOf(main) ?? (Number(d.productPriceKDVIncluded) > 0 ? Math.round(Number(d.productPriceKDVIncluded) * 100) / 100 : parsePrice(d.productPrice));
   return {
-    url: base.toString(), name: clean(d.productName, 300), price, list_price: Number(main.satisFiyati) > (price || 0) ? Number(main.satisFiyati) : null,
+    url: base.toString(), name: clean(d.productName, 300), price, list_price: Number(main.satisFiyati) * vat(main) > (price || 0) + 0.01 ? Math.round(Number(main.satisFiyati) * vat(main) * 100) / 100 : null,
     currency: guessCurrency(d.productCurrency || main.paraBirimiKodu) || "TRY",
     stock: Number.isFinite(Number(d.totalStockAmount)) ? Number(d.totalStockAmount) : null,
     model_code: clean(d.stockCode || main.stokKodu, 80), barcode: clean(main.barkod, 40), brand: clean(d.brandName, 80), category: "",

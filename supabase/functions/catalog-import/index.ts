@@ -380,14 +380,14 @@ async function merge(imp: any) {
   const pdf = (rows || []).filter((r: any) => r.source === "pdf");
   const link = (rows || []).filter((r: any) => r.source === "link");
   // Önceki birleştirmeden kalan bayrakları sıfırla (ikinci kaynak sonradan eklendiyse)
-  await db.from("catalog_import_rows").update({ final: false, merged_from: null }).eq("import_id", imp.id).in("status", ["new", "ok", "missing", "unmatched", "created", "updated"]);
+  await db.from("catalog_import_rows").update({ final: false, merged_from: null, match_by: null }).eq("import_id", imp.id).in("status", ["new", "ok", "missing", "unmatched", "created", "updated"]);
   const finals: any[] = [];
   if (pdf.length && link.length) {
     const m = matchRows(pdf, link);
     for (const p of pdf) {
       const hit = m.get(p.id);
       const l = hit?.link;
-      const f: any = { id: p.id, final: true, merged_from: l?.id ?? null };
+      const f: any = { id: p.id, final: true, merged_from: l?.id ?? null, match_by: hit?.by ?? null };
       if (l) {
         if ((l.images || []).length) f.images = [...l.images, ...(p.images || [])].slice(0, 12);
         if (l.description && String(l.description).length > String(p.description || "").length) f.description = l.description;
@@ -422,7 +422,7 @@ async function merge(imp: any) {
   for (let i = 0; i < finals.length; i += 20) {
     await Promise.all(finals.slice(i, i + 20).map((f) => retry(() => db.from("catalog_import_rows").update({
       final: true, merged_from: f.merged_from ?? null, images: f.images || [], description: f.description ?? null, specs: f.specs ?? null, brand: f.brand ?? null,
-      barcode: f.barcode ?? null, variants: f.variants ?? null, url: f.url ?? null, problems: f.problems, status: f.status, product_id: f.product_id ?? null,
+      barcode: f.barcode ?? null, variants: f.variants ?? null, url: f.url ?? null, problems: f.problems, status: f.status, product_id: f.product_id ?? null, match_by: f.match_by ?? null,
     }).eq("id", f.id))));
   }
   const ids = finals.map((f) => f.id);

@@ -369,6 +369,7 @@
       plSt_parsing: 'Okunuyor', plSt_merging: 'Eşleştiriliyor', plSt_need_margin: 'Kâr oranı bekleniyor', plSt_saving: 'Kaydediliyor', plSt_ready: 'Hazır (taslak)',
       plSt_publishing: 'Yayınlanıyor', plSt_published: 'Yayında', plSt_failed: 'Hata', plSt_cancelled: 'İptal',
       plRow_created: 'Yeni', plRow_updated: 'Güncellendi', plRow_error: 'Okunamadı', plRow_unmatched: 'Eşleşmedi', plRow_ok: 'Tam', plRow_missing: 'Eksik', plRow_new: '—', plRow_skipped: 'Atlandı',
+      plMatch: 'Siteyle eşleşti: {by}', plBy_barcode: 'barkod', plBy_sku: 'stok kodu / model', plBy_name: 'ürün adı',
       plOpenProduct: 'Düzenle',
       plMore: '… ve {n} satır daha',
     },
@@ -397,6 +398,7 @@
       plSt_parsing: 'Reading', plSt_merging: 'Matching', plSt_need_margin: 'Waiting for margin', plSt_saving: 'Saving', plSt_ready: 'Ready (draft)',
       plSt_publishing: 'Publishing', plSt_published: 'Live', plSt_failed: 'Error', plSt_cancelled: 'Cancelled',
       plRow_created: 'New', plRow_updated: 'Updated', plRow_error: 'Unreadable', plRow_unmatched: 'Not matched', plRow_ok: 'Complete', plRow_missing: 'Incomplete', plRow_new: '—', plRow_skipped: 'Skipped',
+      plMatch: 'Matched with site by {by}', plBy_barcode: 'barcode', plBy_sku: 'stock code / model', plBy_name: 'product name',
       plOpenProduct: 'Edit',
       plMore: '… and {n} more rows',
     },
@@ -2671,14 +2673,15 @@
     async function plDetail(m) {
       const box = document.getElementById('plDetail');
       if (!m) { box.innerHTML = ''; return; }
-      const { data } = await db.from('catalog_import_rows').select('id, source, final, page, name, model_code, barcode, cost, sale_price, currency, stock, images, status, problems, error, product_id, variants')
+      const { data } = await db.from('catalog_import_rows').select('id, source, final, page, name, model_code, barcode, cost, sale_price, currency, stock, images, status, problems, error, product_id, variants, match_by')
         .eq('import_id', m.id).or('final.eq.true,status.eq.error').order('idx').limit(500);
       const rows = data || [];
       box.innerHTML = '<div class="table-wrap"><table class="mini-table" id="plRows"><thead><tr><th>#</th><th>' + esc(t('plThProduct')) + '</th><th>' + esc(t('plThCode')) + '</th><th class="num">' + esc(t('plThPrice')) +
         '</th><th class="num">' + esc(t('plThStock')) + '</th><th>' + esc(t('plThImg')) + '</th><th>' + esc(t('plThNote')) + '</th></tr></thead><tbody>' + rows.map((r, i) => {
           const img = (r.images || [])[0];
           const note = r.status === 'error' ? '<span style="color:#f28b8b">' + esc(r.error || t('plRow_error')) + '</span>'
-            : esc(t('plRow_' + r.status)) + ((r.problems || []).length ? '<div class="muted" style="font-size:11px">' + esc((r.problems || []).join(' · ')) + '</div>' : '');
+            : esc(t('plRow_' + r.status)) + ((r.problems || []).length ? '<div class="muted" style="font-size:11px">' + esc((r.problems || []).join(' · ')) + '</div>' : '')
+              + (r.match_by ? '<div class="muted" style="font-size:11px">🔗 ' + esc(fmt(t('plMatch'), { by: t('plBy_' + r.match_by) })) + '</div>' : '');
           const vars = (r.variants || []).length ? ' <span class="muted">(' + r.variants.length + ')</span>' : '';
           return '<tr class="' + (r.status === 'error' ? 'row-error' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(r.name || '') + vars +
             (r.product_id ? ' <a href="urun-duzenle.html?id=' + r.product_id + '" style="font-size:11px">' + esc(t('plOpenProduct')) + '</a>' : '') + '</td><td>' + esc([r.model_code, r.barcode].filter(Boolean).join(' · ')) +
