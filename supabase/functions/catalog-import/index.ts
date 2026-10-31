@@ -394,6 +394,7 @@ async function merge(imp: any) {
         f.specs = [...(l.specs || []), ...(p.specs || [])].slice(0, 80);
         if (!p.brand && l.brand) f.brand = l.brand;
         if (!p.barcode && l.barcode) f.barcode = l.barcode;
+        if (!p.model_code && l.model_code) f.model_code = l.model_code;
         if (!(p.variants || []).length && (l.variants || []).length) f.variants = (l.variants as any[]).map((v) => ({ ...v, price: null, stock: null }));
         f.url = l.url;
         if (l.product_id && !p.product_id) f.product_id = l.product_id; // önce yalnız linkle kaydedilmişse aynı ürün güncellenir
@@ -422,7 +423,7 @@ async function merge(imp: any) {
   for (let i = 0; i < finals.length; i += 20) {
     await Promise.all(finals.slice(i, i + 20).map((f) => retry(() => db.from("catalog_import_rows").update({
       final: true, merged_from: f.merged_from ?? null, images: f.images || [], description: f.description ?? null, specs: f.specs ?? null, brand: f.brand ?? null,
-      barcode: f.barcode ?? null, variants: f.variants ?? null, url: f.url ?? null, problems: f.problems, status: f.status, product_id: f.product_id ?? null, match_by: f.match_by ?? null,
+      barcode: f.barcode ?? null, model_code: f.model_code ?? null, variants: f.variants ?? null, url: f.url ?? null, problems: f.problems, status: f.status, product_id: f.product_id ?? null, match_by: f.match_by ?? null,
     }).eq("id", f.id))));
   }
   const ids = finals.map((f) => f.id);

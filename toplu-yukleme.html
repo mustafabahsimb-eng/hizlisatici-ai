@@ -190,7 +190,6 @@
       </div>
       <h3 style="margin:22px 0 8px;font-size:15px" data-t="plHistory"></h3>
       <div id="plHistory"><div class="muted" data-t="plNoHistory"></div></div>
-      <div id="plDetail" style="margin-top:14px"></div>
     </div>
     <div id="folderPanel" style="display:none">
       <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none" onchange="onFolderPicked(this.files); this.value='';">
@@ -349,7 +348,7 @@
       plHint: 'Toptancının PDF fiyat listesini / kataloğunu yükle, istersen ürünlerin bulunduğu site linkini de yaz. Fiyat ve stok PDF\'ten, görsel ve açıklama siteden alınır; aynı barkod / kod varsa yeni ürün açılmaz, fiyat ve stok güncellenir. WhatsApp\'tan gönderdiğinde de aynısı olur.',
       plPick: '📄 PDF seç',
       plUrlPh: 'Site / mağaza linki (isteğe bağlı)',
-      plMarginNote: 'Satış fiyatı, yukarıdaki Kâr kuralındaki orana göre hesaplanır (PDF\'teki fiyat alış fiyatı sayılır).',
+      plMarginNote: 'Satış fiyatı, aşağıdaki Kurallar bölümündeki Kâr oranına göre hesaplanır (PDF\'teki fiyat alış fiyatı sayılır).',
       plStart: 'Başlat',
       plHistory: 'Yükleme geçmişi',
       plNoHistory: 'Henüz yükleme yok.',
@@ -378,7 +377,7 @@
       plHint: 'Upload the supplier\'s PDF price list / catalogue and, if you like, the link of the site where the products are. Price and stock come from the PDF, images and descriptions from the site; if the same barcode / code exists, no new product is created, price and stock are updated. The same happens when you send it on WhatsApp.',
       plPick: '📄 Choose PDF',
       plUrlPh: 'Site / store link (optional)',
-      plMarginNote: 'The selling price is calculated with the margin in the Pricing rule above (the PDF price is treated as cost).',
+      plMarginNote: 'The selling price is calculated with the Margin in the Rules section below (the PDF price is treated as cost).',
       plStart: 'Start',
       plHistory: 'Upload history',
       plNoHistory: 'No uploads yet.',
@@ -2665,14 +2664,16 @@
           const st = esc(t('plSt_' + m.status)) + (m.status === 'parsing' && m.pdf_chunks ? ' (' + m.pdf_chunks_done + '/' + m.pdf_chunks + ')' : '') + (m.error && m.status === 'failed' ? '<div class="muted" style="font-size:11px">' + esc(m.error) + '</div>' : '');
           return '<tr data-imp="' + m.id + '"><td style="white-space:nowrap">' + esc(new Date(m.created_at).toLocaleString(HS.lang === 'en' ? 'en-GB' : 'tr-TR')) + '</td><td>' + esc(t('plSrc_' + m.source)) + '</td><td>' + from + '</td><td>' + st + '</td><td>' +
             esc(fmt(t('plCounts'), m)) + '</td><td style="white-space:nowrap"><button class="btn-secondary btn-small" onclick="plToggle(\'' + m.id + '\')">' + esc(t('plDetail')) + '</button>' +
-            (m.status === 'ready' ? ' <button class="btn-primary btn-small" onclick="plPublish(\'' + m.id + '\')">' + esc(t('plPublish')) + '</button>' : '') + '</td></tr>';
+            (m.status === 'ready' ? ' <button class="btn-primary btn-small" onclick="plPublish(\'' + m.id + '\')">' + esc(t('plPublish')) + '</button>' : '') + '</td></tr>' +
+            (m.id === plOpen ? '<tr class="pl-detail-row"><td colspan="6" style="background:#0b0e15;padding:10px 12px"><div id="plDetail"></div></td></tr>' : '');
         }).join('') + '</tbody></table></div>';
       await plDetail(list.find((m) => m.id === plOpen));
       if (list.some((m) => ACTIVE.includes(m.status))) plTimer = setTimeout(plLoad, 3000);
+      else if (document.getElementById('plMsg').textContent === t('plStarted')) msg('');
     };
     async function plDetail(m) {
       const box = document.getElementById('plDetail');
-      if (!m) { box.innerHTML = ''; return; }
+      if (!m || !box) return;
       const { data } = await db.from('catalog_import_rows').select('id, source, final, page, name, model_code, barcode, cost, sale_price, currency, stock, images, status, problems, error, product_id, variants, match_by')
         .eq('import_id', m.id).or('final.eq.true,status.eq.error').order('idx').limit(500);
       const rows = data || [];
