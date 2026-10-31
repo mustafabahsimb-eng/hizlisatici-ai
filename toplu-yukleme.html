@@ -2683,9 +2683,9 @@
           const note = r.status === 'error' ? '<span style="color:#f28b8b">' + esc(r.error || t('plRow_error')) + '</span>'
             : esc(t('plRow_' + r.status)) + ((r.problems || []).length ? '<div class="muted" style="font-size:11px">' + esc((r.problems || []).join(' · ')) + '</div>' : '')
               + (r.match_by ? '<div class="muted" style="font-size:11px">🔗 ' + esc(fmt(t('plMatch'), { by: t('plBy_' + r.match_by) })) + '</div>' : '');
-          const vars = (r.variants || []).length ? ' <span class="muted">(' + r.variants.length + ')</span>' : '';
+          const vars = (r.variants || []).length > 1 ? ' <span class="muted">(' + r.variants.length + ')</span>' : '';
           return '<tr class="' + (r.status === 'error' ? 'row-error' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(r.name || '') + vars +
-            (r.product_id ? ' <a href="urun-duzenle.html?id=' + r.product_id + '" style="font-size:11px">' + esc(t('plOpenProduct')) + '</a>' : '') + '</td><td>' + esc([r.model_code, r.barcode].filter(Boolean).join(' · ')) +
+            (r.product_id ? ' <a href="urun-duzenle.html?id=' + r.product_id + '" style="font-size:11px;color:#1D9E75">' + esc(t('plOpenProduct')) + '</a>' : '') + '</td><td>' + esc([r.model_code, r.barcode].filter(Boolean).join(' · ')) +
             '</td><td class="num">' + money(r.cost, r.currency) + ' → ' + money(r.sale_price, r.currency) + '</td><td class="num">' + (r.stock != null ? r.stock : '–') + '</td><td>' +
             (img ? '<img src="' + esc(img) + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px">' : '–') + '</td><td>' + note + '</td></tr>';
         }).join('') + '</tbody></table></div>';
