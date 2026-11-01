@@ -9,6 +9,9 @@
 //   { action: "connections" } -> süresi dolmak üzere olan bağlantılar kuyruğa (günde bir)
 //   { action: "wa_templates" } -> WhatsApp 24 saat dışı bildirim şablonlarını Seltigo hesabında onaya gönder / durumunu sor
 //   { action: "telegram_webhook" } -> Telegram webhook adresini kaydet (bot anahtarı girildikten sonra bir kez)
+//   { action: "wa_health", phone? } -> WhatsApp sağlık kontrolü: token (süre, izinler), numara, WABA aboneliği, şablonlar, bağlı numara
+//   { action: "wa_files", userId, files: [{ base64, filename, caption? }], text? } -> satıcının WhatsApp'ına dosya (+ metin) gönderimi kuyruğa;
+//        24 saat penceresi kapalıysa satıcı yazana kadar bekler (3 gün), sonra sırayla gider (ör. saha demosu dosyaları)
 // =========================================================
 import { db, handleIncoming, renderAlert } from "../_shared/assistant-core.ts";
 import { sendReply, telegramApi } from "../_shared/assistant-channels.ts";
@@ -44,7 +47,19 @@ async function runOutbox() {
       if (!links?.length) { await db.from("assistant_outbox").update({ status: "skipped", error: "bağlı hesap yok" }).eq("id", it.id); continue; }
       const { data: st } = await db.from("assistant_settings").select("*").eq("user_id", it.user_id).maybeSingle();
       const { data: prof } = await db.from("user_profiles").select("timezone").eq("user_id", it.user_id).maybeSingle();
-      if (inQuiet(st, prof?.timezone) && !["loss_approval"].includes(it.kind)) {
+      const p = it.payload || {};
+      if (p.wait_window) {
+        // Satıcı yazana kadar bekler (Meta 24 saat kuralı: pencere kapalıyken dosya / serbest metin gönderilemez)
+        const l = links.find((x: any) => x.channel === (p.only_channel || "whatsapp"));
+        const open = !!l?.last_inbound_at && Date.now() - new Date(l.last_inbound_at).getTime() < 23.5 * 3600_000;
+        if (!l || !open) {
+          const expired = p.expires_at && Date.now() > new Date(p.expires_at).getTime();
+          await db.from("assistant_outbox").update(expired ? { status: "skipped", error: "satıcı yazmadı (süre doldu)" } : { send_after: new Date(Date.now() + 60_000).toISOString() }).eq("id", it.id);
+          results.push({ id: it.id, waiting: !expired });
+          continue;
+        }
+      }
+      if (!p.wait_window && inQuiet(st, prof?.timezone) && !["loss_approval"].includes(it.kind)) {
         // Sessiz saat: bitişine ertele
         await db.from("assistant_outbox").update({ send_after: new Date(Date.now() + 30 * 60_000).toISOString() }).eq("id", it.id);
         results.push({ id: it.id, deferred: true });
@@ -52,7 +67,8 @@ async function runOutbox() {
       }
       const r = await renderAlert(it.kind, it.payload || {}, it.user_id);
       if (!r) { await db.from("assistant_outbox").update({ status: "skipped", error: "bilinmeyen tür" }).eq("id", it.id); continue; }
-      const allowed = links.filter((l: any) => l.role === "full" || (r.need === "orders" && l.role === "orders") || (r.need === "products" && l.role === "products"));
+      const allowed = links.filter((l: any) => l.role === "full" || (r.need === "orders" && l.role === "orders") || (r.need === "products" && l.role === "products"))
+        .filter((l: any) => !p.only_channel || l.channel === p.only_channel);
       const sent: unknown[] = [];
       for (const l of allowed) sent.push({ channel: l.channel, ...(await sendReply(db, l, r.reply)) });
       const ok = sent.some((x: any) => x.ok);
@@ -108,6 +124,56 @@ async function waTemplates() {
   return { ok: true, templates: out };
 }
 
+// WhatsApp sağlık kontrolü (token, numara, abonelik, şablon, bağlı numara); token değeri asla dönmez
+async function waHealth(phone: string | null) {
+  const token = env("ASSISTANT_WA_TOKEN"), pid = env("ASSISTANT_WA_PHONE_ID"), waba = env("ASSISTANT_WA_WABA_ID") || env("ASSISTANT_WABA_ID");
+  const g = async (path: string) => {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) });
+    return await r.json().catch(() => ({}));
+  };
+  const out: Record<string, unknown> = { enabled: env("ASSISTANT_WA_ENABLED") === "true", phone_id: !!pid, waba_id: !!waba, token: !!token, verify_token: !!env("WHATSAPP_VERIFY_TOKEN"), app_secret: !!env("FACEBOOK_CLIENT_SECRET") };
+  if (!token) return out;
+  const dbg = await g(`debug_token?input_token=${encodeURIComponent(token)}`);
+  const d = dbg?.data || {};
+  out.token_info = d.is_valid != null ? { valid: d.is_valid, type: d.type, app: d.application, expires: d.expires_at ? new Date(d.expires_at * 1000).toISOString() : "never", scopes: d.scopes } : { error: short(dbg?.error?.message) };
+  const ph = await g(`${pid}?fields=display_phone_number,verified_name,quality_rating,code_verification_status,platform_type,throughput,name_status`);
+  out.number = ph?.error ? { error: short(ph.error.message) } : ph;
+  const sub = await g(`${waba}/subscribed_apps`);
+  out.waba_subscribed_apps = sub?.error ? { error: short(sub.error.message) } : (sub?.data || []).map((x: any) => x?.whatsapp_business_api_data?.name || x?.whatsapp_business_api_data?.id);
+  const tp = await g(`${waba}/message_templates?limit=50&fields=name,status,language`);
+  out.templates = tp?.error ? { error: short(tp.error.message) } : (tp?.data || []).map((x: any) => `${x.name}:${x.language}:${x.status}`);
+  const ph2 = await g(`${waba}/phone_numbers?fields=display_phone_number,id`);
+  out.waba_numbers = (ph2?.data || []).map((x: any) => `${x.display_phone_number} (${x.id === pid ? "bu numara" : x.id})`);
+  if (phone) {
+    const { data: l } = await db.from("assistant_links").select("user_id, display_name, is_owner, role, last_inbound_at").eq("channel", "whatsapp").eq("external_id", phone).maybeSingle();
+    const { data: m } = l ? await db.from("assistant_messages").select("direction, created_at").eq("user_id", l.user_id).eq("channel", "whatsapp").order("created_at", { ascending: false }).limit(1) : { data: null };
+    out.link = l ? { ...l, window_open: !!l.last_inbound_at && Date.now() - new Date(l.last_inbound_at).getTime() < 24 * 3600_000, last_message: m?.[0] || null } : null;
+  }
+  return out;
+}
+
+// Satıcının WhatsApp'ına dosya gönderimi: dosyalar özel depoya, gönderim kuyruğa (pencere açılınca sırayla)
+async function waFiles(userId: string, b: any) {
+  const files: any[] = Array.isArray(b.files) ? b.files.slice(0, 5) : [];
+  const expires = new Date(Date.now() + 3 * 86400_000).toISOString();
+  const ids: unknown[] = [];
+  for (const f of files) {
+    const bytes = Uint8Array.from(atob(String(f.base64 || "")), (c) => c.charCodeAt(0));
+    if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-" || bytes.length > 20 * 1024 * 1024) return { ok: false, error: "Yalnız PDF (en fazla 20 MB)" };
+    const name = String(f.filename || "dosya.pdf").replace(/[^\w.\-]+/g, "_").slice(0, 80);
+    const path = `${userId}/outbox/${Date.now()}-${name}`;
+    const up = await db.storage.from("catalog-uploads").upload(path, bytes, { contentType: "application/pdf", upsert: true });
+    if (up.error) return { ok: false, error: up.error.message };
+    const { data } = await db.from("assistant_outbox").insert({ user_id: userId, kind: "file", payload: { path, filename: name, caption: short(f.caption, 900), only_channel: "whatsapp", wait_window: true, expires_at: expires } }).select("id").single();
+    ids.push(data?.id);
+  }
+  if (b.text) {
+    const { data } = await db.from("assistant_outbox").insert({ user_id: userId, kind: "notice", payload: { text: short(b.text, 900), only_channel: "whatsapp", wait_window: true, expires_at: expires } }).select("id").single();
+    ids.push(data?.id);
+  }
+  return { ok: true, queued: ids };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const b = await req.json().catch(() => ({}));
@@ -127,6 +193,8 @@ Deno.serve(async (req) => {
       if (b.action === "reports") return json({ ok: true, queued: await queueReports() });
       if (b.action === "connections") return json({ ok: true, queued: await queueConnections() });
       if (b.action === "wa_templates") return json(await waTemplates());
+      if (b.action === "wa_health") return json(await waHealth(b.phone ? String(b.phone) : null));
+      if (b.action === "wa_files" && b.userId) return json(await waFiles(String(b.userId), b));
       if (b.action === "telegram_webhook") {
         const secret = env("TELEGRAM_WEBHOOK_SECRET");
         const r = await telegramApi("setWebhook", { url: `${SUPABASE_URL}/functions/v1/telegram-bot`, secret_token: secret || undefined, allowed_updates: ["message", "callback_query"] });

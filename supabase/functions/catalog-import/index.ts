@@ -478,7 +478,9 @@ async function save(imp: any, rowIds: number[]) {
     for (let i = 0; i < list.length; i++) {
       const p = prods[i];
       if (!p) { await db.from("catalog_import_rows").update({ status: "error", error: "Kaydedilemedi" }).eq("id", list[i].id); continue; }
-      await db.from("catalog_import_rows").update({ product_id: p.id, status: p.action === "updated" ? "updated" : "created", sale_price: p.sale_price ?? null }).eq("id", list[i].id);
+      // Bu yüklemede az önce açılan ürün (ör. önce PDF, sonra link geldi) yine "yeni" sayılır
+      const st = p.action === "updated" && list[i].status !== "created" ? "updated" : "created";
+      await db.from("catalog_import_rows").update({ product_id: p.id, status: st, sale_price: p.sale_price ?? null }).eq("id", list[i].id);
     }
   } else {
     await db.from("catalog_import_rows").update({ status: "error", error: short(res?.error || "Kaydedilemedi", 200) }).in("id", rowIds);
@@ -634,6 +636,8 @@ async function notify(id: string) {
   const lines = list.slice(0, 10).map((r: any, i: number) => `${i + 1}. ${short(r.name, 50)} — ${money(r.sale_price, r.currency || "TRY")}`);
   const kar = imp.price_type === "retail" ? "Fiyatlar PDF'teki satış fiyatı." : `Kâr: alışın üstüne %${Number(imp.margin ?? 30)}.`;
   const errs = imp.failed ? `\n⚠️ ${imp.failed} satır / sayfa okunamadı (panelde görürsün).` : "";
+  // Resimsiz PDF tek başına geldiyse: görseller için ürünlerin satıldığı sitenin linki istenir (10 dk içinde gelirse aynı yüklemeye eklenir)
+  const askLink = !imp.link_url && imp.pdf_path && cnt("Görsel") ? `\n\n📷 Görselleri ve açıklamaları siteden alayım: bu ürünlerin satıldığı sitenin linkini gönder (ör. www.markaadi.com).` : "";
   // Önce oturum durumu ("%45" ile fiyat düzenleme), sonra mesaj: satıcı hemen cevap verirse kaçmasın
   if (imp.link_id) {
     const ids = await productIds(id);
@@ -641,8 +645,8 @@ async function notify(id: string) {
     await db.from("assistant_sessions").upsert({ link_id: imp.link_id, state: { ...(s?.state || {}), lastImport: id, awaitPriceEdit: ids, awaitPublish: null }, updated_at: new Date().toISOString() });
   }
   await say(imp, {
-    text: `${from}\n${list.length} ürün bulundu (${imp.created} yeni, ${imp.updated} güncellendi)` + (miss.length ? `, ${miss.length}'inde eksik bilgi var: ${parts.join(", ")}.` : ", hepsi tam.") +
-      `\n${kar}\n\n${lines.join("\n")}${list.length > 10 ? `\n… ve ${list.length - 10} ürün daha` : ""}${errs}\n\nFarklı kâr için "%45" yazabilirsin.`,
+    text: `${from}\n${list.length} ürün bulundu (${imp.created} yeni, ${imp.updated} güncellendi)` + (miss.length ? `, ${miss.length} üründe eksik bilgi var: ${parts.join(", ")}.` : ", hepsi tam.") +
+      `\n${kar}\n\n${lines.join("\n")}${list.length > 10 ? `\n… ve ${list.length - 10} ürün daha` : ""}${errs}${askLink}\n\nFarklı kâr için "%45" yazabilirsin.`,
     buttons: [{ id: `cimp_pub:${id}`, title: "Yayınla" }, { id: `cimp_panel:${id}`, title: "Panelde kontrol et" }],
     link: panel,
   });
@@ -670,7 +674,7 @@ export async function start(userId: string, o: { source: string; linkId?: string
   const { data: r2 } = await db.rpc("rate_hit", { p_key: "cimp:d:" + userId, p_limit: 150, p_window_seconds: 86400 });
   if (r1 === false || r2 === false) return { ok: false, error: "Çok sık yükleme yaptın; biraz sonra tekrar dene (saatte en fazla 30, günde 150).", limited: true };
 
-  let pages = 0;
+  let pages = 0, ppc = PAGES_PER_CHUNK;
   if (o.pdfPath) {
     if (!String(o.pdfPath).startsWith(userId + "/")) return { ok: false, error: "Geçersiz dosya" };
     const { data: f, error } = await db.storage.from(BUCKET).download(o.pdfPath);
@@ -680,6 +684,8 @@ export async function start(userId: string, o: { source: string; linkId?: string
     if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") return { ok: false, error: "Yalnız PDF dosyası kabul edilir." };
     try { pages = (await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })).getPageCount(); }
     catch { return { ok: false, error: "PDF açılamadı (bozuk ya da şifreli olabilir)." }; }
+    // Fotoğrafı ağır PDF (sayfa başına > 800 KB): her parça tek sayfa (görsel çözme işlem süresi sınırını aşmasın)
+    if (bytes.length / Math.max(1, pages) > 800_000) ppc = 1;
     if (pages > MAX_PAGES) return { ok: false, error: `PDF en fazla ${MAX_PAGES} sayfa olabilir (bu dosya ${pages} sayfa). Bölüp ayrı gönder.` };
   }
 
@@ -696,21 +702,21 @@ export async function start(userId: string, o: { source: string; linkId?: string
   if (imp) {
     attached = true;
     const patch: any = { status: "parsing", notified_at: null, finished_at: null };
-    if (o.pdfPath) Object.assign(patch, { pdf_path: o.pdfPath, pdf_name: o.pdfName || "katalog.pdf", pdf_pages: pages, pdf_status: "running", pdf_chunks: Math.ceil(pages / PAGES_PER_CHUNK), pdf_chunks_done: 0 });
+    if (o.pdfPath) Object.assign(patch, { pdf_path: o.pdfPath, pdf_name: o.pdfName || "katalog.pdf", pdf_pages: pages, pdf_status: "running", pdf_chunks: Math.ceil(pages / ppc), pdf_chunks_done: 0 });
     if (url) Object.assign(patch, { link_url: url, link_status: "discover" });
     await patchImp(imp.id, patch);
   } else {
     const ins = await db.from("catalog_imports").insert({
       user_id: userId, source: o.source, link_id: o.linkId || null, status: "parsing", margin: o.margin ?? null, method: "free",
       pdf_path: o.pdfPath || null, pdf_name: o.pdfPath ? (o.pdfName || "katalog.pdf") : null, pdf_pages: pages || null,
-      pdf_status: o.pdfPath ? "running" : "none", pdf_chunks: o.pdfPath ? Math.ceil(pages / PAGES_PER_CHUNK) : 0,
+      pdf_status: o.pdfPath ? "running" : "none", pdf_chunks: o.pdfPath ? Math.ceil(pages / ppc) : 0,
       link_url: url, link_status: url ? "discover" : "none", distributed: o.channels?.length ? { channels: o.channels } : null,
     }).select("*").single();
     if (ins.error) return { ok: false, error: ins.error.message };
     imp = ins.data;
   }
   const jobs: Record<string, unknown>[] = [];
-  if (o.pdfPath) for (let p = 1; p <= pages; p += PAGES_PER_CHUNK) jobs.push({ importId: imp.id, step: "pdf", from: p, to: Math.min(pages, p + PAGES_PER_CHUNK - 1) });
+  if (o.pdfPath) for (let p = 1; p <= pages; p += ppc) jobs.push({ importId: imp.id, step: "pdf", from: p, to: Math.min(pages, p + ppc - 1) });
   if (url) jobs.push({ importId: imp.id, step: "link", url });
   await enqueue(userId, jobs);
   return { ok: true, importId: imp.id, attached, pages, chunks: jobs.length };

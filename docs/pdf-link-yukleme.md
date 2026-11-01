@@ -41,3 +41,9 @@ Toplu Yükleme > 📥 PDF + link (geçici ad).
 Seltigo'nun WhatsApp numarası (Meta test numarası) secrets'a girilince (`ASSISTANT_WA_*`, YARIM_ISLER.md) ve Meta panelinde webhook
 `https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/whatsapp-webhook` adresine "messages" alanıyla abone edilince çalışır.
 Doğrulama anahtarı `WHATSAPP_VERIFY_TOKEN` secret'ında; imza anahtarı `FACEBOOK_CLIENT_SECRET` (Meta uygulamasının App Secret'ı).
+
+## Saha demosu
+- Dosyalar: `python tools/demo/demo_dosyalari.py <klasör>` → Toptan_Giyim_Katalogu.pdf (resimli, 10 ürün, fotoğraflar 480 px) + Bayi_Fiyat_Listesi.pdf (resimsiz, 9 ürün; link https://www.gaus.com.tr/).
+- Satıcının WhatsApp'ına gönderim: assistant `{ action: "wa_files", userId, files, text }` (sistem); 24 saat penceresi kapalıysa satıcı yazana kadar bekler (3 gün).
+- Sağlık kontrolü: assistant `{ action: "wa_health", phone }` (token süresi / izinler, numara, WABA aboneliği, şablonlar, bağlı numara).
+- Temizlik (tek komut): `python C:\Projeler\hizlisatici-ai\tools\demo\demo_temizle.py` → demo dosyalarının / demo linkinin AÇTIĞI ürünler + ilanlar silinir (yumuşak); önceden var olan ürünlere dokunulmaz.
