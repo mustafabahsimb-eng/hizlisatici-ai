@@ -35,6 +35,15 @@ def http(method, url, body=None, headers=None):
         except Exception: return e.code, raw.decode(errors="ignore")
 
 
+def reset_limits(uid):
+    """Art arda çalıştırmada tanıma / doğrulama sınırına (saatte 30) takılmamak için test kullanıcısının sayaçları sıfırlanır (Supabase CLI girişiyle)."""
+    import tempfile
+    cli = Path(os.environ["LOCALAPPDATA"]) / "supabase-cli" / "supabase.exe"
+    f = Path(tempfile.gettempdir()) / "site_baglama_reset.sql"
+    f.write_text(f"delete from rate_limits where key = 'sitec:d:{uid}' or key like 'sitec:v:%' or key like 'siteapi:%';", encoding="utf-8")
+    subprocess.run([str(cli), "db", "query", "--linked", "--project-ref", "ytucdrrgxsjhrqmaxckt", "-f", str(f)], capture_output=True, timeout=120)
+
+
 def main():
     shots = shots_dir()
     c = Checks()
@@ -51,6 +60,7 @@ def main():
         page.goto(f"{SITE}/site-baglanti.html")
         page.wait_for_function("() => window.HS && HS.user", timeout=30000)
         uid = ev("() => HS.user.id")
+        reset_limits(uid)
         before = ev("async () => (await HS.db.from('products').select('id').order('id', {ascending:false}).limit(1)).data?.[0]?.id || 0")
 
         # 6) Güvenlik: iç ağ
@@ -93,7 +103,7 @@ def main():
         secs = time.time() - t0
         line = page.inner_text("#progLine")
         page.screenshot(path=str(shots / "site_2_aktarim.png"), full_page=True)
-        rows = ev("""async (b) => (await HS.db.from('site_product_map').select('product_id, url, p:products(id, name, sale_price, stock_qty, image_url, source_url)').eq('connection_id', b).is('removed_at', null)).data""", crawl["id"])
+        rows = ev("""async (b) => (await HS.db.from('site_product_map').select('product_id, url, p:products(id, name, sale_price, stock_qty, image_url, source_url, deleted_at)').eq('connection_id', b).is('removed_at', null)).data.filter(x => x.p && !x.p.deleted_at && x.url.startsWith('http'))""", crawl["id"])
         names = sorted((x["p"] or {}).get("name", "") for x in rows)
         c.check("Aktarım bitti; ilerleme çubuğu çalıştı", "Bitti" in line or "Done" in line, f"{line} · {secs:.0f} sn")
         c.check("Tarama: JSON-LD ve OpenGraph/mikroveri ürünleri geldi", any("Keten" in n for n in names) and any("Kadife" in n for n in names), str(names))

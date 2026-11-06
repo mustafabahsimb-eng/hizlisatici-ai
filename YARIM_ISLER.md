@@ -25,6 +25,13 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 7. ~~**Printify:** ödeme yöntemi + siparişler elle onay~~ — ✅ TAMAMLANDI (16 Ekim 2026, Mustafa).
 8. **Hepsiburada / Çiçeksepeti / Pazarama / PTT AVM satıcı hesapları:** sipariş alanlarının doğrulanması için (hesap açılınca).
 
+## Mağaza ve site bağlama (6 Kasım 2026)
+15. **iyzico deneme (sandbox) hesabı** (ücretsiz, e-postayla üyelik): https://sandbox-merchant.iyzipay.com/auth/register → giriş yap → Ayarlar > Firma Ayarları'ndaki **API Anahtarı** ve **Güvenlik Anahtarı**nı https://mustafabahsimb-eng.github.io/hizlisatici-ai/magaza-yonetimi.html?tab=checkout → "Kartla ödeme hesabı" → iyzico → Deneme (sandbox) → "Bağla ve dene"ye yapıştır.
+   - Neden: kartla ödeme kodu hazır ve sandbox'a gerçek istekle denendi (sahte anahtar doğru şekilde reddedildi); deneme kartıyla uçtan uca ödeme için gerçek sandbox anahtarı gerekiyor. "Yaptım" deyince Claude test kartıyla ödemeyi uçtan uca dener.
+16. **PayTR mağaza başvurusu** (şirket kurulunca; şahıs başvurusu da kabul ediliyor): https://www.paytr.com/magaza/basvuru → onaylanınca Mağaza Paneli > Bilgi'deki Merchant ID / Key / Salt'ı aynı yere gir; PayTR panelinde "Bildirim URL" alanına `https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/store-checkout?provider=paytr` yaz. PayTR'de test modu da onaylı mağaza ister.
+17. **Kendi alan adı servisi (ödeme gerektirir):** bir alan adı satın al (ör. seltigo.com, yıllık ~10-15 $) ve ücretsiz Cloudflare hesabı aç: https://dash.cloudflare.com/sign-up → alan adını Cloudflare'e ekle → SSL/TLS > Custom Hostnames'ten "Cloudflare for SaaS"ı aç (ilk 100 alan adı ücretsiz; kart bilgisi isteyebilir) → My Profile > API Tokens'ta "Zone: SSL and Certificates: Edit + Custom Hostnames: Edit" yetkili anahtar oluştur → anahtarı, Zone ID'yi ve alan adını Claude'a ver.
+   - Neden: satıcının kendi alan adını bağlama kodu hazır (DNS kaydı gösterme, otomatik algılama, SSL, 301, site haritası, Cloudflare Worker `tools/cloudflare/store-worker.js`); Claude secrets'ı (CF_API_TOKEN, CF_ZONE_ID, STORE_EDGE_HOST) girer, Worker'ı yayınlar, bekleyen alan adları kendiliğinden bağlanır. Domain Connect (tek tıkla bağlama) şablonu da bu alan adıyla Domain Connect'e gönderilir.
+
 ## Para / şirket gerektirenler (karar: şirket kurulunca)
 9. Chrome Web Mağazası geliştirici hesabı (tek seferlik 5 $).
 10. Sabit IP sunucusu (docs/sabit-ip-kurulumu.md "Sunucuyu alacağın gün").
@@ -58,6 +65,12 @@ Yalnız senin site şifreni / girişini, hesap iznini, kart / ödemeni ya da kim
 - Eski notlardaki "Etsy bağlantısı süresi doldu" çözüldü (bağlantı açık, senkron saatlik başarılı).
 
 ## Claude'un verdiği kararlar (isteğe bağlı gözden geçirme; değiştirmek istersen söyle)
+- (6 Kasım) Site bağlama: okuma sırası resmi API (Hesaplarım'daki Shopify / WooCommerce / Wix) > ürün akışı (XML / CSV; TR altyapılarında panelin XML çıktısı) > tarama (site haritası, schema.org, OpenGraph, mikroveri, gerekirse yapay zekâ). ikas / Ticimax / IdeaSoft / T-Soft resmi API'leri iş ortaklığı onayı istediği için XML ürün akışı yolu seçildi.
+- (6 Kasım) Sahiplik doğrulaması zorunlu (meta / DNS TXT / dosya); paylaşımlı alanlarda (github.io vb.) kapsam girilen klasör, DNS yolu kapalı.
+- (6 Kasım) Ortak stok: her yeni sipariş (mağaza, site, pazaryeri) stoğu bir kez düşürür, iptal / iadede geri ekler; 3 günden eski içe aktarılan siparişler stoğa dokunmaz. Kendi stoğundaki ürün 0'a inince "tükendi" (dropshipping hariç).
+- (6 Kasım) Kartla ödemede siparişler ödeme onayından SONRA açılır (stok ödenmemiş sepetle düşmez); kapıda / havalede hemen açılır.
+- (6 Kasım) Müşteri hesabı mağaza başına ayrı (satıcı hesaplarından bağımsız), parola bcrypt; e-posta doğrulaması ve parola sıfırlama e-posta servisi gelince eklenecek.
+- (6 Kasım) Supabase ücretsiz planda fonksiyon sınırı doldu: mağaza SEO'su ayrı fonksiyon yerine store-checkout içinde (GET). Yeni fonksiyon gerekirse mevcutlarla birleştirilecek.
 - Asistan numara bağlama (30 Ekim): başka hesaba bağlı numaradan geçerli "BAĞLA <kod>" gelirse numara yeni hesaba TAŞINIR (kodu yeni hesabın sahibi aldı, mesaj numaranın kendisinden geldi), önceki hesabın yarım işleri silinir, cevapta "TAŞINDI" yazar. Geçersiz kodda "bağlantı değişmedi" denir, karşılama mesajı gitmez. Bağlı numarada kod yalnız "BAĞLA <kod>" ile işlenir.
 - Yayın özetlerinde sandbox / test bağlantıları (ör. Amazon sandbox) satıcıya gösterilmez.
 - PDF + link ile ürün yükleme (27 Ekim; docs/pdf-link-yukleme.md):
