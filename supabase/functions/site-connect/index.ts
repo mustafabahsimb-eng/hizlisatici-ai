@@ -124,7 +124,7 @@ async function detect(userId: string, b: any) {
   const { data: ex } = await db.from("site_connections").select("*").eq("user_id", userId).eq("host", ref.host).eq("scope_path", ref.scopePath).is("deleted_at", null).maybeSingle();
   const fields = {
     url: ref.url, origin: ref.origin, platform, platform_evidence: evidence, method, feed_url: feed, store_connection_id: api?.id || null,
-    purpose: b.purpose === "migrate" ? "migrate" : (ex?.purpose || "connect"), updated_at: now(),
+    purpose: ["migrate", "connect"].includes(b.purpose) ? b.purpose : (ex?.purpose || "connect"), updated_at: now(),
   };
   let conn;
   if (ex) conn = (await db.from("site_connections").update(fields).eq("id", ex.id).select("*").single()).data;
@@ -418,10 +418,11 @@ async function maybeFinish(connectionId: string, runId: string) {
 async function buildRedirects(c: any) {
   const { data: st } = await db.from("store_settings").select("store_slug, custom_domain").eq("user_id", c.user_id).maybeSingle();
   if (!st) return;
-  const { data: maps } = await db.from("site_product_map").select("product_id, url").eq("connection_id", c.id).not("product_id", "is", null).is("removed_at", null).limit(5000);
-  const rows = (maps || []).map((m: any) => {
+  const { data: maps } = await db.from("site_product_map").select("product_id, url, p:products(deleted_at)").eq("connection_id", c.id).not("product_id", "is", null).is("removed_at", null).limit(5000);
+  const rows = (maps || []).filter((m: any) => !m.p?.deleted_at).map((m: any) => {
     let path = "";
-    try { const u = new URL(m.url); path = (u.pathname + u.search).replace(/\/+$/, "") || "/"; } catch { return null; }
+    // Yalnız sitedeki gerçek sayfa adresleri (API ile gelen ürünün sayfası yok)
+    try { const u = new URL(m.url); if (!/^https?:$/.test(u.protocol)) return null; path = (u.pathname + u.search).replace(/\/+$/, "") || "/"; } catch { return null; }
     if (path === "/" || path.startsWith("/#")) return null;
     return { user_id: c.user_id, from_path: path.slice(0, 500), to_url: `/p/${m.product_id}`, product_id: m.product_id, connection_id: c.id };
   }).filter(Boolean);

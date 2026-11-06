@@ -115,6 +115,17 @@ def main():
         n2 = ev("async (b) => (await HS.db.from('products').select('id', {count:'exact', head:true}).gt('id', b).is('deleted_at', null)).count", before)
         c.check("Yeniden eşitleme: kopya ürün açılmadı", n1 == n2 and st["created"] == 0, f"önce {n1}, sonra {n2}, yeni {st['created']}, değişmeyen/güncel {st['updated']}")
 
+        # Taşıma: aynı site "taşı" amacıyla -> eski adresler için 301 haritası
+        call({"action": "detect", "url": CRAWL, "purpose": "migrate"})
+        call({"action": "import", "id": crawl["id"]})
+        for _ in range(120):
+            st = call({"action": "status", "id": crawl["id"]})["connections"][0]["runs"][0]
+            if st["status"] in ("done", "error"): break
+            time.sleep(3)
+        red = ev("async (i) => (await HS.db.from('store_redirects').select('from_path, to_url').eq('connection_id', i)).data", crawl["id"])
+        c.check("Taşıma: eski ürün adresleri için 301 haritası", len(red) >= 3 and all(r["to_url"].startswith("/p/") and r["from_path"].startswith("/hizlisatici-ai/test-site/urun/") for r in red), str(red)[:200])
+        call({"action": "detect", "url": CRAWL, "purpose": "connect"})
+
         # 3) Akış sitesi
         r = call({"action": "detect", "url": FEED})
         c.check("Akış sitesi: CSV ürün akışı bulundu", r.get("method") == "feed" and str(r.get("feed", "")).endswith("urunler.csv"), f"{r.get('method')} {r.get('feed')}")
