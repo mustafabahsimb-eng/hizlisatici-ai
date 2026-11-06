@@ -138,7 +138,7 @@
       <div class="keybox hidden" id="keyBox"><div class="muted" data-t="keyOnce"></div><pre class="code" id="keyVal"></pre><button class="btn2" data-copy="keyVal" data-t="copy"></button></div>
       <div style="margin-top:16px">
         <div class="muted" data-t="whLabel"></div>
-        <div class="row" style="margin-top:6px"><input type="url" id="whUrl" placeholder="https://siten.com/seltigo-webhook.php"><button class="btn2" id="whSave" data-t="save"></button><button class="btn2" id="whTest" data-t="whTest"></button></div>
+        <div class="row" style="margin-top:6px"><input type="url" id="whUrl" placeholder="https://siten.com/seltigo-webhook.php"><button class="btn2" id="whSave" data-t="save"></button><button class="btn2" id="whTest" data-t="whTest"></button><button class="btn2" id="whSecret" data-t="whNewSecret"></button></div>
         <div class="keybox hidden" id="whBox"><div class="muted" data-t="whOnce"></div><pre class="code" id="whVal"></pre><button class="btn2" data-copy="whVal" data-t="copy"></button></div>
         <div class="msg" id="whMsg"></div>
       </div>
@@ -178,7 +178,7 @@ const T = {
     autoSync: 'Otomatik eşitle', every: 'Her {h} saatte bir', syncNow: 'Şimdi eşitle', syncStarted: 'Eşitleme başladı.', lastSync: 'Son eşitleme: {d}', nextSync: 'Sonraki: {d}',
     apiTitle: 'Seltigo bağlantı kodu (iki yönlü)', apiHint: 'Sitenin yazılımcısı bu anahtarla bir kez kurulum yapar: Seltigo\'da eklenen ürün siteye, sitedeki satış Seltigo\'ya ve tüm pazaryerlerine (ortak stok) kendiliğinden yansır.',
     keyCreate: 'API anahtarı oluştur', keyRenew: 'Yeni anahtar oluştur (eskisi geçersiz olur)', keyOnce: 'Bu anahtar yalnız şimdi gösterilir; güvenli bir yere kopyala.', keyInfo: 'Etkin anahtar: {p}… · son kullanım: {u}', never: 'henüz yok',
-    setupPage: 'Yazılımcı için kurulum sayfası', whLabel: 'Webhook adresi (Seltigo\'daki değişiklikler siteye bu adrese gönderilir)', whTest: 'Deneme gönder', whOnce: 'İmza anahtarı (yalnız şimdi gösterilir; sitedeki koda yaz):',
+    setupPage: 'Yazılımcı için kurulum sayfası', whLabel: 'Webhook adresi (Seltigo\'daki değişiklikler siteye bu adrese gönderilir)', whTest: 'Deneme gönder', whNewSecret: 'Yeni imza anahtarı', confirmSecret: 'Yeni imza anahtarı eskisini geçersiz kılar; sitedeki kodu da güncellemen gerekir. Devam edilsin mi?', whOnce: 'İmza anahtarı (yalnız şimdi gösterilir; sitedeki koda yaz):',
     whOk: '✅ Site deneme olayını aldı (HTTP {s}).', whFail: 'Site cevap vermedi: {e}', confirmRenew: 'Yeni anahtar eskisini geçersiz kılar. Devam edilsin mi?', remove: 'Bu site bağlantısını kaldır', confirmRemove: 'Bağlantı kaldırılsın mı? (Ürünler silinmez, eşitleme durur.)',
     err: 'Hata: ', mApiShort: 'Resmi API', mFeedShort: 'Ürün akışı', mCrawlShort: 'Site taraması', newSite: '+ Yeni site',
   },
@@ -207,7 +207,7 @@ const T = {
     autoSync: 'Sync automatically', every: 'Every {h} hours', syncNow: 'Sync now', syncStarted: 'Sync started.', lastSync: 'Last sync: {d}', nextSync: 'Next: {d}',
     apiTitle: 'Seltigo connection code (two-way)', apiHint: 'Your developer sets this up once with the key: products added in Seltigo appear on your site, sales on your site reach Seltigo and every marketplace (shared stock).',
     keyCreate: 'Create API key', keyRenew: 'Create new key (old one stops working)', keyOnce: 'This key is shown only now; copy it somewhere safe.', keyInfo: 'Active key: {p}… · last used: {u}', never: 'not yet',
-    setupPage: 'Setup page for your developer', whLabel: 'Webhook URL (changes in Seltigo are sent to your site here)', whTest: 'Send test', whOnce: 'Signing secret (shown only now; put it in your site code):',
+    setupPage: 'Setup page for your developer', whLabel: 'Webhook URL (changes in Seltigo are sent to your site here)', whTest: 'Send test', whNewSecret: 'New signing secret', confirmSecret: 'A new signing secret invalidates the old one; you must update your site code too. Continue?', whOnce: 'Signing secret (shown only now; put it in your site code):',
     whOk: '✅ Your site received the test event (HTTP {s}).', whFail: 'Your site did not respond: {e}', confirmRenew: 'A new key invalidates the old one. Continue?', remove: 'Remove this site connection', confirmRemove: 'Remove the connection? (Products stay, sync stops.)',
     err: 'Error: ', mApiShort: 'Official API', mFeedShort: 'Product feed', mCrawlShort: 'Site crawl', newSite: '+ New site',
   },
@@ -387,6 +387,12 @@ async function init() {
     msg('whMsg', t('saved'), 'ok');
     if (d.webhook_secret) { $('whBox').classList.remove('hidden'); $('whVal').textContent = d.webhook_secret; }
     refresh(cur.id);
+  };
+  $('whSecret').onclick = async () => {
+    if (!confirm(t('confirmSecret'))) return;
+    const d = await call({ action: 'webhook_secret', id: cur.id });
+    if (!d.ok) { msg('whMsg', d.error, 'err'); return; }
+    $('whBox').classList.remove('hidden'); $('whVal').textContent = d.webhook_secret;
   };
   $('whTest').onclick = async () => { const d = await call({ action: 'webhook_test', id: cur.id }); msg('whMsg', d.ok ? t('whOk', { s: d.status }) : t('whFail', { e: d.error || ('HTTP ' + d.status) }), d.ok ? 'ok' : 'err'); };
   $('delBtn').onclick = async () => { if (!confirm(t('confirmRemove'))) return; await call({ action: 'delete', id: cur.id }); cur = null; await refresh(); };

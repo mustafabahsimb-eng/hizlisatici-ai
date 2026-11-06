@@ -97,7 +97,7 @@ async function detect(userId: string, b: any) {
   if (lim === false) return { ok: false, error: "Çok sık denedin; biraz sonra tekrar dene." };
   try { await assertPublicHost(new URL(ref.url).hostname); } catch (e) { return { ok: false, error: (e as Error).message }; }
   let home;
-  try { home = await safeFetch(ref.origin + ref.scopePath, { maxBytes: 2_000_000, noPace: true }); }
+  try { home = await safeFetch(ref.url, { maxBytes: 2_000_000, noPace: true }); }
   catch (e) { return { ok: false, error: "Site açılamadı: " + (e as Error).message }; }
   if (home.status >= 400) return { ok: false, error: `Site açılamadı (HTTP ${home.status}).` };
   const { platform, evidence } = detectPlatform(home.text, home.headers);
@@ -345,8 +345,9 @@ async function saveItems(c: any, run: any, items: any[], extra: { failed?: numbe
   items = items.filter((i) => i?.name && (i.url || i.sku || i.source_item_id));
   for (const i of items) if (!i.url) i.url = `${c.origin}/#${encodeURIComponent(i.sku || i.source_item_id)}`;
   const urls = items.map((i) => String(i.url));
-  const { data: maps } = urls.length ? await db.from("site_product_map").select("id, url, hash, product_id").eq("connection_id", c.id).in("url", urls) : { data: [] };
-  const mapBy = new Map((maps || []).map((m: any) => [m.url, m]));
+  const { data: maps } = urls.length ? await db.from("site_product_map").select("id, url, hash, product_id, p:products(deleted_at)").eq("connection_id", c.id).in("url", urls) : { data: [] };
+  // Silinmiş ürünün eşlemesi yok sayılır (ürün yeniden açılır)
+  const mapBy = new Map((maps || []).filter((m: any) => !m.p?.deleted_at).map((m: any) => [m.url, m]));
   const hashes = await Promise.all(items.map(itemHash));
   const todo: any[] = [], todoHash: string[] = [];
   let unchanged = 0;
