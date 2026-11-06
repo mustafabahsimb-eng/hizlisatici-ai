@@ -1,0 +1,12 @@
+# Seltigo mağaza sunucusu (Cloudflare Worker). Yayın: npx wrangler deploy (Cloudflare hesabıyla giriş gerekir)
+name = "seltigo-store-edge"
+main = "store-worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+SUPABASE_URL = "https://ytucdrrgxsjhrqmaxckt.supabase.co"
+SUPABASE_KEY = "sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD"
+PAGES_ORIGIN = "https://mustafabahsimb-eng.github.io/hizlisatici-ai"
+
+# Cloudflare for SaaS: satıcı alan adları bu Worker'a gelir (Workers Routes -> */* "fallback origin" alan adı)
+# routes = [{ pattern = "*/*", zone_name = "SELTIGO_ALAN_ADI" }]

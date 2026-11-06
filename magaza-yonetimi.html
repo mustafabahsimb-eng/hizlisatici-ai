@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mağaza Ayarları - Seltigo</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid #1d2230; background: #10131c; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 9px; background: #1D9E75; color: #04150f; display: flex; align-items: center; justify-content: center; }
+  .header-right { display: flex; align-items: center; gap: 14px; font-size: 13px; } .header-right a { color: #9aa3b2; text-decoration: none; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 18px 80px; }
+  h1 { font-size: 24px; margin: 0 0 4px; } .sub { color: #9aa3b2; font-size: 14px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tab { background: #141821; border: 1px solid #2a3040; color: #9aa3b2; border-radius: 9px; padding: 8px 13px; font: inherit; font-size: 14px; cursor: pointer; }
+  .tab.on { color: #e6e8ee; border-color: #1D9E75; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 16px; margin: 0 0 6px; } .hint { color: #9aa3b2; font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
+  label.f { display: block; font-size: 12.5px; color: #9aa3b2; margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 9px; padding: 9px 11px; color: #e6e8ee; font: inherit; font-size: 14px; }
+  input[type=color] { padding: 2px; height: 38px; } input[type=checkbox] { width: auto; accent-color: #1D9E75; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .row > * { flex: 1; min-width: 140px; }
+  .btn { background: #1D9E75; color: #04150f; border: 0; border-radius: 9px; padding: 10px 16px; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; flex: 0 0 auto; }
+  .btn2 { background: transparent; color: #e6e8ee; border: 1px solid #2a3040; border-radius: 9px; padding: 9px 13px; font: inherit; font-size: 13px; cursor: pointer; flex: 0 0 auto; text-decoration: none; }
+  .btn:disabled { opacity: .5; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .preset { border: 2px solid transparent; border-radius: 12px; padding: 10px; cursor: pointer; font-size: 13px; }
+  .preset.on { border-color: #1D9E75; } .preset .sw { display: flex; gap: 4px; margin-top: 6px; } .preset .sw i { width: 18px; height: 18px; border-radius: 5px; display: inline-block; border: 1px solid rgba(0,0,0,.2); }
+  .preview { border-radius: 12px; padding: 16px; margin-top: 12px; border: 1px solid #2a3040; }
+  .preview .pc { display: inline-block; width: 150px; margin: 6px 8px 0 0; padding: 10px; vertical-align: top; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; } th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #232838; } th { color: #9aa3b2; font-weight: 600; }
+  .msg { font-size: 13px; margin-top: 8px; } .msg.ok { color: #7fd8b5; } .msg.err { color: #f08a84; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; background: #1b2a24; color: #7fd8b5; border: 1px solid #24503f; }
+  .pill.warn { background: #2a2414; color: #e6c96a; border-color: #5a4a1a; } .pill.err { background: #2a1616; color: #f08a84; border-color: #5a2a2a; }
+  code { background: #0a0c12; border: 1px solid #232838; border-radius: 6px; padding: 2px 6px; font-size: 12.5px; color: #cfe8dc; word-break: break-all; }
+  .hidden { display: none !important; }
+  .chkrow { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div>Seltigo</div></div>
+  <div class="header-right"><a href="dashboard.html" data-t="back"></a><a id="viewStore" target="_blank" rel="noopener" data-t="viewStore"></a><span id="langSwitcherHost"></span></div>
+</header>
+<main>
+  <h1 data-t="title"></h1>
+  <div class="sub" data-t="sub"></div>
+  <div id="noStore" class="card hidden"><p data-t="noStore"></p><a class="btn" href="store-builder.html" data-t="buildStore" style="text-decoration:none;display:inline-block"></a></div>
+  <div id="app" class="hidden">
+    <div class="tabs" id="tabs"></div>
+
+    <!-- Tasarım -->
+    <section data-p="design">
+      <div class="card"><h2 data-t="presetsTitle"></h2><p class="hint" data-t="presetsHint"></p><div class="presets" id="presets"></div></div>
+      <div class="card"><h2 data-t="aiTitle"></h2><p class="hint" data-t="aiHint"></p>
+        <div class="row"><input id="aiPrompt" data-tp="aiPh"><button class="btn" id="aiBtn" data-t="aiBtn"></button></div><div class="msg" id="aiMsg"></div></div>
+      <div class="card"><h2 data-t="customTitle"></h2>
+        <div class="row" id="colorRow"></div>
+        <div class="row"><div><label class="f" data-t="font"></label><select id="thFont"></select></div><div><label class="f" data-t="layout"></label><select id="thLayout"></select></div><div><label class="f" data-t="radius"></label><input type="number" id="thRadius" min="0" max="24"></div></div>
+        <label class="f" data-t="heroTitle"></label><input id="thHeroTitle" maxlength="80">
+        <label class="f" data-t="heroSub"></label><input id="thHeroSub" maxlength="160">
+        <label class="f" data-t="announce"></label><input id="thAnn" maxlength="120">
+        <div class="preview" id="preview"></div>
+        <div class="row" style="margin-top:12px"><button class="btn" id="saveTheme" data-t="save"></button></div><div class="msg" id="themeMsg"></div></div>
+    </section>
+
+    <!-- Kargo + ödeme -->
+    <section data-p="checkout" class="hidden">
+      <div class="card"><h2 data-t="shipTitle"></h2><p class="hint" data-t="shipHint"></p>
+        <table><thead><tr><th data-t="shipName"></th><th data-t="shipPrice"></th><th data-t="shipFree"></th><th data-t="shipDays"></th><th></th></tr></thead><tbody id="shipRows"></tbody></table>
+        <div class="row" style="margin-top:10px"><button class="btn2" id="shipAdd" data-t="shipAdd"></button><button class="btn" id="shipSave" data-t="save"></button></div><div class="msg" id="shipMsg"></div></div>
+      <div class="card"><h2 data-t="payTitle"></h2><p class="hint" data-t="payHint"></p>
+        <div class="chkrow"><input type="checkbox" id="mCod"> <span data-t="mCod"></span></div>
+        <div class="row"><div><label class="f" data-t="codFee"></label><input type="number" id="codFee" min="0" step="0.01"></div></div>
+        <div class="chkrow"><input type="checkbox" id="mBank"> <span data-t="mBank"></span></div>
+        <div class="row"><div><label class="f">IBAN</label><input id="iban" placeholder="TR00 0000 0000 0000 0000 0000 00"></div><div><label class="f" data-t="accName"></label><input id="accName"></div></div>
+        <div class="chkrow"><input type="checkbox" id="mIyzico"> <span>iyzico</span> <span class="pill warn" id="iyzicoPill"></span></div>
+        <div class="chkrow"><input type="checkbox" id="mPaytr"> <span>PayTR</span> <span class="pill warn" id="paytrPill"></span></div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="paySave" data-t="save"></button></div><div class="msg" id="payMsg"></div></div>
+      <div class="card"><h2 data-t="keysTitle"></h2><p class="hint" data-t="keysHint"></p>
+        <div class="row"><select id="provSel" style="max-width:200px"><option value="iyzico">iyzico</option><option value="paytr">PayTR</option></select><select id="provEnv" style="max-width:220px"></select></div>
+        <div id="keysIyzico"><div class="row"><div><label class="f">API Key</label><input id="kApi" autocomplete="off"></div><div><label class="f">Secret Key</label><input id="kSecret" type="password" autocomplete="off"></div></div></div>
+        <div id="keysPaytr" class="hidden"><div class="row"><div><label class="f">Merchant ID</label><input id="kMid" autocomplete="off"></div><div><label class="f">Merchant Key</label><input id="kMkey" type="password" autocomplete="off"></div><div><label class="f">Merchant Salt</label><input id="kMsalt" type="password" autocomplete="off"></div></div>
+          <p class="hint" style="margin-top:8px"><span data-t="paytrNotify"></span> <code id="notifyUrl"></code></p></div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="keysSave" data-t="keysSave"></button></div><div class="msg" id="keysMsg"></div></div>
+    </section>
+
+    <!-- Kuponlar -->
+    <section data-p="coupons" class="hidden">
+      <div class="card"><h2 data-t="cpTitle"></h2><p class="hint" data-t="cpHint"></p>
+        <div class="row"><div><label class="f" data-t="cpCode"></label><input id="cpCode" maxlength="30" style="text-transform:uppercase"></div><div><label class="f" data-t="cpKind"></label><select id="cpKind"></select></div><div><label class="f" data-t="cpValue"></label><input id="cpValue" type="number" min="0"></div></div>
+        <div class="row"><div><label class="f" data-t="cpMin"></label><input id="cpMin" type="number" min="0"></div><div><label class="f" data-t="cpMax"></label><input id="cpMax" type="number" min="1"></div><div><label class="f" data-t="cpEnd"></label><input id="cpEnd" type="date"></div></div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="cpAdd" data-t="cpAdd"></button></div><div class="msg" id="cpMsg"></div>
+        <table style="margin-top:14px"><thead><tr><th data-t="cpCode"></th><th data-t="cpKind"></th><th data-t="cpValue"></th><th data-t="cpUsed"></th><th data-t="cpEnd"></th><th></th></tr></thead><tbody id="cpRows"></tbody></table></div>
+    </section>
+
+    <!-- Alan adı -->
+    <section data-p="domain" class="hidden">
+      <div class="card"><h2 data-t="domTitle"></h2><p class="hint" data-t="domHint"></p>
+        <div class="row"><input id="domIn" placeholder="www.markam.com"><button class="btn" id="domAdd" data-t="domAdd"></button></div><div class="msg" id="domMsg"></div>
+        <div id="domEdge" class="msg"></div></div>
+      <div id="domList"></div>
+    </section>
+
+    <!-- SEO -->
+    <section data-p="seo" class="hidden">
+      <div class="card"><h2 data-t="seoTitle"></h2><p class="hint" data-t="seoHint"></p>
+        <label class="f" data-t="seoT"></label><input id="seoT" maxlength="70">
+        <label class="f" data-t="seoD"></label><textarea id="seoD" maxlength="160" rows="3"></textarea>
+        <label class="f" data-t="seoK"></label><input id="seoK" maxlength="200">
+        <label class="f" data-t="seoImg"></label><input id="seoImg" placeholder="https://...">
+        <div class="row" style="margin-top:12px"><button class="btn" id="seoSave" data-t="save"></button></div><div class="msg" id="seoMsg"></div>
+        <p class="hint" style="margin-top:14px"><span data-t="sitemap"></span> <a id="sitemapLink" target="_blank" style="color:#7fd8b5"></a></p></div>
+    </section>
+
+    <!-- Taşıma -->
+    <section data-p="migrate" class="hidden">
+      <div class="card"><h2 data-t="migTitle"></h2><p class="hint" data-t="migHint"></p>
+        <a class="btn" href="site-baglanti.html?mode=migrate" data-t="migBtn" style="text-decoration:none;display:inline-block"></a>
+        <p class="hint" style="margin-top:14px" id="redirInfo"></p>
+        <table><thead><tr><th data-t="redFrom"></th><th data-t="redTo"></th><th data-t="redHits"></th></tr></thead><tbody id="redRows"></tbody></table></div>
+    </section>
+  </div>
+</main>
+<script>
+const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+const T = {
+  tr: {
+    back: '← Panele dön', viewStore: 'Mağazamı aç ↗', title: '🛍️ Mağaza Ayarları', sub: 'Mağazanın tasarımı, kargo ve ödeme seçenekleri, kuponlar, kendi alan adın, arama motoru ayarları ve başka altyapıdan taşıma.',
+    noStore: 'Henüz mağazan yok.', buildStore: 'Mağazanı kur',
+    t_design: '🎨 Tasarım', t_checkout: '🚚 Kargo ve ödeme', t_coupons: '🏷️ Kuponlar', t_domain: '🌐 Alan adı', t_seo: '🔎 SEO', t_migrate: '📦 Taşıma',
+    presetsTitle: 'Hazır temalar', presetsHint: 'Birini seç, aşağıda önizle ve kaydet.', p_gece: 'Gece', p_beyaz: 'Minimal beyaz', p_butik: 'Butik', p_pastel: 'Pastel', p_canli: 'Canlı', p_dogal: 'Doğal',
+    aiTitle: '✨ Yapay zekâ ile tasarla', aiHint: 'Mağazanı anlat; ürünlerine ve isteğine göre renk, yazı tipi, yerleşim ve karşılama yazısı hazırlanır (kaydetmeden önce önizlersin).', aiPh: 'ör. el yapımı seramikler, sıcak ve doğal bir görünüm', aiBtn: 'Tasarla', aiWorking: 'Tasarlanıyor...', aiDone: 'Hazır; önizlemeye bak, beğenirsen kaydet.',
+    customTitle: 'Ayrıntılar', font: 'Yazı tipi', layout: 'Ürün yerleşimi', radius: 'Köşe yuvarlaklığı (px)', heroTitle: 'Karşılama başlığı', heroSub: 'Karşılama alt yazısı', announce: 'Üst duyuru bandı (ör. 500 TL üzeri kargo bedava)',
+    f_system: 'Sade', f_serif: 'Klasik (tırnaklı)', f_rounded: 'Yuvarlak', f_mono: 'Daktilo', l_grid: 'Izgara', l_large: 'Büyük kartlar', l_list: 'Liste',
+    c_bg: 'Zemin', c_panel: 'Kart', c_panel2: 'Kart 2', c_border: 'Çizgi', c_text: 'Yazı', c_dim: 'Soluk yazı', c_accent: 'Vurgu',
+    save: 'Kaydet', saved: 'Kaydedildi.', previewBuy: 'Sepete ekle', previewProd: 'Örnek ürün',
+    shipTitle: 'Kargo seçenekleri', shipHint: 'Müşteri sepette seçer. "Ücretsiz eşiği" girersen bu tutarın üstündeki siparişlerde kargo bedava olur.', shipName: 'Ad', shipPrice: 'Ücret (TL)', shipFree: 'Ücretsiz eşiği (TL)', shipDays: 'Teslim süresi', shipAdd: '+ Seçenek ekle',
+    payTitle: 'Ödeme yöntemleri', payHint: 'Kartla ödeme için aşağıda ödeme hesabını bağla (şimdilik deneme / sandbox ortamı; canlıya şirket kurulunca geçilir).',
+    mCod: 'Kapıda ödeme', codFee: 'Kapıda ödeme ücreti (TL, isteğe bağlı)', mBank: 'Havale / EFT', accName: 'Hesap sahibi', notConnected: 'bağlı değil', connected: 'bağlı ({e})',
+    keysTitle: 'Kartla ödeme hesabı (iyzico / PayTR)', keysHint: 'Anahtarlar şifreli kasada saklanır, bir daha gösterilmez. Kaydederken bağlantı denenir.', env_sandbox: 'Deneme (sandbox)', env_live: 'Canlı (şirket kurulunca)',
+    keysSave: 'Bağla ve dene', keysOk: '✅ Bağlandı ve denendi.', paytrNotify: 'PayTR panelinde "Bildirim URL" alanına şunu yaz:',
+    cpTitle: 'İndirim kuponları', cpHint: 'Müşteri sepette kodu girer; indirim sunucuda hesaplanır.', cpCode: 'Kod', cpKind: 'Tür', cpValue: 'Değer', cpMin: 'En az sepet (TL)', cpMax: 'Kullanım sınırı', cpEnd: 'Bitiş', cpUsed: 'Kullanım', cpAdd: 'Kupon ekle',
+    k_percent: 'Yüzde (%)', k_amount: 'Tutar (TL)', k_free_shipping: 'Ücretsiz kargo', del: 'Sil', on: 'Açık', off: 'Kapalı',
+    domTitle: 'Kendi alan adın', domHint: 'Mağazan kendi adresinde açılsın (ör. www.markam.com). SSL sertifikası otomatik. Alan adı sağlayıcın Domain Connect destekliyorsa tek tıkla bağlanır; desteklemiyorsa eklenecek DNS kaydını gösteririz ve bağlantıyı kendimiz algılarız.',
+    domAdd: 'Alan adını bağla', domCheck: 'Şimdi kontrol et', domRemove: 'Kaldır', domRecords: 'DNS sağlayıcında şu kaydı ekle:', domOneClick: 'Tek tıkla bağla ({p})',
+    ds_pending_dns: 'DNS kaydı bekleniyor', ds_verifying: 'SSL hazırlanıyor', ds_active: 'Yayında', ds_error: 'Hata', domEdgeOff: 'ℹ️ Seltigo mağaza sunucusu henüz açılmadı: alan adını şimdi ekleyebilirsin, sunucu açılınca otomatik bağlanır.',
+    seoTitle: 'Arama motoru (SEO)', seoHint: 'Google\'da görünen başlık ve açıklama. Boş bırakırsan mağaza adın kullanılır. Ürün sayfalarına schema.org ürün bilgisi ve site haritası otomatik eklenir.',
+    seoT: 'Başlık (en fazla 70 karakter)', seoD: 'Açıklama (en fazla 160 karakter)', seoK: 'Anahtar kelimeler (virgülle)', seoImg: 'Paylaşım görseli (OpenGraph) adresi', sitemap: 'Site haritası:',
+    migTitle: 'Başka altyapıdan taşı', migHint: 'Shopify, ikas, Ticimax, IdeaSoft, T-Soft, WooCommerce, Wix ya da kendi yapımı sitenden ürünler, görseller, seçenekler ve kategoriler taşınır. Eski ürün adreslerin yeni mağazana 301 ile yönlenir.',
+    migBtn: '🚚 Taşımayı başlat', redInfo: '{n} eski adres yeni mağazana 301 ile yönleniyor (kendi alan adın bağlıyken çalışır).', redFrom: 'Eski adres', redTo: 'Yeni adres', redHits: 'Ziyaret',
+    err: 'Hata: ',
+  },
+  en: {
+    back: '← Back to panel', viewStore: 'Open my store ↗', title: '🛍️ Store Settings', sub: 'Your store design, shipping and payment options, coupons, own domain, search engine settings and moving from another platform.',
+    noStore: 'You don\'t have a store yet.', buildStore: 'Build your store',
+    t_design: '🎨 Design', t_checkout: '🚚 Shipping & payment', t_coupons: '🏷️ Coupons', t_domain: '🌐 Domain', t_seo: '🔎 SEO', t_migrate: '📦 Move',
+    presetsTitle: 'Ready themes', presetsHint: 'Pick one, preview below and save.', p_gece: 'Night', p_beyaz: 'Minimal white', p_butik: 'Boutique', p_pastel: 'Pastel', p_canli: 'Vivid', p_dogal: 'Natural',
+    aiTitle: '✨ Design with AI', aiHint: 'Describe your store; colours, font, layout and a welcome line are prepared from your products and request (preview before saving).', aiPh: 'e.g. handmade ceramics, warm natural look', aiBtn: 'Design', aiWorking: 'Designing...', aiDone: 'Ready; check the preview and save if you like it.',
+    customTitle: 'Details', font: 'Font', layout: 'Product layout', radius: 'Corner radius (px)', heroTitle: 'Welcome title', heroSub: 'Welcome subtitle', announce: 'Top announcement bar (e.g. free shipping over 500 TL)',
+    f_system: 'Plain', f_serif: 'Classic (serif)', f_rounded: 'Rounded', f_mono: 'Typewriter', l_grid: 'Grid', l_large: 'Large cards', l_list: 'List',
+    c_bg: 'Background', c_panel: 'Card', c_panel2: 'Card 2', c_border: 'Border', c_text: 'Text', c_dim: 'Muted text', c_accent: 'Accent',
+    save: 'Save', saved: 'Saved.', previewBuy: 'Add to cart', previewProd: 'Sample product',
+    shipTitle: 'Shipping options', shipHint: 'Customers choose in the cart. With a "free over" amount, orders above it ship free.', shipName: 'Name', shipPrice: 'Price (TL)', shipFree: 'Free over (TL)', shipDays: 'Delivery time', shipAdd: '+ Add option',
+    payTitle: 'Payment methods', payHint: 'Connect a payment account below for card payments (sandbox for now; live after the company is set up).',
+    mCod: 'Cash on delivery', codFee: 'Cash on delivery fee (TL, optional)', mBank: 'Bank transfer', accName: 'Account holder', notConnected: 'not connected', connected: 'connected ({e})',
+    keysTitle: 'Card payment account (iyzico / PayTR)', keysHint: 'Keys are stored encrypted and never shown again. The connection is tested when you save.', env_sandbox: 'Test (sandbox)', env_live: 'Live (after company setup)',
+    keysSave: 'Connect and test', keysOk: '✅ Connected and tested.', paytrNotify: 'In the PayTR panel, set "Notification URL" to:',
+    cpTitle: 'Discount coupons', cpHint: 'Customers enter the code in the cart; the discount is calculated on the server.', cpCode: 'Code', cpKind: 'Type', cpValue: 'Value', cpMin: 'Min. cart (TL)', cpMax: 'Usage limit', cpEnd: 'Ends', cpUsed: 'Used', cpAdd: 'Add coupon',
+    k_percent: 'Percent (%)', k_amount: 'Amount (TL)', k_free_shipping: 'Free shipping', del: 'Delete', on: 'On', off: 'Off',
+    domTitle: 'Your own domain', domHint: 'Open your store at your own address (e.g. www.mybrand.com). SSL is automatic. If your DNS provider supports Domain Connect it connects in one click; otherwise we show the DNS record and detect it ourselves.',
+    domAdd: 'Connect domain', domCheck: 'Check now', domRemove: 'Remove', domRecords: 'Add this record at your DNS provider:', domOneClick: 'Connect in one click ({p})',
+    ds_pending_dns: 'Waiting for DNS', ds_verifying: 'Preparing SSL', ds_active: 'Live', ds_error: 'Error', domEdgeOff: 'ℹ️ The Seltigo store server is not live yet: you can add your domain now; it connects automatically when the server opens.',
+    seoTitle: 'Search engines (SEO)', seoHint: 'Title and description shown on Google. If empty, your store name is used. schema.org product data and a sitemap are added automatically.',
+    seoT: 'Title (max 70 chars)', seoD: 'Description (max 160 chars)', seoK: 'Keywords (comma separated)', seoImg: 'Share image (OpenGraph) URL', sitemap: 'Sitemap:',
+    migTitle: 'Move from another platform', migHint: 'Products, images, options and categories are moved from Shopify, ikas, Ticimax, IdeaSoft, T-Soft, WooCommerce, Wix or a custom site. Old product URLs 301-redirect to your new store.',
+    migBtn: '🚚 Start moving', redInfo: '{n} old URLs 301-redirect to your new store (works while your own domain is connected).', redFrom: 'Old URL', redTo: 'New URL', redHits: 'Visits',
+    err: 'Error: ',
+  },
+};
+const lang = () => { const l = (window.HS && HS.lang) || 'tr'; return T[l] ? l : 'tr'; };
+const t = (k, v) => { let s = T[lang()][k] ?? T.tr[k] ?? k; Object.keys(v || {}).forEach((x) => { s = s.split('{' + x + '}').join(v[x]); }); return s; };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const msg = (id, text, ok) => { const el = $(id); el.textContent = text || ''; el.className = 'msg ' + (ok === true ? 'ok' : ok === false ? 'err' : ''); };
+const TABS = ['design', 'checkout', 'coupons', 'domain', 'seo', 'migrate'];
+const COLORS = ['bg', 'panel', 'panel2', 'border', 'text', 'dim', 'accent'];
+const PRESET_COLORS = { gece: ['#0b1220', '#111a2e', '#1D9E75', '#e7ecf5'], beyaz: ['#ffffff', '#f6f7f9', '#111827', '#14171c'], butik: ['#faf7f2', '#ffffff', '#8a5a3b', '#2b2118'], pastel: ['#fdf6f9', '#ffffff', '#c2477d', '#3a2a33'], canli: ['#0f0f1a', '#181830', '#ffcc00', '#f3f3ff'], dogal: ['#f4f6ef', '#ffffff', '#3f6b2a', '#1f2a17'] };
+let db, S = null, theme = null, ship = [], tab = 'design';
+
+async function call(body) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { location.href = 'index.html'; return {}; }
+  const r = await fetch(SUPABASE_URL + '/functions/v1/store-admin', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + SUPABASE_KEY, apikey: SUPABASE_KEY }, body: JSON.stringify({ ...body, userAccessToken: session.access_token }) });
+  return await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+}
+function applyStatic() {
+  document.documentElement.lang = lang();
+  document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  document.querySelectorAll('[data-tp]').forEach((el) => { el.placeholder = t(el.dataset.tp); });
+  document.title = t('title').replace(/^\S+\s/, '') + ' - Seltigo';
+  $('tabs').innerHTML = TABS.map((x) => `<button class="tab${x === tab ? ' on' : ''}" data-tab="${x}">${esc(t('t_' + x))}</button>`).join('');
+  $('tabs').querySelectorAll('.tab').forEach((b) => b.onclick = () => { tab = b.dataset.tab; history.replaceState({}, '', '?tab=' + tab); applyStatic(); });
+  document.querySelectorAll('section[data-p]').forEach((s) => s.classList.toggle('hidden', s.dataset.p !== tab));
+  $('thFont').innerHTML = ['system', 'serif', 'rounded', 'mono'].map((f) => `<option value="${f}">${esc(t('f_' + f))}</option>`).join('');
+  $('thLayout').innerHTML = ['grid', 'large', 'list'].map((f) => `<option value="${f}">${esc(t('l_' + f))}</option>`).join('');
+  $('cpKind').innerHTML = ['percent', 'amount', 'free_shipping'].map((f) => `<option value="${f}">${esc(t('k_' + f))}</option>`).join('');
+  $('provEnv').innerHTML = `<option value="sandbox">${esc(t('env_sandbox'))}</option><option value="live">${esc(t('env_live'))}</option>`;
+  if (S) render();
+}
+function render() {
+  const st = S.store;
+  $('viewStore').href = 'magaza.html?slug=' + encodeURIComponent(st.slug);
+  // Tasarım
+  $('presets').innerHTML = S.presets.map((p) => { const c = PRESET_COLORS[p] || []; return `<div class="preset${theme.preset === p ? ' on' : ''}" data-p="${p}" style="background:${c[0]};color:${c[3]}"><b>${esc(t('p_' + p))}</b><div class="sw">${c.map((x) => `<i style="background:${x}"></i>`).join('')}</div></div>`; }).join('');
+  $('presets').querySelectorAll('.preset').forEach((d) => d.onclick = async () => { const r = await call({ action: 'design', preset: d.dataset.p }); if (r.ok) { theme = { ...r.theme, hero: theme.hero, announcement: theme.announcement }; renderTheme(); render(); } });
+  renderTheme();
+  // Kargo
+  renderShip();
+  const co = st.checkout || {}, m = co.methods || ['cod'];
+  $('mCod').checked = m.includes('cod'); $('mBank').checked = m.includes('bank_transfer'); $('mIyzico').checked = m.includes('iyzico'); $('mPaytr').checked = m.includes('paytr');
+  $('codFee').value = co.cod_fee || ''; $('iban').value = co.iban || ''; $('accName').value = co.account_name || '';
+  for (const p of ['iyzico', 'paytr']) {
+    const pr = S.providers.find((x) => x.provider === p);
+    $(p + 'Pill').textContent = pr && pr.enabled ? t('connected', { e: t('env_' + pr.environment) }) : t('notConnected');
+    $(p + 'Pill').className = 'pill' + (pr && pr.enabled ? '' : ' warn');
+  }
+  $('notifyUrl').textContent = S.payment_notify_url;
+  // Kuponlar
+  $('cpRows').innerHTML = S.coupons.map((c) => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(t('k_' + c.kind))}</td><td>${c.kind === 'free_shipping' ? '–' : esc(c.value) + (c.kind === 'percent' ? '%' : ' TL')}</td><td>${c.used_count}${c.max_uses ? ' / ' + c.max_uses : ''}</td><td>${c.ends_at ? esc(new Date(c.ends_at).toLocaleDateString()) : '–'}</td>
+    <td><button class="btn2" data-tg="${c.id}">${esc(c.active ? t('on') : t('off'))}</button> <button class="btn2" data-del="${c.id}">${esc(t('del'))}</button></td></tr>`).join('');
+  $('cpRows').querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { await db.from('store_coupons').delete().eq('id', b.dataset.del); load(); });
+  $('cpRows').querySelectorAll('[data-tg]').forEach((b) => b.onclick = async () => { const c = S.coupons.find((x) => x.id === b.dataset.tg); await db.from('store_coupons').update({ active: !c.active }).eq('id', c.id); load(); });
+  // Alan adı
+  $('domEdge').textContent = S.edge.configured ? '' : t('domEdgeOff');
+  $('domList').innerHTML = S.domains.map((d) => `<div class="card"><div class="row"><h2 style="flex:1;margin:0">${esc(d.hostname)}</h2><span class="pill ${d.status === 'active' ? '' : d.status === 'error' ? 'err' : 'warn'}" style="flex:0 0 auto">${esc(t('ds_' + d.status))}</span></div>
+    ${d.status !== 'active' ? `<p class="hint" style="margin-top:8px">${esc(t('domRecords'))}</p><table><tr><th>Tür</th><th>Ad</th><th>Değer</th></tr>${(d.records || []).map((r) => `<tr><td>${esc(r.type)}</td><td><code>${esc(r.name)}</code></td><td><code>${esc(r.value)}</code></td></tr>`).join('')}</table>` : `<p class="hint"><a href="https://${esc(d.hostname)}" target="_blank" style="color:#7fd8b5">https://${esc(d.hostname)}</a></p>`}
+    ${d.error ? `<p class="msg">${esc(d.error)}</p>` : ''}${d.provider ? `<p class="hint">DNS: ${esc(d.provider)}</p>` : ''}
+    <div class="row" style="margin-top:8px">${d.connect_url ? `<a class="btn" href="${esc(d.connect_url)}" target="_blank">${esc(t('domOneClick', { p: d.domain_connect && d.domain_connect.provider_name || '' }))}</a>` : ''}<button class="btn2" data-dc="${d.id}">${esc(t('domCheck'))}</button><button class="btn2" data-dr="${d.id}">${esc(t('domRemove'))}</button></div></div>`).join('');
+  $('domList').querySelectorAll('[data-dc]').forEach((b) => b.onclick = async () => { b.disabled = true; await call({ action: 'domain_check', id: b.dataset.dc }); load(); });
+  $('domList').querySelectorAll('[data-dr]').forEach((b) => b.onclick = async () => { await call({ action: 'domain_remove', id: b.dataset.dr }); load(); });
+  // SEO
+  const seo = st.seo || {};
+  $('seoT').value = seo.title || ''; $('seoD').value = seo.description || ''; $('seoK').value = seo.keywords || ''; $('seoImg').value = seo.og_image || '';
+  const sm = SUPABASE_URL + '/functions/v1/store-checkout?action=sitemap&slug=' + encodeURIComponent(st.slug);
+  $('sitemapLink').href = st.custom_domain ? 'https://' + st.custom_domain + '/sitemap.xml' : sm; $('sitemapLink').textContent = $('sitemapLink').href;
+  $('redirInfo').textContent = t('redInfo', { n: S.redirects });
+}
+function renderTheme() {
+  const c = theme.colors;
+  $('colorRow').innerHTML = COLORS.map((k) => `<div><label class="f">${esc(t('c_' + k))}</label><input type="color" data-c="${k}" value="${esc(c[k])}"></div>`).join('');
+  $('colorRow').querySelectorAll('[data-c]').forEach((i) => i.oninput = () => { theme.colors[i.dataset.c] = i.value; preview(); });
+  $('thFont').value = theme.font; $('thLayout').value = theme.layout; $('thRadius').value = theme.radius;
+  $('thHeroTitle').value = theme.hero?.title || ''; $('thHeroSub').value = theme.hero?.subtitle || ''; $('thAnn').value = theme.announcement || '';
+  preview();
+}
+function readTheme() {
+  return { ...theme, font: $('thFont').value, layout: $('thLayout').value, radius: Number($('thRadius').value) || 0, hero: { title: $('thHeroTitle').value, subtitle: $('thHeroSub').value }, announcement: $('thAnn').value };
+}
+function preview() {
+  const th = readTheme(), c = th.colors, ff = { system: "'Segoe UI',Arial,sans-serif", serif: 'Georgia,serif', rounded: "'Nunito','Segoe UI',Arial,sans-serif", mono: 'ui-monospace,Consolas,monospace' }[th.font];
+  const btnText = c.accentText || '#fff';
+  $('preview').style.cssText = `background:${c.bg};color:${c.text};font-family:${ff};border-radius:${th.radius}px`;
+  $('preview').innerHTML = (th.announcement ? `<div style="background:${c.accent};color:${btnText};padding:5px;text-align:center;font-size:12px;margin:-16px -16px 12px;border-radius:${th.radius}px ${th.radius}px 0 0">${esc(th.announcement)}</div>` : '')
+    + `<div style="font-size:20px;font-weight:700">${esc(th.hero.title || S.store.name)}</div><div style="color:${c.dim};font-size:13px">${esc(th.hero.subtitle)}</div>`
+    + [1, 2, 3].map((i) => `<div class="pc" style="background:${c.panel};border:1px solid ${c.border};border-radius:${th.radius}px"><div style="height:80px;background:${c.panel2};border-radius:${Math.max(0, th.radius - 4)}px"></div><div style="font-size:13px;margin:6px 0">${esc(t('previewProd'))} ${i}</div><div style="font-weight:700">₺${199 + i * 50}</div><div style="background:${c.accent};color:${btnText};border-radius:${th.radius}px;padding:6px;text-align:center;font-size:12px;margin-top:6px">${esc(t('previewBuy'))}</div></div>`).join('');
+}
+function renderShip() {
+  $('shipRows').innerHTML = ship.map((s, i) => `<tr><td><input data-s="${i}" data-k="name" value="${esc(s.name)}"></td><td><input type="number" min="0" step="0.01" data-s="${i}" data-k="price" value="${esc(s.price)}"></td><td><input type="number" min="0" data-s="${i}" data-k="free_over" value="${esc(s.free_over ?? '')}"></td><td><input data-s="${i}" data-k="days" value="${esc(s.days || '')}"></td><td><button class="btn2" data-sx="${i}">✕</button></td></tr>`).join('');
+  $('shipRows').querySelectorAll('input').forEach((inp) => inp.oninput = () => { ship[+inp.dataset.s][inp.dataset.k] = inp.value; });
+  $('shipRows').querySelectorAll('[data-sx]').forEach((b) => b.onclick = () => { ship.splice(+b.dataset.sx, 1); renderShip(); });
+}
+async function load() {
+  S = await call({ action: 'settings' });
+  if (!S.ok) { msg('themeMsg', S.error, false); return; }
+  if (!S.store) { $('noStore').classList.remove('hidden'); return; }
+  $('app').classList.remove('hidden');
+  theme = theme || S.store.theme;
+  ship = S.store.shipping_options.map((x) => ({ ...x }));
+  render();
+}
+async function init() {
+  try { await HS.init({ auth: true }); } catch (e) {}
+  db = HS.db;
+  const q = new URLSearchParams(location.search).get('tab');
+  if (TABS.includes(q)) tab = q;
+  applyStatic();
+  ['thFont', 'thLayout', 'thRadius', 'thHeroTitle', 'thHeroSub', 'thAnn'].forEach((id) => $(id).addEventListener('input', preview));
+  $('aiBtn').onclick = async () => { $('aiBtn').disabled = true; msg('aiMsg', t('aiWorking')); const r = await call({ action: 'design', prompt: $('aiPrompt').value }); $('aiBtn').disabled = false; if (!r.ok) { msg('aiMsg', r.error, false); return; } theme = r.theme; renderTheme(); render(); msg('aiMsg', t('aiDone') + (r.note ? ' ' + r.note : ''), true); };
+  $('saveTheme').onclick = async () => { const r = await call({ action: 'save', theme: readTheme() }); msg('themeMsg', r.ok ? t('saved') : r.error, r.ok); if (r.ok) { theme = r.theme; renderTheme(); } };
+  $('shipAdd').onclick = () => { ship.push({ id: 'k' + (ship.length + 1), name: '', price: 0, free_over: null, days: '' }); renderShip(); };
+  $('shipSave').onclick = async () => { const r = await call({ action: 'save', shipping_options: ship }); msg('shipMsg', r.ok ? t('saved') : r.error, r.ok); if (r.ok) load(); };
+  $('paySave').onclick = async () => {
+    const methods = [['mCod', 'cod'], ['mBank', 'bank_transfer'], ['mIyzico', 'iyzico'], ['mPaytr', 'paytr']].filter(([id]) => $(id).checked).map(([, m]) => m);
+    const r = await call({ action: 'save', checkout: { methods, iban: $('iban').value, account_name: $('accName').value, cod_fee: Number($('codFee').value) || 0 } });
+    msg('payMsg', r.ok ? t('saved') : r.error, r.ok); if (r.ok) load();
+  };
+  $('provSel').onchange = () => { const p = $('provSel').value; $('keysIyzico').classList.toggle('hidden', p !== 'iyzico'); $('keysPaytr').classList.toggle('hidden', p !== 'paytr'); };
+  $('keysSave').onclick = async () => {
+    const p = $('provSel').value;
+    const keys = p === 'iyzico' ? { api_key: $('kApi').value, secret_key: $('kSecret').value } : { merchant_id: $('kMid').value, merchant_key: $('kMkey').value, merchant_salt: $('kMsalt').value };
+    $('keysSave').disabled = true; const r = await call({ action: 'payment_set', provider: p, environment: $('provEnv').value, keys }); $('keysSave').disabled = false;
+    msg('keysMsg', r.ok ? t('keysOk') : r.error, r.ok); if (r.ok) { ['kApi', 'kSecret', 'kMid', 'kMkey', 'kMsalt'].forEach((id) => $(id).value = ''); load(); }
+  };
+  $('cpAdd').onclick = async () => {
+    const { data: { session } } = await db.auth.getSession();
+    const code = $('cpCode').value.trim().toUpperCase().replace(/\s+/g, '');
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) { msg('cpMsg', t('cpCode') + ': A-Z 0-9 (3-30)', false); return; }
+    const row = { user_id: session.user.id, code, kind: $('cpKind').value, value: Number($('cpValue').value) || 0, min_total: Number($('cpMin').value) || 0, max_uses: Number($('cpMax').value) || null, ends_at: $('cpEnd').value ? new Date($('cpEnd').value + 'T23:59:59').toISOString() : null };
+    const { error } = await db.from('store_coupons').insert(row);
+    msg('cpMsg', error ? (error.code === '23505' ? 'Bu kod var' : error.message) : t('saved'), !error); if (!error) { $('cpCode').value = ''; load(); }
+  };
+  $('domAdd').onclick = async () => { $('domAdd').disabled = true; const r = await call({ action: 'domain_add', hostname: $('domIn').value }); $('domAdd').disabled = false; msg('domMsg', r.ok ? (r.note || t('saved')) : r.error, r.ok); if (r.ok) { $('domIn').value = ''; load(); } };
+  $('seoSave').onclick = async () => { const r = await call({ action: 'save', seo: { title: $('seoT').value, description: $('seoD').value, keywords: $('seoK').value, og_image: $('seoImg').value } }); msg('seoMsg', r.ok ? t('saved') : r.error, r.ok); };
+  await load();
+  if (S && S.store && tab === 'migrate') {
+    const { data } = await db.from('store_redirects').select('from_path, to_url, hits').order('hits', { ascending: false }).limit(50);
+    $('redRows').innerHTML = (data || []).map((r) => `<tr><td><code>${esc(r.from_path)}</code></td><td><code>${esc(r.to_url)}</code></td><td>${r.hits}</td></tr>`).join('');
+  }
+}
+document.addEventListener('hs:langchange', applyStatic);
+window.addEventListener('hs:langchange', applyStatic);
+init();
+</script>
+</body>
+</html>

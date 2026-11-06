@@ -316,7 +316,8 @@ const T = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const slug = params.get('slug') || params.get('magaza');
+// Kendi alan adında (Cloudflare Worker) mağaza adı sayfaya gömülü gelir: window.SELTIGO_STORE
+const slug = window.SELTIGO_STORE || params.get('slug') || params.get('magaza') || params.get('s');
 const urlLang = (params.get('lang') || '').toLowerCase();
 let LANG = T[urlLang] ? urlLang : 'tr';
 
@@ -483,6 +484,7 @@ async function loadMore(){
     currentProducts = currentProducts.concat(more);
     nextOffset = data.next_offset ?? null;
     appendCards(more);
+    if (window.SeltigoPro) SeltigoPro.onCards();
     updateSentinel();
   } catch (e) { console.error(e); }
   finally { loadingMore = false; }
@@ -523,6 +525,8 @@ async function loadStore(){
     }
     renderStore();
     renderProducts();
+    // Tam mağaza katmanı (tema, SEO, ürün sayfası, sepet, ödeme, müşteri hesabı): magaza-pro.js
+    if (window.SeltigoPro) SeltigoPro.onStore(currentStore);
   } catch (err) {
     console.error(err);
     document.getElementById('storeName').textContent = t('notFound');
@@ -830,5 +834,6 @@ document.getElementById('content').textContent = t('loading');
 loadStore();
 loadPolicy();
 </script>
+<script src="magaza-pro.js"></script>
 </body>
 </html>

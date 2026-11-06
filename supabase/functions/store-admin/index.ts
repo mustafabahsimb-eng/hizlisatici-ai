@@ -77,7 +77,7 @@ async function settings(userId: string) {
   ]);
   return {
     ok: true, store: { slug: st.store_slug, name: st.store_name, theme: sanitizeTheme(st.theme, st.store_name), seo: st.seo || {}, shipping_options: st.shipping_options?.length ? st.shipping_options : DEFAULT_SHIPPING, checkout: st.checkout || { methods: ["cod"] }, custom_domain: st.custom_domain },
-    presets: Object.keys(PRESETS), providers: prov || [], domains: doms || [], coupons: coupons || [], redirects: redirects || 0,
+    presets: Object.keys(PRESETS), providers: prov || [], domains: (doms || []).map((d: any) => ({ ...d, connect_url: connectUrl(d, d.hostname) })), coupons: coupons || [], redirects: redirects || 0,
     payment_notify_url: `${SUPABASE_URL}/functions/v1/store-checkout?provider=paytr`, edge: { configured: !!(env("CF_API_TOKEN") && env("CF_ZONE_ID") && env("STORE_EDGE_HOST")), host: env("STORE_EDGE_HOST") || null },
     features: {
       store_checkout: await featureEnabled(userId, "store_checkout"), store_payments: await featureEnabled(userId, "store_payments"),
