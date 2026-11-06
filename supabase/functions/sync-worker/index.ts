@@ -650,13 +650,14 @@ for (const m of AMAZON_MARKETS) ADAPTERS[m.code] = amazonAdapter;
 async function processJob(job) {
   // PDF + link ile ürün yükleme parçaları: catalog-import kendi isteğinde (kendi süre sınırıyla) işler ve işi kendisi kapatır.
   // Kapatamazsa (çökme) iş 3 dk sonra claim_sync_jobs ile yeniden sıraya döner.
-  if (job.job_type === "catalog_import") {
-    const r = await fetch(SUPABASE_URL + "/functions/v1/catalog-import", {
+  if (job.job_type === "catalog_import" || job.job_type === "site_connect") {
+    const fnName = job.job_type === "site_connect" ? "site-connect" : "catalog-import"; // site bağlama / taşıma parçaları da aynı yolla
+    const r = await fetch(SUPABASE_URL + "/functions/v1/" + fnName, {
       method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (Deno.env.get("SUPABASE_ANON_KEY") ?? "") },
       body: JSON.stringify({ cronSecret: CRON_SECRET, action: "run", jobId: job.id }), signal: AbortSignal.timeout(20000),
     });
     await r.body?.cancel();
-    if (!r.ok) throw new Error("catalog-import HTTP " + r.status);
+    if (!r.ok) throw new Error(fnName + " HTTP " + r.status);
     return { id: job.id, outcome: "delegated", step: job.payload?.step };
   }
   if (job.job_type !== "listing_sync") {
