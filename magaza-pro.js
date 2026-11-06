@@ -202,9 +202,13 @@
   }
 
   // ---------- Sepet çekmecesi ----------
+  let qSeq = 0;
   async function requote() {
+    const my = ++qSeq; // üst üste istekte yalnız sonuncusunun cevabı gösterilir
     const body = { action: 'quote', store_slug: SL(), items: cart.map((l) => ({ product_id: l.product_id, variant_id: l.variant_id, qty: l.qty })), ...sel };
-    lastQuote = cart.length ? await fetch(FN + 'store-checkout', { method: 'POST', headers: H, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => null) : null;
+    const q = cart.length ? await fetch(FN + 'store-checkout', { method: 'POST', headers: H, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => null) : null;
+    if (my !== qSeq) return;
+    lastQuote = q;
     renderCart();
   }
   function openCart() { document.getElementById('spCart').classList.add('open'); requote(); }
