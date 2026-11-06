@@ -140,7 +140,11 @@ async function testKeys(provider: string, environment: string, k: any): Promise<
 // ---------- Kendi alan adı ----------
 const TR_SUFFIX = /\.(com|net|org|gen|web|biz|info|av|k12|tv|bel|pol|edu|gov|name|tel)\.tr$/i;
 function apexOf(host: string) { const p = host.split("."); return p.slice(TR_SUFFIX.test(host) ? -3 : -2).join("."); }
-function hostOk(h: string) { return /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(h) && !/(seltigo|github\.io|supabase\.co)/i.test(h); }
+// Seltigo'nun kendi sunucu adresleri (Pages, Supabase, mağaza sunucusu) bağlanamaz
+function hostOk(h: string) {
+  const edge = env("STORE_EDGE_HOST").toLowerCase();
+  return /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(h) && !/(\.github\.io|\.supabase\.co)$/i.test(h) && !(edge && (h === edge || h.endsWith("." + apexOf(edge))));
+}
 async function cf(path: string, init: RequestInit = {}) {
   const r = await fetch(`https://api.cloudflare.com/client/v4${path}`, { ...init, headers: { Authorization: `Bearer ${env("CF_API_TOKEN")}`, "Content-Type": "application/json" }, signal: AbortSignal.timeout(20000) });
   return await r.json().catch(() => ({ success: false, errors: [{ message: "HTTP " + r.status }] }));

@@ -73,6 +73,7 @@
     .sp-err{color:var(--danger);font-size:13px;margin:6px 0} .sp-ok{color:var(--accent);font-size:13px;margin:6px 0}
     .sp-pp{position:fixed;inset:0;background:var(--bg-dark);z-index:55;overflow-y:auto;display:none}
     .sp-pp.open{display:block}
+    body.sp-pp-open .sp-hdr-actions{position:fixed;top:14px;right:18px;z-index:57}
     .sp-pp-in{max-width:1000px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.1fr 1fr;gap:28px}
     @media(max-width:760px){.sp-pp-in{grid-template-columns:1fr}.sp-hdr-actions{position:static;justify-content:center;margin-top:10px}}
     .sp-gal img.main{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--radius,12px);background:var(--bg-panel-2)}
@@ -164,7 +165,7 @@
         <div class="sp-desc">${esc(String(p.description || '').replace(/<[^>]*>/g, ''))}</div>
         ${(p.specs || []).length ? `<div class="sp-sec">${esc(tt('specs'))}</div><ul style="font-size:13px;color:var(--text-dim)">${p.specs.slice(0, 30).map((s) => `<li>${esc(s.k)}: ${esc(s.v)}</li>`).join('')}</ul>` : ''}
       </div></div>`;
-    pp.classList.add('open'); document.body.style.overflow = 'hidden'; window.scrollTo(0, 0);
+    pp.classList.add('open'); document.body.classList.add('sp-pp-open'); document.body.style.overflow = 'hidden'; window.scrollTo(0, 0);
     pp.querySelectorAll('.sp-thumbs img').forEach((im) => im.onclick = () => { document.getElementById('spMainImg').src = im.src; pp.querySelectorAll('.sp-thumbs img').forEach((x) => x.classList.toggle('on', x === im)); });
     const pick = () => {
       const want = {}; pp.querySelectorAll('.sp-sel').forEach((s) => { if (s.value) want[s.dataset.k] = s.value; });
@@ -194,7 +195,7 @@
     track('ViewContent', { content_ids: [String(p.id)], value: p.price, currency: p.currency });
   }
   function closeProduct(back) {
-    document.getElementById('spPP').classList.remove('open'); document.body.style.overflow = '';
+    document.getElementById('spPP').classList.remove('open'); document.body.classList.remove('sp-pp-open'); document.body.style.overflow = '';
     const s = document.getElementById('sp-ld-product'); if (s) s.remove();
     if (back && history.state && history.state.p) history.back(); else if (back) history.replaceState({}, '', baseUrl().replace(location.origin, ''));
     storeSeo();
@@ -371,5 +372,5 @@
     },
     onCards() { wireCards(); if (pro()) document.querySelectorAll('.buy-btn').forEach((b) => b.textContent = tt('addToCart')); },
   };
-  window.addEventListener('popstate', () => { const pid = Number(new URLSearchParams(location.search).get('p')); if (pid) openProduct(pid, false); else if (document.getElementById('spPP').classList.contains('open')) { document.getElementById('spPP').classList.remove('open'); document.body.style.overflow = ''; storeSeo(); } });
+  window.addEventListener('popstate', () => { const pid = Number(new URLSearchParams(location.search).get('p')); if (pid) openProduct(pid, false); else if (document.getElementById('spPP').classList.contains('open')) { document.getElementById('spPP').classList.remove('open'); document.body.classList.remove('sp-pp-open'); document.body.style.overflow = ''; storeSeo(); } });
 })();

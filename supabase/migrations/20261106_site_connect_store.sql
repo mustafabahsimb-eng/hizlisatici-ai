@@ -482,3 +482,27 @@ revoke all on function public.site_run_bump(uuid, integer, integer, integer, int
 revoke all on function public.site_run_finish(uuid) from public, anon, authenticated;
 grant execute on function public.site_run_bump(uuid, integer, integer, integer, integer, integer, integer, integer, integer) to service_role;
 grant execute on function public.site_run_finish(uuid) to service_role;
+-- Stok miktarı ile durum tutarlı: kendi stoğundaki ürün 0'a inince "tükendi", stok gelince "stokta" (dropshipping hariç)
+create or replace function public.products_before_write()
+ returns trigger language plpgsql as $function$
+begin
+  if new.cost_currency is null then
+    new.cost_currency := case
+      when new.platform in ('Etsy','Amazon (Global)','eBay','Facebook Marketplace','TikTok Shop','Shopify','WooCommerce','Wix')
+      then 'USD' else 'TRY' end;
+  end if;
+  if new.content_language is null then
+    new.content_language := 'tr';
+  end if;
+  if (tg_op = 'INSERT' or new.stock_qty is distinct from old.stock_qty) and new.stock_qty is not null
+     and coalesce(new.supplier, '') not in ('aliexpress', 'cj', 'printify') then
+    if new.stock_qty <= 0 then new.stock_status := 'tukendi';
+    elsif new.stock_status is null or new.stock_status in ('tukendi', 'bilinmiyor') then new.stock_status := 'stokta';
+    end if;
+  end if;
+  if tg_op = 'UPDATE' then
+    new.updated_at := now();
+  end if;
+  return new;
+end;
+$function$;
