@@ -25,7 +25,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -f supabase/config.toml ]; then supabase init; fi
+          # Ortak dosyalar (_shared): depodaki sürüm esastır. Her fonksiyon paketinde kendi yayın anındaki kopyası olur;
+          # uzun süredir yayınlanmamış bir fonksiyonun eski kopyası yenisinin üzerine yazılmasın (yalnız depoda olmayan dosya eklenir)
+          cp -r supabase/functions/_shared /tmp/shared_repo 2>/dev/null || true
           supabase functions download --use-api --project-ref ytucdrrgxsjhrqmaxckt
+          if [ -d /tmp/shared_repo ]; then cp -r /tmp/shared_repo/. supabase/functions/_shared/; fi
           echo "Indirilen fonksiyonlar:"
           ls supabase/functions
 
