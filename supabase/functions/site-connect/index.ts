@@ -108,7 +108,7 @@ async function detect(userId: string, b: any) {
   let feed: string | null = null;
   if (b.feed_url) feed = await checkFeed(String(b.feed_url));
   if (!feed) {
-    for (const f of feedCandidates(home.text, ref.origin, platform).slice(0, 6)) {
+    for (const f of feedCandidates(home.text, ref.origin, platform, home.url).slice(0, 6)) {
       feed = await checkFeed(f, 400_000).catch(() => null);
       if (feed) break;
     }
@@ -403,9 +403,10 @@ async function maybeFinish(connectionId: string, runId: string) {
   if (c.purpose === "migrate") await buildRedirects(c);
   const next = new Date(Date.now() + (c.sync_hours || 6) * 3600_000).toISOString();
   const { count } = await db.from("site_product_map").select("id", { count: "exact", head: true }).eq("connection_id", c.id).is("removed_at", null);
+  const { count: redirects } = c.purpose === "migrate" ? await db.from("store_redirects").select("id", { count: "exact", head: true }).eq("connection_id", c.id) : { count: null };
   await db.from("site_connections").update({
     status: "active", last_sync_at: now(), next_sync_at: c.auto_sync ? next : null, updated_at: now(),
-    stats: { products: count || 0, last_run: { kind: run.kind, created: run.created, updated: run.updated, failed: run.failed, removed, skipped_robots: run.skipped_robots, source: run.source } },
+    stats: { products: count || 0, ...(redirects != null ? { redirects } : {}), last_run: { kind: run.kind, created: run.created, updated: run.updated, failed: run.failed, removed, skipped_robots: run.skipped_robots, source: run.source } },
   }).eq("id", c.id);
   if (run.kind === "import" && (run.created || run.updated)) {
     const { data: st } = await db.from("store_settings").select("store_slug").eq("user_id", c.user_id).maybeSingle();

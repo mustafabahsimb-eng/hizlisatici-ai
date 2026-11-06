@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seltigo bağlantı kodu — kurulum</title>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; line-height: 1.6; }
+  main { max-width: 920px; margin: 0 auto; padding: 30px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; } h2 { font-size: 18px; margin: 32px 0 8px; border-top: 1px solid #232838; padding-top: 22px; }
+  p, li { color: #c9cfdb; font-size: 14.5px; }
+  code { background: #161b26; border: 1px solid #232838; border-radius: 5px; padding: 1px 6px; font-size: 13px; color: #cfe8dc; }
+  pre { background: #0a0c12; border: 1px solid #232838; border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 12.5px; color: #cfe8dc; max-height: 520px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 8px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #232838; vertical-align: top; }
+  th { color: #9aa3b2; font-weight: 600; }
+  .m { font-weight: 700; color: #7fd8b5; white-space: nowrap; }
+  .tabs { display: flex; gap: 6px; margin-top: 10px; }
+  .tab { background: #141821; border: 1px solid #2a3040; color: #9aa3b2; border-radius: 8px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 13px; }
+  .tab.on { color: #e6e8ee; border-color: #1D9E75; }
+  a { color: #7fd8b5; }
+  .note { background: #141821; border: 1px solid #232838; border-left: 3px solid #1D9E75; border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #c9cfdb; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Seltigo bağlantı kodu — yazılımcı kurulumu</h1>
+  <p>Bu sayfa, sitesini Seltigo'ya iki yönlü bağlamak isteyen satıcının yazılımcısı içindir. Kurulum bir kez yapılır; sonra her şey kendiliğinden işler:</p>
+  <ul>
+    <li><b>Seltigo → site:</b> Seltigo'da eklenen / güncellenen ürün, stok değişikliği ve başka kanaldaki satış sitenize <i>webhook</i> (imzalı HTTP isteği) olarak gelir.</li>
+    <li><b>Site → Seltigo:</b> Sitenizdeki satış ve stok değişikliği REST API ile Seltigo'ya bildirilir; stok tek merkezden yönetilir ve tüm pazaryerlerine (Trendyol, Hepsiburada, Amazon, Etsy …) ve Seltigo mağazasına yansır.</li>
+  </ul>
+  <div class="note">Satıcı önce Seltigo panelinde <b>🌐 Sitemi Bağla</b> sayfasında sitesini doğrular, sonra "Seltigo bağlantı kodu" bölümünden <b>API anahtarını</b> (<code>slt_live_…</code>) ve webhook adresini girince <b>imza anahtarını</b> (<code>whsec_…</code>) alır. İkisi de yalnız bir kez gösterilir.</div>
+
+  <h2>1. Kimlik</h2>
+  <p>Her isteğe başlık ekleyin: <code>Authorization: Bearer slt_live_…</code>. Adres: <code>https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/site-api</code>. Sınır: bağlantı başına dakikada 120 istek. Gövdeler JSON; hatalar <code>{"error":{"code","message"}}</code>.</p>
+
+  <h2>2. Uç noktalar</h2>
+  <table>
+    <tr><th>İstek</th><th>Ne yapar</th></tr>
+    <tr><td class="m">GET /ping</td><td>Anahtarı dener; mağaza adı ve adresi döner.</td></tr>
+    <tr><td class="m">GET /products?limit=&amp;offset=&amp;updated_since=</td><td>Ürünler (id, sku, gtin, ad, açıklama, fiyat, stok, görseller, seçenekler, mağaza adresi). <code>updated_since</code> ile yalnız değişenler (silinenler <code>deleted: true</code>).</td></tr>
+    <tr><td class="m">GET /products/{id}</td><td>Tek ürün.</td></tr>
+    <tr><td class="m">POST /products</td><td>Ürün oluştur: <code>{ name, description, price, stock_qty, sku, gtin, brand, category, images: [https…], variants: [{ sku, gtin, stock_qty, attributes: { "Beden": "M" } }], url }</code> ya da <code>{ products: [...] }</code> (en fazla 100). Aynı barkod / SKU / ürün adresi varsa yeni ürün açılmaz, güncellenir. Ürün Seltigo mağazasında yayına girer.</td></tr>
+    <tr><td class="m">PATCH /products/{id}</td><td><code>{ name?, title?, description?, price?, cost?, stock_qty?, sku?, gtin? }</code></td></tr>
+    <tr><td class="m">DELETE /products/{id}</td><td>Ürünü kaldırır (pazaryeri ilanları da kapanır).</td></tr>
+    <tr><td class="m">POST /stock</td><td><code>{ items: [{ sku | gtin | product_id, variant_sku?, quantity }] }</code> — stok miktarını yazar; tüm kanallara yansır.</td></tr>
+    <tr><td class="m">POST /orders</td><td>Sitede satış: <code>{ external_order_id, items: [{ sku | gtin | product_id, variant_sku?, quantity, price }], currency, customer: { name, email, phone, address, city, district, zip } }</code>. Ortak stok düşer, pazaryerlerine yansır. Aynı sipariş numarası ikinci kez sayılmaz.</td></tr>
+    <tr><td class="m">GET /orders?since=</td><td>Seltigo'daki diğer kanalların (pazaryerleri, Seltigo mağazası) siparişleri.</td></tr>
+  </table>
+
+  <h2>3. Webhook (Seltigo → site)</h2>
+  <p>Gövde: <code>{ "id", "event", "created_at", "data": {...} }</code>. Başlıklar: <code>X-Seltigo-Event</code>, <code>X-Seltigo-Delivery</code>, <code>X-Seltigo-Signature: sha256=&lt;HMAC-SHA256(imza anahtarı, ham gövde)&gt;</code>. İmzayı <b>ham gövde</b> üzerinden doğrulayın ve 2xx dönün; 2xx gelmezse 1 dk, 5 dk, 30 dk, 2 sa, 12 sa, 24 sa sonra tekrar denenir.</p>
+  <table>
+    <tr><th>Olay</th><th>data</th></tr>
+    <tr><td class="m">product.created / product.updated</td><td><code>product_id, sku, gtin, name, price, stock_qty, stock_status</code> — tüm ayrıntı için <code>GET /products/{id}</code></td></tr>
+    <tr><td class="m">product.deleted</td><td><code>product_id, sku</code></td></tr>
+    <tr><td class="m">stock.updated</td><td><code>product_id, sku, stock_qty, stock_status</code></td></tr>
+    <tr><td class="m">order.created</td><td><code>order_id, channel, product_id, variant_id, quantity, price, currency</code> (başka kanaldaki satış)</td></tr>
+    <tr><td class="m">ping</td><td>Panelden "Deneme gönder".</td></tr>
+  </table>
+  <p>Sitenizden API ile yaptığınız değişiklik size webhook olarak geri gönderilmez.</p>
+
+  <h2>4. Hazır kod</h2>
+  <p>İndirin: <a href="tools/site-baglanti/seltigo.php" download>seltigo.php</a> (PHP 7.4+, WooCommerce kancaları hazır) · <a href="tools/site-baglanti/seltigo.js" download>seltigo.js</a> (Node.js 18+).</p>
+  <div class="tabs"><button class="tab on" data-f="php">PHP</button><button class="tab" data-f="js">JavaScript</button></div>
+  <pre id="code">Yükleniyor…</pre>
+
+  <h2>5. Deneme</h2>
+  <pre>curl -H "Authorization: Bearer slt_live_…" https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/site-api/ping
+
+curl -X POST -H "Authorization: Bearer slt_live_…" -H "Content-Type: application/json" \
+  -d '{"external_order_id":"1001","items":[{"sku":"AB-1","quantity":1,"price":199.90}]}' \
+  https://ytucdrrgxsjhrqmaxckt.supabase.co/functions/v1/site-api/orders</pre>
+</main>
+<script>
+const files = { php: 'tools/site-baglanti/seltigo.php', js: 'tools/site-baglanti/seltigo.js' };
+async function show(f) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b.dataset.f === f));
+  try { document.getElementById('code').textContent = await (await fetch(files[f])).text(); } catch (e) { document.getElementById('code').textContent = files[f]; }
+}
+document.querySelectorAll('.tab').forEach((b) => b.onclick = () => show(b.dataset.f));
+show('php');
+</script>
+</body>
+</html>

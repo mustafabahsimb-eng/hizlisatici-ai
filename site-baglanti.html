@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sitemi Bağla - Seltigo</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0f16; color: #e6e8ee; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid #1d2230; background: #10131c; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 9px; background: #1D9E75; color: #04150f; display: flex; align-items: center; justify-content: center; }
+  .header-right { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+  .header-right a { color: #9aa3b2; text-decoration: none; }
+  main { max-width: 900px; margin: 0 auto; padding: 26px 18px 80px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .sub { color: #9aa3b2; font-size: 14px; line-height: 1.55; margin-bottom: 20px; }
+  .card { background: #141821; border: 1px solid #232838; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  .card .hint { color: #9aa3b2; font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
+  .step { font-size: 11px; letter-spacing: .08em; color: #1D9E75; font-weight: 700; }
+  input[type=text], input[type=url], select { width: 100%; background: #0d0f16; border: 1px solid #2a3040; border-radius: 9px; padding: 10px 12px; color: #e6e8ee; font-size: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row > input { flex: 1; min-width: 220px; }
+  button { font: inherit; cursor: pointer; }
+  .btn { background: #1D9E75; color: #04150f; border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 600; font-size: 14px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn2 { background: transparent; color: #e6e8ee; border: 1px solid #2a3040; border-radius: 9px; padding: 9px 14px; font-size: 13px; }
+  .danger { color: #f08a84; border-color: #5a2a2a; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 12px; background: #1b2a24; color: #7fd8b5; border: 1px solid #24503f; }
+  .pill.warn { background: #2a2414; color: #e6c96a; border-color: #5a4a1a; }
+  .pill.err { background: #2a1616; color: #f08a84; border-color: #5a2a2a; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tab { background: #0d0f16; border: 1px solid #2a3040; color: #9aa3b2; border-radius: 8px; padding: 7px 12px; font-size: 13px; }
+  .tab.on { border-color: #1D9E75; color: #e6e8ee; }
+  pre.code { background: #0a0c12; border: 1px solid #232838; border-radius: 9px; padding: 10px 12px; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 6px 0; color: #cfe8dc; }
+  .bar { height: 9px; background: #232838; border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+  .bar > div { height: 100%; width: 0; background: #1D9E75; transition: width .4s; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+  .stat { background: #0d0f16; border: 1px solid #232838; border-radius: 9px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { font-size: 11px; color: #9aa3b2; }
+  .msg { font-size: 13px; margin-top: 8px; line-height: 1.5; }
+  .msg.ok { color: #7fd8b5; } .msg.err { color: #f08a84; }
+  .sites { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .site-chip { border: 1px solid #2a3040; border-radius: 9px; padding: 7px 11px; font-size: 13px; background: #141821; color: #e6e8ee; }
+  .site-chip.on { border-color: #1D9E75; }
+  label.chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #c9cfdb; margin: 8px 0; }
+  label.chk input { margin-top: 2px; accent-color: #1D9E75; }
+  .muted { color: #9aa3b2; font-size: 12px; }
+  .hidden { display: none !important; }
+  .keybox { border: 1px dashed #1D9E75; border-radius: 9px; padding: 10px 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot">S</div><div>Seltigo</div></div>
+  <div class="header-right"><a href="dashboard.html" data-t="back"></a><span id="langSwitcherHost"></span></div>
+</header>
+<main>
+  <h1 id="pageH1"></h1>
+  <div class="sub" id="pageSub"></div>
+  <div class="sites" id="sites"></div>
+
+  <!-- 1) Adres -->
+  <div class="card" id="cardUrl">
+    <div class="step" data-t="s1"></div>
+    <h2 data-t="urlTitle"></h2>
+    <p class="hint" data-t="urlHint"></p>
+    <div class="row"><input type="url" id="url" placeholder="www.siten.com" autocomplete="off"><button class="btn" id="detectBtn" data-t="detect"></button></div>
+    <div class="msg" id="urlMsg"></div>
+  </div>
+
+  <div id="connBox" class="hidden">
+    <!-- 2) Altyapı -->
+    <div class="card">
+      <div class="step" data-t="s2"></div>
+      <h2><span data-t="platformTitle"></span> <span class="pill" id="platformPill"></span></h2>
+      <p class="hint" id="platformNote"></p>
+      <div class="muted" id="methodLine"></div>
+      <div id="apiHint" class="msg hidden"></div>
+      <div style="margin-top:12px">
+        <div class="muted" data-t="feedLabel"></div>
+        <div class="row" style="margin-top:6px"><input type="url" id="feed" placeholder="https://siten.com/urunler.xml"><button class="btn2" id="feedBtn" data-t="save"></button></div>
+        <div class="msg" id="feedMsg"></div>
+      </div>
+    </div>
+
+    <!-- 3) Sahiplik -->
+    <div class="card" id="cardVerify">
+      <div class="step" data-t="s3"></div>
+      <h2><span data-t="verifyTitle"></span> <span class="pill warn" id="verifyPill"></span></h2>
+      <p class="hint" data-t="verifyHint"></p>
+      <div id="verifyBody">
+        <div class="tabs"><button class="tab on" data-v="meta" data-t="vMeta"></button><button class="tab" data-v="dns" data-t="vDns"></button><button class="tab" data-v="file" data-t="vFile"></button></div>
+        <div data-vp="meta"><div class="muted" id="metaWhere"></div><pre class="code" id="metaCode"></pre><button class="btn2" data-copy="metaCode" data-t="copy"></button></div>
+        <div data-vp="dns" class="hidden"><div class="muted" data-t="dnsHow"></div><pre class="code" id="dnsCode"></pre><button class="btn2" data-copy="dnsVal" data-t="copyValue"></button><pre class="code hidden" id="dnsVal"></pre></div>
+        <div data-vp="file" class="hidden"><div class="muted" id="fileWhere"></div><pre class="code" id="fileCode"></pre><button class="btn2" data-copy="fileCode" data-t="copy"></button></div>
+        <div class="row" style="margin-top:12px"><button class="btn" id="verifyBtn" data-t="verify"></button></div>
+      </div>
+      <div class="msg" id="verifyMsg"></div>
+    </div>
+
+    <!-- 4) Aktarım -->
+    <div class="card" id="cardImport">
+      <div class="step" data-t="s4"></div>
+      <h2 id="importTitle"></h2>
+      <p class="hint" id="importHint"></p>
+      <label class="chk" id="consentRow"><input type="checkbox" id="consent"> <span data-t="imageTerms"></span></label>
+      <div class="row"><button class="btn" id="importBtn"></button><a class="btn2" id="openStore" target="_blank" rel="noopener" data-t="openStore" style="text-decoration:none"></a></div>
+      <div id="progress" class="hidden">
+        <div class="msg" id="progLine"></div>
+        <div class="bar"><div id="progBar"></div></div>
+        <div class="stats" id="progStats"></div>
+      </div>
+      <div class="msg" id="importMsg"></div>
+    </div>
+
+    <!-- 5) Sürekli eşitleme -->
+    <div class="card" id="cardSync">
+      <div class="step" data-t="s5"></div>
+      <h2 data-t="syncTitle"></h2>
+      <p class="hint" data-t="syncHint"></p>
+      <label class="chk"><input type="checkbox" id="autoSync"> <span data-t="autoSync"></span></label>
+      <div class="row"><select id="syncHours" style="max-width:220px"></select><button class="btn2" id="syncSave" data-t="save"></button><button class="btn2" id="syncNow" data-t="syncNow"></button></div>
+      <div class="msg" id="syncMsg"></div>
+    </div>
+
+    <!-- 6) Bağlantı kodu -->
+    <div class="card" id="cardApi">
+      <div class="step" data-t="s6"></div>
+      <h2 data-t="apiTitle"></h2>
+      <p class="hint" data-t="apiHint"></p>
+      <div class="row"><button class="btn" id="keyBtn"></button><a class="btn2" href="site-baglanti-kurulum.html" target="_blank" style="text-decoration:none" data-t="setupPage"></a></div>
+      <div class="muted" id="keyInfo" style="margin-top:8px"></div>
+      <div class="keybox hidden" id="keyBox"><div class="muted" data-t="keyOnce"></div><pre class="code" id="keyVal"></pre><button class="btn2" data-copy="keyVal" data-t="copy"></button></div>
+      <div style="margin-top:16px">
+        <div class="muted" data-t="whLabel"></div>
+        <div class="row" style="margin-top:6px"><input type="url" id="whUrl" placeholder="https://siten.com/seltigo-webhook.php"><button class="btn2" id="whSave" data-t="save"></button><button class="btn2" id="whTest" data-t="whTest"></button></div>
+        <div class="keybox hidden" id="whBox"><div class="muted" data-t="whOnce"></div><pre class="code" id="whVal"></pre><button class="btn2" data-copy="whVal" data-t="copy"></button></div>
+        <div class="msg" id="whMsg"></div>
+      </div>
+    </div>
+
+    <div style="text-align:right"><button class="btn2 danger" id="delBtn" data-t="remove"></button></div>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ytucdrrgxsjhrqmaxckt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xJXwqD9NmwU70kv2eFKk0A_O2q9gOcD';
+const MODE = new URLSearchParams(location.search).get('mode') === 'migrate' ? 'migrate' : 'connect';
+const T = {
+  tr: {
+    back: '← Panele dön', h1: '🌐 Sitemi Bağla', h1m: '🚚 Mağazanı Taşı',
+    sub: 'Siten hangi altyapıda olursa olsun bağla: ürünlerin Seltigo mağazana ve tüm pazaryerlerine gelsin, fiyat ve stok kendiliğinden güncel kalsın.',
+    subm: 'Shopify, ikas, Ticimax, IdeaSoft, T-Soft, WooCommerce, Wix ya da kendi yapımı sitenden ürünlerini Seltigo mağazana taşı. Eski ürün adreslerin yeni mağazana 301 ile yönlenir (Google sıralaman korunur).',
+    s1: '1. ADIM', s2: '2. ADIM', s3: '3. ADIM', s4: '4. ADIM', s5: '5. ADIM', s6: '6. ADIM',
+    urlTitle: 'Sitenin adresi', urlHint: 'Ana sayfa adresini yaz. Önce altyapısını tanırız; bilinen bir altyapıysa resmi yoluyla bağlanırız.', detect: 'Siteyi tanı', detecting: 'Site inceleniyor...',
+    platformTitle: 'Altyapı', feedLabel: 'Ürün akışı adresi (Google Merchant / XML / CSV) — varsa fiyat ve stok buradan okunur (isteğe bağlı)', save: 'Kaydet', saved: 'Kaydedildi.',
+    mApi: 'Okuma yolu: resmi API (Hesaplarım\'daki bağlantın)', mFeed: 'Okuma yolu: ürün akışı', mCrawl: 'Okuma yolu: site taraması (site haritası → ürün sayfaları; robots.txt\'e uyulur)',
+    apiConnect: 'Bu siteyi Hesaplarım\'dan bağlarsan stok miktarları da resmi API\'den gelir.', apiConnectLink: 'Hesaplarım\'ı aç',
+    robotsBlocked: '⚠️ Sitenin robots.txt dosyası botları engelliyor; tarama yapılamaz. Ürün akışı adresi gir ya da robots.txt\'e "User-agent: SeltigoBot / Allow: /" ekle.',
+    verifyTitle: 'Sitenin sana ait olduğunu doğrula', verifyHint: 'Başkasının sitesini aktarmayı önlemek için zorunlu. Aşağıdaki üç yoldan BİRİNİ yap, sonra "Doğrula"ya bas.',
+    vMeta: 'Meta etiketi', vDns: 'DNS kaydı', vFile: 'Doğrulama dosyası', copy: 'Kopyala', copyValue: 'Değeri kopyala', copied: 'Kopyalandı',
+    metaWhere: 'Bu etiketi şu sayfanın <head> bölümüne ekle: {u}', dnsHow: 'Alan adı sağlayıcının DNS ayarlarına şu TXT kaydını ekle (yayılması birkaç dakika sürebilir):',
+    dnsShared: 'Bu adres paylaşımlı bir alanda; DNS ile doğrulanamaz. Meta etiketi ya da dosya yolunu kullan.', fileWhere: 'Şu adreste, içinde yalnız aşağıdaki kod olan bir dosya yayınla: {u}',
+    verify: 'Doğrula', verifying: 'Kontrol ediliyor...', verified: 'Doğrulandı', notVerified: 'Doğrulanmadı', verifiedBy: '✅ Site doğrulandı ({m}).',
+    importTitle: 'Ürünleri aktar', importTitleM: 'Ürünleri taşı', importHint: 'Ürünler parça parça okunur; sayfayı kapatabilirsin, iş arka planda sürer. Aynı barkod / stok kodu / ürün adresi varsa yeni ürün açılmaz, güncellenir.',
+    importHintM: 'Ürünler, görseller, seçenekler ve kategoriler taşınır; eski ürün adreslerin için 301 yönlendirme haritası otomatik hazırlanır.',
+    imageTerms: 'Bu ürünlerin ve görsellerin sahibi benim / kullanma hakkım var.', importBtn: 'Ürünleri aktar', importBtnM: 'Taşımayı başlat', importAgain: 'Yeniden aktar',
+    needConsent: 'Devam etmek için onay kutusunu işaretle.', needVerify: 'Önce 3. adımda siteyi doğrula.', openStore: 'Mağazamı aç',
+    pQueued: 'Sıraya alındı...', pDiscover: 'Site okunuyor, ürünler bulunuyor...', pRunning: 'Aktarılıyor: {d} / {t}', pDone: '✅ Bitti: {d} ürün işlendi.', pError: 'Hata: {e}',
+    stTotal: 'bulunan', stCreated: 'yeni', stUpdated: 'güncel', stFailed: 'okunamadı', stRobots: 'robots.txt yasağı', stRemoved: 'sitede yok (gizlendi)', stRedirects: '301 yönlendirme',
+    syncTitle: 'Sürekli eşitleme', syncHint: 'Site belirli aralıklarla yeniden okunur: fiyat ve stok değişiklikleri Seltigo\'ya ve tüm pazaryerlerine otomatik yansır; sitede kalkan ürün vitrinden kalkar.',
+    autoSync: 'Otomatik eşitle', every: 'Her {h} saatte bir', syncNow: 'Şimdi eşitle', syncStarted: 'Eşitleme başladı.', lastSync: 'Son eşitleme: {d}', nextSync: 'Sonraki: {d}',
+    apiTitle: 'Seltigo bağlantı kodu (iki yönlü)', apiHint: 'Sitenin yazılımcısı bu anahtarla bir kez kurulum yapar: Seltigo\'da eklenen ürün siteye, sitedeki satış Seltigo\'ya ve tüm pazaryerlerine (ortak stok) kendiliğinden yansır.',
+    keyCreate: 'API anahtarı oluştur', keyRenew: 'Yeni anahtar oluştur (eskisi geçersiz olur)', keyOnce: 'Bu anahtar yalnız şimdi gösterilir; güvenli bir yere kopyala.', keyInfo: 'Etkin anahtar: {p}… · son kullanım: {u}', never: 'henüz yok',
+    setupPage: 'Yazılımcı için kurulum sayfası', whLabel: 'Webhook adresi (Seltigo\'daki değişiklikler siteye bu adrese gönderilir)', whTest: 'Deneme gönder', whOnce: 'İmza anahtarı (yalnız şimdi gösterilir; sitedeki koda yaz):',
+    whOk: '✅ Site deneme olayını aldı (HTTP {s}).', whFail: 'Site cevap vermedi: {e}', confirmRenew: 'Yeni anahtar eskisini geçersiz kılar. Devam edilsin mi?', remove: 'Bu site bağlantısını kaldır', confirmRemove: 'Bağlantı kaldırılsın mı? (Ürünler silinmez, eşitleme durur.)',
+    err: 'Hata: ', mApiShort: 'Resmi API', mFeedShort: 'Ürün akışı', mCrawlShort: 'Site taraması', newSite: '+ Yeni site',
+  },
+  en: {
+    back: '← Back to panel', h1: '🌐 Connect My Site', h1m: '🚚 Move My Store',
+    sub: 'Connect your website whatever it runs on: products come to your Seltigo store and all marketplaces, prices and stock stay in sync automatically.',
+    subm: 'Move your products from Shopify, ikas, Ticimax, IdeaSoft, T-Soft, WooCommerce, Wix or a custom site. Old product URLs 301-redirect to your new store (keeps your Google ranking).',
+    s1: 'STEP 1', s2: 'STEP 2', s3: 'STEP 3', s4: 'STEP 4', s5: 'STEP 5', s6: 'STEP 6',
+    urlTitle: 'Your site address', urlHint: 'Enter your home page. We detect the platform first and use its official route when available.', detect: 'Detect site', detecting: 'Inspecting site...',
+    platformTitle: 'Platform', feedLabel: 'Product feed URL (Google Merchant / XML / CSV) — if available, price and stock are read from it (optional)', save: 'Save', saved: 'Saved.',
+    mApi: 'Read via: official API (your connection in My Accounts)', mFeed: 'Read via: product feed', mCrawl: 'Read via: site crawl (sitemap → product pages; robots.txt respected)',
+    apiConnect: 'Connect this site in My Accounts to also get stock quantities from the official API.', apiConnectLink: 'Open My Accounts',
+    robotsBlocked: '⚠️ The site\'s robots.txt blocks bots; crawling is not possible. Enter a product feed URL or allow "User-agent: SeltigoBot" in robots.txt.',
+    verifyTitle: 'Verify you own this site', verifyHint: 'Required so nobody imports someone else\'s site. Do ONE of the three below, then press "Verify".',
+    vMeta: 'Meta tag', vDns: 'DNS record', vFile: 'Verification file', copy: 'Copy', copyValue: 'Copy value', copied: 'Copied',
+    metaWhere: 'Add this tag to the <head> of: {u}', dnsHow: 'Add this TXT record in your domain provider\'s DNS settings (may take a few minutes to propagate):',
+    dnsShared: 'This address is on a shared domain; DNS verification is not possible. Use the meta tag or the file.', fileWhere: 'Publish a file containing only the code below at: {u}',
+    verify: 'Verify', verifying: 'Checking...', verified: 'Verified', notVerified: 'Not verified', verifiedBy: '✅ Site verified ({m}).',
+    importTitle: 'Import products', importTitleM: 'Move products', importHint: 'Products are read in chunks; you can close this page, it continues in the background. Same barcode / SKU / product URL updates instead of duplicating.',
+    importHintM: 'Products, images, options and categories are moved; a 301 redirect map for your old product URLs is prepared automatically.',
+    imageTerms: 'I own these products and images / I have the right to use them.', importBtn: 'Import products', importBtnM: 'Start moving', importAgain: 'Import again',
+    needConsent: 'Tick the consent box to continue.', needVerify: 'Verify the site in step 3 first.', openStore: 'Open my store',
+    pQueued: 'Queued...', pDiscover: 'Reading the site, finding products...', pRunning: 'Importing: {d} / {t}', pDone: '✅ Done: {d} products processed.', pError: 'Error: {e}',
+    stTotal: 'found', stCreated: 'new', stUpdated: 'updated', stFailed: 'unreadable', stRobots: 'blocked by robots.txt', stRemoved: 'gone from site (hidden)', stRedirects: '301 redirects',
+    syncTitle: 'Continuous sync', syncHint: 'The site is re-read periodically: price and stock changes flow to Seltigo and all marketplaces; products removed from the site are hidden.',
+    autoSync: 'Sync automatically', every: 'Every {h} hours', syncNow: 'Sync now', syncStarted: 'Sync started.', lastSync: 'Last sync: {d}', nextSync: 'Next: {d}',
+    apiTitle: 'Seltigo connection code (two-way)', apiHint: 'Your developer sets this up once with the key: products added in Seltigo appear on your site, sales on your site reach Seltigo and every marketplace (shared stock).',
+    keyCreate: 'Create API key', keyRenew: 'Create new key (old one stops working)', keyOnce: 'This key is shown only now; copy it somewhere safe.', keyInfo: 'Active key: {p}… · last used: {u}', never: 'not yet',
+    setupPage: 'Setup page for your developer', whLabel: 'Webhook URL (changes in Seltigo are sent to your site here)', whTest: 'Send test', whOnce: 'Signing secret (shown only now; put it in your site code):',
+    whOk: '✅ Your site received the test event (HTTP {s}).', whFail: 'Your site did not respond: {e}', confirmRenew: 'A new key invalidates the old one. Continue?', remove: 'Remove this site connection', confirmRemove: 'Remove the connection? (Products stay, sync stops.)',
+    err: 'Error: ', mApiShort: 'Official API', mFeedShort: 'Product feed', mCrawlShort: 'Site crawl', newSite: '+ New site',
+  },
+};
+const lang = () => { const l = (window.HS && HS.lang) || 'tr'; return T[l] ? l : 'tr'; };
+const t = (k, v) => { let s = T[lang()][k] ?? T.tr[k] ?? k; Object.keys(v || {}).forEach((x) => { s = s.split('{' + x + '}').join(v[x]); }); return s; };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmtDate = (d) => d ? new Date(d).toLocaleString(lang() === 'en' ? 'en-GB' : 'tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : '–';
+let db, conns = [], cur = null, poll = null, storeSlug = null, detectInfo = null;
+
+async function call(body) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { location.href = 'index.html'; return {}; }
+  const r = await fetch(SUPABASE_URL + '/functions/v1/site-connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + SUPABASE_KEY, apikey: SUPABASE_KEY }, body: JSON.stringify({ ...body, userAccessToken: session.access_token }) });
+  return await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+}
+function msg(id, text, cls) { const el = $(id); el.textContent = text || ''; el.className = 'msg' + (cls ? ' ' + cls : ''); }
+
+function applyStatic() {
+  document.documentElement.lang = lang();
+  document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  $('pageH1').textContent = t(MODE === 'migrate' ? 'h1m' : 'h1');
+  $('pageSub').textContent = t(MODE === 'migrate' ? 'subm' : 'sub');
+  document.title = t(MODE === 'migrate' ? 'h1m' : 'h1').replace(/^\S+\s/, '') + ' - Seltigo';
+  $('syncHours').innerHTML = [1, 3, 6, 12, 24, 72].map((h) => `<option value="${h}">${esc(t('every', { h }))}</option>`).join('');
+  renderSites(); if (cur) render();
+}
+function renderSites() {
+  $('sites').innerHTML = conns.map((c) => `<button class="site-chip${cur && c.id === cur.id ? ' on' : ''}" data-id="${c.id}">${esc(c.host + (c.scope_path !== '/' ? c.scope_path : ''))} ${c.verified_at ? '✅' : '⏳'}</button>`).join('')
+    + (conns.length ? `<button class="site-chip" data-id="">${esc(t('newSite'))}</button>` : '');
+  $('sites').querySelectorAll('button').forEach((b) => b.onclick = () => { cur = conns.find((c) => c.id === b.dataset.id) || null; detectInfo = null; if (!cur) { $('url').value = ''; } render(); renderSites(); });
+}
+
+function render() {
+  $('connBox').classList.toggle('hidden', !cur);
+  if (!cur) { clearInterval(poll); return; }
+  $('url').value = cur.url;
+  const info = cur.platform_info || {};
+  $('platformPill').textContent = (info.name || cur.platform || '') + ' · ' + t(cur.method === 'api' ? 'mApiShort' : cur.method === 'feed' ? 'mFeedShort' : 'mCrawlShort');
+  $('platformNote').textContent = info.note || '';
+  $('methodLine').textContent = t(cur.method === 'api' ? 'mApi' : cur.method === 'feed' ? 'mFeed' : 'mCrawl') + (cur.platform_evidence ? ' · ' + cur.platform_evidence : '');
+  const needApi = ['shopify', 'woocommerce', 'wix'].includes(cur.platform) && cur.method !== 'api';
+  const robots = detectInfo?.robots?.blocked;
+  $('apiHint').classList.toggle('hidden', !needApi && !robots);
+  $('apiHint').innerHTML = robots ? esc(t('robotsBlocked')) : needApi ? `${esc(t('apiConnect'))} <a href="accounts.html" style="color:#7fd8b5">${esc(t('apiConnectLink'))}</a>` : '';
+  $('feed').value = cur.feed_url || '';
+  // Doğrulama
+  const v = !!cur.verified_at;
+  $('verifyPill').textContent = v ? t('verified') : t('notVerified');
+  $('verifyPill').className = 'pill' + (v ? '' : ' warn');
+  $('verifyBody').classList.toggle('hidden', v);
+  if (v) msg('verifyMsg', t('verifiedBy', { m: cur.verify_method }), 'ok');
+  else if (cur.verify) {
+    $('metaWhere').textContent = t('metaWhere', { u: cur.verify.meta_where });
+    $('metaCode').textContent = cur.verify.meta;
+    if (cur.verify.dns) { $('dnsCode').textContent = `Tür / Type: TXT\nAd / Name: ${cur.verify.dns.name}\nDeğer / Value: ${cur.verify.dns.value}`; $('dnsVal').textContent = cur.verify.dns.value; }
+    else $('dnsCode').textContent = t('dnsShared');
+    $('fileWhere').textContent = t('fileWhere', { u: cur.verify.file.url });
+    $('fileCode').textContent = cur.verify.file.content;
+    if (cur.verify_error && !$('verifyMsg').textContent) msg('verifyMsg', cur.verify_error, 'err');
+  }
+  // Aktarım
+  const mig = cur.purpose === 'migrate';
+  $('importTitle').textContent = t(mig ? 'importTitleM' : 'importTitle');
+  $('importHint').textContent = t(mig ? 'importHintM' : 'importHint');
+  $('cardImport').style.opacity = v ? 1 : .55;
+  $('importBtn').disabled = !v;
+  const run = (cur.runs || [])[0];
+  $('importBtn').textContent = run ? t('importAgain') : t(mig ? 'importBtnM' : 'importBtn');
+  $('openStore').href = storeSlug ? 'magaza.html?slug=' + encodeURIComponent(storeSlug) : '#';
+  $('openStore').classList.toggle('hidden', !storeSlug || !run);
+  renderRun(run);
+  // Eşitleme
+  $('cardSync').style.opacity = v ? 1 : .55;
+  $('autoSync').checked = !!cur.auto_sync;
+  $('syncHours').value = String(cur.sync_hours || 6);
+  if (!$('syncMsg').textContent && cur.last_sync_at) msg('syncMsg', t('lastSync', { d: fmtDate(cur.last_sync_at) }) + (cur.auto_sync && cur.next_sync_at ? ' · ' + t('nextSync', { d: fmtDate(cur.next_sync_at) }) : ''));
+  // API
+  $('cardApi').style.opacity = v ? 1 : .55;
+  $('keyBtn').disabled = !v;
+  $('keyBtn').textContent = cur.has_api_key ? t('keyRenew') : t('keyCreate');
+  $('keyInfo').textContent = cur.has_api_key ? t('keyInfo', { p: cur.api_key_prefix, u: cur.api_last_used_at ? fmtDate(cur.api_last_used_at) : t('never') }) : '';
+  $('whUrl').value = cur.webhook_url || '';
+  if (cur.webhook_last_error && !$('whMsg').textContent) msg('whMsg', cur.webhook_last_error, 'err');
+}
+function renderRun(run) {
+  $('progress').classList.toggle('hidden', !run);
+  clearInterval(poll);
+  if (!run) return;
+  const pct = run.total ? Math.round(Math.min(1, run.done / run.total) * 100) : (run.status === 'done' ? 100 : 4);
+  $('progBar').style.width = pct + '%';
+  const line = run.status === 'done' ? t('pDone', { d: run.done }) : run.status === 'error' ? t('pError', { e: run.error || '' })
+    : run.status === 'running' ? t('pRunning', { d: run.done, t: run.total }) : run.status === 'discover' ? t('pDiscover') : t('pQueued');
+  msg('progLine', line, run.status === 'error' ? 'err' : run.status === 'done' ? 'ok' : '');
+  const st = [['stTotal', run.total], ['stCreated', run.created], ['stUpdated', run.updated], ['stFailed', run.failed]];
+  if (run.skipped_robots) st.push(['stRobots', run.skipped_robots]);
+  if (run.removed) st.push(['stRemoved', run.removed]);
+  if (cur.purpose === 'migrate' && cur.stats?.redirects != null) st.push(['stRedirects', cur.stats.redirects]);
+  $('progStats').innerHTML = st.map(([k, n]) => `<div class="stat"><b>${n || 0}</b><span>${esc(t(k))}</span></div>`).join('');
+  if (['queued', 'discover', 'running'].includes(run.status)) poll = setInterval(refresh, 3000);
+}
+async function refresh(selectId) {
+  const d = await call({ action: 'status' });
+  if (!d.ok) return;
+  conns = (d.connections || []).filter((c) => MODE === 'migrate' ? c.purpose === 'migrate' : c.purpose !== 'migrate');
+  const id = selectId || cur?.id;
+  cur = conns.find((c) => c.id === id) || (selectId === undefined && !cur ? conns[0] : cur && conns.find((c) => c.id === cur.id)) || null;
+  renderSites(); render();
+}
+
+async function detect() {
+  const url = $('url').value.trim();
+  if (!url) return;
+  $('detectBtn').disabled = true; msg('urlMsg', t('detecting'));
+  try {
+    const d = await call({ action: 'detect', url, purpose: MODE });
+    if (!d.ok) { msg('urlMsg', d.error || 'Hata', 'err'); return; }
+    detectInfo = d; msg('urlMsg', '');
+    await refresh(d.connection.id);
+  } finally { $('detectBtn').disabled = false; }
+}
+async function verify() {
+  $('verifyBtn').disabled = true; msg('verifyMsg', t('verifying'));
+  const method = document.querySelector('.tab.on')?.dataset.v;
+  try {
+    const d = await call({ action: 'verify', id: cur.id, method });
+    if (d.verified) { msg('verifyMsg', t('verifiedBy', { m: d.method }), 'ok'); await refresh(cur.id); }
+    else msg('verifyMsg', d.detail || d.error || '', 'err');
+  } finally { $('verifyBtn').disabled = false; }
+}
+async function startImport() {
+  if (!cur.verified_at) { msg('importMsg', t('needVerify'), 'err'); return; }
+  const showConsent = !$('consentRow').classList.contains('hidden');
+  if (showConsent && !$('consent').checked) { msg('importMsg', t('needConsent'), 'err'); return; }
+  $('importBtn').disabled = true;
+  const d = await call({ action: 'import', id: cur.id, consent: $('consent').checked || undefined });
+  $('importBtn').disabled = false;
+  if (d.needConsent) { $('consentRow').classList.remove('hidden'); msg('importMsg', t('needConsent'), 'err'); return; }
+  if (!d.ok) { msg('importMsg', d.error || 'Hata', 'err'); return; }
+  msg('importMsg', '');
+  await refresh(cur.id);
+}
+async function copyFrom(id, btn) { try { await navigator.clipboard.writeText($(id).textContent); const o = btn.textContent; btn.textContent = t('copied'); setTimeout(() => btn.textContent = o, 1500); } catch (e) {} }
+
+async function init() {
+  try { await HS.init({ auth: true }); } catch (e) {}
+  db = HS.db;
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { location.href = 'index.html'; return; }
+  const { data: st } = await db.from('store_settings').select('store_slug').eq('user_id', session.user.id).maybeSingle();
+  storeSlug = st?.store_slug || null;
+  const { data: prof } = await db.from('user_profiles').select('image_terms_accepted_at').eq('user_id', session.user.id).maybeSingle();
+  $('consentRow').classList.toggle('hidden', !!prof?.image_terms_accepted_at);
+  applyStatic();
+  $('detectBtn').onclick = detect;
+  $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') detect(); });
+  document.querySelectorAll('.tab').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('[data-vp]').forEach((p) => p.classList.toggle('hidden', p.dataset.vp !== b.dataset.v));
+  });
+  document.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => copyFrom(b.dataset.copy, b));
+  $('verifyBtn').onclick = verify;
+  $('importBtn').onclick = startImport;
+  $('feedBtn').onclick = async () => { const d = await call({ action: 'set', id: cur.id, feed_url: $('feed').value.trim() }); msg('feedMsg', d.ok ? t('saved') : d.error, d.ok ? 'ok' : 'err'); if (d.ok) refresh(cur.id); };
+  $('syncSave').onclick = async () => { const d = await call({ action: 'set', id: cur.id, auto_sync: $('autoSync').checked, sync_hours: Number($('syncHours').value) }); msg('syncMsg', d.ok ? t('saved') : d.error, d.ok ? 'ok' : 'err'); if (d.ok) refresh(cur.id); };
+  $('syncNow').onclick = async () => { const d = await call({ action: 'sync_now', id: cur.id }); msg('syncMsg', d.ok ? t('syncStarted') : d.error, d.ok ? 'ok' : 'err'); if (d.ok) refresh(cur.id); };
+  $('keyBtn').onclick = async () => {
+    if (cur.has_api_key && !confirm(t('confirmRenew'))) return;
+    const d = await call({ action: 'api_key', id: cur.id });
+    if (!d.ok) { msg('whMsg', d.error, 'err'); return; }
+    $('keyBox').classList.remove('hidden'); $('keyVal').textContent = d.api_key; refresh(cur.id);
+  };
+  $('whSave').onclick = async () => {
+    const d = await call({ action: 'set', id: cur.id, webhook_url: $('whUrl').value.trim() });
+    if (!d.ok) { msg('whMsg', d.error, 'err'); return; }
+    msg('whMsg', t('saved'), 'ok');
+    if (d.webhook_secret) { $('whBox').classList.remove('hidden'); $('whVal').textContent = d.webhook_secret; }
+    refresh(cur.id);
+  };
+  $('whTest').onclick = async () => { const d = await call({ action: 'webhook_test', id: cur.id }); msg('whMsg', d.ok ? t('whOk', { s: d.status }) : t('whFail', { e: d.error || ('HTTP ' + d.status) }), d.ok ? 'ok' : 'err'); };
+  $('delBtn').onclick = async () => { if (!confirm(t('confirmRemove'))) return; await call({ action: 'delete', id: cur.id }); cur = null; await refresh(); };
+  const pre = new URLSearchParams(location.search).get('url');
+  if (pre) { $('url').value = pre; }
+  await refresh(undefined);
+}
+document.addEventListener('hs:langchange', applyStatic);
+window.addEventListener('hs:langchange', applyStatic);
+init();
+</script>
+</body>
+</html>

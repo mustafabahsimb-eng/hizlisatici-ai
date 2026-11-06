@@ -46,7 +46,7 @@ async function productOut(p: any, slug: string | null) {
     description: p.generated_description || "", price: num(p.sale_price), currency: "TRY", stock_qty: p.stock_qty, stock_status: p.stock_status,
     images: (imgs || []).map((i: any) => i.url).filter(Boolean).length ? (imgs || []).map((i: any) => i.url) : (p.image_url ? [p.image_url] : []),
     variants: (vars || []).filter((v: any) => !v.is_default).map((v: any) => ({ id: v.id, sku: v.supplier_sku || v.sku, gtin: v.gtin, attributes: v.attributes, stock_qty: v.stock_qty, stock_status: v.stock_status })),
-    url: slug ? `${SITE}/magaza.html?s=${slug}&p=${p.id}` : null, updated_at: p.updated_at, deleted: !!p.deleted_at,
+    url: slug ? `${SITE}/magaza.html?slug=${slug}&p=${p.id}` : null, updated_at: p.updated_at, deleted: !!p.deleted_at,
   };
 }
 
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     if (["POST", "PATCH"].includes(req.method) && !body) return err("invalid_json", "Gövde JSON olmalı");
     const m = path.match(/^\/products\/(\d+)$/);
 
-    if (path === "/ping" && req.method === "GET") return json({ ok: true, site: c.origin, store: st?.store_name || null, store_url: st ? `${SITE}/magaza.html?s=${st.store_slug}` : null, verified: !!c.verified_at });
+    if (path === "/ping" && req.method === "GET") return json({ ok: true, site: c.origin, store: st?.store_name || null, store_url: st ? `${SITE}/magaza.html?slug=${st.store_slug}` : null, verified: !!c.verified_at });
     if (path === "/products" && req.method === "GET") {
       const u = new URL(req.url);
       const limit = Math.min(100, Math.max(1, Number(u.searchParams.get("limit")) || 50)), offset = Math.max(0, Number(u.searchParams.get("offset")) || 0);

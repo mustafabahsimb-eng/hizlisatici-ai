@@ -249,13 +249,13 @@ export const PLATFORM_INFO: Record<string, { name: string; api: "store_connectio
 };
 
 // Ürün akışı adayları (sayfadaki <link rel=alternate>, bilinen yollar)
-export function feedCandidates(html: string, origin: string, platform: string): string[] {
+export function feedCandidates(html: string, origin: string, platform: string, pageUrl?: string): string[] {
   const out: string[] = [];
   for (const m of html.matchAll(/<link[^>]+rel=["']alternate["'][^>]*>/gi)) {
     const tag = m[0];
     const type = tag.match(/type=["']([^"']+)/i)?.[1] || "";
     const href = tag.match(/href=["']([^"']+)/i)?.[1];
-    if (href && /xml|rss|atom|csv/i.test(type) && !/comments|wp-json|oembed/i.test(href)) out.push(new URL(href, origin).href);
+    if (href && /xml|rss|atom|csv/i.test(type) && !/comments|wp-json|oembed/i.test(href)) out.push(new URL(href, pageUrl || origin).href); // göreli adres sayfaya göre
   }
   const common = ["/google-merchant.xml", "/googlemerchant.xml", "/merchant.xml", "/products.xml", "/product-feed.xml", "/feed/products.xml", "/urunler.xml", "/xml/urunler.xml"];
   if (platform === "woocommerce") common.push("/wp-content/uploads/woo-feed/google/xml/feed.xml", "/?feed=products");

@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { featureEnabled } from "../_shared/features.ts";
+import { sanitizeTheme } from "../_shared/store-theme.ts";
+import { DEFAULT_SHIPPING, storeMethods } from "../_shared/store-cart.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -177,6 +180,15 @@ serve(async (req) => {
       store_slug: store.store_slug, store_name: store.store_name,
       business_name: store.business_name || null, business_logo_url: store.business_logo_url || null,
       website_url: store.website_url || null, buy_on_website: store.buy_on_website === true,
+      // Tam mağaza (tema, SEO, sepet / ödeme seçenekleri); IBAN gibi bilgiler yalnız sipariş sonrası verilir
+      theme: sanitizeTheme(store.theme, store.store_name), seo: store.seo || {}, custom_domain: store.custom_domain || null,
+      shipping_options: Array.isArray(store.shipping_options) && store.shipping_options.length ? store.shipping_options : DEFAULT_SHIPPING,
+      checkout: await (async () => {
+        const on = await featureEnabled(store.user_id, "store_checkout");
+        if (!on) return { enabled: false };
+        const { data: prov } = await supabase.from("store_payment_providers").select("provider, enabled").eq("user_id", store.user_id);
+        return { enabled: true, methods: storeMethods(store, prov || [], await featureEnabled(store.user_id, "store_payments")), cod_fee: Number(store.checkout?.cod_fee) || 0 };
+      })(),
     };
     const next_offset = limit && total != null && offset + limit < total ? offset + limit : null;
     return json({ store: publicStore, products, source, ...(limit ? { total, next_offset } : {}) });
